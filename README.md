@@ -26,6 +26,6 @@ Lancez le bot en exécutant la commande : `npm start`
 - `/color`: Change la couleur du pseudo de l'utilisateur.
   - Utilisation : `/color #codeCouleur`
   - Exemple : `/color #FF0000` (pour rouge)
-  - 
+
 ## Auteur
 Sydnec - https://github.com/sydnec
