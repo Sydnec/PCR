@@ -1,130 +1,143 @@
 import { REST, EmbedBuilder, Routes } from "discord.js";
 import { readdirSync } from "fs";
-import { format } from 'date-fns';
+import { format } from "date-fns";
+import { emojiRegex } from "./regex.js";
 import dotenv from "dotenv";
 dotenv.config();
 
-/**
- * retourne un numéro sur une plage maximum
- * @param {int} max valeur max
- * @returns nombre entre 0 et max
- */
-function getRandomInt(max) {
-  return Math.floor(Math.random() * max);
-}
-
-function embed(index, tab, credits) {
-  const toSend = tab[index];
-  return (
-    new EmbedBuilder()
-      // https://discordjs.guide/popular-topics/embeds.html#embed-preview
-      .setColor(0x0099ff)
-      .setTitle(toSend.nom)
-      .setDescription("Signification: " + toSend.signification)
-      .setImage(toSend.imageurl)
-      .setTimestamp()
-      .setFooter({
-        text: credits,
-        icon_url: "https://precoce-radio.fr/assets/images/poncefleur.png",
-      })
-  );
-}
-
 function isAdmin(message) {
-  // check if the message author is an admin using ADMIN_ROLE_ID
-  return message.member.roles.cache.has(process.env.ADMIN_ROLE_ID);
+	return message.member.roles.cache.has(process.env.ADMIN_ROLE_ID);
 }
-
 const getCommand = (message = "") =>
-  message.replace(/\s+/, "\x01").split("\x01"); // Créer un tableau avec le séparateur ' '
-
+	message.replace(/\s+/, "\x01").split("\x01"); // Créer un tableau avec le séparateur ' '
 async function registerCommands() {
-  const commandFiles = readdirSync("./commands/").filter((file) =>
-    file.endsWith(".js")
-  );
+	const commandFiles = readdirSync("./commands/").filter((file) =>
+		file.endsWith(".js")
+	);
 
-  const commands = [];
-  for (const file of commandFiles) {
-    const command = require(`../commands/${file}`);
-    if (command.slashData && !command.onlyAdmin) {
-      commands.push(command.slashData.toJSON());
-    }
-  }
+	const commands = [];
+	for (const file of commandFiles) {
+		try {
+			const commandModule = await import(`../commands/${file}`);
+			const { slashData, onlyAdmin } = commandModule.default || commandModule;
+			if (slashData && !onlyAdmin) {
+				commands.push(slashData.toJSON());
+			}
+		} catch (error) {
+			console.error(`Erreur lors de l'import du fichier ${file}:`, error);
+		}
+	}
 
-  const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
-  try {
-    log("Started refreshing application (/) commands.");
-
-    if (environmentIsProd()) {
-      await rest.put(Routes.applicationCommands(process.env.DICORD_CLIENT_ID), {
-        body: commands,
-      });
-    } else {
-      await rest.put(
-        Routes.applicationGuildCommands(
-          process.env.DICORD_CLIENT_ID,
-          process.env.DICORD_GUILD_ID
-        ),
-        {
-          body: commands,
-        }
-      );
-      log("[DEV] application (/) locally.");
-    }
-    log("Successfully reloaded application (/) commands.");
-  } catch (e) {
-    handleException(e);
-  }
+	const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
+	try {
+		log("Started refreshing application (/) commands.");
+		await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), {
+			body: commands,
+		});
+		log("Successfully reloaded application (/) commands.");
+	} catch (e) {
+		handleException(e);
+	}
 }
-
-function randomNum(min = 0, max = 1) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-function shuffleArray(array) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    const temp = array[i];
-    array[i] = array[j];
-    array[j] = temp;
-  }
-
-  return array;
-}
-
 function environmentIsProd() {
-  return process.env.ENV === "production";
+	return process.env.ENV === "production";
 }
-
 function handleException(e) {
-  error(e);
+	error(e);
 }
-
 function log(...args) {
-  const messageWithDate = [`${formatDate()} -`, ...args];
-  console.log(...messageWithDate);
+	const messageWithDate = [`${formatDate()} -`, ...args];
+	console.log(...messageWithDate);
 }
-
 function error(...args) {
-  const messageWithDate = [`${formatDate()} -`, ...args];
-  console.error(...messageWithDate);
+	const messageWithDate = [`${formatDate()} -`, ...args];
+	console.error(...messageWithDate);
 }
-
 function formatDate() {
-  const currentDate = new Date();
-  return format(currentDate, 'dd/MM/yyyy HH:mm:ss');;
+	const currentDate = new Date();
+	return format(currentDate, "dd/MM/yyyy HH:mm:ss");
+}
+async function autoAddEmojis(message, bot) {
+	try {
+		const numbers = [
+			"1️⃣",
+			"2️⃣",
+			"3️⃣",
+			"4️⃣",
+			"5️⃣",
+			"6️⃣",
+			"7️⃣",
+			"8️⃣",
+			"9️⃣",
+			"🔟",
+		];
+		const content = message.content.split("\n"); //Sépare chaque ligne dans un tableau
+
+		let i = 0;
+		let emojisArray = [];
+		let newEmojisArray = [];
+		let newMessageString = "";
+		let noEmojiLine = false;
+
+		content.forEach((line) => {
+			//Analyse ligne par ligne le message d'origine
+			emojisArray = line.match(emojiRegex);
+			if (emojisArray === null) {
+				//Aucun emoji sur la ligne
+				newEmojisArray.push(numbers[i]);
+				newMessageString += numbers[i] + " " + line + "\n";
+				noEmojiLine = true;
+			} else {
+				//La ligne contient un/des emoji.s
+				if (
+					message.guild.emojis.cache.find(
+						(emoji) => emoji.name === emojisArray[0].split(":")[1]
+					) !== undefined ||
+					!emojisArray[0].startsWith("<:")
+				) {
+					//L'emoji est accessible
+					newEmojisArray.push(emojisArray[0]);
+					newMessageString += " " + line + "\n";
+				} else {
+					//L'emoji n'est pas accessible
+					newEmojisArray.push(numbers[i]);
+					newMessageString += numbers[i] + " " + line.split(">")[1] + "\n";
+					noEmojiLine = true;
+				}
+			}
+			i++;
+		});
+		if (noEmojiLine === true) {
+			//Il y a au moins une ligne sans emoji ou avec un emoji innaccessible
+			if (message.author.id === process.env.CLIENT_ID) {
+				message.edit(newMessageString);
+				newEmojisArray.forEach((emoji) => {
+					message.react(emoji); //Ajoute les reactions
+				});
+			} else {
+				const newMessage = await message.thread.send(newMessageString); //Message écrit par le bot
+				newEmojisArray.forEach((emoji) => {
+					newMessage.react(emoji); //Ajoute les reactions
+				});
+				await message.delete(); //Supprime le message de base
+			}
+		} else {
+			newEmojisArray.forEach((emoji) => {
+				message.react(emoji); //Ajoute les reactions
+			});
+		}
+	} catch (e) {
+		error(e);
+	}
 }
 
 export {
-  getRandomInt,
-  embed,
-  isAdmin,
-  registerCommands,
-  getCommand,
-  randomNum,
-  shuffleArray,
-  environmentIsProd,
-  handleException,
-  log,
-  error,
+	isAdmin,
+	registerCommands,
+	getCommand,
+	environmentIsProd,
+	handleException,
+	log,
+	error,
+	autoAddEmojis,
 };

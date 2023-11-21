@@ -1,4 +1,4 @@
-import { log } from "../../modules/utils.js";
+import { log, registerCommands } from "../../modules/utils.js";
 
 const name = "ready";
 const once = true;

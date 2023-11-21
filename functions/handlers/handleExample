@@ -1,4 +1,6 @@
 import { handleException, error, log } from "../../modules/utils.js";
+import dotenv from "dotenv";
+dotenv.config(); // process.env.CONSTANT
 
 export default (bot) => {
   bot.handleExample = async () => {
