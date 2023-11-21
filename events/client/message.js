@@ -5,7 +5,7 @@ dotenv.config();
 
 const name = "messageCreate";
 const once = false;
-async function execute(message, bot) {
+async function execute(message) {
 	try {
 		if (message.author.bot) return;
 		const messageContent = message.content;

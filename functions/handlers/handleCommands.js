@@ -3,9 +3,7 @@ import { REST } from "@discordjs/rest";
 import { Routes } from "discord-api-types/v10";
 import {
 	handleException,
-	log,
-	error,
-	environmentIsProd,
+	log
 } from "../../modules/utils.js";
 import dotenv from "dotenv";
 dotenv.config();
