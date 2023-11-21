@@ -1,4 +1,4 @@
-import { error } from "../../modules/utils.js";
+import { error, log } from "../../modules/utils.js";
 import { twitterRegex } from "../../modules/regex.js";
 import dotenv from "dotenv";
 dotenv.config();
@@ -7,6 +7,7 @@ const name = "messageCreate";
 const once = false;
 async function execute(message) {
 	try {
+		log(message.channel.guild.id)
 		if (message.author.bot) return;
 		const messageContent = message.content;
 		if (twitterRegex.test(messageContent)) {
