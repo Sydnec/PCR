@@ -1,5 +1,5 @@
 import { readdirSync } from "fs";
-import { handleException, log } from "../../modules/utils.js";
+import { handleException, log, error } from "../../modules/utils.js";
 
 export default (bot) => {
   bot.handleEvents = async () => {
@@ -8,28 +8,34 @@ export default (bot) => {
       const eventsFiles = readdirSync(`./events/${folder}`).filter((file) =>
         file.endsWith(".js")
       );
+      
       switch (folder) {
         case "client":
           for (const file of eventsFiles) {
-            const event = require(`../../events/${folder}/${file}`);
-            if (event.once) {
-              bot.once(event.name, (...args) => {
-                try {
-                  event.execute(...args, bot);
-                } catch (e) {
-                  handleException(e);
-                }
-              });
-            } else {
-              bot.on(event.name, (...args) => {
-                try {
-                  event.execute(...args, bot);
-                } catch (e) {
-                  handleException(e);
-                }
-              });
-            }
-            log(`registered event: ${file}`);
+            import(`../../events/${folder}/${file}`).then((eventModule) => {
+              const event = eventModule.default || eventModule;
+              if (event.once) {
+                bot.once(event.name, (...args) => {
+                  try {
+                    event.execute(...args, bot);
+                  } catch (e) {
+                    handleException(e);
+                  }
+                });
+              } else {
+                bot.on(event.name, (...args) => {
+                  try {
+                    event.execute(...args, bot);
+                  } catch (e) {
+                    handleException(e);
+                  }
+                });
+              }
+              log(`Registered event: ${file}`);
+            }).catch((e) => {
+              // Gère les erreurs liées à l'importation
+              error(`Error importing event ${file}: ${e}`);
+            });
           }
           break;
       }

@@ -1,0 +1,7 @@
+import { handleException, error, log } from "../../modules/utils.js";
+
+export default (bot) => {
+  bot.handleExample = async () => {
+
+  };
+};

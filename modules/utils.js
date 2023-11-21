@@ -1,5 +1,6 @@
 import { REST, EmbedBuilder, Routes } from "discord.js";
 import { readdirSync } from "fs";
+import { format } from 'date-fns';
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -50,7 +51,7 @@ async function registerCommands() {
     }
   }
 
-  const rest = new REST({ version: "9" }).setToken(process.env.DISCORD_TOKEN);
+  const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
   try {
     log("Started refreshing application (/) commands.");
 
@@ -96,16 +97,22 @@ function environmentIsProd() {
 }
 
 function handleException(e) {
-  log("called handleException", e);
-  error(`[${new Date()}] ${e}`);
+  error(e);
 }
 
-function log(message) {
-  console.log(`[${new Date()}] ${message}`);
+function log(...args) {
+  const messageWithDate = [`${formatDate()} -`, ...args];
+  console.log(...messageWithDate);
 }
 
-function error(e) {
-  console.error(`[${new Date()}] ${e}`);
+function error(...args) {
+  const messageWithDate = [`${formatDate()} -`, ...args];
+  console.error(...messageWithDate);
+}
+
+function formatDate() {
+  const currentDate = new Date();
+  return format(currentDate, 'dd/MM/yyyy HH:mm:ss');;
 }
 
 export {
