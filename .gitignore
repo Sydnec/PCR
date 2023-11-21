@@ -1,7 +1,4 @@
 node_modules
 .env
 package-lock.json
-functions/handlers/example
-events/client/example
-commands/example
 commands/test.js
