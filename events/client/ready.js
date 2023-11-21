@@ -1,9 +1,9 @@
-import { log, registerCommands } from "../../modules/utils.js";
+import { log } from "../../modules/utils.js";
 
 const name = "ready";
 const once = true;
 async function execute(bot) {
-  log(`Bonjour, je suis ${bot.user.tag} et j'ai bien démarré !`);
+	log(`Bonjour, je suis ${bot.user.tag} et j'ai bien démarré !`);
 }
 
 export { name, once, execute };

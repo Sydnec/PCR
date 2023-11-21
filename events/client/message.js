@@ -1,4 +1,4 @@
-import { error, log } from "../../modules/utils.js";
+import { error } from "../../modules/utils.js";
 import { twitterRegex } from "../../modules/regex.js";
 import dotenv from "dotenv";
 dotenv.config();
