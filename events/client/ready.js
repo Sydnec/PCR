@@ -1,6 +1,4 @@
 import { log } from "../../modules/utils.js";
-import dotenv from "dotenv";
-dotenv.config();
 
 const name = "ready";
 const once = true;

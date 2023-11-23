@@ -1,4 +1,4 @@
-import { handleException, error, log } from "../../modules/utils.js";
+import { error } from "../../modules/utils.js";
 import { emojiRegex } from "../../modules/regex.js";
 import dotenv from "dotenv";
 dotenv.config(); // process.env.CONSTANT
@@ -24,7 +24,7 @@ export default (bot) => {
 				}
 			});
 		let newMessage = "Pour être ping, réagissez à ce message :\n";
-		lowerRoles.forEach((role) => {
+		await lowerRoles.forEach(async (role) => {
 			const emojis = role.name.match(emojiRegex);
 			if (emojis) {
 				messageRole.react(emojis[0]);

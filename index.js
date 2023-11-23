@@ -11,7 +11,7 @@ try {
       GatewayIntentBits.Guilds,
       GatewayIntentBits.GuildMembers,
       GatewayIntentBits.GuildMessages,
-      // GatewayIntentBits.GuildMessageReactions,
+      GatewayIntentBits.GuildMessageReactions,
       // GatewayIntentBits.DirectMessageReactions,
       GatewayIntentBits.DirectMessages,
       GatewayIntentBits.MessageContent,
