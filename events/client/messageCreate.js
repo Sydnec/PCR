@@ -7,7 +7,6 @@ const name = "messageCreate";
 const once = false;
 async function execute(message) {
 	try {
-		log(message.channel.guild.id)
 		if (message.author.bot) return;
 		const messageContent = message.content;
 		if (twitterRegex.test(messageContent)) {
