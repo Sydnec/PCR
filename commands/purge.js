@@ -1,5 +1,5 @@
 import { SlashCommandBuilder } from 'discord.js';
-import { handleException, log, error, isAdmin } from '../modules/utils.js';
+import { handleException, isAdmin } from '../modules/utils.js';
 import dotenv from 'dotenv';
 dotenv.config(); // process.env.CONSTANT
 
@@ -16,9 +16,15 @@ export default {
 			option.setName('nombre').setDescription('Nombre de messages à supprimer')
 		),
 
-	async execute(interaction, bot) {
+	async execute(interaction) {
 		try {
 			if (!isAdmin(interaction.member)) {
+				await interaction.reply({
+					content: "Vous n'avez pas les autorisations nécessaires pour utiliser cette commande.",
+					ephemeral: true,
+				});
+			}
+			else {
 				if (
 					!(
 						interaction.options.getNumber('nombre') > 0 ||
