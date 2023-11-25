@@ -8,7 +8,7 @@ export default {
 		.setName('restart')
 		.setDescription('Redémarre le bot (réservé aux administrateurs)'),
 
-	async execute(interaction) {
+	async execute(interaction, bot) {
 		try {
 			if (!isAdmin(interaction.member)) {
 				await interaction.reply({
