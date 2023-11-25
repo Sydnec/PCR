@@ -1,12 +1,12 @@
-import { REST, EmbedBuilder, Routes } from "discord.js";
+import { REST, Routes, PermissionsBitField } from "discord.js";
 import { readdirSync } from "fs";
 import { format } from "date-fns";
 import { emojiRegex } from "./regex.js";
 import dotenv from "dotenv";
 dotenv.config();
 
-function isAdmin(message) {
-	return message.member.roles.cache.has(process.env.ADMIN_ROLE_ID);
+function isAdmin(member) {
+	return (member.permissions.has(PermissionsBitField.Flags.Administrator));
 }
 const getCommand = (message = "") =>
 	message.replace(/\s+/, "\x01").split("\x01"); // Créer un tableau avec le séparateur ' '
