@@ -14,7 +14,6 @@ export default (bot) => {
 
 async function createMatrix(channel) {
     await clear(channel);
-    await channel.send("Voici le calendrier de l'avent");
     for (let rows = 0; rows < 5; rows++) {
         let row = new ActionRowBuilder();
         for (let buttons = 0; buttons < 5; buttons++) {
@@ -35,6 +34,6 @@ async function createMatrix(channel) {
 }
 
 async function clear(channel) {
-    const messages = await channel.messages.fetch({ limit: 6 });
+    const messages = await channel.messages.fetch({ limit: 5 });
     channel.bulkDelete(messages);
 }
