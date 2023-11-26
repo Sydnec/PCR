@@ -22,7 +22,7 @@ async function createMatrix(channel) {
                 const button = new ButtonBuilder()
                     .setCustomId(`${randomArray[buttons + 5 * rows]}`)
                     .setLabel(`${randomArray[buttons + 5 * rows]}`);
-                if (randomArray[buttons + 5 * rows] < 12) {
+                if (randomArray[buttons + 5 * rows] <= new Date().getDate()) {
                     button.setStyle(ButtonStyle.Primary);
                 } else {
                     button.setStyle(ButtonStyle.Secondary);
@@ -38,9 +38,3 @@ async function clear(channel) {
     const messages = await channel.messages.fetch({ limit: 6 });
     channel.bulkDelete(messages);
 }
-
-// const jsonData = await readFile('./modules/advent.json', 'utf-8');
-// const funFact = JSON.parse(jsonData).find(
-//   (item) => item.jour === new Date().getMinutes()
-// );
-// channel.send(`## ${funFact.categorie}\n\n${funFact.contenu}`);
