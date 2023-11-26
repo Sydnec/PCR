@@ -1,8 +1,8 @@
-import { handleException, error, log } from "../../modules/utils.js";
-import dotenv from "dotenv";
+import { handleException, error, log } from '../../modules/utils.js';
+import dotenv from 'dotenv';
 dotenv.config();
 
-const name = "name";
+const name = 'name';
 const once = false;
 async function execute() {}
 

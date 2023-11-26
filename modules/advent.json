@@ -1,0 +1,127 @@
+[
+    {
+        "jour": 1,
+        "categorie": "Fun fact du jour 1",
+        "contenu": "Le saviez-vous ? Le mois de décembre était initialement le 10ème mois de l’année ! Et oui, en latin décembre se dit “decembris”, venant de “decem”, “dix”. C’était en effet le dixième mois de l’année du calendrier romain. Le mois de décembre est le premier mois de l’hiver dans l’hémisphère nord. Cependant, avec l'ajout ultérieur de janvier et février, décembre est devenu le douzième mois de l'année dans le calendrier que nous utilisons aujourd'hui."
+    },
+    {
+        "jour": 2,
+        "categorie": "Fun fact du jour 2",
+        "contenu": "Contenu du jour 2."
+    },
+    {
+        "jour": 3,
+        "categorie": "Fun fact du jour 3",
+        "contenu": "Contenu du jour 3."
+    },
+    {
+        "jour": 4,
+        "categorie": "Fun fact du jour 4",
+        "contenu": "Contenu du jour 4."
+    },
+    {
+        "jour": 5,
+        "categorie": "Fun fact du jour 5",
+        "contenu": "Contenu du jour 5."
+    },
+    {
+        "jour": 6,
+        "categorie": "Fun fact du jour 6",
+        "contenu": "Contenu du jour 6."
+    },
+    {
+        "jour": 7,
+        "categorie": "Fun fact du jour 7",
+        "contenu": "Contenu du jour 7."
+    },
+    {
+        "jour": 8,
+        "categorie": "Fun fact du jour 8",
+        "contenu": "Contenu du jour 8."
+    },
+    {
+        "jour": 9,
+        "categorie": "Fun fact du jour 9",
+        "contenu": "Contenu du jour 9."
+    },
+    {
+        "jour": 10,
+        "categorie": "Fun fact du jour 10",
+        "contenu": "Contenu du jour 10."
+    },
+    {
+        "jour": 11,
+        "categorie": "Fun fact du jour 11",
+        "contenu": "Contenu du jour 11."
+    },
+    {
+        "jour": 12,
+        "categorie": "Fun fact du jour 12",
+        "contenu": "Contenu du jour 12."
+    },
+    {
+        "jour": 13,
+        "categorie": "Fun fact du jour 13",
+        "contenu": "Contenu du jour 13."
+    },
+    {
+        "jour": 14,
+        "categorie": "Fun fact du jour 14",
+        "contenu": "Contenu du jour 14."
+    },
+    {
+        "jour": 15,
+        "categorie": "Fun fact du jour 15",
+        "contenu": "Contenu du jour 15."
+    },
+    {
+        "jour": 16,
+        "categorie": "Fun fact du jour 16",
+        "contenu": "Contenu du jour 16."
+    },
+    {
+        "jour": 17,
+        "categorie": "Fun fact du jour 17",
+        "contenu": "Contenu du jour 17."
+    },
+    {
+        "jour": 18,
+        "categorie": "Fun fact du jour 18",
+        "contenu": "Contenu du jour 18."
+    },
+    {
+        "jour": 19,
+        "categorie": "Fun fact du jour 19",
+        "contenu": "Contenu du jour 19."
+    },
+    {
+        "jour": 20,
+        "categorie": "Fun fact du jour 20",
+        "contenu": "Contenu du jour 20."
+    },
+    {
+        "jour": 21,
+        "categorie": "Fun fact du jour 21",
+        "contenu": "Contenu du jour 21."
+    },
+    {
+        "jour": 22,
+        "categorie": "Fun fact du jour 22",
+        "contenu": "Contenu du jour 22."
+    },
+    {
+        "jour": 23,
+        "categorie": "Fun fact du jour 23",
+        "contenu": "Contenu du jour 23."
+    },
+    {
+        "jour": 24,
+        "categorie": "Fun fact du jour 24",
+        "contenu": "Contenu du jour 24."
+    },
+    {
+        "jour": 25,
+        "categorie": "Fun fact du jour 25",
+        "contenu": "Contenu du jour 25."
+    }
+]
