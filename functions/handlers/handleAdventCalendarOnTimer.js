@@ -21,7 +21,7 @@ async function createMatrix(channel) {
                 const button = new ButtonBuilder()
                     .setCustomId(`${randomArray[buttons + 5 * rows]}`)
                     .setLabel(`${randomArray[buttons + 5 * rows]}`);
-                if (randomArray[buttons + 5 * rows] <= new Date().getDate()-10) {
+                if (randomArray[buttons + 5 * rows] <= new Date().getDate()) {
                     button.setStyle(ButtonStyle.Primary);
                 } else {
                     button.setStyle(ButtonStyle.Secondary);

@@ -4,7 +4,7 @@ const name = 'interactionCreate';
 const once = false;
 
 async function execute(interaction, bot) {
-    const today = new Date().getDate()-10;
+    const today = new Date().getDate();
     if (interaction.isButton()) {
         const { customId } = interaction;
         const jsonData = await readFile('./modules/advent.json', 'utf-8');
