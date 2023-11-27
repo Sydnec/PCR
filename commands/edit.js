@@ -1,5 +1,5 @@
 import { SlashCommandBuilder } from 'discord.js';
-import { addEmojis } from '../modules/utils.js';
+import { autoAddEmojis } from '../modules/utils.js';
 import dotenv from 'dotenv';
 dotenv.config(); // process.env.CONSTANT
 
@@ -23,6 +23,6 @@ export default {
         await message.edit(
             interaction.options.getString('message').replace(/;/g, '\n')
         );
-        addEmojis(message);
+        autoAddEmojis(message);
     },
 };
