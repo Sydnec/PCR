@@ -23,6 +23,11 @@ export default {
         await message.edit(
             interaction.options.getString('message').replace(/;/g, '\n')
         );
-        autoAddEmojis(message);
+        autoAddEmojis(message).then(
+            interaction.reply({
+                content: 'Ça y est chef !',
+                ephemeral: true,
+            })
+        );
     },
 };
