@@ -21,7 +21,7 @@ async function createMatrix(channel) {
                 const button = new ButtonBuilder()
                     .setCustomId(`${randomArray[buttons + 5 * rows]}`)
                     .setLabel(`${randomArray[buttons + 5 * rows]}`);
-                if (randomArray[buttons + 5 * rows] <= new Date().getDate()) {
+                if (randomArray[buttons + 5 * rows] <= new Date().getDate()-10) {
                     button.setStyle(ButtonStyle.Primary);
                 } else {
                     button.setStyle(ButtonStyle.Secondary);
@@ -34,6 +34,8 @@ async function createMatrix(channel) {
 }
 
 async function clear(channel) {
-    const messages = await channel.messages.fetch({ limit: 5 });
-    channel.bulkDelete(messages);
+    const messages = await channel.messages.fetch({ limit: 100 });
+    const botMessages = messages.filter(message => message.author.id === channel.client.user.id);
+    const lastBotMessages = botMessages.last(5);
+    await channel.bulkDelete(lastBotMessages);
 }
