@@ -1,4 +1,4 @@
-import { error } from '../../modules/utils.js';
+import { handleException } from '../../modules/utils.js';
 import { emojiRegex } from '../../modules/regex.js';
 
 export default (bot) => {
@@ -18,7 +18,7 @@ export default (bot) => {
                 try {
                     await reaction.users.remove(bot.user.id);
                 } catch (e) {
-                    error(e);
+                    handleException(e);
                 }
             });
         let newMessage = 'Pour être ping, réagissez à ce message :\n';

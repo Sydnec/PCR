@@ -19,15 +19,19 @@ export default {
     async execute(interaction, bot) {
         const channel = interaction.channel;
         if (channel.parentId != process.env.POLL_CHANNEL_ID) return;
-        const message = await channel.fetchStarterMessage(); //Récupère le message du post
-        await message.edit(
-            interaction.options.getString('message').replace(/;/g, '\n')
-        );
-        autoAddEmojis(message).then(
-            interaction.reply({
-                content: 'Ça y est chef !',
-                ephemeral: true,
-            })
-        );
+        try {
+            const message = await channel.fetchStarterMessage(); //Récupère le message du post
+            await message.edit(
+                interaction.options.getString('message').replace(/;/g, '\n')
+            );
+            autoAddEmojis(message).then(
+                interaction.reply({
+                    content: 'Ça y est chef !',
+                    ephemeral: true,
+                })
+            );
+        } catch (e) {
+            handleException(e);
+        }
     },
 };

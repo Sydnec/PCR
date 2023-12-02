@@ -142,6 +142,5 @@ export {
     environmentIsProd,
     handleException,
     log,
-    error,
     autoAddEmojis,
 };

@@ -1,5 +1,5 @@
 import { readdirSync } from 'fs';
-import { handleException, log, error } from '../../modules/utils.js';
+import { handleException, log } from '../../modules/utils.js';
 
 export default (bot) => {
     bot.handleEvents = async () => {
@@ -37,7 +37,7 @@ export default (bot) => {
                             })
                             .catch((e) => {
                                 // Gère les erreurs liées à l'importation
-                                error(`Error importing event ${file}: ${e}`);
+                                handleException(`Error importing event ${file}: ${e}`);
                             });
                     }
                     break;

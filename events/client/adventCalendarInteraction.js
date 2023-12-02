@@ -2,7 +2,6 @@ import { readFile } from 'fs/promises';
 
 const name = 'interactionCreate';
 const once = false;
-
 async function execute(interaction, bot) {
     const today = new Date().getDate();
     if (interaction.isButton()) {

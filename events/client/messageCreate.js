@@ -1,4 +1,4 @@
-import { error } from '../../modules/utils.js';
+import { handleException } from '../../modules/utils.js';
 import { twitterRegex } from '../../modules/regex.js';
 import dotenv from 'dotenv';
 dotenv.config();
@@ -24,10 +24,10 @@ async function execute(message) {
                     );
                 })
                 .then(message.delete())
-                .catch((e) => error(e));
+                .catch((e) => handleException(e));
         }
     } catch (e) {
-        error(e);
+        handleException(e);
     }
 }
 
