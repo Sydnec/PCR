@@ -1,6 +1,11 @@
 import { Client, Collection, GatewayIntentBits } from 'discord.js'; // , Events, Routes, REST
 import { readdirSync } from 'fs';
-import { handleException, log, error } from './modules/utils.js';
+import {
+    handleException,
+    log,
+    error,
+    environmentIsProd,
+} from './modules/utils.js';
 import cron from 'node-cron';
 import dotenv from 'dotenv';
 dotenv.config();
@@ -35,7 +40,7 @@ try {
     }
 
     bot.handleEvents();
-    bot.handleCommands();
+    if (environmentIsProd()) bot.handleCommands();
 
     bot.login(process.env.DISCORD_TOKEN);
 
