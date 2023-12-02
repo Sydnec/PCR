@@ -40,7 +40,7 @@ try {
     }
 
     bot.handleEvents();
-    if (environmentIsProd()) bot.handleCommands();
+    bot.handleCommands();
 
     bot.login(process.env.DISCORD_TOKEN);
 
