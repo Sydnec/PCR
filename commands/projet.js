@@ -10,7 +10,7 @@ export default {
 
     async execute(interaction) {
         try {
-            if (!isAdmin(interaction.member)) {
+            if (isAdmin(interaction.member)) {
                 interaction.reply({
                     content:
                         'Le récapitulatif 2023 te sera envoyé en MP quand il sera prêt',
