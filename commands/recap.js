@@ -1,39 +1,45 @@
 import { SlashCommandBuilder } from 'discord.js';
-import { handleException } from '../modules/utils.js';
+import { handleException, isAdmin } from '../modules/utils.js';
 import dotenv from 'dotenv';
 dotenv.config(); // process.env.CONSTANT
 
 export default {
     data: new SlashCommandBuilder()
-        .setName('recap')
-        .setDescription('Affiche un récapitulatif pour le membre'),
+        .setName('projet')
+        .setDescription('projet'),
 
     async execute(interaction) {
         try {
-            interaction.reply({ content: "Le récapitulatif 2023 te sera envoyé en MP quand il sera prêt", ephemeral: true });
+            if (!isAdmin(interaction.member)) {
+                interaction.reply({
+                    content:
+                        'Le récapitulatif 2023 te sera envoyé en MP quand il sera prêt',
+                    ephemeral: true,
+                });
 
-            // Récupérer les informations nécessaires
-            const member = interaction.member;
-            const joinDate = member.joinedAt.toLocaleDateString('fr-FR', {
-                day: 'numeric',
-                month: 'numeric',
-                year: 'numeric',
-            });
-            const analyse = await getMessageCountAndOldestMessageUrl(
-                interaction.guild,
-                member
-            );
-            const firstMessage = analyse.oldestMessage.url;
-            const messageCount = analyse.count;
+                // Récupérer les informations nécessaires
+                const member = interaction.member;
+                const joinDate = member.joinedAt.toLocaleDateString('fr-FR', {
+                    day: 'numeric',
+                    month: 'numeric',
+                    year: 'numeric',
+                });
+                const analyse = await getMessageCountAndOldestMessageUrl(
+                    interaction.guild,
+                    member
+                );
+                const firstMessage = analyse.oldestMessage.url;
+                const messageCount = analyse.count;
 
-            const recapText =
-                `Récapitulatif pour ${member.displayName} :\n` +
-                `Date d'entrée sur le serveur : ${joinDate}\n` +
-                `Premier message : ${firstMessage}\n` +
-                `Nombre de messages : ${messageCount}\n`;
+                const recapText =
+                    `Récapitulatif pour ${member.displayName} :\n` +
+                    `Date d'entrée sur le serveur : ${joinDate}\n` +
+                    `Premier message : ${firstMessage}\n` +
+                    `Nombre de messages : ${messageCount}\n`;
 
-            // Envoyer RecapText en MP à member
-            await member.send(recapText);
+                // Envoyer RecapText en MP à member
+                await member.send(recapText);
+            }
         } catch (error) {
             handleException(error);
         }
