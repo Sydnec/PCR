@@ -14,8 +14,13 @@ export default {
                         'Le récapitulatif 2023 te sera envoyé en MP quand il sera prêt',
                     ephemeral: true,
                 });
-                getMessageCount(interaction.guild);
-            }
+                const result = await getMessageCount(interaction.guild)
+                  // Appeler la fonction pour chaque utilisateur
+                for (const userId in result) {
+                    interaction.channel.send(getUserInfo(userId, result));
+                }
+                
+          }
         } catch (error) {
             handleException(error);
         }
@@ -24,41 +29,117 @@ export default {
 
 async function getMessageCount(guild) {
     try {
-        await guild.members.fetch(); // Assure-toi que tous les membres sont chargés
-
-        const userMessageCount = {}; // Utilise un objet pour stocker le nombre de messages par utilisateur
-
-        for (const [_, channel] of guild.channels.cache) {
-            const excludedChannelTypes = [4, 15];
-
-            if (!excludedChannelTypes.includes(channel.type)) {
-                try {
-                    let lastId;
-                    do {
-                        const options = { limit: 100, before: lastId };
-                        const messages = await channel.messages.fetch(options);
-
+        await guild.members.fetch();
+        const userStats = {};
+        if (guild.channels.cache) {
+            for (const [_, channel] of guild.channels.cache) {
+                let userCount = {};
+                const excludedChannelTypes = [4, 15];
+                if (!excludedChannelTypes.includes(channel.type)) {
+                    try {
+                        let lastId;
+                        do {
+                            const options = { limit: 100, before: lastId };
+                            const messages =
+                                channel && channel.messages
+                                    ? await channel.messages.fetch(options)
+                                    : null;
+                            for (const [_, member] of guild.members.cache) {
+                                const filteredMessages = messages.filter(
+                                    (msg) => msg.author.id === member.id
+                                );
+                                const messageCount = filteredMessages.size;
+                                if (messageCount > 0) {
+                                    userStats[member.id] = userStats[
+                                        member.id
+                                    ] || {
+                                        username: member.user.username,
+                                        count: 0,
+                                        mostReactedMessage: '',
+                                        mostActiveChannel: channel,
+                                        channelMaxNumber: 0,
+                                    };
+                                    userCount[member.id] = userCount[
+                                        member.id
+                                    ] || {
+                                        count: 0,
+                                    };
+                                    userCount[member.id].count += messageCount;
+                                    userStats[member.id].count += messageCount;
+                                    const newMostReactedMessage =
+                                        await Array.from(
+                                            filteredMessages.values()
+                                        ).reduce((prev, current) =>
+                                            prev.reactions.cache.size >
+                                            current.reactions.cache.size
+                                                ? prev
+                                                : current
+                                        );
+                                    if (
+                                        !userStats[member.id].mostReactedMessage || newMostReactedMessage.reactions.cache
+                                            .size >
+                                        userStats[member.id].mostReactedMessage
+                                            .reactions.cache.size
+                                    ) {
+                                        userStats[
+                                            member.id
+                                        ].mostReactedMessage =
+                                            newMostReactedMessage;
+                                    }
+                                }
+                            }
+                            lastId = messages.last()?.id;
+                        } while (lastId !== undefined);
                         for (const [_, member] of guild.members.cache) {
-                            const filteredMessages = messages.filter(
-                                (msg) => msg.author.id === member.id
-                            );
-                            userMessageCount[member.id] =
-                                (userMessageCount[member.id] || 0) +
-                                filteredMessages.size;
+                            if (
+                                userCount[member.id] &&
+                                userCount[member.id].count >
+                                    userStats[member.id].channelMaxNumber
+                            ) {
+                                userStats[member.id].channelMaxNumber =
+                                    userCount[member.id].count;
+                                userStats[member.id].mostActiveChannel =
+                                    channel;
+                            }
                         }
-
-                        lastId = messages.last()?.id;
-                    } while (lastId !== undefined);
-                } catch (e) {
-                    handleException(e);
+                    } catch (e) {
+                        handleException(e);
+                    }
                 }
             }
         }
-        console.log(userMessageCount)
-        // Maintenant, userMessageCount contient le nombre de messages pour chaque utilisateur
-        return userMessageCount;
+        return userStats;
     } catch (e) {
         handleException(e);
-        return {}; // En cas d'erreur, retourne un objet vide
+        return {};
     }
 }
+
+function getUserInfo(userId, result) {
+    const user = result[userId];
+    let resultString = ""
+    // Vérifier si l'utilisateur existe
+    if (!user) {
+      console.log(`Utilisateur avec l'ID ${userId} non trouvé.`);
+      return;
+    }
+  
+    // Récupérer les informations demandées
+    const username = user.username;
+    const count = user.channelMaxNumber;
+    const mostActiveChannel = user.mostActiveChannel;
+    const mostReactedMessage = user.mostReactedMessage;
+  
+    // Afficher les informations
+    resultString += `Pour l'utilisateur '${username}':\n`
+    resultString += `- Nom d'utilisateur: ${username}\n`
+    resultString += `- Nombre de messages dans le canal le plus actif: ${count}\n`
+    resultString += `- Nom du canal le plus actif:\n`
+    resultString += `  - Nom du channel: ${mostActiveChannel.name}\n`
+    resultString += `  - Lien du channel: ${mostActiveChannel.url}\n`
+    resultString += `- Message le plus réagi:\n`
+    resultString += `  - Lien du message: ${mostReactedMessage.url}\n`
+    resultString += `  - Contenu du message: ${mostReactedMessage.content}\n`
+    // Les informations sur les réactions ne sont pas fournies dans la structure
+      return resultString
+  }
