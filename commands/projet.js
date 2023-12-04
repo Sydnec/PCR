@@ -1,5 +1,6 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { handleException, isAdmin } from '../modules/utils.js';
+import { format } from 'date-fns';
 import dotenv from 'dotenv';
 dotenv.config(); // process.env.CONSTANT
 
@@ -54,6 +55,7 @@ async function getMessageCount(guild) {
                                         member.id
                                     ] || {
                                         username: member.user.username,
+                                        joinedAt: member.joinedAt,
                                         count: 0,
                                         mostReactedMessage: '',
                                         mostActiveChannel: channel,
@@ -126,14 +128,18 @@ function getUserInfo(userId, result) {
   
     // Récupérer les informations demandées
     const username = user.username;
-    const count = user.channelMaxNumber;
+    const joinedAt = user.joinedAt;
+    const count = user.count;
+    const countChannelMax = user.channelMaxNumber;
     const mostActiveChannel = user.mostActiveChannel;
     const mostReactedMessage = user.mostReactedMessage;
   
     // Afficher les informations
     resultString += `Pour l'utilisateur '${username}':\n`
     resultString += `- Nom d'utilisateur: ${username}\n`
-    resultString += `- Nombre de messages dans le canal le plus actif: ${count}\n`
+    resultString += `- Date d'arrivée sur le serveur: ${format(joinedAt, 'dd/MM/yyyy', { locale: fr })}\n`
+    resultString += `- Nombre de messages au total: ${count}\n`
+    resultString += `- Nombre de messages dans le canal le plus actif: ${countChannelMax}\n`
     resultString += `- Nom du canal le plus actif:\n`
     resultString += `  - Nom du channel: ${mostActiveChannel.name}\n`
     resultString += `  - Lien du channel: ${mostActiveChannel.url}\n`
