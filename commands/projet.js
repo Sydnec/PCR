@@ -46,6 +46,9 @@ async function getMessageCount(guild) {
                                     ? await channel.messages.fetch(options)
                                     : null;
                             for (const [_, member] of guild.members.cache) {
+                                if (member.user.bot) {
+                                    continue;
+                                }
                                 const filteredMessages = messages.filter(
                                     (msg) => msg.author.id === member.id
                                 );
@@ -93,6 +96,9 @@ async function getMessageCount(guild) {
                             lastId = messages.last()?.id;
                         } while (lastId !== undefined);
                         for (const [_, member] of guild.members.cache) {
+                            if (member.user.bot) {
+                                continue;
+                            }
                             if (
                                 userCount[member.id] &&
                                 userCount[member.id].count >
