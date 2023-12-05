@@ -1,4 +1,5 @@
 import { SlashCommandBuilder } from 'discord.js';
+import { createCanvas, loadImage } from 'canvas';
 import { handleException, isAdmin } from '../modules/utils.js';
 import { format } from 'date-fns';
 import dotenv from 'dotenv';
@@ -12,13 +13,14 @@ export default {
             if (isAdmin(interaction.member)) {
                 interaction.reply({
                     content:
-                        'Le récapitulatif 2023 te sera envoyé en MP quand il sera prêt',
+                        'Le récapitulatif 2023 est en cours de génération ...',
                     ephemeral: true,
                 });
-                const result = await getMessageCount(interaction.guild);
+                const result = await getMessageCount(message.channel.guild);
                 // Appeler la fonction pour chaque utilisateur
                 for (const userId in result) {
-                    interaction.channel.send(getUserInfo(userId, result));
+                    const userRecap = await generateUserInfoImage(userId, result);
+                    message.channel.send({ content: `### Message ayant le plus fait réagir : ${userRecap.message}`, files: [userRecap.image] });
                 }
             }
         } catch (error) {
@@ -45,43 +47,61 @@ async function getMessageCount(guild) {
                                     ? await channel.messages.fetch(options)
                                     : null;
                             for (const [_, member] of guild.members.cache) {
-                                 if (member.user.bot) {
-                                     continue;
-                                 }
+                                if (member.user.bot) {
+                                    continue;
+                                }
                                 const filteredMessages = messages.filter(
                                     (msg) => msg.author.id === member.id
                                 );
                                 const messageCount = filteredMessages.size;
                                 if (messageCount > 0) {
-                                    userStats[member.id] = userStats[
-                                        member.id
-                                    ] || {
-                                        username: member.user.username,
+                                    const defaultUserStats = {
+                                        username: member.displayName,
+                                        avatarUrl: member.user.displayAvatarURL({ format: 'webp', dynamic: true, size: 2048 }).replace(".webp", ".jpg"),
                                         joinedAt: member.joinedAt,
                                         count: 0,
                                         mostReactedMessage: '',
                                         mostActiveChannel: channel,
                                         channelMaxNumber: 0,
+                                        emojiOccurrences: {},
+                                        emojiMaxOccurrences: 0,
+                                        mostUsedEmoji: {},
                                     };
-                                    userCount[member.id] = userCount[
-                                        member.id
-                                    ] || {
-                                        count: 0,
-                                    };
+                                    userStats[member.id] = userStats[member.id] || defaultUserStats
+                                    userCount[member.id] = userCount[member.id] || { count: 0, };
+
                                     userCount[member.id].count += messageCount;
                                     userStats[member.id].count += messageCount;
+
+                                    filteredMessages.forEach(message => {
+                                        const emojis = message.content.match(emojiRegex)
+                                        if (emojis) {
+                                            const emojiIds = emojis.map((emoji) => {
+                                                const [_, emojiId] = emoji.slice(2, -1).split(':');
+                                                return emojiId;
+                                            });
+
+                                            emojiIds.forEach(id => {
+                                                userStats[member.id].emojiOccurrences[id] = (userStats[member.id].emojiOccurrences[id] || 0) + 1;
+                                                const currentCount = userStats[member.id].emojiOccurrences[id]
+                                                if (!userStats[member.id].mostUsedEmoji.count || currentCount > userStats[member.id].mostUsedEmoji.count) {
+                                                    userStats[member.id].mostUsedEmoji = { id, count: currentCount };
+                                                }
+                                            });
+                                        }
+                                    });
                                     const newMostReactedMessage = await Array.from(filteredMessages.values()).reduce((prev, current) => {
                                         const totalReactionsPrev = prev.reactions.cache.reduce((acc, reaction) => acc + reaction.count, 0);
                                         const totalReactionsCurrent = current.reactions.cache.reduce((acc, reaction) => acc + reaction.count, 0);
-                                    
+
                                         return totalReactionsPrev > totalReactionsCurrent ? prev : current;
-                                    });                               
+                                    });
                                     if (
                                         !userStats[member.id]
                                             .mostReactedMessage ||
                                         newMostReactedMessage.reactions.cache.reduce((acc, reaction) => acc + reaction.count, 0) >
-                                            userStats[member.id]
-                                                .mostReactedMessage.reactions.cache.reduce((acc, reaction) => acc + reaction.count, 0)
+                                        userStats[member.id]
+                                            .mostReactedMessage.reactions.cache.reduce((acc, reaction) => acc + reaction.count, 0)
                                     ) {
                                         userStats[
                                             member.id
@@ -89,17 +109,18 @@ async function getMessageCount(guild) {
                                             newMostReactedMessage;
                                     }
                                 }
+
                             }
                             lastId = messages.last()?.id;
                         } while (lastId !== undefined);
                         for (const [_, member] of guild.members.cache) {
-                             if (member.user.bot) {
-                                 continue;
-                             }
+                            if (member.user.bot) {
+                                continue;
+                            }
                             if (
                                 userCount[member.id] &&
                                 userCount[member.id].count >
-                                    userStats[member.id].channelMaxNumber
+                                userStats[member.id].channelMaxNumber
                             ) {
                                 userStats[member.id].channelMaxNumber =
                                     userCount[member.id].count;
@@ -120,9 +141,9 @@ async function getMessageCount(guild) {
     }
 }
 
-function getUserInfo(userId, result) {
+
+async function generateUserInfoImage(userId, result) {
     const user = result[userId];
-    let resultString = '';
     // Vérifier si l'utilisateur existe
     if (!user) {
         console.log(`Utilisateur avec l'ID ${userId} non trouvé.`);
@@ -136,20 +157,40 @@ function getUserInfo(userId, result) {
     const countChannelMax = user.channelMaxNumber;
     const mostActiveChannel = user.mostActiveChannel;
     const mostReactedMessage = user.mostReactedMessage;
+    const mostUsedEmoji = user.mostUsedEmoji;
+    const avatar = user.avatarUrl; // Ajout de l'URL de l'avatar
 
-    // Afficher les informations
-    resultString += `Pour l'utilisateur '${username}':\n`;
-    resultString += `- Nom d'utilisateur: ${username}\n`;
-    resultString += `- Date d'arrivée sur le serveur: ${format(
-        joinedAt,
-        'dd/MM/yyyy'
-    )}\n`;
-    resultString += `- Nombre de messages au total: ${count}\n`;
-    resultString += `- Nombre de messages dans le canal le plus actif: ${countChannelMax}\n`;
-    resultString += `- Nom du canal le plus actif:\n`;
-    resultString += `  - Lien du channel: ${mostActiveChannel.url}\n`;
-    resultString += `- Message le plus réagi:\n`;
-    resultString += `  - Lien du message: ${mostReactedMessage.url}\n`;
-    // Les informations sur les réactions ne sont pas fournies dans la structure
-    return resultString;
+    // Parametrage de la police
+    const fontPath = './fonts/Montserrat-SemiBold.ttf';
+    registerFont(fontPath, { family: 'Montserrat' });
+    // Créer un canvas
+    const canvas = createCanvas(1200, 450);
+    const ctx = canvas.getContext('2d');
+    ctx.font = '35px Montserrat'
+    ctx.fillStyle = '#011526';
+
+    // Charger une image de fond
+    const backgroundImage = await loadImage('/home/sydnec/Documents/PCR/images/background.jpg');
+    ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
+    ctx.strokeRect(8, 8, 1184, 434);
+
+    // Charger l'avatar de l'utilisateur
+    const avatarImage = await loadImage(avatar);
+    ctx.drawImage(avatarImage, 70, 50, 300, 300);
+
+    // Dessiner les informations sur le canvas
+    var text = ctx.measureText(`${username}`)
+    ctx.fillText(`${username}`, 230 - (text.width / 2), 410);
+    ctx.fillText(`A rejoint le serveur le : ${format(joinedAt, 'dd/MM/yyyy')}`, 470, 80);
+    ctx.fillText(`Messages envoyés : ${count}`, 470, 160);
+    ctx.fillText(`Channel le plus actif : ${mostActiveChannel.name}\n\t avec ${countChannelMax} messages`, 470, 240);
+
+    // Charge l'image de l'emoji
+    ctx.fillText(`Emoji le plus utilisé :\n\tavec ${mostUsedEmoji.count} utilisations`, 470, 350);
+    const mostUsedEmojiImage = await loadImage(`https://cdn.discordapp.com/emojis/${mostUsedEmoji.id}.png`);
+    ctx.drawImage(mostUsedEmojiImage, 900, 300, 120, 120);
+
+    // Sauvegarder le canvas comme image
+    const imageBuffer = canvas.toBuffer('image/png');
+    return { image: imageBuffer, message: mostReactedMessage.url };
 }
