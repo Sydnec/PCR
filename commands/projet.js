@@ -1,6 +1,7 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { createCanvas, loadImage } from 'canvas';
 import { handleException, isAdmin } from '../modules/utils.js';
+import { emojiRegex } from '../modules/regex.js';
 import { format } from 'date-fns';
 import dotenv from 'dotenv';
 dotenv.config(); // process.env.CONSTANT
@@ -16,11 +17,11 @@ export default {
                         'Le récapitulatif 2023 est en cours de génération ...',
                     ephemeral: true,
                 });
-                const result = await getMessageCount(message.channel.guild);
+                const result = await getMessageCount(interaction.channel.guild);
                 // Appeler la fonction pour chaque utilisateur
                 for (const userId in result) {
                     const userRecap = await generateUserInfoImage(userId, result);
-                    message.channel.send({ content: `### Message ayant le plus fait réagir : ${userRecap.message}`, files: [userRecap.image] });
+                    interaction.channel.send({ content: `### Message ayant le plus fait réagir : ${userRecap.message}`, files: [userRecap.image] });
                 }
             }
         } catch (error) {
