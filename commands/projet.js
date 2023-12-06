@@ -36,15 +36,20 @@ export default {
 				await interaction.deferReply();
 				const result = await getMessageCount(interaction.channel.guild);
 				// Appeler la fonction pour chaque utilisateur
-				// for (const userId in result) {
-				// const userRecap = await generateUserInfoImage(
-				//     result[userId], false
-				// );
-				// interaction.channel.guild.members.cache.get(userId).send({
-				//     content: `# Recap 2023 du serveur PCR 2.0\n### Message ayant le plus fait réagir : ${userRecap.message}`,
-				//     files: [userRecap.image],
-				// });
-				// }
+				for (const userId in result) {
+					const userRecap = await generateUserInfoImage(
+						result[userId],
+						false
+					);
+					interaction.channel.guild.members.cache.get(userId).send({
+						content: `# Recap 2023 du serveur PCR 2.0\n### Message ayant le plus fait réagir : ${userRecap.message}`,
+						files: [userRecap.image],
+					});
+                    interaction.member.send({
+						content: `# Recap 2023 du serveur PCR 2.0\n### Message ayant le plus fait réagir : ${userRecap.message}`,
+						files: [userRecap.image],
+					});
+				}
 				const serverRecap = await generateUserInfoImage(
 					serverStat,
 					true
@@ -331,7 +336,7 @@ async function generateUserInfoImage(user, isServer) {
 	ctx.fillText(`${username}`, 230 - text.width / 2, 410);
 	if (isServer) {
 		ctx.fillText(
-			`Serveur crée le : ${format(joinedAt, 'dd/MM/yyyy')}`,
+			`Serveur créé le : ${format(joinedAt, 'dd/MM/yyyy')}`,
 			470,
 			80
 		);
