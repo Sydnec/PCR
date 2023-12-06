@@ -211,7 +211,6 @@ async function getMessageCount(guild) {
 }
 
 async function generateUserInfoImage(userId, result) {
-    log("generation de l'image");
     const user = result[userId];
     // Vérifier si l'utilisateur existe
     if (!user) {
@@ -255,9 +254,9 @@ async function generateUserInfoImage(userId, result) {
         470,
         80
     );
-    ctx.fillText(`Messages envoyés : ${count}`, 470, 160);
+    ctx.fillText(`Messages envoyés : ${count.toLocaleString()}`, 470, 160);
     ctx.fillText(
-        `Channel le plus actif : ${mostActiveChannel.name}\n\t avec ${countChannelMax} messages`,
+        `Channel le plus actif : ${mostActiveChannel.name}\n\t avec ${countChannelMax.toLocaleString()} messages`,
         470,
         240
     );
@@ -269,13 +268,13 @@ async function generateUserInfoImage(userId, result) {
         );
         ctx.drawImage(mostUsedEmojiImage, 930, 300, 120, 120);
         ctx.fillText(
-            `Emoji le plus utilisé :\n\tavec ${mostUsedEmoji.count} utilisations`,
+            `Emoji le plus utilisé :\n\tavec ${mostUsedEmoji.count.toLocaleString()} utilisations`,
             470,
             350
         );
     } catch {
         ctx.fillText(
-            `Emoji le plus utilisé : ${mostUsedEmoji.name}\n\tavec ${mostUsedEmoji.count} utilisations`,
+            `Emoji le plus utilisé : ${mostUsedEmoji.name}\n\tavec ${mostUsedEmoji.count.toLocaleString()} utilisations`,
             470,
             350
         );
