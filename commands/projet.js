@@ -33,18 +33,21 @@ export default {
 					mostUsedEmoji: {},
 				};
 				// Défère la réponse initiale
-				await interaction.deferReply();
-				const result = await getMessageCount(interaction.channel.guild);
+				interaction.reply({
+                    content:
+                        'Le récapitulatif 2023 est en cours de génération ...',
+                    ephemeral: true,
+                });				const result = await getMessageCount(interaction.channel.guild);
 				// Appeler la fonction pour chaque utilisateur
 				for (const userId in result) {
 					const userRecap = await generateUserInfoImage(
 						result[userId],
 						false
 					);
-					interaction.channel.guild.members.cache.get(userId).send({
-						content: `# Recap 2023 du serveur PCR 2.0\n### Message ayant le plus fait réagir : ${userRecap.message}`,
-						files: [userRecap.image],
-					});
+					// interaction.channel.guild.members.cache.get(userId).send({
+					// 	content: `# Recap 2023 du serveur PCR 2.0\n### Message ayant le plus fait réagir : ${userRecap.message}`,
+					// 	files: [userRecap.image],
+					// });
                     interaction.member.send({
 						content: `# Recap 2023 du serveur PCR 2.0\n### Message ayant le plus fait réagir : ${userRecap.message}`,
 						files: [userRecap.image],
@@ -54,7 +57,7 @@ export default {
 					serverStat,
 					true
 				);
-				interaction.editReply({
+				interaction.channel.send({
 					content: `# Recap 2023 du serveur PCR 2.0\n### Message ayant le plus fait réagir : ${serverRecap.message}`,
 					files: [serverRecap.image],
 				});
