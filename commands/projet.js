@@ -87,6 +87,7 @@ async function getMessageCount(guild) {
 									? await channel.messages.fetch(options)
 									: null;
 							channelCountMessage += messages.size;
+							log(`${channel.name} : ${channelCountMessage}`)
 							serverStat.count += messages.size;
 							for (const [_, member] of guild.members.cache) {
 								if (member.user.bot) {
