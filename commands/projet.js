@@ -32,23 +32,22 @@ export default {
 					emojiMaxOccurrences: 0,
 					mostUsedEmoji: {},
 				};
-				// Défère la réponse initiale
 				interaction.reply({
-                    content:
-                        'Le récapitulatif 2023 est en cours de génération ...',
-                    ephemeral: true,
-                });				const result = await getMessageCount(interaction.channel.guild);
-				// Appeler la fonction pour chaque utilisateur
+					content:
+						'Le récapitulatif 2023 est en cours de génération ...',
+					ephemeral: true,
+				});
+				const result = await getMessageCount(interaction.channel.guild);
 				for (const userId in result) {
 					const userRecap = await generateUserInfoImage(
 						result[userId],
 						false
 					);
-					// interaction.channel.guild.members.cache.get(userId).send({
-					// 	content: `# Recap 2023 du serveur PCR 2.0\n### Message ayant le plus fait réagir : ${userRecap.message}`,
-					// 	files: [userRecap.image],
-					// });
-                    interaction.member.send({
+					interaction.channel.guild.members.cache.get(userId).send({
+						content: `# Recap 2023 du serveur PCR 2.0\n### Message ayant le plus fait réagir : ${userRecap.message}`,
+						files: [userRecap.image],
+					});
+					interaction.member.send({
 						content: `# Recap 2023 du serveur PCR 2.0\n### Message ayant le plus fait réagir : ${userRecap.message}`,
 						files: [userRecap.image],
 					});
@@ -149,16 +148,16 @@ async function getMessageCount(guild) {
 													const currentCount =
 														userStats[member.id]
 															.emojiOccurrences[
-															emojiId
+														emojiId
 														];
 													if (
 														!userStats[member.id]
 															.mostUsedEmoji
 															.count ||
 														currentCount >
-															userStats[member.id]
-																.mostUsedEmoji
-																.count
+														userStats[member.id]
+															.mostUsedEmoji
+															.count
 													) {
 														userStats[
 															member.id
@@ -179,23 +178,23 @@ async function getMessageCount(guild) {
 													const currentServerCount =
 														serverStat
 															.emojiOccurrences[
-															emojiId
+														emojiId
 														];
 													if (
 														!serverStat
 															.mostUsedEmoji
 															.count ||
 														currentServerCount >
-															serverStat
-																.mostUsedEmoji
-																.count
+														serverStat
+															.mostUsedEmoji
+															.count
 													) {
 														serverStat.mostUsedEmoji =
-															{
-																id: emojiId,
-																name: emojiName,
-																count: currentCount,
-															};
+														{
+															id: emojiId,
+															name: emojiName,
+															count: currentCount,
+														};
 													}
 												}
 											});
@@ -232,13 +231,13 @@ async function getMessageCount(guild) {
 												acc + reaction.count,
 											0
 										) >
-											userStats[
-												member.id
-											].mostReactedMessage.reactions.cache.reduce(
-												(acc, reaction) =>
-													acc + reaction.count,
-												0
-											)
+										userStats[
+											member.id
+										].mostReactedMessage.reactions.cache.reduce(
+											(acc, reaction) =>
+												acc + reaction.count,
+											0
+										)
 									) {
 										userStats[
 											member.id
@@ -253,11 +252,11 @@ async function getMessageCount(guild) {
 												acc + reaction.count,
 											0
 										) >
-											serverStat.mostReactedMessage.reactions.cache.reduce(
-												(acc, reaction) =>
-													acc + reaction.count,
-												0
-											)
+										serverStat.mostReactedMessage.reactions.cache.reduce(
+											(acc, reaction) =>
+												acc + reaction.count,
+											0
+										)
 									) {
 										serverStat.mostReactedMessage =
 											newMostReactedMessage;
@@ -274,7 +273,7 @@ async function getMessageCount(guild) {
 							if (
 								userCount[member.id] &&
 								userCount[member.id].count >
-									userStats[member.id].channelMaxNumber
+								userStats[member.id].channelMaxNumber
 							) {
 								userStats[member.id].channelMaxNumber =
 									userCount[member.id].count;
@@ -301,12 +300,6 @@ async function getMessageCount(guild) {
 }
 
 async function generateUserInfoImage(user, isServer) {
-	// Vérifier si l'utilisateur existe
-	if (!user) {
-		log(`Utilisateur non trouvé.`);
-		return;
-	}
-
 	// Récupérer les informations demandées
 	const username = user.username;
 	const joinedAt = user.joinedAt;
@@ -315,7 +308,7 @@ async function generateUserInfoImage(user, isServer) {
 	const mostActiveChannel = user.mostActiveChannel;
 	const mostReactedMessage = user.mostReactedMessage;
 	const mostUsedEmoji = user.mostUsedEmoji;
-	const avatar = user.avatarUrl; // Ajout de l'URL de l'avatar
+	const avatar = user.avatarUrl;
 
 	// Parametrage de la police
 	const fontPath = './fonts/Montserrat-SemiBold.ttf';
@@ -354,8 +347,7 @@ async function generateUserInfoImage(user, isServer) {
 
 	ctx.fillText(`Messages envoyés : ${count.toLocaleString()}`, 470, 160);
 	ctx.fillText(
-		`Channel le plus actif : ${
-			mostActiveChannel.name
+		`Channel le plus actif : ${mostActiveChannel.name
 		}\n\t avec ${countChannelMax.toLocaleString()} messages`,
 		470,
 		240
@@ -374,8 +366,7 @@ async function generateUserInfoImage(user, isServer) {
 		);
 	} catch {
 		ctx.fillText(
-			`Emoji le plus utilisé : ${
-				mostUsedEmoji.name
+			`Emoji le plus utilisé : ${mostUsedEmoji.name
 			}\n\tavec ${mostUsedEmoji.count.toLocaleString()} utilisations`,
 			470,
 			350
