@@ -1,125 +1,146 @@
 [
     {
         "jour": 1,
-        "categorie": "Fun fact",
-        "contenu": "Le saviez-vous ? Le mois de décembre était initialement le 10ème mois de l’année ! Et oui, en latin décembre se dit “decembris”, venant de “decem”, “dix”. C’était en effet le dixième mois de l’année du calendrier romain. Le mois de décembre est le premier mois de l’hiver dans l’hémisphère nord. Cependant, avec l'ajout ultérieur de janvier et février, décembre est devenu le douzième mois de l'année dans le calendrier que nous utilisons aujourd'hui."
+        "categorie": "",
+        "image": "",
+        "contenu": ""
     },
     {
         "jour": 2,
-        "categorie": "Photo du jour",
-        "image": "./images/2.jpg"
+        "categorie": "",
+        "image": "",
+        "contenu": ""
     },
     {
         "jour": 3,
-        "categorie": "Charade",
-        "contenu": "Pour fêter la nouvelle année on s’embrasse sous mon premier\nMon second est un préfixe qui indique la répétition.\nMon troisième n’est pas rapide\nMon quatrième est le double de 1\nMon tout décore le sapin.\n\nRéponse : ||     Guirlande     ||"
+        "categorie": "",
+        "image": "",
+        "contenu": ""
     },
     {
         "jour": 4,
-        "categorie": "Pensée positive",
-        "contenu": "\"On ne se rend compte des choses qui comptent que quand on nous les arrache.\""
+        "categorie": "",
+        "image": "",
+        "contenu": ""
     },
     {
         "jour": 5,
-        "categorie": "Blind test",
-        "contenu": "'https://urlz.fr/oFkZ'"
+        "categorie": "",
+        "image": "",
+        "contenu": ""
     },
     {
         "jour": 6,
-        "categorie": "Fun fact",
-        "contenu": "Aujourd’hui c’est la Saint-Nicolas ! Mais dis-moi ~~Jamy~~ Hiindy, qu’est-ce que la Saint-Nicolas ? Assieds-toi, je t’explique.\n\n\tLa Saint-Nicolas est une fête chrétienne, célébrée le 6 décembre, notamment en Belgique et dans le Nord-Est de la France. Elle est inspirée de l’évêque Nicolas de Myre.\n\n\tDans les écoles du nord-est, on apprend aux enfants la légende du Saint-Nicolas. En effet, la légende raconte que pendant un hiver, trois enfants se sont perdus. Attirés par la lumière d’une maison, ils s’approchent et frappent à la porte. Pierre Lenoir, boucher, leur ouvrent la porte. Sauf qu’une fois les enfants rentrés dans sa maison, Pierre Lenoir les tue, les coupe en petits morceaux et les met dans un tonneau afin d’en faire du petit salé. Saint-Nicolas, chevauchant son âne, passe par là et frappe à son tour à la porte du boucher. Le boucher l’invite à manger et Saint-Nicolas lui demande du petit salé. Le boucher se rend compte qu’il est pris au piège et avoue tout. Saint-Nicolas étend alors trois doigts au-dessus du tonneau, reconstitue et ressuscite les trois enfants. Saint-Nicolas enchaîne ensuite le boucher à son âne et le garde auprès de lui pour le punir. Il devient alors le père Fouettard, dont le rôle est de punir les enfants désobéissants.\n\n\tDe nos jours, la Saint-Nicolas est toujours fêtée dans la plupart des écoles du grand-est de la France. Il vient, accompagné du père fouettard, apporter des chocolats et du pain d’épices aux enfants. Le père Fouettard fait grave flipper car il a une longue barbe noire, de la suie sur le visage, et il est méchant avec les enfants. Aussi les enfants doivent préparer une carotte et du foin pour l’âne de Saint-Nicolas.",
-        "image": "./images/6.jpg"
+        "categorie": "",
+        "image": "",
+        "contenu": ""
     },
     {
         "jour": 7,
-        "categorie": "Photo du jour",
-        "image": "./images/7.jpg"
+        "categorie": "",
+        "image": "",
+        "contenu": ""
     },
     {
         "jour": 8,
-        "categorie": "Charade",
-        "contenu": "Mon premier est le contraire de froid\nMon deuxième se trouve en haut d’une chemise ou d’un manteau\nMon troisième vient en premier dans l’alphabet\nMon tout s’offre souvent à Noël.\n\nRéponse : ||    Chocolat    ||"
+        "categorie": "",
+        "image": "",
+        "contenu": ""
     },
     {
         "jour": 9,
-        "categorie": "Musique",
-        "contenu": "'https://urlz.fr/oEam'"
+        "categorie": "",
+        "image": "",
+        "contenu": ""
     },
     {
         "jour": 10,
-        "categorie": "Pensée positive",
-        "contenu": "\"Regarde toi dans le miroir pour voir la belle personne que tu es. Soit bienveillant(e) avec toi, car tu es merveilleux(se)\""
+        "categorie": "",
+        "image": "",
+        "contenu": ""
     },
     {
         "jour": 11,
-        "categorie": "Enigme",
-        "contenu": "Un lutin regarde un portrait et dit : « Je n’ai ni frère ni sœur, mais le père de cet homme est le fils de mon père. » De qui le lutin regarde-t-il le portrait ?\n\nRéponse : ||De lui même||"
+        "categorie": "",
+        "image": "",
+        "contenu": ""
     },
     {
         "jour": 12,
-        "categorie": "Fun fact",
-        "contenu": "Le Père Noël a-t-il été créé par Coca-Cola ?\n\n\tOn connaît tous cette légende qui dit que Coca-Cola aurait inventé le Père Noël, mais est-ce vrai ? Oui et non. Les origines du Père Noël remonte au 4ème siècle, et à l’époque il s’appelait Nicolas ! Ça ne te rappelle pas quelque chose ? Et oui, le fameux Saint-Nicolas dont je vous ai raconté l’histoire le 6 décembre dernier ! Au début on avait du mal à être d’accord sur l’apparence de Saint-Nicolas (et donc du Père Noël): tunique verte, violette ou encore jaune. Le nom hollandais de Saint-Nicolas est Sinter Klass, qui devient Santa Claus aux Etats-Unis. En 1863, dans un journal New-Yorkais, le “Harper’s Illustrated weekly”, Thomas NAST dessine Santa Claus vêtu d’un costume garni de fourrure blanche et portant un large ceinturon de cuir, avec une longue barbe blanche et accompagné de rennes. Mais c’est en 1931 que né le Père Noël que l’on connaît tous, et cela grâce à Coca Cola ! En effet, la firme Américaine demande à Haddon SUNDBLOM de dessiner Santa Claud en train de boire du Coca Cola. Le dessinateur décide de l’habiller aux couleurs de la marque: rouge et blanc. Ainsi, le père Noël existait aussi sans Coca-Cola. Mais sans Coca-Cola, il n’aurait jamais été celui qu’il est aujourd’hui – une icône reconnue dans le monde entier.",
-        "image": "./images/12.jpg"
+        "categorie": "",
+        "image": "",
+        "contenu": ""
     },
     {
         "jour": 13,
-        "categorie": "Recette de spritz de Noël !",
-        "contenu": "## Ingrédients : \n- 250 g de farine\n- 125 g de sucre\n- 1 sachet de sucre vanillé\n- 150 g de beurre\n- 1 œuf\n- 80 g de poudre d'amandes\n- 1 pointe de couteau de levure chimique\n\n## Préparation:\n**Etape 1**\nPréchauffer votre four a 180°C (th.6).\nDans un récipient, mélanger le beurre et le sucre/sucre vanillé.\nAjouter ensuite l’œuf.\nMélanger la farine et la levure. L'incorporer au mélange puis ajouter la poudre d'amande.\n### Etape 2\nFormer vos spritz en forme de bâtonnets, de S ou d’anneaux. Les déposer sur une plaque allant au four recouverte d’une feuille de cuisson et enfourner durant 8 à 10 minutes..",
-        "image": "./images/13.png"
+        "categorie": "",
+        "image": "",
+        "contenu": ""
     },
     {
         "jour": 14,
-        "categorie": "Musique",
-        "contenu": "'https://urlz.fr/oFb9'"
+        "categorie": "",
+        "image": "",
+        "contenu": ""
     },
     {
         "jour": 15,
-        "categorie": "Photo du jour",
-        "image": "./images/15.jpg"
+        "categorie": "",
+        "image": "",
+        "contenu": ""
     },
     {
         "jour": 16,
-        "categorie": "Blind test",
-        "contenu": "'https://urlz.fr/oFl8'"
+        "categorie": "",
+        "image": "",
+        "contenu": ""
     },
     {
         "jour": 17,
-        "categorie": "Pensée positive",
-        "contenu": "\"Pour pouvoir contempler un arc-en-ciel, il faut d’abord endurer la pluie\""
+        "categorie": "",
+        "image": "",
+        "contenu": ""
     },
     {
         "jour": 18,
-        "categorie": "Fun fact",
-        "contenu": "Le saviez-vous ? La musique “Jingle Bells” est la première chanson à avoir été jouée dans l’espace ! En effet, en décembre 1965, deux astronautes de la capsule Gemini 6: Walter M. Schirra Jr et Thomas P.Stafford jouent “Jingle Bells” à l’harmonica, pour leurs collègues de la station de Houston (Texas)."
+        "categorie": "",
+        "image": "",
+        "contenu": ""
     },
     {
         "jour": 19,
-        "categorie": "10 idées cadeaux à offrir à quelqu'un qu'on aime pas :",
-        "contenu": "1. Un coffret de parfum Scorpio\n2. Un t-shirt “Les jeux-vidéos ont ruiné ma vie, il m’en reste deux”\n3. Un livre “Comment ne pas devenir un vieux con”\n4. Un t-shirt de Johnny Hallyday avec un loup qui hurle face à la pleine lune\n5. Un caleçon Freegun Rick & Morty\n6. Une boîte de mouchoirs\n7. Mein Kampf\n8. Un déodorant\n9. Livres de régime\n10. Une poupée gonflable"
+        "categorie": "",
+        "image": "",
+        "contenu": ""
     },
     {
         "jour": 20,
-        "categorie": "Musique",
-        "contenu": "https://urlz.fr/oEak"
+        "categorie": "",
+        "image": "",
+        "contenu": ""
     },
     {
         "jour": 21,
-        "categorie": "Photo du jour",
-        "image": "./images/21.jpg"
+        "categorie": "",
+        "image": "",
+        "contenu": ""
     },
     {
         "jour": 22,
-        "categorie": "Enigme",
-        "contenu": "Un lutin vient de trouver le registre des cadeaux que le père Noël doit distribuer.\nEn le feuilletant, il se rend compte qu’il manque des pages et que le registre passe de la page 24 à la page 45.\nCombien de feuilles ont disparu du registre du père Noël ?\n\nRéponse : || 10||"
+        "categorie": "",
+        "image": "",
+        "contenu": ""
     },
     {
         "jour": 23,
-        "categorie": "Musique",
-        "contenu": "'https://urlz.fr/4nf'"
+        "categorie": "",
+        "image": "",
+        "contenu": ""
     },
     {
         "jour": 24,
-        "categorie": "Fun fact",
-        "contenu": "En cette période enchantée de l'année, je nous souhaite un Noël empreint de bienveillance et de chaleur. Que ces jours festifs soient le théâtre de moments complices, de rires partagés et de souvenirs qui réchauffent nos cœurs.\n\nQue la magie de Noël illumine nos vies de mille feux, nous rappelant l'importance des liens qui nous unissent. Que chaque échange, chaque sourire, chaque instant passé ensemble soit une célébration de l'amitié qui nous unit.\n\nEnsemble, que nous partagions la joie de cette saison, que nous créions des souvenirs impérissables et que nous cultivions la bienveillance qui fait de Noël une période si spéciale. Puissent ces jours de fête être le reflet de nos valeurs communes : l'amour, la générosité et le partage.\n\nQue la paix et la sérénité de Noël guident chacun de nous vers une nouvelle année pleine de réussite, de bonheur et de moments mémorables.\n\nJoyeux Noël à vous tous, chers amis ! Que cette période festive soit le prélude à une année à venir pleine d'opportunités et de prospérité."
+        "categorie": "",
+        "image": "",
+        "contenu": ""
     }
 ]

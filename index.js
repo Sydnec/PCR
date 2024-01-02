@@ -39,9 +39,9 @@ try {
 
     bot.login(process.env.DISCORD_TOKEN);
 
-    cron.schedule(process.env.ADVENT_CRON_TIMER, () => {
-        bot.handleAdventCalendarOnTimer();
-    });
+    // cron.schedule(process.env.ADVENT_CRON_TIMER, () => {
+    //     bot.handleAdventCalendarOnTimer();
+    // });
 
     bot.on('error', (e) => {
         handleException(e);
