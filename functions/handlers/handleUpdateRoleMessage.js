@@ -26,7 +26,7 @@ export default (bot) => {
             const emojis = role.name.match(emojiRegex);
             if (emojis) {
                 messageRole.react(emojis[0]);
-                newMessage += `- ${emojis[0]} pour les${role.name.replace(
+                newMessage += `- ${emojis[0]} pour${role.name.replace(
                     emojis[0],
                     ''
                 )}\n`;
