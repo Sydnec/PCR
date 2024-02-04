@@ -83,6 +83,11 @@ async function autoAddEmojis(message, bot) {
         let noEmojiLine = false;
 
         content.forEach((line) => {
+            if(line[0] === '#') {
+                newMessageString += ' ' + line + '\n';
+                return;
+            }
+
             //Analyse ligne par ligne le message d'origine
             emojisArray = line.match(emojiRegex);
             if (emojisArray === null) {
