@@ -45,6 +45,14 @@ async function registerCommands() {
 function environmentIsProd() {
     return process.env.ENV === 'production';
 }
+function getRoleID(roleName, guild) {
+    const role = guild.roles.cache.find(role => role.name === roleName);
+    if (role) {
+      return role.id;
+    } else {
+      return -1;
+    }
+}
 function handleException(e) {
     error(e);
 }
@@ -148,4 +156,5 @@ export {
     handleException,
     log,
     autoAddEmojis,
+    getRoleID,
 };

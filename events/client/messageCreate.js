@@ -1,4 +1,4 @@
-import { handleException } from '../../modules/utils.js';
+import { handleException, getRoleID } from '../../modules/utils.js';
 import { twitterRegex } from '../../modules/regex.js';
 import dotenv from 'dotenv';
 dotenv.config();
@@ -6,6 +6,7 @@ dotenv.config();
 const name = 'messageCreate';
 const once = false;
 async function execute(message) {
+    console.log(getRoleID('Temp', message.guild))
     try {
         if (message.author.bot) return;
         const messageContent = message.content;
