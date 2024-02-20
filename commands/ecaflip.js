@@ -30,7 +30,7 @@ export default {
 		let options = []
 		for(let i = 1; i <= 10; i++){
 			const option = interaction.options.getString(`option${i}`);
-			if(option != '') options.push(option);
+			if(option != null) options.push(option);
 		}
 		const alea = Math.random();
 		const optionNumber = Math.floor(alea * options.length);
