@@ -34,7 +34,7 @@ export default {
 		}
 		const alea = Math.random();
 		const optionNumber = Math.floor(alea * options.length);
-		if (options.length) {
+		if (options.length == 1) {
 			interaction.reply({
 				content: alea >= 0.5 ? 'Oui' : 'Non',
 			});
