@@ -25,8 +25,8 @@ export default {
                 await bot.destroy();
                 process.exit(0);
             }
-        } catch (e) {
-            handleException(e);
+        } catch (err) {
+            handleException(err);
         }
     },
 };

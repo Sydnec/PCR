@@ -68,8 +68,8 @@ export default {
                     }
                 }
             }
-        } catch (e) {
-            handleException(e);
+        } catch (err) {
+            handleException(err);
         }
     },
 };

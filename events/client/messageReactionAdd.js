@@ -17,8 +17,8 @@ async function execute(reaction, user) {
                 );
             await guildMember.roles.add(matchingRoles);
         }
-    } catch (e) {
-        handleException(e);
+    } catch (err) {
+        handleException(err);
     }
 }
 

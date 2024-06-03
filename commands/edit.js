@@ -16,7 +16,7 @@ export default {
                 .setRequired(true)
         ),
 
-    async execute(interaction, bot) {
+    async execute(interaction) {
         const channel = interaction.channel;
         if (channel.parentId != process.env.POLL_CHANNEL_ID) return;
         try {
@@ -30,8 +30,8 @@ export default {
                     ephemeral: true,
                 })
             );
-        } catch (e) {
-            handleException(e);
+        } catch (err) {
+            handleException(err);
         }
     },
 };

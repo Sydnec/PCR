@@ -18,7 +18,7 @@ export default {
         const input = interaction.options.getString('question');
         const daysOfTheWeek = 'Lundi \nMardi \nMercredi \nJeudi \nVendredi \nSamedi \nDimanche'
         let pollMessage = await interaction.channel.send(`# ${input} :\n ${daysOfTheWeek}`);
-        await autoAddEmojis(pollMessage, bot);
+        await autoAddEmojis(pollMessage);
         await interaction.reply({
             content: 'Sondage créé',
             ephemeral: true,

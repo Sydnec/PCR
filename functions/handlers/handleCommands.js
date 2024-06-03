@@ -20,10 +20,8 @@ export default (bot) => {
                         `Command: ${command.data.name} has passed through the handler`
                     );
                 })
-                .catch((e) => {
-                    // Gère les erreurs liées à l'importation
-                    console.error(`Error importing command ${file}: ${e}`);
-                });
+                .catch(handleException);
+
         }
 
         const clientId = process.env.CLIENT_ID;

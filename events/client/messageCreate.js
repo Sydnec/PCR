@@ -24,10 +24,10 @@ async function execute(message) {
                     );
                 })
                 .then(message.delete())
-                .catch((e) => handleException(e));
+                .catch((err) => handleException(err));
         }
-    } catch (e) {
-        handleException(e);
+    } catch (err) {
+        handleException(err);
     }
 }
 

@@ -14,7 +14,7 @@ export default {
                 .setRequired(true)
         ),
 
-    async execute(interaction, bot) {
+    async execute(interaction) {
         const user = interaction.member;
         const guild = interaction.guild;
         const code = interaction.options

@@ -17,8 +17,8 @@ async function execute(interaction, bot) {
 
         try {
             await command.execute(interaction, bot);
-        } catch (e) {
-            handleException(e);
+        } catch (err) {
+            handleException(err);
             await interaction.reply({
                 content: `Erreur lors de l'execution de la commande.`,
                 ephemeral: true,
@@ -34,8 +34,8 @@ async function execute(interaction, bot) {
         }
         try {
             await button.execute(interaction, bot);
-        } catch (e) {
-            handleException(e);
+        } catch (err) {
+            handleException(err);
         }
     }
     if (interaction.isContextMenuCommand()) {
@@ -47,8 +47,8 @@ async function execute(interaction, bot) {
         }
         try {
             await contextCommand.execute(interaction, bot);
-        } catch (e) {
-            handleException(e);
+        } catch (err) {
+            handleException(err);
         }
     }
 }
