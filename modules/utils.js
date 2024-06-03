@@ -183,5 +183,4 @@ export {
 	autoAddEmojis,
 	getRoleID,
 	dbAddDeleteMessage,
-    db,
 };
