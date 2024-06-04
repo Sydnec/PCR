@@ -12,15 +12,6 @@ export default (bot) => {
             .get(process.env.ROLE_CHANNEL_ID)
             .messages.fetch(process.env.ROLE_MESSAGE_ID);
 
-        await messageRole.reactions.cache
-            .filter((reaction) => reaction.me)
-            .forEach(async (reaction) => {
-                try {
-                    await reaction.users.remove(bot.user.id);
-                } catch (e) {
-                    handleException(e);
-                }
-            });
         let newMessage = 'Pour être ping, réagissez à ce message :\n';
         await lowerRoles.forEach(async (role) => {
             const emojis = role.name.match(emojiRegex);
