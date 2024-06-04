@@ -147,27 +147,55 @@ async function autoAddEmojis(message) {
 		error(e);
 	}
 }
-async function dbAddDeleteMessage(message, days, db) {
-	try {
-		const messageLink = message.url;
-		const messageId = message.id;
-		const createdAt = message.createdTimestamp; // Date de création du message en millisecondes
-		const expireAt = createdAt + days * 24 * 60 * 60 * 1000; // Convertir les jours en millisecondes
+async function dbAddDeleteMessage(messageId, messageLink, expireAt, db) {
+	const expireAtString =  new Date(expireAt).toLocaleString('fr-FR', {
+		day: '2-digit', 
+		month: '2-digit', 
+		year: 'numeric', 
+		hour: '2-digit', 
+		minute: '2-digit', 
+		second: '2-digit'
+	});
 
-		// Stocker l'information du message à supprimer dans la base de données
-		db.run(
-			'INSERT INTO messages (id, link, expire_at) VALUES (?, ?, ?)',
-			[messageId, messageLink, expireAt],
-			(err) => {
-				if (err) {
-					handleException(err);
-				} else {
-					log(
-						`Message programmé pour suppression après ${days} jours : ${messageLink}`
-					);
-				}
+	try {
+		// Vérifier si le message existe déjà dans la base de données
+		db.get('SELECT * FROM messages WHERE id = ?', [messageId], (err, row) => {
+			if (err) {
+				handleException(err);
+				return;
 			}
-		);
+			if (row) {
+				// Le message existe déjà, mettre à jour l'enregistrement
+				db.run(
+					'UPDATE messages SET expire_at = ? WHERE id = ?',
+					[expireAt, messageId],
+					(err) => {
+						if (err) {
+							handleException(err);
+						} else {
+							log(
+								`(MàJ) Message programmé pour suppression le ${expireAtString} : ${messageLink}`
+							);
+						}
+					}
+				);
+			} else {
+				// Le message n'existe pas, insérer un nouvel enregistrement
+				db.run(
+					'INSERT INTO messages (id, link, expire_at) VALUES (?, ?, ?)',
+					[messageId, messageLink, expireAt],
+					(err) => {
+						if (err) {
+							handleException(err);
+						} else {
+							log(
+								`Message programmé pour suppression le ${expireAtString} : ${messageLink}`
+							);
+						}
+					}
+				);
+			}
+		});
 	} catch (err) {
 		handleException(err);
 	}

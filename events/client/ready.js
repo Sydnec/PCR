@@ -1,4 +1,5 @@
 import { log } from '../../modules/utils.js';
+import sqlite3 from "sqlite3";
 
 const name = 'ready';
 const once = true;

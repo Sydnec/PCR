@@ -18,6 +18,8 @@ const db = new sqlite3.Database('./messages.db', (err) => {
     }
 });
 
+const timeouts = new Map();
+
 export default {
 	data: new SlashCommandBuilder()
 		.setName('autodel')
@@ -40,18 +42,6 @@ export default {
 
 	async execute(interaction, bot) {
         try {
-            // Initialisation de la base de données SQLite
-            const db = new sqlite3.Database('./messages.db', (err) => {
-                if (err) {
-                    console.error('Erreur lors de l\'ouverture de la base de données :', err);
-                } else {
-                    db.run('CREATE TABLE IF NOT EXISTS messages (id TEXT PRIMARY KEY, link TEXT, expire_at INTEGER)', (err) => {
-                        if (err) {
-                            console.error('Erreur lors de la création de la table :', err);
-                        }
-                    });
-                }
-            });
             const messageLink = interaction.options.getString('lien');
             const days = interaction.options.getNumber('jours') || 7;
 
@@ -59,6 +49,7 @@ export default {
             const pathSegments = urlParts.pathname.split('/');
 
             if (pathSegments.length < 5) {
+                console.log("non")
                 throw new Error("Le lien de message fourni n'est pas valide.");
             }
 
@@ -69,33 +60,49 @@ export default {
             const guild = await bot.guilds.fetch(guildId);
             const channel = await guild.channels.resolve(channelId);
 
-            if (!channel || !channel.isText()) {
+            if (!channel) {
+                console.log("non")
                 throw new Error(
                     "Le canal spécifié n'est pas un canal de texte valide."
                 );
             }
 
             const message = await channel.messages.fetch(messageId);
-            dbAddDeleteMessage(message, days, db);
+            if (message.author == interaction.user) {
+                const messageLink = message.url;
+                const messageId = message.id;
+                const createdAt = message.createdTimestamp; // Date de création du message en millisecondes
+                const expireAt = createdAt + days /** 24 * 60*/ * 60 * 1000; // Convertir les jours en millisecondes
+                dbAddDeleteMessage(messageId, messageLink, expireAt, db);
 
-            // Planifier la suppression si l'expiration est dans le futur
-            const delay = expireAt - Date.now();
-            if (delay > 0) {
-                setTimeout(async () => {
+                // Clear existing timeout if it exists
+                if (timeouts.has(messageId)) {
+                    clearTimeout(timeouts.get(messageId));
+                    timeouts.delete(messageId);
+                }
+
+                // Planifier la suppression si l'expiration est dans le futur
+                const delay = expireAt - Date.now();
+                if (delay > 0) {
+                    const timeout = setTimeout(async () => {
+                        await message.delete();
+                        log(`Message supprimé : ${messageLink}`);
+                        db.run('DELETE FROM messages WHERE id = ?', [messageId]);
+                        timeouts.delete(messageId);
+                    }, delay);
+
+                    timeouts.set(messageId, timeout);
+                } else {
                     await message.delete();
-                    log(`Message supprimé : ${messageLink}`);
+                    log(`Message supprimé immédiatement : ${messageLink}`);
                     db.run('DELETE FROM messages WHERE id = ?', [messageId]);
-                }, delay);
-            } else {
-                await message.delete();
-                log(`Message supprimé immédiatement : ${messageLink}`);
-                db.run('DELETE FROM messages WHERE id = ?', [messageId]);
-            }
+                }
 
-            await interaction.reply({
-                content: `Le message sera supprimé après ${days} jours.`,
-                ephemeral: true,
-            });
+                await interaction.reply({
+                    content: `Le message sera supprimé après ${days} jours.`,
+                    ephemeral: true,
+                });
+            }
         } catch (err) {
             handleException(err)
         }

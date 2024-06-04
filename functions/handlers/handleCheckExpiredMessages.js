@@ -27,7 +27,7 @@ export default (bot) => {
                         const guild = await bot.guilds.fetch(guildId);
                         const channel = await guild.channels.resolve(channelId);
 
-                        if (!channel || !channel.isText()) {
+                        if (!channel) {
                             throw new Error("Le canal spécifié n'est pas un canal de texte valide.");
                         }
 
