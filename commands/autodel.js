@@ -72,7 +72,7 @@ export default {
                 const messageLink = message.url;
                 const messageId = message.id;
                 const createdAt = message.createdTimestamp; // Date de création du message en millisecondes
-                const expireAt = createdAt + days /** 24 * 60*/ * 60 * 1000; // Convertir les jours en millisecondes
+                const expireAt = createdAt + days * 24 * 60 * 60 * 1000; // Convertir les jours en millisecondes
                 dbAddDeleteMessage(messageId, messageLink, expireAt, db);
 
                 // Clear existing timeout if it exists
