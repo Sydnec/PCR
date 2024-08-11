@@ -1,4 +1,4 @@
-import { Client, Collection, GatewayIntentBits } from 'discord.js'; // , Events, Routes, REST
+import { Client, Collection, GatewayIntentBits } from 'discord.js'; 
 import { readdirSync } from 'fs';
 import { handleException } from './modules/utils.js';
 import cron from 'node-cron';
@@ -20,6 +20,19 @@ try {
     bot.commands = new Collection();
     bot.commandsArray = [];
     bot.buttons = new Collection();
+
+    // Initialize invite cache
+    bot.invites = new Map();
+
+    bot.on('ready', async () => {
+        console.log(`Logged in as ${bot.user.tag}`);
+
+        // Load and cache invites
+        bot.guilds.cache.forEach(async guild => {
+            const firstInvites = await guild.invites.fetch();
+            bot.invites.set(guild.id, new Map(firstInvites.map(invite => [invite.code, invite.uses])));
+        });
+    });
 
     const functionFolders = readdirSync('./functions');
     for (const folder of functionFolders) {
@@ -48,7 +61,7 @@ try {
     });
 } catch (e) {
     handleException(e);
-}
+            }
 
 process.on('unhandledRejection', (e) => {
     handleException(e);
