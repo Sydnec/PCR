@@ -56,6 +56,10 @@ try {
     //     bot.handleAdventCalendarOnTimer();
     // });
 
+    cron.schedule(process.env.COTD_CRON_TIMER, () => {
+        bot.handleCOTDOnTimer();
+    });
+
     bot.on('error', (e) => {
         handleException(e);
     });
