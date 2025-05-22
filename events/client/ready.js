@@ -1,4 +1,4 @@
-import { log } from '../../modules/utils.js';
+import { log, updateThreadList } from '../../modules/utils.js';
 import sqlite3 from "sqlite3";
 
 const name = 'ready';
@@ -16,6 +16,7 @@ async function execute(bot) {
             });
         }
     });
+    updateThreadList(bot.guilds.cache.first(), bot);
 
     bot.handleUpdateRoleMessage();
     bot.handleCheckExpiredMessages(db);
