@@ -200,19 +200,14 @@ async function dbAddDeleteMessage(messageId, messageLink, expireAt, db) {
 		handleException(err);
 	}
 }
-async function updateThreadList(client) {
-	const guild = await client.guilds.fetch(process.env.GUILD_ID);
-    const CHANNEL_ID = process.env.THREAD_LIST_CHANNEL_ID;
-    const DEFAULT_ROLE_ID = process.env.DEFAULT_ROLE_ID;
+async function updateThreadList(guild) {
+    const channel = await guild.channels.fetch(process.env.THREAD_LIST_CHANNEL_ID);
 
-    const channel = await guild.channels.fetch(CHANNEL_ID);
-
-    const defaultRole = guild.roles.cache.get(DEFAULT_ROLE_ID);
+	const defaultRole = guild.roles.cache.get(process.env.DEFAULT_ROLE_ID);
 
     const textChannels = guild.channels.cache.filter(
         c =>
             (c.type === ChannelType.GuildText) &&
-			c.id !== process.env.POLL_CHANNEL_ID &&
             c.permissionsFor(defaultRole)?.has(PermissionsBitField.Flags.ViewChannel)
     );
 
@@ -226,20 +221,32 @@ async function updateThreadList(client) {
                 if (!threadsByChannel.has(ch)) threadsByChannel.set(ch, []);
                 threadsByChannel.get(ch).push(thread);
             }
-            // // Fils archivés publics
-            // const archivedPublic = await ch.threads.fetchArchived({ type: 'public' });
-            // for (const thread of archivedPublic.threads.values()) {
-            //     if (!threadsByChannel.has(ch)) threadsByChannel.set(ch, []);
-            //     // Évite les doublons
-            //     if (!threadsByChannel.get(ch).some(t => t.id === thread.id)) {
-            //         threadsByChannel.get(ch).push(thread);
-            //     }
-            // }
+            // Fils archivés publics
+            const archivedPublic = await ch.threads.fetchArchived({ type: 'public' });
+            for (const thread of archivedPublic.threads.values()) {
+                if (!threadsByChannel.has(ch)) threadsByChannel.set(ch, []);
+                // Évite les doublons
+                if (!threadsByChannel.get(ch).some(t => t.id === thread.id)) {
+                    threadsByChannel.get(ch).push(thread);
+                }
+            }
         }
     }
 
     let threadList = '';
-    for (const [parent, threads] of threadsByChannel) {
+    const sortedChannels = Array.from(threadsByChannel.keys()).sort((a, b) => {
+        if (a.parent && b.parent) {
+            if (a.parent.position !== b.parent.position) {
+                return a.parent.position - b.parent.position;
+            }
+        }
+        if (a.parent && !b.parent) return 1;
+        if (!a.parent && b.parent) return -1;
+        return a.position - b.position;
+    });
+
+    for (const parent of sortedChannels) {
+        const threads = threadsByChannel.get(parent);
         if (threads.length === 0) continue;
         threadList += `\n__**${parent.name}**__\n`;
         threadList += threads.map(t => `- <#${t.id}> (${t.name})`).join('\n') + '\n';

@@ -6,11 +6,9 @@ const name = 'threadCreate';
 const once = false;
 
 async function execute(thread) {
-    const guild = thread.guild;
-
     // Si ce n'est pas dans le channel sondage, on liste tous les fils du serveur
     if (thread.parentId != process.env.POLL_CHANNEL_ID) {
-        updateThreadList(guild, thread.client);
+        updateThreadList(thread.guild);
     } else { 
         //N'accepte que les post de #Sondage
         let message = await thread.fetchStarterMessage();

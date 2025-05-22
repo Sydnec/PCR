@@ -16,7 +16,8 @@ async function execute(bot) {
             });
         }
     });
-    updateThreadList(bot);
+    const guild = await bot.guilds.fetch(process.env.GUILD_ID);
+    updateThreadList(guild);
 
     bot.handleUpdateRoleMessage();
     bot.handleCheckExpiredMessages(db);
