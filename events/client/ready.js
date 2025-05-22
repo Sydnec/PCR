@@ -4,7 +4,7 @@ import sqlite3 from "sqlite3";
 const name = 'ready';
 const once = true;
 async function execute(bot) {
-    // Initialisation de la base de données SQLite
+    // Initialisation de la base de données SQLite pour autodel
     const db = new sqlite3.Database('./messages.db', (err) => {
         if (err) {
             console.error('Erreur lors de l\'ouverture de la base de données :', err);
@@ -16,7 +16,7 @@ async function execute(bot) {
             });
         }
     });
-    updateThreadList(bot.guilds.cache.first(), bot);
+    updateThreadList(bot);
 
     bot.handleUpdateRoleMessage();
     bot.handleCheckExpiredMessages(db);
