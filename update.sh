@@ -103,10 +103,6 @@ sleep 3
 echo -e "${BLUE}📊 Statut du bot:${NC}"
 pm2 status $PM2_PROCESS_NAME
 
-# Afficher les logs récents
-echo -e "${BLUE}📜 Logs récents:${NC}"
-pm2 logs $PM2_PROCESS_NAME --lines 10
-
 # Restaurer les changements stashés si nécessaire
 if [ "$stashed" = true ]; then
     echo -e "${YELLOW}🔄 Restauration des changements locaux sauvegardés...${NC}"
