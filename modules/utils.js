@@ -148,12 +148,12 @@ async function autoAddEmojis(message) {
 	}
 }
 async function dbAddDeleteMessage(messageId, messageLink, expireAt, db) {
-	const expireAtString =  new Date(expireAt).toLocaleString('fr-FR', {
-		day: '2-digit', 
-		month: '2-digit', 
-		year: 'numeric', 
-		hour: '2-digit', 
-		minute: '2-digit', 
+	const expireAtString = new Date(expireAt).toLocaleString('fr-FR', {
+		day: '2-digit',
+		month: '2-digit',
+		year: 'numeric',
+		hour: '2-digit',
+		minute: '2-digit',
 		second: '2-digit'
 	});
 
@@ -201,86 +201,83 @@ async function dbAddDeleteMessage(messageId, messageLink, expireAt, db) {
 	}
 }
 async function updateThreadList(guild) {
-    const channel = await guild.channels.fetch(process.env.THREAD_LIST_CHANNEL_ID);
+	const channel = await guild.channels.fetch(process.env.THREAD_LIST_CHANNEL_ID);
 
 	const defaultRole = guild.roles.cache.get(process.env.DEFAULT_ROLE_ID);
 
-    const textChannels = guild.channels.cache.filter(
-        c =>
-            (c.type === ChannelType.GuildText) &&
-            c.permissionsFor(defaultRole)?.has(PermissionsBitField.Flags.ViewChannel)
-    );
+	const textChannels = guild.channels.cache.filter(
+		c =>
+			(c.type === ChannelType.GuildText) &&
+			c.permissionsFor(defaultRole)?.has(PermissionsBitField.Flags.ViewChannel)
+	);
 
-    let threadsByChannel = new Map();
+	let threadsByChannel = new Map();
 
-    for (const [, ch] of textChannels) {
-        if (ch.threads && typeof ch.threads.fetchActive === 'function') {
-            // Fils actifs
-            const active = await ch.threads.fetchActive();
-            for (const thread of active.threads.values()) {
-                if (!threadsByChannel.has(ch)) threadsByChannel.set(ch, []);
-                threadsByChannel.get(ch).push(thread);
-            }
-            // Fils archivés publics
-            const archivedPublic = await ch.threads.fetchArchived({ type: 'public' });
-            for (const thread of archivedPublic.threads.values()) {
-                if (!threadsByChannel.has(ch)) threadsByChannel.set(ch, []);
-                // Évite les doublons
-                if (!threadsByChannel.get(ch).some(t => t.id === thread.id)) {
-                    threadsByChannel.get(ch).push(thread);
-                }
-            }
-        }
-    }
+	for (const [, ch] of textChannels) {
+		if (ch.threads && typeof ch.threads.fetchActive === 'function') {
+			// Fils actifs
+			const active = await ch.threads.fetchActive();
+			for (const thread of active.threads.values()) {
+				if (!threadsByChannel.has(ch)) threadsByChannel.set(ch, []);
+				threadsByChannel.get(ch).push(thread);
+			}
+			// Fils archivés publics
+			const archivedPublic = await ch.threads.fetchArchived({ type: 'public' });
+			for (const thread of archivedPublic.threads.values()) {
+				if (!threadsByChannel.has(ch)) threadsByChannel.set(ch, []);
+				// Évite les doublons
+				if (!threadsByChannel.get(ch).some(t => t.id === thread.id)) {
+					threadsByChannel.get(ch).push(thread);
+				}
+			}
+		}
+	}
 
-    let threadList = '';
-    const sortedChannels = Array.from(threadsByChannel.keys()).sort((a, b) => {
-        if (a.parent && b.parent) {
-            if (a.parent.position !== b.parent.position) {
-                return a.parent.position - b.parent.position;
-            }
-        }
-        if (a.parent && !b.parent) return 1;
-        if (!a.parent && b.parent) return -1;
-        return a.position - b.position;
-    });
+	let threadList = '';
+	const sortedChannels = Array.from(threadsByChannel.keys()).sort((a, b) => {
+		if (a.parent && b.parent) {
+			if (a.parent.position !== b.parent.position) {
+				return a.parent.position - b.parent.position;
+			}
+		}
+		if (a.parent && !b.parent) return 1;
+		if (!a.parent && b.parent) return -1;
+		return a.position - b.position;
+	});
 
-    for (const parent of sortedChannels) {
-        const threads = threadsByChannel.get(parent);
-        if (threads.length === 0) continue;
-        threadList += `\n__**${parent.name}**__\n`;
-        threadList += threads.map(t => `- <#${t.id}> (${t.name})`).join('\n') + '\n';
-    }
-    if (!threadList) threadList = 'Aucun fil sur le serveur.';
+	for (const parent of sortedChannels) {
+		const threads = threadsByChannel.get(parent);
+		if (threads.length === 0) continue;
+		threadList += `\n__**${parent.name}**__\n`;
+		threadList += threads.map(t => `- <#${t.id}> (${t.name})`).join('\n') + '\n';
+	}
+	if (!threadList) threadList = 'Aucun fil sur le serveur.';
 
-    const messages = splitMessage(`**Liste des fils du serveur :**\n${threadList}`);
+	const messages = splitMessage(`**Liste des fils du serveur :**\n${threadList}`);
 
-    let fetched;
-    do {
-        fetched = await channel.messages.fetch({ limit: 100 });
-        if (fetched.size > 0) {
-            await channel.bulkDelete(fetched, true);
-        }
-    } while (fetched.size >= 2); // Discord ne permet pas de bulkDelete 1 seul message
+	let fetched = await channel.messages.fetch({ limit: 100 });
 
-    let listMessage;
-    for (const msg of messages) {
-        listMessage = await channel.send(msg);
-    }
+	for (const [, message] of fetched) {
+		await message.delete();
+	}
+	let listMessage;
+	for (const msg of messages) {
+		listMessage = await channel.send(msg);
+	}
 }
 function splitMessage(text, maxLength = 2000) {
-    const lines = text.split('\n');
-    const messages = [];
-    let current = '';
-    for (const line of lines) {
-        if ((current + line + '\n').length > maxLength) {
-            messages.push(current);
-            current = '';
-        }
-        current += line + '\n';
-    }
-    if (current) messages.push(current);
-    return messages;
+	const lines = text.split('\n');
+	const messages = [];
+	let current = '';
+	for (const line of lines) {
+		if ((current + line + '\n').length > maxLength) {
+			messages.push(current);
+			current = '';
+		}
+		current += line + '\n';
+	}
+	if (current) messages.push(current);
+	return messages;
 }
 
 export {
