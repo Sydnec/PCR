@@ -1,0 +1,886 @@
+#!/bin/bash
+
+# 🤖 PCR Bot Discord - Script de gestion unifié
+# Usage: pcr [command]
+
+# Auto-détection du répertoire du projet
+# Si le script est dans /usr/local/bin, on utilise le répertoire courant
+# Sinon, on utilise le répertoire du script
+
+if [[ "$(realpath "$0")" == "/usr/local/bin/pcr" ]]; then
+    # Script installé globalement, utiliser le répertoire courant
+    PROJECT_DIR="$(pwd)"
+    # Vérifier si on est dans un projet PCR valide
+    if [[ ! -f "index.js" ]] || [[ ! -f "package.json" ]]; then
+        # Essayer de trouver le projet dans les répertoires parents
+        current_dir="$(pwd)"
+        found=false
+        while [[ "$current_dir" != "/" ]]; do
+            if [[ -f "$current_dir/index.js" ]] && [[ -f "$current_dir/package.json" ]] && [[ -f "$current_dir/pcr" ]]; then
+                PROJECT_DIR="$current_dir"
+                found=true
+                break
+            fi
+            current_dir="$(dirname "$current_dir")"
+        done
+        
+        if [[ "$found" != true ]]; then
+            PROJECT_DIR="/home/sydnec/PCR"  # Fallback
+        fi
+    fi
+else
+    # Script local, utiliser le répertoire du script
+    PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+fi
+
+LOG_DIR="$PROJECT_DIR/logs"
+BACKUP_DIR="$PROJECT_DIR/backups"
+
+# Validation du répertoire de projet
+validate_project_directory() {
+    if [[ ! -f "$PROJECT_DIR/index.js" ]] || [[ ! -f "$PROJECT_DIR/package.json" ]]; then
+        print_error "Ce répertoire ne semble pas être un projet PCR valide."
+        print_error "Fichiers attendus :"
+        print_error "  - index.js: $PROJECT_DIR/index.js"
+        print_error "  - package.json: $PROJECT_DIR/package.json"
+        print_error ""
+        print_error "Répertoire actuel détecté : $PROJECT_DIR"
+        print_error "Assurez-vous d'être dans le répertoire racine du projet ou que les fichiers existent."
+        exit 1
+    fi
+}
+
+# Création du répertoire de backup si nécessaire
+ensure_backup_dir() {
+    if [[ ! -d "$BACKUP_DIR" ]]; then
+        mkdir -p "$BACKUP_DIR"
+    fi
+}
+
+# Création du répertoire de logs si nécessaire
+ensure_log_dir() {
+    if [[ ! -d "$LOG_DIR" ]]; then
+        mkdir -p "$LOG_DIR"
+    fi
+}
+
+# Fonction pour trouver le chemin de la base de données
+find_database_path() {
+    local db_paths=(
+        "$PROJECT_DIR/messages.db"
+        "$PROJECT_DIR/database.db"
+        "$PROJECT_DIR/bot.db"
+    )
+    
+    for path in "${db_paths[@]}"; do
+        if [[ -f "$path" ]]; then
+            echo "$path"
+            return 0
+        fi
+    done
+    
+    # Retourner le chemin standard si aucun fichier trouvé
+    echo "$PROJECT_DIR/messages.db"
+    return 1
+}
+
+# Fonction de sauvegarde de la base de données
+backup_database() {
+    ensure_backup_dir
+    local backup_file="$BACKUP_DIR/db_backup_$(date +%Y%m%d_%H%M%S).db"
+    local db_path
+    
+    db_path=$(find_database_path)
+    
+    if [[ -f "$db_path" ]]; then
+        cp "$db_path" "$backup_file"
+        print_success "Base de données sauvegardée : $backup_file"
+        print_success "Source: $db_path"
+        return 0
+    else
+        print_warning "Aucune base de données trouvée"
+        print_warning "Emplacements vérifiés:"
+        print_warning "  - $PROJECT_DIR/messages.db"
+        print_warning "  - $PROJECT_DIR/database.db"
+        print_warning "  - $PROJECT_DIR/bot.db"
+        return 1
+    fi
+}
+
+# Fonction de restauration de la base de données
+restore_database() {
+    local backup_file="$1"
+    
+    if [[ -z "$backup_file" ]]; then
+        print_error "Fichier de sauvegarde requis"
+        echo "Usage: pcr restore <fichier_backup>"
+        echo "Sauvegardes disponibles:"
+        ls -la "$BACKUP_DIR"/*.db 2>/dev/null || echo "Aucune sauvegarde trouvée"
+        return 1
+    fi
+    
+    if [[ ! -f "$backup_file" ]]; then
+        print_error "Fichier de sauvegarde non trouvé: $backup_file"
+        return 1
+    fi
+    
+    local db_path
+    db_path=$(find_database_path)
+    
+    print_step "Arrêt du bot pour la restauration..."
+    pm2 stop pcr 2>/dev/null || echo "Bot déjà arrêté"
+    
+    print_step "Restauration de la base de données..."
+    cp "$backup_file" "$db_path"
+    print_success "Base de données restaurée vers: $db_path"
+    
+    print_step "Redémarrage du bot..."
+    pm2 start "$PROJECT_DIR/index.js" --name pcr
+    
+    if check_app_status; then
+        print_success "Base de données restaurée avec succès"
+    else
+        print_error "Erreur lors de la restauration"
+    fi
+}
+
+# Couleurs
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+print_section() {
+    echo -e "${CYAN}📊 $1${NC}"
+    echo "----------------------------"
+}
+
+print_step() {
+    echo -e "${GREEN}[ÉTAPE]${NC} $1"
+}
+
+print_success() {
+    echo -e "${GREEN}✅ $1${NC}"
+}
+
+print_warning() {
+    echo -e "${YELLOW}⚠️  $1${NC}"
+}
+
+print_error() {
+    echo -e "${RED}❌ $1${NC}"
+}
+
+# Fonction pour vérifier si le bot est en ligne
+check_app_status() {
+    if pm2 list 2>/dev/null | grep -q "pcr.*online"; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Fonction de monitoring complète
+monitor_function() {
+    clear
+    echo -e "${PURPLE}🤖 PCR BOT DISCORD - MONITORING${NC}"
+    echo "================================="
+    echo ""
+    
+    # 1. Statut PM2
+    print_section "Statut PM2"
+    if pm2 list 2>/dev/null | grep -q "pcr"; then
+        pm2 list
+        echo ""
+        if check_app_status; then
+            print_success "Bot PCR en ligne"
+        else
+            print_error "Bot PCR hors ligne"
+        fi
+    else
+        print_error "Aucun processus PM2 trouvé"
+    fi
+    echo ""
+
+    # 2. Ressources système
+    print_section "Ressources système"
+    echo "💾 Mémoire: $(free -h | awk '/^Mem:/ {printf "Utilisée: %s/%s (%.2f%%)", $3, $2, ($3/$2)*100}')"
+    echo "🔥 CPU: $(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | sed 's/%us,//')% utilisé"
+    echo "💿 Disque: $(df -h / | awk 'NR==2 {printf "Utilisé: %s/%s (%s)", $3, $2, $5}')"
+    echo ""
+
+    # 3. Informations de déploiement
+    print_section "Informations de déploiement"
+    echo "📁 Répertoire projet: $PROJECT_DIR"
+    echo "👤 Utilisateur: $(whoami)"
+    echo "🖥️  Hostname: $(hostname)"
+    echo "📝 Dernière modification: $(stat -c %y "$PROJECT_DIR/index.js" 2>/dev/null || stat -f %Sm "$PROJECT_DIR/index.js" 2>/dev/null || echo "Non disponible")"
+    echo ""
+
+    # 4. Logs récents
+    print_section "Logs récents (dernières 5 lignes)"
+    pm2 logs pcr --lines 5 --nostream 2>/dev/null || echo "Aucun log disponible"
+    echo ""
+
+    echo "🔄 Pour actualiser: pcr monitor"
+    echo "📊 Pour PM2 monitoring: pm2 monit"
+    echo "📋 Pour redémarrer: pcr restart"
+}
+
+# Fonction de mise à jour
+update_function() {
+    cd "$PROJECT_DIR" || {
+        print_error "Impossible d'accéder au répertoire $PROJECT_DIR"
+        exit 1
+    }
+
+    print_step "🔄 Mise à jour PCR Bot..."
+    
+    # Sauvegarde automatique avant mise à jour
+    print_step "Sauvegarde automatique avant mise à jour..."
+    backup_database || echo "Continuer sans sauvegarde..."
+
+    # Sauvegarde des logs
+    ensure_log_dir
+    print_step "Sauvegarde des logs actuels..."
+    if [ -f "$LOG_DIR/pcr.log" ]; then
+        cp "$LOG_DIR/pcr.log" "$LOG_DIR/pcr.log.backup.$(date +%Y%m%d_%H%M%S)"
+    fi
+
+    # Vérifier et arrêter PM2 si nécessaire
+    print_step "📋 Vérification du statut PM2..."
+    if pm2 describe pcr &> /dev/null; then
+        print_step "✅ Processus PM2 'pcr' trouvé"
+        print_step "Arrêt temporaire du bot..."
+        pm2 stop pcr
+    else
+        print_warning "⚠️ Processus PM2 'pcr' non trouvé"
+    fi
+
+    # Stash des changements locaux non commités (si il y en a)
+    if ! git diff-index --quiet HEAD -- 2>/dev/null; then
+        print_step "💾 Sauvegarde des changements locaux..."
+        git stash push -m "Auto-stash avant mise à jour $(date)"
+        stashed=true
+    else
+        stashed=false
+    fi
+
+    # Git pull
+    print_step "Récupération des dernières modifications..."
+    git fetch origin
+    git pull origin main || print_warning "Impossible de faire git pull"
+
+    # Vérifier si package.json a été modifié
+    if git diff HEAD@{1} HEAD --name-only 2>/dev/null | grep -q "package.json"; then
+        print_step "📦 package.json modifié, mise à jour des dépendances..."
+        npm install
+    else
+        print_step "Installation/mise à jour des dépendances..."
+        npm install
+    fi
+
+    # Restaurer les changements stashés si nécessaire
+    if [ "$stashed" = true ]; then
+        print_step "🔄 Restauration des changements locaux sauvegardés..."
+        git stash pop
+    fi
+
+    # Redémarrage
+    print_step "Redémarrage du bot..."
+    pm2 restart pcr || pm2 start index.js --name pcr
+    pm2 save
+
+    # Vérification finale
+    sleep 5
+    if check_app_status; then
+        print_success "🎉 Mise à jour terminée avec succès!"
+        print_success "Le bot PCR est en ligne"
+    else
+        print_error "❌ Problème lors de la mise à jour"
+        echo "Vérifiez les logs avec: pcr logs"
+    fi
+}
+
+# Fonction de création d'événement
+create_event() {
+    local event_name="$1"
+    
+    if [[ -z "$event_name" ]]; then
+        print_error "Nom d'événement requis"
+        echo "Usage: pcr event --name <nom_evenement>"
+        echo "Exemple: pcr event --name messageUpdate"
+        return 1
+    fi
+    
+    # Vérifier que le nom est valide (alphanumeric + tirets)
+    if [[ ! "$event_name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        print_error "Nom d'événement invalide. Utilisez uniquement des lettres, chiffres, tirets et underscores."
+        return 1
+    fi
+    
+    local events_dir="$PROJECT_DIR/events/client"
+    local example_file="$events_dir/example"
+    local new_event_file="$events_dir/$event_name.js"
+    
+    # Vérifier si le fichier example existe
+    if [[ ! -f "$example_file" ]]; then
+        print_error "Fichier template non trouvé: $example_file"
+        return 1
+    fi
+    
+    # Vérifier si l'événement existe déjà
+    if [[ -f "$new_event_file" ]]; then
+        print_error "L'événement '$event_name' existe déjà"
+        print_warning "Fichier existant: $new_event_file"
+        return 1
+    fi
+    
+    print_step "Création de l'événement '$event_name'..."
+    
+    # Copier le template et remplacer les valeurs par défaut
+    cp "$example_file" "$new_event_file"
+    
+    # Remplacer 'name' par le nom de l'événement
+    sed -i "s/const name = 'name'/const name = '$event_name'/g" "$new_event_file"
+    
+    # Ajouter un commentaire d'identification
+    sed -i "1i// Événement: $event_name" "$new_event_file"
+    sed -i "2i//" "$new_event_file"
+    
+    print_success "Événement '$event_name' créé avec succès!"
+    print_success "Fichier: $new_event_file"
+    echo ""
+    echo "📝 Prochaines étapes:"
+    echo "───────────────────"
+    echo "  1. Éditez le fichier pour personnaliser l'événement"
+    echo "  2. Modifiez la propriété 'once' (true/false)"
+    echo "  3. Implémentez la logique dans la fonction execute"
+    echo "  4. Redémarrez le bot: pcr restart"
+    echo ""
+    echo "💡 Commandes utiles:"
+    echo "  • Éditer: nano $new_event_file"
+    echo "  • Voir les logs: pcr logs"
+    echo ""
+    echo "📚 Événements Discord courants:"
+    echo "  • ready, messageCreate, messageDelete"
+    echo "  • guildMemberAdd, guildMemberRemove"
+    echo "  • interactionCreate, messageReactionAdd"
+}
+
+# Fonction de création de commande
+create_command() {
+    local command_name="$1"
+    local command_desc="$2"
+    
+    if [[ -z "$command_name" ]]; then
+        print_error "Nom de commande requis"
+        echo "Usage: pcr command --name <nom_commande> [--desc <description>]"
+        echo "Exemple: pcr command --name hello"
+        echo "Exemple: pcr command --name hello --desc \"Commande de salutation\""
+        return 1
+    fi
+    
+    # Vérifier que le nom est valide (alphanumeric + tirets)
+    if [[ ! "$command_name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        print_error "Nom de commande invalide. Utilisez uniquement des lettres, chiffres, tirets et underscores."
+        return 1
+    fi
+    
+    local commands_dir="$PROJECT_DIR/commands"
+    local example_file="$commands_dir/example"
+    local new_command_file="$commands_dir/$command_name.js"
+    
+    # Vérifier si le fichier example existe
+    if [[ ! -f "$example_file" ]]; then
+        print_error "Fichier template non trouvé: $example_file"
+        return 1
+    fi
+    
+    # Vérifier si la commande existe déjà
+    if [[ -f "$new_command_file" ]]; then
+        print_error "La commande '$command_name' existe déjà"
+        print_warning "Fichier existant: $new_command_file"
+        return 1
+    fi
+    
+    print_step "Création de la commande '$command_name'..."
+    
+    # Copier le template et remplacer les valeurs par défaut
+    cp "$example_file" "$new_command_file"
+    
+    # Remplacer 'name' par le nom de la commande
+    sed -i "s/\.setName('name')/\.setName('$command_name')/g" "$new_command_file"
+    
+    # Remplacer 'Description' par une description personnalisée
+    if [[ -n "$command_desc" ]]; then
+        # Utiliser la description fournie
+        sed -i "s/\.setDescription('Description')/\.setDescription('$command_desc')/g" "$new_command_file"
+    else
+        # Utiliser une description par défaut
+        sed -i "s/\.setDescription('Description')/\.setDescription('Description de la commande $command_name')/g" "$new_command_file"
+    fi
+    
+    print_success "Commande '$command_name' créée avec succès!"
+    print_success "Fichier: $new_command_file"
+    echo ""
+    echo "📝 Prochaines étapes:"
+    echo "───────────────────"
+    echo "  1. Éditez le fichier pour personnaliser la commande"
+    echo "  2. Modifiez la description et les options"
+    echo "  3. Implémentez la logique dans la fonction execute"
+    echo "  4. Redémarrez le bot: pcr restart"
+    echo ""
+    echo "💡 Commandes utiles:"
+    echo "  • Éditer: nano $new_command_file"
+    echo "  • Voir les logs: pcr logs"
+}
+
+# Fonction d'installation du script dans le PATH
+install_script() {
+    local script_path="/usr/local/bin/pcr"
+    
+    if [[ -f "$script_path" ]]; then
+        echo -n "Le script est déjà installé. Voulez-vous le mettre à jour? (O/n): "
+        read -n 1 confirmation
+        echo ""
+        if [[ ! "$confirmation" =~ ^[Oo]$ ]] && [[ -n "$confirmation" ]]; then
+            print_warning "Installation annulée"
+            return 1
+        fi
+    fi
+    
+    print_step "Installation du script pcr dans /usr/local/bin..."
+    
+    # Copier le script
+    if sudo cp "$PROJECT_DIR/pcr" "$script_path"; then
+        sudo chmod +x "$script_path"
+        print_success "Script installé avec succès!"
+        print_success "Vous pouvez maintenant utiliser 'pcr' depuis n'importe où"
+        echo ""
+        echo "💡 Conseils:"
+        echo "  - Utilisez 'pcr' depuis le répertoire du projet ou ses sous-répertoires"
+        echo "  - Le script détectera automatiquement le bon répertoire de projet"
+        echo "  - Pour désinstaller: sudo rm /usr/local/bin/pcr"
+    else
+        print_error "Erreur lors de l'installation (permissions sudo requises)"
+        return 1
+    fi
+}
+
+case "$1" in
+    dev)
+        validate_project_directory
+        echo "🚀 Lancement du mode développement..."
+        echo ""
+        print_step "Démarrage du bot en mode développement..."
+        cd "$PROJECT_DIR"
+        npm run dev
+        ;;
+    start)
+        validate_project_directory
+        print_section "Démarrage du Bot PCR"
+        cd "$PROJECT_DIR"
+        pm2 start index.js --name pcr 2>/dev/null || {
+            print_warning "Processus déjà en cours, tentative de redémarrage..."
+            pm2 restart pcr
+        }
+        pm2 save
+        sleep 2
+        echo ""
+        if check_app_status; then
+            print_success "🎉 Bot PCR démarré avec succès!"
+            echo ""
+            echo "📊 Informations du bot:"
+            echo "─────────────────────"
+            echo "🤖 Nom: PCR Discord Bot"
+            echo "📁 Répertoire: $PROJECT_DIR"
+            echo ""
+            echo "💡 Commandes utiles:"
+            echo "  • pcr status   - Vérifier l'état"
+            echo "  • pcr logs     - Voir les logs"
+            echo "  • pcr monitor  - Monitoring complet"
+        else
+            print_error "❌ Échec du démarrage"
+            echo ""
+            echo "🔍 Vérifications suggérées:"
+            echo "  • Vérifiez les logs: pcr logs"
+            echo "  • Vérifiez les permissions"
+            echo "  • Redémarrez: pcr restart"
+        fi
+        ;;
+    stop)
+        print_section "Arrêt du Bot PCR"
+        pm2 stop pcr 2>/dev/null || print_warning "Bot déjà arrêté"
+        echo ""
+        print_success "🛑 Bot PCR arrêté avec succès"
+        echo ""
+        echo "💡 Pour redémarrer:"
+        echo "  • pcr start    - Démarrer le bot"
+        echo "  • pcr restart  - Redémarrer directement"
+        ;;
+    restart)
+        print_section "Redémarrage du Bot PCR"
+        cd "$PROJECT_DIR"
+        pm2 restart pcr 2>/dev/null || {
+            print_warning "Processus non trouvé, démarrage..."
+            pm2 start index.js --name pcr
+        }
+        pm2 save
+        sleep 2
+        echo ""
+        if check_app_status; then
+            print_success "🔄 Bot PCR redémarré avec succès!"
+            echo ""
+            echo "📊 Informations du bot:"
+            echo "─────────────────────"
+            echo "🤖 Nom: PCR Discord Bot"
+            echo "📁 Répertoire: $PROJECT_DIR"
+            echo ""
+            echo "💡 Commandes utiles:"
+            echo "  • pcr logs     - Voir les logs"
+            echo "  • pcr monitor  - Monitoring complet"
+        else
+            print_error "❌ Échec du redémarrage"
+            echo ""
+            echo "🔍 Vérifications suggérées:"
+            echo "  • Vérifiez les logs: pcr logs"
+            echo "  • Essayez un arrêt/démarrage: pcr stop && pcr start"
+        fi
+        ;;
+    status)
+        print_section "Statut du Bot PCR"
+        if check_app_status; then
+            print_success "🟢 Bot PCR en ligne"
+            echo ""
+            echo "📊 Informations rapides:"
+            echo "─────────────────────"
+            echo "🤖 Processus PM2: Actif"
+            echo "📁 Répertoire: $PROJECT_DIR"
+            echo ""
+            echo "💡 Commandes utiles:"
+            echo "  • pcr logs     - Voir les logs en temps réel"
+            echo "  • pcr monitor  - Monitoring détaillé"
+        else
+            print_error "🔴 Bot PCR hors ligne"
+            echo ""
+            echo "🔍 Actions suggérées:"
+            echo "───────────────────"
+            echo "  • pcr start    - Démarrer le bot"
+            echo "  • pcr logs     - Vérifier les erreurs"
+            echo "  • pcr deploy   - Redéployer si nécessaire"
+        fi
+        ;;
+    logs)
+        print_section "Logs du Bot PCR"
+        echo "📋 Affichage en temps réel (Ctrl+C pour arrêter)"
+        echo "═════════════════════════════════════════════"
+        echo ""
+        pm2 logs pcr 2>/dev/null || {
+            print_error "Impossible d'accéder aux logs"
+            echo ""
+            echo "🔍 Vérifications:"
+            echo "  • Le bot est-il démarré? pcr status"
+            echo "  • Essayez de redémarrer: pcr restart"
+        }
+        ;;
+    monitor)
+        monitor_function
+        ;;
+    update)
+        update_function
+        ;;
+    deploy)
+        echo "🚀 Déploiement du bot PCR..."
+        cd "$PROJECT_DIR"
+        
+        # Sauvegarde automatique avant déploiement
+        print_step "Sauvegarde automatique avant déploiement..."
+        backup_database || echo "Continuer sans sauvegarde..."
+        
+        # Vérification et création du fichier .env
+        print_step "Vérification de la configuration d'environnement..."
+        if [ ! -f ".env" ]; then
+            if [ -f ".env.example" ]; then
+                print_step "Copie de .env.example vers .env..."
+                cp .env.example .env
+                print_success "Fichier .env créé à partir de .env.example"
+                print_warning "N'oubliez pas de configurer vos tokens dans .env"
+            else
+                print_warning "Ni .env ni .env.example trouvés"
+                print_warning "Assurez-vous d'avoir configuré vos variables d'environnement"
+            fi
+        else
+            print_success "Fichier .env déjà présent"
+        fi
+        
+        # Arrêt de l'application
+        print_step "Arrêt du bot si il est en cours d'exécution..."
+        pm2 stop pcr 2>/dev/null || echo "Bot pas encore démarré"
+
+        # Installation des dépendances
+        print_step "Installation des dépendances..."
+        npm install
+
+        # Démarrage du bot avec PM2
+        print_step "Démarrage du bot avec PM2..."
+        pm2 start index.js --name pcr
+
+        # Sauvegarde de la configuration PM2
+        print_step "Sauvegarde de la configuration PM2..."
+        pm2 save
+
+        # Vérification finale
+        sleep 5
+        if check_app_status; then
+            print_success "🎉 Déploiement terminé avec succès!"
+            print_success "Bot PCR Discord en ligne"
+        else
+            print_error "❌ Problème lors du déploiement"
+        fi
+        ;;
+    event)
+        # Gestion des options pour la commande event
+        validate_project_directory
+        
+        # Parser les arguments
+        event_name=""
+        
+        # Analyser les paramètres
+        shift # Enlever 'event'
+        while [[ $# -gt 0 ]]; do
+            case $1 in
+                --name)
+                    event_name="$2"
+                    shift 2
+                    ;;
+                *)
+                    print_error "Option inconnue: $1"
+                    echo "Usage: pcr event --name <nom_evenement>"
+                    exit 1
+                    ;;
+            esac
+        done
+        
+        if [[ -n "$event_name" ]]; then
+            create_event "$event_name"
+        else
+            print_error "Usage: pcr event --name <nom_evenement>"
+            echo "Exemple: pcr event --name messageUpdate"
+            echo ""
+            echo "Cette commande crée un nouvel événement Discord en utilisant"
+            echo "le template du fichier 'example' dans le dossier events/client/"
+            echo ""
+            echo "📚 Événements Discord courants:"
+            echo "  • ready, messageCreate, messageDelete, messageUpdate"
+            echo "  • guildMemberAdd, guildMemberRemove, guildMemberUpdate"
+            echo "  • interactionCreate, messageReactionAdd, messageReactionRemove"
+        fi
+        ;;
+    command)
+        # Gestion des options pour la commande command
+        validate_project_directory
+        
+        # Parser les arguments
+        command_name=""
+        command_desc=""
+        
+        # Analyser les paramètres
+        shift # Enlever 'command'
+        while [[ $# -gt 0 ]]; do
+            case $1 in
+                --name)
+                    command_name="$2"
+                    shift 2
+                    ;;
+                --desc)
+                    command_desc="$2"
+                    shift 2
+                    ;;
+                *)
+                    print_error "Option inconnue: $1"
+                    echo "Usage: pcr command --name <nom_commande> [--desc <description>]"
+                    exit 1
+                    ;;
+            esac
+        done
+        
+        if [[ -n "$command_name" ]]; then
+            create_command "$command_name" "$command_desc"
+        else
+            print_error "Usage: pcr command --name <nom_commande> [--desc <description>]"
+            echo "Exemple: pcr command --name hello"
+            echo "Exemple: pcr command --name hello --desc \"Commande de salutation\""
+            echo ""
+            echo "Cette commande crée une nouvelle commande Discord en utilisant"
+            echo "le template du fichier 'example' dans le dossier commands/"
+        fi
+        ;;
+    install)
+        install_script
+        ;;
+    backup)
+        validate_project_directory
+        print_section "Sauvegarde de la Base de Données"
+        if backup_database; then
+            echo ""
+            echo "💡 Commandes utiles:"
+            echo "───────────────────"
+            echo "  • pcr restore <fichier>  - Restaurer une sauvegarde"
+            echo "  • ls -la $BACKUP_DIR     - Voir toutes les sauvegardes"
+        else
+            echo ""
+            echo "🔍 Vérifications:"
+            echo "───────────────"
+            echo "  • La base de données existe-t-elle?"
+            echo "  • Le bot a-t-il été initialisé? pcr deploy"
+        fi
+        ;;
+    restore)
+        validate_project_directory
+        if [[ -n "$2" ]]; then
+            print_section "Restauration de la Base de Données"
+            restore_database "$2"
+        else
+            print_section "Sauvegardes Disponibles"
+            if ls "$BACKUP_DIR"/*.db 1> /dev/null 2>&1; then
+                ls -la "$BACKUP_DIR"/*.db
+                echo ""
+                echo "Usage: pcr restore <fichier_backup>"
+                echo "Exemple:"
+                echo "  pcr restore $BACKUP_DIR/$(ls "$BACKUP_DIR"/*.db 2>/dev/null | head -1 | xargs basename)"
+            else
+                print_warning "Aucune sauvegarde trouvée"
+                echo ""
+                echo "💡 Pour créer une sauvegarde:"
+                echo "  pcr backup"
+            fi
+        fi
+        ;;
+    reset)
+        # Vérifier si l'option --y ou -y est présente
+        auto_confirm=false
+        if [[ "$2" == "--y" ]] || [[ "$2" == "-y" ]]; then
+            auto_confirm=true
+        fi
+        
+        echo "🔄 Réinitialisation complète du bot PCR..."
+        echo ""
+        echo -e "${YELLOW}⚠️  ATTENTION: Cette action va supprimer toutes les données!${NC}"
+        echo -e "${YELLOW}⚠️  Les messages, configurations et données du bot seront perdues!${NC}"
+        echo ""
+        
+        # Sauvegarde de sécurité avant reset
+        if [[ "$auto_confirm" != true ]]; then
+            echo "💾 Création d'une sauvegarde de sécurité avant reset..."
+            backup_database || echo "Continuer sans sauvegarde..."
+            echo ""
+        fi
+        
+        if [ "$auto_confirm" = true ]; then
+            echo "Mode automatique activé (--y), confirmation ignorée"
+            confirmation="o"
+        else
+            echo -n "Êtes-vous sûr de vouloir continuer? (O/n): "
+            read -n 1 confirmation
+            echo ""
+        fi
+        
+        if [[ "$confirmation" =~ ^[Oo]$ ]] || [ -z "$confirmation" ]; then
+            cd "$PROJECT_DIR" || {
+                print_error "Impossible d'accéder au répertoire $PROJECT_DIR"
+                exit 1
+            }
+
+            # Suppression des logs
+            print_step "Suppression des logs..."
+            if [ -d "$LOG_DIR" ]; then
+                rm -rf "$LOG_DIR"/*
+                print_success "Logs supprimés et répertoire recréé"
+            else
+                mkdir -p "$LOG_DIR"
+            fi
+
+            # Suppression de la base de données
+            print_step "Suppression de la base de données..."
+            db_path=$(find_database_path)
+            if [[ -f "$db_path" ]]; then
+                rm -f "$db_path"
+                print_success "Base de données supprimée"
+            fi
+
+            # Arrêt et suppression du processus PM2
+            print_step "Arrêt du processus PM2..."
+            pm2 stop pcr 2>/dev/null || echo "Processus déjà arrêté"
+            pm2 delete pcr 2>/dev/null || echo "Processus non trouvé"
+
+            # Réinstallation des dépendances
+            print_step "Réinstallation des dépendances..."
+            rm -rf node_modules package-lock.json
+            npm install
+
+            # Redémarrage
+            print_step "Redémarrage du bot..."
+            pm2 start index.js --name pcr
+            pm2 save
+            
+            sleep 2
+            if check_app_status; then
+                print_success "🎉 Réinitialisation terminée avec succès!"
+                print_success "Bot PCR redémarré avec une configuration propre"
+            else
+                print_error "❌ Erreur lors de la réinitialisation"
+            fi
+        else
+            print_warning "Réinitialisation annulée"
+        fi
+        ;;
+    *)
+        echo -e "${PURPLE}🤖 PCR BOT DISCORD - Script de gestion unifié${NC}"
+        echo "============================================="
+        echo ""
+        echo "Usage: pcr [commande]"
+        echo ""
+        echo "Commandes disponibles:"
+        echo ""
+        echo "🚀 Gestion du bot:"
+        echo "  start         - Démarre le bot"
+        echo "  stop          - Arrête le bot"
+        echo "  restart       - Redémarre le bot"
+        echo "  status        - Affiche le statut du bot"
+        echo ""
+        echo "📊 Monitoring et logs:"
+        echo "  logs          - Affiche les logs PM2 du bot en temps réel"
+        echo "  monitor       - Monitoring complet avec ressources système"
+        echo ""
+        echo "🔧 Développement:"
+        echo "  dev           - Lance le bot en mode développement (avec nodemon)"
+        echo "  command       - Crée une nouvelle commande Discord"
+        echo "                  Usage: pcr command --name <nom> [--desc <description>]"
+        echo "  event         - Crée un nouvel événement Discord"
+        echo "                  Usage: pcr event --name <nom>"
+        echo ""
+        echo "🚀 Déploiement:"
+        echo "  deploy        - Déploiement complet du bot"
+        echo "  update        - Mise à jour du bot depuis Git"
+        echo ""
+        echo "💾 Sauvegarde et restauration:"
+        echo "  backup        - Sauvegarde la base de données"
+        echo "  restore       - Restaure une sauvegarde (pcr restore <fichier>)"
+        echo ""
+        echo "⚙️ Configuration:"
+        echo "  install       - Installe le script dans le PATH global"
+        echo "  reset         - Réinitialise complètement le bot (⚠️ SUPPRIME TOUTES LES DONNÉES)"
+        echo "                  Options: --y ou -y pour confirmer automatiquement"
+        echo ""
+        echo "Architecture:"
+        echo "  📁 Bot Discord : PCR - Gestion communautaire"
+        echo "  📁 Base de données : SQLite (messages.db)"
+        echo "  📁 Logs : PM2 + fichiers locaux"
+        echo ""
+        exit 1
+        ;;
+esac

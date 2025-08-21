@@ -6,8 +6,12 @@
   "main": "./index.js",  "scripts": {
     "start": "node ./index.js",
     "dev": "nodemon ./index.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "update": "bash ./update.sh"
+    "test": "node test.js",
+    "lint": "echo 'Linting code...' && node -c index.js",
+    "update": "bash ./pcr update",
+    "deploy": "bash ./pcr deploy",
+    "backup": "bash ./pcr backup",
+    "status": "bash ./pcr status"
   },
   "repository": {
     "type": "git",

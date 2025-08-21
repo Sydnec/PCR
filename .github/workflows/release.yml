@@ -1,0 +1,93 @@
+name: 📦 Release automatique
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    name: 🚀 Create Release
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: 📋 Install dependencies
+        run: npm ci
+        
+      - name: 🏗️ Build project
+        run: |
+          echo "🏗️ Préparation de la release..."
+          npm audit fix --force || true
+          
+      - name: 📝 Generate changelog
+        id: changelog
+        run: |
+          echo "## 🔄 Changelog" > RELEASE_NOTES.md
+          echo "" >> RELEASE_NOTES.md
+          
+          # Récupérer les commits depuis le dernier tag
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+          
+          if [ -n "$LAST_TAG" ]; then
+            echo "### ✨ Nouveautés depuis $LAST_TAG" >> RELEASE_NOTES.md
+            git log ${LAST_TAG}..HEAD --pretty=format:"- %s" >> RELEASE_NOTES.md
+          else
+            echo "### ✨ Première release" >> RELEASE_NOTES.md
+            echo "- 🤖 Bot Discord PCR initial" >> RELEASE_NOTES.md
+            echo "- 🛠️ Script de gestion unifié \`pcr\`" >> RELEASE_NOTES.md
+            echo "- 📊 Système de monitoring" >> RELEASE_NOTES.md
+            echo "- 💾 Sauvegardes automatiques" >> RELEASE_NOTES.md
+          fi
+          
+          echo "" >> RELEASE_NOTES.md
+          echo "### 🚀 Installation rapide" >> RELEASE_NOTES.md
+          echo "\`\`\`bash" >> RELEASE_NOTES.md
+          echo "git clone https://github.com/sydnec/PCR.git" >> RELEASE_NOTES.md
+          echo "cd PCR" >> RELEASE_NOTES.md
+          echo "./pcr deploy" >> RELEASE_NOTES.md
+          echo "\`\`\`" >> RELEASE_NOTES.md
+          
+      - name: 📦 Create Release Archive
+        run: |
+          # Créer une archive de la release
+          tar -czf pcr-bot-${GITHUB_REF#refs/tags/}.tar.gz \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='.github' \
+            --exclude='backups' \
+            --exclude='logs' \
+            --exclude='*.db' \
+            .
+            
+      - name: 🚀 Create GitHub Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: 🤖 PCR Bot ${{ github.ref }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: false
+          
+      - name: 📎 Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./pcr-bot-${{ github.ref_name }}.tar.gz
+          asset_name: pcr-bot-${{ github.ref_name }}.tar.gz
+          asset_content_type: application/gzip

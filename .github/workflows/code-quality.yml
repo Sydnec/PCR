@@ -1,0 +1,155 @@
+name: 🔍 Code Quality Check
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  quality:
+    name: 🔍 Code Quality Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        
+      - name: 📦 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: 📋 Install dependencies
+        run: npm ci
+        
+      - name: 🔒 Security audit
+        run: |
+          echo "🔒 Audit de sécurité des dépendances..."
+          npm audit --audit-level=moderate || true
+          
+      - name: 📊 Check file structure
+        run: |
+          echo "📊 Vérification de la structure du projet..."
+          
+          # Vérifier les fichiers essentiels
+          files_to_check=("index.js" "package.json" "pcr")
+          for file in "${files_to_check[@]}"; do
+            if [ -f "$file" ]; then
+              echo "✅ $file trouvé"
+            else
+              echo "❌ $file manquant"
+              exit 1
+            fi
+          done
+          
+          # Vérifier les dossiers
+          dirs_to_check=("commands" "events" "modules")
+          for dir in "${dirs_to_check[@]}"; do
+            if [ -d "$dir" ]; then
+              echo "✅ Dossier $dir trouvé"
+            else
+              echo "❌ Dossier $dir manquant"
+            fi
+          done
+          
+      - name: 🔍 Validate JavaScript syntax
+        run: |
+          echo "🔍 Validation de la syntaxe JavaScript..."
+          
+          # Fonction pour vérifier la syntaxe
+          check_js_files() {
+            local dir=$1
+            local errors=0
+            
+            if [ -d "$dir" ]; then
+              for file in "$dir"/*.js; do
+                if [ -f "$file" ]; then
+                  echo "Vérification: $file"
+                  if node -c "$file" 2>/dev/null; then
+                    echo "✅ $file - Syntaxe valide"
+                  else
+                    echo "❌ $file - Erreur de syntaxe"
+                    errors=$((errors + 1))
+                  fi
+                fi
+              done
+            fi
+            
+            return $errors
+          }
+          
+          # Vérifier index.js
+          if node -c index.js; then
+            echo "✅ index.js - Syntaxe valide"
+          else
+            echo "❌ index.js - Erreur de syntaxe"
+            exit 1
+          fi
+          
+          # Vérifier les commandes
+          check_js_files "commands"
+          commands_errors=$?
+          
+          # Vérifier les événements
+          check_js_files "events/client"
+          events_errors=$?
+          
+          total_errors=$((commands_errors + events_errors))
+          
+          if [ $total_errors -eq 0 ]; then
+            echo "🎉 Toutes les vérifications de syntaxe sont passées!"
+          else
+            echo "❌ $total_errors erreur(s) de syntaxe détectée(s)"
+            exit 1
+          fi
+          
+      - name: 📝 Check for TODO/FIXME
+        run: |
+          echo "📝 Recherche de TODO/FIXME dans le code..."
+          
+          todos=$(grep -r "TODO\|FIXME\|XXX\|HACK" --include="*.js" . || true)
+          
+          if [ -n "$todos" ]; then
+            echo "⚠️ TODO/FIXME trouvés:"
+            echo "$todos"
+          else
+            echo "✅ Aucun TODO/FIXME trouvé"
+          fi
+          
+      - name: 🔍 Check Discord.js patterns
+        run: |
+          echo "🔍 Vérification des patterns Discord.js..."
+          
+          # Vérifier l'utilisation correcte des intents
+          if grep -r "GatewayIntentBits" index.js; then
+            echo "✅ Intents Discord.js correctement utilisés"
+          else
+            echo "⚠️ Vérifiez l'utilisation des intents Discord.js"
+          fi
+          
+          # Vérifier l'utilisation de SlashCommandBuilder
+          command_files=$(find commands -name "*.js" -type f 2>/dev/null || true)
+          if [ -n "$command_files" ]; then
+            for file in $command_files; do
+              if [ -f "$file" ] && grep -q "SlashCommandBuilder" "$file"; then
+                echo "✅ $file utilise SlashCommandBuilder"
+              fi
+            done
+          fi
+          
+      - name: 📊 Generate quality report
+        run: |
+          echo "📊 Rapport de qualité généré"
+          echo "=========================="
+          echo "📁 Projet: PCR Bot Discord"
+          echo "📅 Date: $(date)"
+          echo "🔢 Commit: ${{ github.sha }}"
+          echo ""
+          echo "📈 Statistiques:"
+          echo "- Fichiers JS: $(find . -name "*.js" -not -path "./node_modules/*" | wc -l)"
+          echo "- Commandes: $(ls commands/*.js 2>/dev/null | wc -l || echo 0)"
+          echo "- Événements: $(ls events/client/*.js 2>/dev/null | wc -l || echo 0)"
+          echo ""
+          echo "✅ Vérifications passées avec succès!"
