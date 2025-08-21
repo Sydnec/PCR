@@ -1,26 +1,18 @@
 # Changelog PCR Bot
 
-## [1.0.2] - 2025-08-21
-
-### Système de workflow épuré
-
-#### ⚡ Nouvelles Commandes
-
-- **test-clean**: Nouvelle commande Discord: /test-clean (par Développeur PCR)
-
 ## [1.0.1] - 2025-08-21
 
-### Test du nouveau workflow de changelog
+### Release 1.0.1
 
 #### ⚡ Nouvelles Commandes
 
-- **test-workflow**: Nouvelle commande Discord: /test-workflow (par Développeur PCR)
+- **hello**: Nouvelle commande Discord: /hello (par Développeur PCR)
 
 ## [1.0.0] - 2025-08-21
 
-### Version initiale
+### Version initiale du PCR Bot
 
 #### ✨ Nouvelles Fonctionnalités
 
-- **Bot Discord PCR**: Version initiale du bot Discord PCR avec commandes de base (par Sydnec)
+- **Bot Discord PCR**: Version initiale du bot Discord PCR avec commandes de base et système de workflow automatisé (par Sydnec)
 

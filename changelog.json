@@ -1,7 +1,23 @@
 {
-  "version": "1.0.0",
-  "lastUpdated": "2025-08-21T20:23:21.572Z",
+  "version": "1.0.1",
+  "lastUpdated": "2025-08-21T20:24:41.902Z",
   "releases": [
+    {
+      "version": "1.0.1",
+      "date": "2025-08-21",
+      "title": "Release 1.0.1",
+      "features": [
+        {
+          "type": "command",
+          "name": "hello",
+          "description": "Nouvelle commande Discord: /hello",
+          "author": "Développeur PCR",
+          "commit": "39866f0e",
+          "timestamp": "2025-08-21T20:23:21.569Z",
+          "branch": "feature/command-hello"
+        }
+      ]
+    },
     {
       "version": "1.0.0",
       "date": "2025-08-21",
@@ -18,15 +34,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "command",
-      "name": "hello",
-      "description": "Nouvelle commande Discord: /hello",
-      "author": "Développeur PCR",
-      "commit": "39866f0e",
-      "timestamp": "2025-08-21T20:23:21.569Z",
-      "branch": "feature/command-hello"
-    }
-  ]
+  "pending": []
 }
