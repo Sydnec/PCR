@@ -18,7 +18,7 @@ export default {
                 flags: MessageFlags.Ephemeral,
             });
         } catch (error) {
-            handleException(error, interaction);
+            handleException(error);
         }
     },
 };

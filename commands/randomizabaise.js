@@ -12,14 +12,14 @@ export default {
         try {
             const guild = interaction.guild;
             if (!guild) {
-                handleException(interaction, "La commande doit être utilisée dans un serveur.");
+                handleException("La commande doit être utilisée dans un serveur.");
                 return;
             }
 
             // Récupère le rôle via l'ID depuis .env
             const defaultRole = guild.roles.cache.get(process.env.DEFAULT_ROLE_ID);
             if (!defaultRole) {
-                handleException(interaction, "Le rôle par défaut spécifié est introuvable.");
+                handleException("Le rôle par défaut spécifié est introuvable.");
                 return;
             }
 
@@ -30,7 +30,7 @@ export default {
                 .map(member => member);
 
             if (eligibleMembers.length < 2) {
-                interaction.reply({
+                await interaction.reply({
                     content: "Pas assez de membres éligibles pour faire un ship !",
                     flags: MessageFlags.Ephemeral,
                 });
@@ -41,16 +41,12 @@ export default {
             const shuffled = eligibleMembers.sort(() => 0.5 - Math.random());
             const [member1, member2] = shuffled;
 
-            interaction.reply({
+            await interaction.reply({
                 content: `💞 Aujourd'hui, je ship <@${member1.id}> et <@${member2.id}> !`,
                 ephemeral: false,
             });
         } catch (error) {
-            handleException(interaction, error);
+            handleException(error);
         }
-        interaction.reply({
-            content: '',
-            flags: MessageFlags.Ephemeral,
-        });
     },
 };
