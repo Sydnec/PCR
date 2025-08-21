@@ -680,32 +680,6 @@ EOF
     # Nettoyer le fichier temporaire
     rm -f "$temp_script.js"
 }
-        read -n 1 push_confirm
-        echo ""
-        if [[ "$push_confirm" =~ ^[Oo]$ ]] || [[ -z "$push_confirm" ]]; then
-            print_step "Push de la branche '$branch_name'..."
-            if git push -u origin "$branch_name"; then
-                print_success "Branche poussée vers origin/$branch_name"
-                echo ""
-                echo "🌐 Actions suggérées:"
-                echo "  • Créer une Pull Request sur GitHub/GitLab"
-                echo "  • Continuer le développement sur cette branche"
-                echo "  • Merger quand prêt: git checkout main && git merge $branch_name"
-            else
-                print_warning "Erreur lors du push - vous pouvez le faire manuellement plus tard"
-                echo "  Commande: git push -u origin $branch_name"
-            fi
-        else
-            print_success "Branche créée localement (non poussée)"
-            echo ""
-            echo "💡 Pour pousser plus tard:"
-            echo "  git push -u origin $branch_name"
-        fi
-    else
-        print_error "Erreur lors du commit"
-        return 1
-    fi
-}
 
 # Fonction de création d'événement
 create_event() {
