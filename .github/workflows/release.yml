@@ -5,6 +5,10 @@ on:
     tags:
       - 'v*.*.*'
 
+permissions:
+  contents: write
+  pull-requests: read
+
 jobs:
   release:
     name: 🚀 Create Release and Deploy Changelog
@@ -143,14 +147,17 @@ jobs:
             
       - name: 🚀 Create GitHub Release
         id: create_release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v${{ steps.version.outputs.VERSION }}
-          name: 🤖 PCR Bot v${{ steps.version.outputs.VERSION }}
-          body_path: RELEASE_NOTES.md
-          draft: false
-          prerelease: false
-          files: pcr-bot-v${{ steps.version.outputs.VERSION }}.tar.gz
+        run: |
+          echo "🚀 Création de la release GitHub..."
+          
+          # Créer la release avec GitHub CLI
+          gh release create "v${{ steps.version.outputs.VERSION }}" \
+            --title "🤖 PCR Bot v${{ steps.version.outputs.VERSION }}" \
+            --notes-file RELEASE_NOTES.md \
+            --target main \
+            ./pcr-bot-v${{ steps.version.outputs.VERSION }}.tar.gz
+          
+          echo "✅ Release v${{ steps.version.outputs.VERSION }} créée avec succès"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
