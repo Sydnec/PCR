@@ -1,4 +1,5 @@
 import { log, updateThreadList } from '../../modules/utils.js';
+import { checkAndAnnounceNewRelease } from '../../modules/changelog-notifier.js';
 import sqlite3 from "sqlite3";
 
 const name = 'ready';
@@ -19,6 +20,12 @@ async function execute(bot) {
     
     bot.handleUpdateRoleMessage();
     bot.handleCheckExpiredMessages(db);
+    
+    // Vérifier et annoncer les nouvelles releases (après un délai pour s'assurer que le bot est prêt)
+    setTimeout(async () => {
+        await checkAndAnnounceNewRelease(bot);
+    }, 5000);
+    
     log(`Bonjour, je suis ${bot.user.tag} et j'ai bien démarré !`);
 }
 

@@ -113,15 +113,33 @@ jobs:
       - name: 📦 Create Release Archive
         run: |
           echo "📦 Création de l'archive de release..."
-          tar -czf pcr-bot-v${{ steps.version.outputs.VERSION }}.tar.gz \
-            --exclude='.git' \
-            --exclude='node_modules' \
-            --exclude='.github' \
-            --exclude='backups' \
-            --exclude='logs' \
+          # Créer un répertoire temporaire pour l'archive
+          mkdir -p /tmp/pcr-release
+          
+          # Copier les fichiers nécessaires en excluant les répertoires/fichiers indésirables
+          rsync -av --progress \
+            --exclude='.git/' \
+            --exclude='node_modules/' \
+            --exclude='.github/' \
+            --exclude='backups/' \
+            --exclude='logs/' \
             --exclude='*.db' \
             --exclude='.env' \
-            .
+            --exclude='*.tar.gz' \
+            --exclude='/tmp/' \
+            ./ /tmp/pcr-release/
+          
+          # Créer l'archive depuis le répertoire temporaire
+          cd /tmp
+          tar -czf pcr-bot-v${{ steps.version.outputs.VERSION }}.tar.gz pcr-release/
+          
+          # Déplacer l'archive vers le répertoire de travail
+          mv pcr-bot-v${{ steps.version.outputs.VERSION }}.tar.gz $GITHUB_WORKSPACE/
+          
+          # Nettoyer le répertoire temporaire
+          rm -rf /tmp/pcr-release
+          
+          echo "✅ Archive créée: pcr-bot-v${{ steps.version.outputs.VERSION }}.tar.gz"
             
       - name: 🚀 Create GitHub Release
         id: create_release
@@ -145,126 +163,6 @@ jobs:
           asset_name: pcr-bot-v${{ steps.version.outputs.VERSION }}.tar.gz
           asset_content_type: application/gzip
 
-      - name: 📢 Send Discord Changelog Notification
-        if: success()
-        run: |
-          echo "📢 Envoi de la notification Discord..."
-          
-          # Script Node.js pour envoyer le changelog à Discord
-          cat > discord_notification.js << 'EOF'
-          const https = require('https');
-          const fs = require('fs');
-          
-          async function sendDiscordNotification() {
-            try {
-              const webhookUrl = process.env.DISCORD_CHANGELOG_WEBHOOK;
-              if (!webhookUrl) {
-                console.log('⚠️ DISCORD_CHANGELOG_WEBHOOK non configuré, notification ignorée');
-                return;
-              }
-              
-              const version = process.env.VERSION;
-              let embed = {
-                title: `🚀 PCR Bot v${version} déployé !`,
-                description: `Nouvelle version du PCR Bot déployée automatiquement via GitHub Actions.`,
-                color: 0x00ff00,
-                timestamp: new Date().toISOString(),
-                footer: {
-                  text: 'Déploiement automatique GitHub Actions',
-                  icon_url: 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png'
-                },
-                fields: []
-              };
-              
-              // Lire le changelog si disponible
-              if (fs.existsSync('changelog.json')) {
-                try {
-                  const changelog = JSON.parse(fs.readFileSync('changelog.json', 'utf8'));
-                  const release = changelog.releases.find(r => r.version === version);
-                  
-                  if (release && release.features) {
-                    embed.description = `${release.title || `Release ${version}`}\n\n${release.features.length} nouvelle(s) fonctionnalité(s) incluse(s).`;
-                    
-                    const featuresByType = release.features.reduce((acc, feature) => {
-                      if (!acc[feature.type]) acc[feature.type] = [];
-                      acc[feature.type].push(feature);
-                      return acc;
-                    }, {});
-                    
-                    Object.entries(featuresByType).forEach(([type, features]) => {
-                      const typeTitle = {
-                        'command': '⚡ Nouvelles Commandes',
-                        'event': '🎯 Nouveaux Événements',
-                        'feature': '✨ Nouvelles Fonctionnalités',
-                        'fix': '🐛 Corrections',
-                        'enhancement': '🔧 Améliorations'
-                      }[type] || '📋 Autres';
-                      
-                      const featureList = features.map(f => `• **${f.name}**: ${f.description}`).join('\n');
-                      
-                      embed.fields.push({
-                        name: typeTitle,
-                        value: featureList.length > 1024 ? featureList.substring(0, 1020) + '...' : featureList,
-                        inline: false
-                      });
-                    });
-                  }
-                } catch (error) {
-                  console.log('⚠️ Erreur lors de la lecture du changelog:', error.message);
-                }
-              }
-              
-              // Ajouter des liens utiles
-              embed.fields.push({
-                name: '🔗 Liens',
-                value: `• [Voir la release](https://github.com/${process.env.GITHUB_REPOSITORY}/releases/tag/v${version})\n• [Code source](https://github.com/${process.env.GITHUB_REPOSITORY})`,
-                inline: false
-              });
-              
-              const payload = JSON.stringify({ embeds: [embed] });
-              
-              const url = new URL(webhookUrl);
-              const options = {
-                hostname: url.hostname,
-                path: url.pathname + url.search,
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Content-Length': Buffer.byteLength(payload)
-                }
-              };
-              
-              return new Promise((resolve, reject) => {
-                const req = https.request(options, (res) => {
-                  console.log(`📢 Discord webhook status: ${res.statusCode}`);
-                  if (res.statusCode >= 200 && res.statusCode < 300) {
-                    console.log('✅ Notification Discord envoyée avec succès');
-                    resolve();
-                  } else {
-                    reject(new Error(`HTTP ${res.statusCode}`));
-                  }
-                });
-                
-                req.on('error', reject);
-                req.write(payload);
-                req.end();
-              });
-              
-            } catch (error) {
-              console.error('❌ Erreur notification Discord:', error.message);
-            }
-          }
-          
-          sendDiscordNotification();
-          EOF
-          
-          # Exécuter la notification
-          node discord_notification.js
-        env:
-          DISCORD_CHANGELOG_WEBHOOK: ${{ secrets.DISCORD_CHANGELOG_WEBHOOK }}
-          VERSION: ${{ steps.version.outputs.VERSION }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-
       - name: ✅ Release Summary
         if: success()
         run: |
@@ -277,6 +175,7 @@ jobs:
           echo "  • Release GitHub: https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.VERSION }}"
           echo ""
           echo "💡 Prochaines étapes:"
-          echo "  • La notification Discord a été envoyée (si configurée)"
+          echo "  • Le bot détectera automatiquement la nouvelle version au redémarrage"
+          echo "  • Les notifications Discord seront envoyées par le bot (pour minor/major uniquement)"
           echo "  • Les utilisateurs peuvent maintenant télécharger la nouvelle version"
           echo "  • Le changelog est automatiquement publié"
