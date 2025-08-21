@@ -24,7 +24,7 @@ try {
     // Initialize invite cache
     bot.invites = new Map();
 
-    bot.on('ready', async () => {
+    bot.on('clientReady', async () => {
         bot.user.setActivity('PCR Bot', { type: 'WATCHING' });
 
         // Load and cache invites
