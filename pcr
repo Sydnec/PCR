@@ -1091,6 +1091,171 @@ create_command() {
     echo "  • Revenir à main: git checkout main"
 }
 
+# Fonction de création de feature branch (nouvelle)
+create_feature_branch() {
+    local feature_name="$1"
+    
+    if [[ -z "$feature_name" ]]; then
+        print_error "Nom de feature requis"
+        echo "Usage: pcr feature <nom_feature>"
+        echo "Exemple: pcr feature user-profile-system"
+        return 1
+    fi
+    
+    # Vérifier que le nom est valide (alphanumeric + tirets)
+    if [[ ! "$feature_name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        print_error "Nom de feature invalide. Utilisez uniquement des lettres, chiffres, tirets et underscores."
+        return 1
+    fi
+    
+    local branch_name="feature/$feature_name"
+    
+    print_section "Création de la feature branch '$feature_name'"
+    
+    # Vérifier si on est dans un repo Git
+    if ! git rev-parse --git-dir > /dev/null 2>&1; then
+        print_error "Pas dans un dépôt Git"
+        return 1
+    fi
+    
+    # Vérifier si la branche existe déjà
+    if git show-ref --verify --quiet refs/heads/"$branch_name"; then
+        print_warning "La branche '$branch_name' existe déjà"
+        echo "Voulez-vous basculer sur cette branche? (O/n): "
+        read -n 1 switch_confirm
+        echo ""
+        if [[ "$switch_confirm" =~ ^[Oo]$ ]] || [[ -z "$switch_confirm" ]]; then
+            git checkout "$branch_name"
+            print_success "Basculé sur la branche existante '$branch_name'"
+        fi
+        return 0
+    fi
+    
+    # Vérifier si on a des changements non committés
+    if ! git diff-index --quiet HEAD --; then
+        print_warning "Changements non committés détectés"
+        echo "Voulez-vous créer un commit avant de créer la nouvelle branche? (O/n): "
+        read -n 1 stash_confirm
+        echo ""
+        if [[ "$stash_confirm" =~ ^[Oo]$ ]] || [[ -z "$stash_confirm" ]]; then
+            git add -A
+            git commit -m "WIP: sauvegarde automatique avant feature $feature_name"
+            print_success "Changements sauvegardés"
+        fi
+    fi
+    
+    # S'assurer qu'on est sur main et à jour
+    print_step "Mise à jour de la branche main..."
+    git checkout main 2>/dev/null || git checkout master 2>/dev/null
+    git pull origin main 2>/dev/null || git pull origin master 2>/dev/null || true
+    
+    # Créer et basculer sur la nouvelle branche
+    print_step "Création de la branche feature '$branch_name'..."
+    if git checkout -b "$branch_name"; then
+        print_success "✅ Branche '$branch_name' créée et activée"
+        echo ""
+        echo "🌿 Feature branch créée:"
+        echo "  • Nom: $branch_name"
+        echo "  • Base: main"
+        echo "  • Statut: Prêt pour le développement"
+        echo ""
+        echo "💡 Prochaines étapes:"
+        echo "  • Développez votre feature"
+        echo "  • Committez vos changements: git add . && git commit -m 'feat: ...'"
+        echo "  • Pushez quand prêt: git push -u origin $branch_name"
+        echo "  • Finalisez avec: pcr finish"
+        echo ""
+        return 0
+    else
+        print_error "Erreur lors de la création de la branche"
+        return 1
+    fi
+}
+
+# Fonction de création de fix branch (nouvelle)
+create_fix_branch() {
+    local fix_name="$1"
+    
+    if [[ -z "$fix_name" ]]; then
+        print_error "Nom de fix requis"
+        echo "Usage: pcr fix <nom_fix>"
+        echo "Exemple: pcr fix login-validation-error"
+        return 1
+    fi
+    
+    # Vérifier que le nom est valide (alphanumeric + tirets)
+    if [[ ! "$fix_name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        print_error "Nom de fix invalide. Utilisez uniquement des lettres, chiffres, tirets et underscores."
+        return 1
+    fi
+    
+    local branch_name="fix/$fix_name"
+    
+    print_section "Création de la fix branch '$fix_name'"
+    
+    # Vérifier si on est dans un repo Git
+    if ! git rev-parse --git-dir > /dev/null 2>&1; then
+        print_error "Pas dans un dépôt Git"
+        return 1
+    fi
+    
+    # Vérifier si la branche existe déjà
+    if git show-ref --verify --quiet refs/heads/"$branch_name"; then
+        print_warning "La branche '$branch_name' existe déjà"
+        echo "Voulez-vous basculer sur cette branche? (O/n): "
+        read -n 1 switch_confirm
+        echo ""
+        if [[ "$switch_confirm" =~ ^[Oo]$ ]] || [[ -z "$switch_confirm" ]]; then
+            git checkout "$branch_name"
+            print_success "Basculé sur la branche existante '$branch_name'"
+        fi
+        return 0
+    fi
+    
+    # Vérifier si on a des changements non committés
+    if ! git diff-index --quiet HEAD --; then
+        print_warning "Changements non committés détectés"
+        echo "Voulez-vous créer un commit avant de créer la nouvelle branche? (O/n): "
+        read -n 1 stash_confirm
+        echo ""
+        if [[ "$stash_confirm" =~ ^[Oo]$ ]] || [[ -z "$stash_confirm" ]]; then
+            git add -A
+            git commit -m "WIP: sauvegarde automatique avant fix $fix_name"
+            print_success "Changements sauvegardés"
+        fi
+    fi
+    
+    # S'assurer qu'on est sur main et à jour
+    print_step "Mise à jour de la branche main..."
+    git checkout main 2>/dev/null || git checkout master 2>/dev/null
+    git pull origin main 2>/dev/null || git pull origin master 2>/dev/null || true
+    
+    # Créer et basculer sur la nouvelle branche
+    print_step "Création de la branche fix '$branch_name'..."
+    if git checkout -b "$branch_name"; then
+        print_success "✅ Branche '$branch_name' créée et activée"
+        echo ""
+        echo "🔧 Fix branch créée:"
+        echo "  • Nom: $branch_name"
+        echo "  • Base: main"  
+        echo "  • Type: Correction de bug"
+        echo "  • Statut: Prêt pour le développement"
+        echo ""
+        echo "💡 Prochaines étapes:"
+        echo "  • Corrigez le problème"
+        echo "  • Committez vos changements: git add . && git commit -m 'fix: ...'"
+        echo "  • Pushez quand prêt: git push -u origin $branch_name"
+        echo "  • Mergez directement (les fixes ne vont pas dans le changelog)"
+        echo ""
+        echo "⚠️  Note: Les fixes ne sont pas ajoutés au changelog automatiquement"
+        echo ""
+        return 0
+    else
+        print_error "Erreur lors de la création de la branche"
+        return 1
+    fi
+}
+
 # Fonction d'installation du script dans le PATH
 install_script() {
     local script_path="/usr/local/bin/pcr"
@@ -1395,47 +1560,53 @@ case "$1" in
             echo "le template du fichier 'example' dans le dossier commands/"
         fi
         ;;
-    changelog)
-        # Gestion de la publication de changelog
-        validate_project_directory
-        
-        # Parser les arguments
-        version=""
-        title=""
-        
-        # Analyser les paramètres
-        shift # Enlever 'changelog'
-        while [[ $# -gt 0 ]]; do
-            case $1 in
-                --version)
-                    version="$2"
-                    shift 2
-                    ;;
-                --title)
-                    title="$2"
-                    shift 2
-                    ;;
-                *)
-                    print_error "Option inconnue: $1"
-                    echo "Usage: pcr changelog --version <version> [--title <titre>]"
-                    exit 1
-                    ;;
-            esac
-        done
-        
-        if [[ -n "$version" ]]; then
-            publish_manual_changelog "$version" "$title"
-        else
-            print_error "Usage: pcr changelog --version <version> [--title <titre>]"
-            echo "Exemple: pcr changelog --version 1.2.0 --title \"Mise à jour majeure\""
-            echo ""
-            echo "Cette commande publie un changelog dans le canal configuré"
-            echo "en analysant les commits récents pour détecter les nouvelles fonctionnalités."
-        fi
-        ;;
     branches)
         validate_project_directory
         list_feature_branches
+        ;;
+    feature)
+        validate_project_directory
+        if [[ -n "$2" ]]; then
+            create_feature_branch "$2"
+        else
+            print_error "Usage: pcr feature <nom_feature>"
+            echo "Exemple: pcr feature user-profile-system"
+            echo ""
+            echo "Cette commande crée une nouvelle branche feature/<nom_feature>"
+            echo "depuis main, sans toucher aux fichiers de changelog."
+            echo ""
+            echo "💡 Différence avec 'pcr command' et 'pcr event':"
+            echo "  • pcr feature : Crée juste la branche Git"
+            echo "  • pcr command : Crée la branche + fichier de commande + changelog"
+            echo "  • pcr event   : Crée la branche + fichier d'événement + changelog"
+            echo ""
+            echo "🎯 Utilisez 'pcr feature' pour des développements généraux"
+            echo "   qui ne sont pas spécifiquement des commandes ou événements Discord."
+        fi
+        ;;
+    fix)
+        validate_project_directory
+        if [[ -n "$2" ]]; then
+            create_fix_branch "$2"
+        else
+            print_error "Usage: pcr fix <nom_fix>"
+            echo "Exemple: pcr fix login-validation-error"
+            echo ""
+            echo "Cette commande crée une nouvelle branche fix/<nom_fix>"
+            echo "depuis main, pour corriger des bugs."
+            echo ""
+            echo "⚠️  Important:"
+            echo "  • Les fixes ne sont PAS ajoutés au changelog automatiquement"
+            echo "  • Mergez directement vers main une fois corrigé"
+            echo "  • Utilisez des messages de commit avec 'fix:' au début"
+            echo ""
+            echo "🔧 Workflow suggéré:"
+            echo "  1. pcr fix mon-bug"
+            echo "  2. Corriger le problème" 
+            echo "  3. git add . && git commit -m 'fix: correction du bug xyz'"
+            echo "  4. git push -u origin fix/mon-bug"
+            echo "  5. Merger directement vers main"
+        fi
         ;;
     install)
         install_script
@@ -1704,13 +1875,20 @@ EOF
         echo ""
         echo "🔧 Développement:"
         echo "  dev           - Lance le bot en mode développement (avec nodemon)"
+        echo "  feature       - Crée une nouvelle branche feature (sans fichiers)"
+        echo "                  Usage: pcr feature <nom_feature>"
+        echo "  fix           - Crée une nouvelle branche fix (sans changelog)"
+        echo "                  Usage: pcr fix <nom_fix>"
         echo "  command       - Crée une nouvelle commande Discord avec branche Git"
         echo "                  Usage: pcr command --name <nom> [--desc <description>] [--no-git]"
         echo "  event         - Crée un nouvel événement Discord avec branche Git"
         echo "                  Usage: pcr event --name <nom> [--no-git]"
         echo "  branches      - Liste les branches de fonctionnalités PCR"
-        echo "  changelog     - Publie un changelog dans Discord"
-        echo "                  Usage: pcr changelog --version <version> [--title <titre>]"
+        echo "  finish        - Finalise une feature branch (commit/merge/push)"
+        echo "  release       - Crée une release avec changelog"
+        echo "                  Usage: pcr release [--type patch|minor|major] [--title titre]"
+        echo "  changelog-status - Affiche le statut du système de changelog"
+        echo "  workflow      - Affiche le guide du workflow de développement"
         echo ""
         echo "🚀 Déploiement:"
         echo "  deploy        - Déploiement complet du bot"
