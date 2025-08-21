@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastUpdated": "2025-08-21T22:00:00.000Z",
+  "lastUpdated": "2025-08-21T20:23:21.572Z",
   "releases": [
     {
       "version": "1.0.0",
@@ -18,5 +18,15 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "command",
+      "name": "hello",
+      "description": "Nouvelle commande Discord: /hello",
+      "author": "Développeur PCR",
+      "commit": "39866f0e",
+      "timestamp": "2025-08-21T20:23:21.569Z",
+      "branch": "feature/command-hello"
+    }
+  ]
 }
