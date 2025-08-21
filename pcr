@@ -792,9 +792,9 @@ auto_commit_and_push() {
                 echo "  • Créer une Pull Request sur GitHub/GitLab"
                 echo "  • Continuer le développement sur cette branche"
                 echo "  • Merger quand prêt: git checkout main && git merge $branch_name"
-                
-                # Créer l'annonce de fonctionnalité
-                create_changelog_announcement "$type" "$name" "$description"
+                echo ""
+                print_success "✅ Feature créée et prête pour le développement"
+                echo "💡 Utilisez 'pcr finish' quand vous aurez terminé le développement"
                 
             else
                 print_warning "Erreur lors du push - vous pouvez le faire manuellement plus tard"
@@ -805,9 +805,9 @@ auto_commit_and_push() {
             echo ""
             echo "💡 Pour pousser plus tard:"
             echo "  git push -u origin $branch_name"
-            
-            # Créer l'annonce même en local
-            create_changelog_announcement "$type" "$name" "$description"
+            echo ""
+            print_success "✅ Feature créée et prête pour le développement"
+            echo "💡 Utilisez 'pcr finish' quand vous aurez terminé le développement"
         fi
     else
         print_error "Erreur lors du commit"
@@ -932,77 +932,6 @@ EOF
     rm -f "${features_json}.js"
 }
 
-# Fonction pour créer une annonce de changelog
-create_changelog_announcement() {
-    local type="$1"
-    local name="$2"
-    local description="$3"
-    
-    print_step "Création de l'annonce de fonctionnalité..."
-    
-    # Créer le script Node.js temporaire pour l'annonce
-    local temp_script="/tmp/pcr_announce_$$"
-    cat > "$temp_script.js" << EOF
-import { Client, GatewayIntentBits } from 'discord.js';
-import { announceNewFeature } from '${PROJECT_DIR}/modules/changelog.js';
-import dotenv from 'dotenv';
-dotenv.config();
-
-const client = new Client({
-    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages]
-});
-
-client.once('ready', async () => {
-    console.log('🤖 Bot connecté pour l\\'annonce...');
-    
-    try {
-        await announceNewFeature(client, {
-            type: '${type}',
-            name: '${name}',
-            description: '${description:-Nouvelle fonctionnalité ajoutée}',
-            author: '$(git config user.name || echo "Développeur PCR")',
-            version: 'En développement'
-        });
-        
-        console.log('✅ Annonce publiée avec succès');
-    } catch (error) {
-        console.error('❌ Erreur lors de l\\'annonce:', error.message);
-    }
-    
-    process.exit(0);
-});
-
-client.login(process.env.DISCORD_TOKEN).catch(error => {
-    console.error('❌ Erreur de connexion Discord:', error.message);
-    console.log('⚠️  Assurez-vous que DISCORD_TOKEN est configuré dans .env');
-    process.exit(1);
-});
-EOF
-
-    # Vérifier si le bot peut se connecter
-    if [[ -f "$PROJECT_DIR/.env" ]] && grep -q "DISCORD_TOKEN=" "$PROJECT_DIR/.env"; then
-        echo ""
-        echo "📢 Voulez-vous publier l'annonce de cette fonctionnalité dans le canal changelog? (O/n): "
-        read -n 1 announce_confirm
-        echo ""
-        
-        if [[ "$announce_confirm" =~ ^[Oo]$ ]] || [[ -z "$announce_confirm" ]]; then
-            cd "$PROJECT_DIR"
-            timeout 30s node "$temp_script.js" 2>/dev/null || {
-                print_warning "Impossible de publier l'annonce automatiquement"
-                echo "💡 Vous pouvez publier manuellement l'annonce plus tard avec:"
-                echo "   node -e \"import('./modules/changelog.js').then(m => console.log('Module chargé'))\""
-            }
-        fi
-    else
-        print_warning "Token Discord non configuré - annonce ignorée"
-        echo "💡 Configurez DISCORD_TOKEN dans .env pour activer les annonces automatiques"
-    fi
-    
-    # Nettoyer le fichier temporaire
-    rm -f "$temp_script.js"
-}
-
 # Fonction de création d'événement
 create_event() {
     local event_name="$1"
@@ -1072,7 +1001,7 @@ create_event() {
     echo ""
     echo "🌿 Git workflow:"
     echo "  • Branche courante: feature/event-$event_name"
-    echo "  • Quand prêt: créer une Pull Request"
+    echo "  • Quand prêt: pcr finish"
     echo "  • Revenir à main: git checkout main"
     echo ""
     echo "📚 Événements Discord courants:"
@@ -1158,7 +1087,7 @@ create_command() {
     echo ""
     echo "🌿 Git workflow:"
     echo "  • Branche courante: feature/command-$command_name"
-    echo "  • Quand prêt: créer une Pull Request"
+    echo "  • Quand prêt: pcr finish"
     echo "  • Revenir à main: git checkout main"
 }
 
