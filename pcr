@@ -423,6 +423,7 @@ auto_commit_and_push() {
     local type="$1"      # "command" ou "event"
     local name="$2"
     local file_path="$3"
+    local description="$4"  # Description optionnelle
     local branch_name="feature/${type}-${name}"
     
     # Vérifier si on est dans un repo Git
@@ -469,6 +470,10 @@ auto_commit_and_push() {
                 echo "  • Créer une Pull Request sur GitHub/GitLab"
                 echo "  • Continuer le développement sur cette branche"
                 echo "  • Merger quand prêt: git checkout main && git merge $branch_name"
+                
+                # Créer l'annonce de fonctionnalité
+                create_changelog_announcement "$type" "$name" "$description"
+                
             else
                 print_warning "Erreur lors du push - vous pouvez le faire manuellement plus tard"
                 echo "  Commande: git push -u origin $branch_name"
@@ -478,11 +483,202 @@ auto_commit_and_push() {
             echo ""
             echo "💡 Pour pousser plus tard:"
             echo "  git push -u origin $branch_name"
+            
+            # Créer l'annonce même en local
+            create_changelog_announcement "$type" "$name" "$description"
         fi
     else
         print_error "Erreur lors du commit"
         return 1
     fi
+}
+
+# Fonction pour publier un changelog manuel
+publish_manual_changelog() {
+    local version="$1"
+    local title="$2"
+    
+    print_step "Analyse des commits récents pour le changelog..."
+    
+    # Récupérer les commits depuis le dernier tag ou les 10 derniers
+    local last_tag
+    last_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+    
+    local commits_range
+    if [[ -n "$last_tag" ]]; then
+        commits_range="${last_tag}..HEAD"
+        echo "📍 Analyse depuis le tag: $last_tag"
+    else
+        commits_range="HEAD~10..HEAD"
+        echo "📍 Analyse des 10 derniers commits"
+    fi
+    
+    # Analyser les commits pour extraire les fonctionnalités
+    local features_json="/tmp/pcr_features_$$"
+    cat > "${features_json}.js" << EOF
+import { Client, GatewayIntentBits } from 'discord.js';
+import { announceChangelog } from '${PROJECT_DIR}/modules/changelog.js';
+import dotenv from 'dotenv';
+import { execSync } from 'child_process';
+dotenv.config();
+
+const client = new Client({
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages]
+});
+
+client.once('ready', async () => {
+    console.log('🤖 Bot connecté pour le changelog...');
+    
+    try {
+        // Récupérer les commits
+        const commits = execSync('git log ${commits_range} --oneline --grep="feat:" || true', {
+            cwd: '${PROJECT_DIR}',
+            encoding: 'utf8'
+        }).trim().split('\n').filter(line => line.length > 0);
+        
+        const features = [];
+        
+        commits.forEach(commit => {
+            const match = commit.match(/feat: add new Discord (command|event) '([^']+)'/);
+            if (match) {
+                const [, type, name] = match;
+                features.push({
+                    type: type,
+                    name: name,
+                    description: \`Nouvelle fonctionnalité: \${name}\`
+                });
+            } else if (commit.includes('feat:')) {
+                // Autres types de fonctionnalités
+                const name = commit.split(' ').slice(1).join(' ').replace(/^feat: /, '');
+                features.push({
+                    type: 'feature',
+                    name: name.substring(0, 50) + (name.length > 50 ? '...' : ''),
+                    description: name
+                });
+            }
+        });
+        
+        if (features.length === 0) {
+            console.log('⚠️  Aucune nouvelle fonctionnalité trouvée dans les commits récents');
+            process.exit(0);
+        }
+        
+        await announceChangelog(client, {
+            version: '${version}',
+            title: '${title:-Changelog PCR Bot}',
+            features: features
+        });
+        
+        console.log(\`✅ Changelog publié avec \${features.length} fonctionnalité(s)\`);
+    } catch (error) {
+        console.error('❌ Erreur lors du changelog:', error.message);
+    }
+    
+    process.exit(0);
+});
+
+client.login(process.env.DISCORD_TOKEN).catch(error => {
+    console.error('❌ Erreur de connexion Discord:', error.message);
+    console.log('⚠️  Assurez-vous que DISCORD_TOKEN est configuré dans .env');
+    process.exit(1);
+});
+EOF
+
+    # Vérifier si le bot peut se connecter
+    if [[ -f "$PROJECT_DIR/.env" ]] && grep -q "DISCORD_TOKEN=" "$PROJECT_DIR/.env"; then
+        echo ""
+        echo "📊 Fonctionnalités détectées depuis les commits récents:"
+        git log $commits_range --oneline --grep="feat:" | head -5 || echo "Aucune fonctionnalité détectée"
+        echo ""
+        echo "📢 Voulez-vous publier le changelog version $version? (O/n): "
+        read -n 1 publish_confirm
+        echo ""
+        
+        if [[ "$publish_confirm" =~ ^[Oo]$ ]] || [[ -z "$publish_confirm" ]]; then
+            cd "$PROJECT_DIR"
+            timeout 30s node "${features_json}.js" 2>/dev/null || {
+                print_warning "Impossible de publier le changelog automatiquement"
+                echo "💡 Vérifiez la configuration Discord et réessayez"
+            }
+        fi
+    else
+        print_warning "Token Discord non configuré"
+        echo "💡 Configurez DISCORD_TOKEN dans .env pour publier des changelogs"
+    fi
+    
+    # Nettoyer le fichier temporaire
+    rm -f "${features_json}.js"
+}
+
+# Fonction pour créer une annonce de changelog
+create_changelog_announcement() {
+    local type="$1"
+    local name="$2"
+    local description="$3"
+    
+    print_step "Création de l'annonce de fonctionnalité..."
+    
+    # Créer le script Node.js temporaire pour l'annonce
+    local temp_script="/tmp/pcr_announce_$$"
+    cat > "$temp_script.js" << EOF
+import { Client, GatewayIntentBits } from 'discord.js';
+import { announceNewFeature } from '${PROJECT_DIR}/modules/changelog.js';
+import dotenv from 'dotenv';
+dotenv.config();
+
+const client = new Client({
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages]
+});
+
+client.once('ready', async () => {
+    console.log('🤖 Bot connecté pour l\\'annonce...');
+    
+    try {
+        await announceNewFeature(client, {
+            type: '${type}',
+            name: '${name}',
+            description: '${description:-Nouvelle fonctionnalité ajoutée}',
+            author: '$(git config user.name || echo "Développeur PCR")',
+            version: 'En développement'
+        });
+        
+        console.log('✅ Annonce publiée avec succès');
+    } catch (error) {
+        console.error('❌ Erreur lors de l\\'annonce:', error.message);
+    }
+    
+    process.exit(0);
+});
+
+client.login(process.env.DISCORD_TOKEN).catch(error => {
+    console.error('❌ Erreur de connexion Discord:', error.message);
+    console.log('⚠️  Assurez-vous que DISCORD_TOKEN est configuré dans .env');
+    process.exit(1);
+});
+EOF
+
+    # Vérifier si le bot peut se connecter
+    if [[ -f "$PROJECT_DIR/.env" ]] && grep -q "DISCORD_TOKEN=" "$PROJECT_DIR/.env"; then
+        echo ""
+        echo "📢 Voulez-vous publier l'annonce de cette fonctionnalité dans le canal changelog? (O/n): "
+        read -n 1 announce_confirm
+        echo ""
+        
+        if [[ "$announce_confirm" =~ ^[Oo]$ ]] || [[ -z "$announce_confirm" ]]; then
+            cd "$PROJECT_DIR"
+            timeout 30s node "$temp_script.js" 2>/dev/null || {
+                print_warning "Impossible de publier l'annonce automatiquement"
+                echo "💡 Vous pouvez publier manuellement l'annonce plus tard avec:"
+                echo "   node -e \"import('./modules/changelog.js').then(m => console.log('Module chargé'))\""
+            }
+        fi
+    else
+        print_warning "Token Discord non configuré - annonce ignorée"
+        echo "💡 Configurez DISCORD_TOKEN dans .env pour activer les annonces automatiques"
+    fi
+    
+    # Nettoyer le fichier temporaire
+    rm -f "$temp_script.js"
 }
 
 # Fonction de création d'événement
@@ -538,7 +734,7 @@ create_event() {
     print_success "Fichier: $new_event_file"
     
     # Commit automatique et push
-    auto_commit_and_push "event" "$event_name" "$new_event_file"
+    auto_commit_and_push "event" "$event_name" "$new_event_file" "Nouvel événement Discord pour gérer $event_name"
     
     echo ""
     echo "📝 Prochaines étapes:"
@@ -623,7 +819,8 @@ create_command() {
     print_success "Fichier: $new_command_file"
     
     # Commit automatique et push
-    auto_commit_and_push "command" "$command_name" "$new_command_file"
+    local desc_for_changelog="${command_desc:-Nouvelle commande Discord: $command_name}"
+    auto_commit_and_push "command" "$command_name" "$new_command_file" "$desc_for_changelog"
     
     echo ""
     echo "📝 Prochaines étapes:"
@@ -947,6 +1144,44 @@ case "$1" in
             echo "le template du fichier 'example' dans le dossier commands/"
         fi
         ;;
+    changelog)
+        # Gestion de la publication de changelog
+        validate_project_directory
+        
+        # Parser les arguments
+        version=""
+        title=""
+        
+        # Analyser les paramètres
+        shift # Enlever 'changelog'
+        while [[ $# -gt 0 ]]; do
+            case $1 in
+                --version)
+                    version="$2"
+                    shift 2
+                    ;;
+                --title)
+                    title="$2"
+                    shift 2
+                    ;;
+                *)
+                    print_error "Option inconnue: $1"
+                    echo "Usage: pcr changelog --version <version> [--title <titre>]"
+                    exit 1
+                    ;;
+            esac
+        done
+        
+        if [[ -n "$version" ]]; then
+            publish_manual_changelog "$version" "$title"
+        else
+            print_error "Usage: pcr changelog --version <version> [--title <titre>]"
+            echo "Exemple: pcr changelog --version 1.2.0 --title \"Mise à jour majeure\""
+            echo ""
+            echo "Cette commande publie un changelog dans le canal configuré"
+            echo "en analysant les commits récents pour détecter les nouvelles fonctionnalités."
+        fi
+        ;;
     branches)
         validate_project_directory
         list_feature_branches
@@ -1095,6 +1330,8 @@ case "$1" in
         echo "  event         - Crée un nouvel événement Discord avec branche Git"
         echo "                  Usage: pcr event --name <nom> [--no-git]"
         echo "  branches      - Liste les branches de fonctionnalités PCR"
+        echo "  changelog     - Publie un changelog dans Discord"
+        echo "                  Usage: pcr changelog --version <version> [--title <titre>]"
         echo ""
         echo "🚀 Déploiement:"
         echo "  deploy        - Déploiement complet du bot"
