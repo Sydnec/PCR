@@ -152,20 +152,3 @@ export async function checkAndAnnounceNewRelease(bot) {
         console.error('❌ Erreur lors de l\'annonce du changelog:', error.message);
     }
 }
-
-/**
- * Force l'annonce d'une version spécifique (pour les tests)
- */
-export async function forceAnnounceVersion(bot, version) {
-    try {
-        // Réinitialiser le fichier pour forcer l'annonce
-        if (fs.existsSync(LAST_ANNOUNCED_FILE)) {
-            fs.unlinkSync(LAST_ANNOUNCED_FILE);
-        }
-        
-        await checkAndAnnounceNewRelease(bot);
-        console.log(`✅ Annonce forcée pour la version ${version}`);
-    } catch (error) {
-        console.error('❌ Erreur lors de l\'annonce forcée:', error.message);
-    }
-}
