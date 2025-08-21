@@ -6,7 +6,7 @@ dotenv.config(); // process.env.CONSTANT
 export default {
     data: new SlashCommandBuilder()
         .setName('name')
-        .setDescription('Description')
+        .setDescription(`Description`)
         .addStringOption((option) =>
             option
                 .setName('option')
