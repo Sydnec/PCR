@@ -12,7 +12,7 @@ permissions:
 jobs:
   release:
     name: 🚀 Create Release and Deploy Changelog
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     
     steps:
       - name: 📥 Checkout code
@@ -164,72 +164,43 @@ jobs:
       - name: 🚀 Deploy to Production Server
         id: deploy
         run: |
-          echo "🚀 Déploiement automatique sur le serveur de production..."
+          echo "🚀 Déploiement automatique (self-hosted runner)..."
           
-          # Configuration SSH
-          mkdir -p ~/.ssh
-          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/prod_key
-          chmod 600 ~/.ssh/prod_key
+          # Naviguer vers le répertoire du projet (même serveur)
+          cd ${{ github.workspace }}
+          echo "📁 Répertoire de projet: $(pwd)"
           
-          # Ajouter l'hôte aux known_hosts pour éviter les prompts
-          ssh-keyscan -H ${{ secrets.PROD_SSH_HOST }} >> ~/.ssh/known_hosts
+          # Basculer vers le nouveau tag
+          echo "🏷️ Basculement vers le tag v${{ steps.version.outputs.VERSION }}..."
+          git checkout v${{ steps.version.outputs.VERSION }}
           
-          # Script de déploiement sur le serveur distant
-          ssh -i ~/.ssh/prod_key ${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }} << 'EOF'
-            set -e
-            echo "📍 Connexion au serveur de production établie"
-            
-            # Naviguer vers le répertoire du projet
-            cd ${{ secrets.PROD_PROJECT_PATH || '/home/sydnec/PCR' }}
-            echo "📁 Répertoire de projet: $(pwd)"
-            
-            # Sauvegarder l'état actuel
-            echo "💾 Sauvegarde de l'état actuel..."
-            git stash push -m "Auto-stash before deployment $(date)" || echo "Rien à sauvegarder"
-            
-            # Récupérer les dernières modifications et tags
-            echo "📥 Récupération des dernières modifications..."
-            git fetch origin --tags
-            
-            # Basculer vers le nouveau tag
-            echo "🏷️ Basculement vers le tag v${{ steps.version.outputs.VERSION }}..."
-            git checkout v${{ steps.version.outputs.VERSION }}
-            
-            # Mettre à jour les dépendances si nécessaire
-            if git diff HEAD~1 HEAD --name-only | grep -q package.json; then
-              echo "📦 package.json modifié, mise à jour des dépendances..."
-              npm install
-            fi
-            
-            # Redémarrer le bot avec PM2
-            echo "🔄 Redémarrage du bot PCR..."
-            pm2 restart pcr || {
-              echo "⚠️ Erreur lors du restart, tentative de start..."
-              pm2 start index.js --name pcr
-            }
-            
-            # Sauvegarder la configuration PM2
-            pm2 save
-            
-            # Vérifier que le bot est en ligne
-            sleep 5
-            if pm2 list | grep -q "pcr.*online"; then
-              echo "✅ Bot PCR redémarré avec succès sur la version v${{ steps.version.outputs.VERSION }}"
-            else
-              echo "❌ Erreur: Le bot n'est pas en ligne après le redémarrage"
-              pm2 logs pcr --lines 10
-              exit 1
-            fi
-            
-            echo "🎉 Déploiement automatique terminé avec succès !"
-          EOF
+          # Mettre à jour les dépendances si nécessaire
+          if git diff HEAD~1 HEAD --name-only | grep -q package.json; then
+            echo "📦 package.json modifié, mise à jour des dépendances..."
+            npm install
+          fi
           
-          # Nettoyer la clé SSH
-          rm -f ~/.ssh/prod_key
+          # Redémarrer le bot avec PM2
+          echo "🔄 Redémarrage du bot PCR..."
+          pm2 restart pcr || {
+            echo "⚠️ Erreur lors du restart, tentative de start..."
+            pm2 start index.js --name pcr
+          }
           
-          echo "✅ Déploiement automatique réussi sur le serveur de production"
-        env:
-          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+          # Sauvegarder la configuration PM2
+          pm2 save
+          
+          # Vérifier que le bot est en ligne
+          sleep 5
+          if pm2 list | grep -q "pcr.*online"; then
+            echo "✅ Bot PCR redémarré avec succès sur la version v${{ steps.version.outputs.VERSION }}"
+          else
+            echo "❌ Erreur: Le bot n'est pas en ligne après le redémarrage"
+            pm2 logs pcr --lines 10
+            exit 1
+          fi
+          
+          echo "🎉 Déploiement automatique terminé avec succès !"
 
       - name: ✅ Release Summary
         if: success()
