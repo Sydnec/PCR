@@ -5,7 +5,7 @@ dotenv.config(); // process.env.CONSTANT
 
 export default {
     data: new SlashCommandBuilder()
-        .setName('test-workflow')
+        .setName('test-clean')
         .setDescription(`Description`)
         .addStringOption((option) =>
             option
