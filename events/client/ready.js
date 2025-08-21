@@ -2,7 +2,7 @@ import { log, updateThreadList } from '../../modules/utils.js';
 import { checkAndAnnounceNewRelease } from '../../modules/changelog-notifier.js';
 import sqlite3 from "sqlite3";
 
-const name = 'ready';
+const name = 'clientReady';
 const once = true;
 async function execute(bot) {
     // Initialisation de la base de données SQLite pour autodel
