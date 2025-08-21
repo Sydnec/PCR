@@ -1,7 +1,39 @@
 {
-  "version": "1.0.0",
-  "lastUpdated": "2025-08-21T00:00:00.000Z",
+  "version": "1.0.2",
+  "lastUpdated": "2025-08-21T20:17:43.259Z",
   "releases": [
+    {
+      "version": "1.0.2",
+      "date": "2025-08-21",
+      "title": "Système de workflow épuré",
+      "features": [
+        {
+          "type": "command",
+          "name": "test-clean",
+          "description": "Nouvelle commande Discord: /test-clean",
+          "author": "Développeur PCR",
+          "commit": "b4095287",
+          "timestamp": "2025-08-21T20:16:13.779Z",
+          "branch": "feature/command-test-clean"
+        }
+      ]
+    },
+    {
+      "version": "1.0.1",
+      "date": "2025-08-21",
+      "title": "Test du nouveau workflow de changelog",
+      "features": [
+        {
+          "type": "command",
+          "name": "test-workflow",
+          "description": "Nouvelle commande Discord: /test-workflow",
+          "author": "Développeur PCR",
+          "commit": "96adc20f",
+          "timestamp": "2025-08-21T20:10:27.999Z",
+          "branch": "feature/command-test-workflow"
+        }
+      ]
+    },
     {
       "version": "1.0.0",
       "date": "2025-08-21",
