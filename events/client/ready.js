@@ -16,6 +16,7 @@ async function execute(bot) {
             });
         }
     });
+    
     bot.handleUpdateRoleMessage();
     bot.handleCheckExpiredMessages(db);
     log(`Bonjour, je suis ${bot.user.tag} et j'ai bien démarré !`);

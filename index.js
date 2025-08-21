@@ -25,7 +25,7 @@ try {
     bot.invites = new Map();
 
     bot.on('ready', async () => {
-        console.log(`Logged in as ${bot.user.tag}`);
+        bot.user.setActivity('PCR Bot', { type: 'WATCHING' });
 
         // Load and cache invites
         bot.guilds.cache.forEach(async guild => {

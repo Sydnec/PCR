@@ -1,0 +1,21 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2025-08-21T00:00:00.000Z",
+  "releases": [
+    {
+      "version": "1.0.0",
+      "date": "2025-08-21",
+      "title": "Version initiale",
+      "features": [
+        {
+          "type": "feature",
+          "name": "Bot Discord PCR",
+          "description": "Version initiale du bot Discord PCR avec commandes de base",
+          "author": "Sydnec",
+          "commit": "initial"
+        }
+      ]
+    }
+  ],
+  "pending": []
+}

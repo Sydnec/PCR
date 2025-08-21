@@ -1,4 +1,4 @@
-name: 📦 Release automatique
+name: 📦 Release et Changelog PCR
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   release:
-    name: 🚀 Create Release
+    name: 🚀 Create Release and Deploy Changelog
     runs-on: ubuntu-latest
     
     steps:
@@ -25,49 +25,102 @@ jobs:
       - name: 📋 Install dependencies
         run: npm ci
         
-      - name: 🏗️ Build project
+      - name: 🏗️ Build and prepare
         run: |
           echo "🏗️ Préparation de la release..."
           npm audit fix --force || true
           
-      - name: 📝 Generate changelog
-        id: changelog
+      - name: 📝 Extract version and prepare release notes
+        id: version
         run: |
-          echo "## 🔄 Changelog" > RELEASE_NOTES.md
-          echo "" >> RELEASE_NOTES.md
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "🏷️ Version détectée: $VERSION"
           
-          # Récupérer les commits depuis le dernier tag
-          LAST_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
-          
-          if [ -n "$LAST_TAG" ]; then
-            echo "### ✨ Nouveautés depuis $LAST_TAG" >> RELEASE_NOTES.md
-            git log ${LAST_TAG}..HEAD --pretty=format:"- %s" >> RELEASE_NOTES.md
+          # Générer les notes de release depuis changelog.json
+          if [ -f "changelog.json" ]; then
+            echo "📋 Génération des notes depuis changelog.json..."
+            node -e "
+              const fs = require('fs');
+              try {
+                const changelog = JSON.parse(fs.readFileSync('changelog.json', 'utf8'));
+                const release = changelog.releases.find(r => r.version === '$VERSION');
+                
+                if (release) {
+                  let notes = \`## 🎉 \${release.title || 'Release ' + release.version}\\n\\n\`;
+                  
+                  if (release.features && release.features.length > 0) {
+                    const featuresByType = release.features.reduce((acc, f) => {
+                      if (!acc[f.type]) acc[f.type] = [];
+                      acc[f.type].push(f);
+                      return acc;
+                    }, {});
+                    
+                    Object.entries(featuresByType).forEach(([type, features]) => {
+                      const typeTitle = {
+                        'command': '⚡ Nouvelles Commandes',
+                        'event': '🎯 Nouveaux Événements', 
+                        'feature': '✨ Nouvelles Fonctionnalités',
+                        'fix': '🐛 Corrections',
+                        'enhancement': '🔧 Améliorations'
+                      }[type] || '📋 Autres';
+                      
+                      notes += \`### \${typeTitle}\\n\\n\`;
+                      features.forEach(f => {
+                        notes += \`- **\${f.name}**: \${f.description}\`;
+                        if (f.author) notes += \` (par \${f.author})\`;
+                        notes += \`\\n\`;
+                      });
+                      notes += \`\\n\`;
+                    });
+                  }
+                  
+                  notes += \`### 🚀 Installation rapide\\n\\n\`;
+                  notes += \`\\\`\\\`\\\`bash\\n\`;
+                  notes += \`git clone https://github.com/sydnec/PCR.git\\n\`;
+                  notes += \`cd PCR\\n\`;
+                  notes += \`./pcr deploy\\n\`;
+                  notes += \`\\\`\\\`\\\`\\n\`;
+                  
+                  fs.writeFileSync('RELEASE_NOTES.md', notes);
+                  console.log('✅ Notes de release générées depuis changelog.json');
+                } else {
+                  throw new Error('Release non trouvée dans changelog.json');
+                }
+              } catch (error) {
+                console.log('⚠️ Erreur avec changelog.json, utilisation du fallback:', error.message);
+                const fallback = \`## 🎉 PCR Bot v\${process.env.VERSION}\\n\\nNouvelle version du bot Discord PCR.\\n\\n### 🚀 Installation\\n\\n\\\`\\\`\\\`bash\\ngit clone https://github.com/sydnec/PCR.git\\ncd PCR\\n./pcr deploy\\n\\\`\\\`\\\`\`;
+                require('fs').writeFileSync('RELEASE_NOTES.md', fallback);
+              }
+            "
           else
-            echo "### ✨ Première release" >> RELEASE_NOTES.md
-            echo "- 🤖 Bot Discord PCR initial" >> RELEASE_NOTES.md
-            echo "- 🛠️ Script de gestion unifié \`pcr\`" >> RELEASE_NOTES.md
-            echo "- 📊 Système de monitoring" >> RELEASE_NOTES.md
-            echo "- 💾 Sauvegardes automatiques" >> RELEASE_NOTES.md
-          fi
+            echo "⚠️ changelog.json non trouvé, génération de notes basiques..."
+            cat > RELEASE_NOTES.md << EOF
+          ## 🎉 PCR Bot v$VERSION
           
-          echo "" >> RELEASE_NOTES.md
-          echo "### 🚀 Installation rapide" >> RELEASE_NOTES.md
-          echo "\`\`\`bash" >> RELEASE_NOTES.md
-          echo "git clone https://github.com/sydnec/PCR.git" >> RELEASE_NOTES.md
-          echo "cd PCR" >> RELEASE_NOTES.md
-          echo "./pcr deploy" >> RELEASE_NOTES.md
-          echo "\`\`\`" >> RELEASE_NOTES.md
+          Nouvelle version du bot Discord PCR.
+          
+          ### 🚀 Installation rapide
+          
+          \`\`\`bash
+          git clone https://github.com/sydnec/PCR.git
+          cd PCR
+          ./pcr deploy
+          \`\`\`
+          EOF
+          fi
           
       - name: 📦 Create Release Archive
         run: |
-          # Créer une archive de la release
-          tar -czf pcr-bot-${GITHUB_REF#refs/tags/}.tar.gz \
+          echo "📦 Création de l'archive de release..."
+          tar -czf pcr-bot-v${{ steps.version.outputs.VERSION }}.tar.gz \
             --exclude='.git' \
             --exclude='node_modules' \
             --exclude='.github' \
             --exclude='backups' \
             --exclude='logs' \
             --exclude='*.db' \
+            --exclude='.env' \
             .
             
       - name: 🚀 Create GitHub Release
@@ -76,8 +129,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref }}
-          release_name: 🤖 PCR Bot ${{ github.ref }}
+          tag_name: v${{ steps.version.outputs.VERSION }}
+          release_name: 🤖 PCR Bot v${{ steps.version.outputs.VERSION }}
           body_path: RELEASE_NOTES.md
           draft: false
           prerelease: false
@@ -88,6 +141,142 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./pcr-bot-${{ github.ref_name }}.tar.gz
-          asset_name: pcr-bot-${{ github.ref_name }}.tar.gz
+          asset_path: ./pcr-bot-v${{ steps.version.outputs.VERSION }}.tar.gz
+          asset_name: pcr-bot-v${{ steps.version.outputs.VERSION }}.tar.gz
           asset_content_type: application/gzip
+
+      - name: 📢 Send Discord Changelog Notification
+        if: success()
+        run: |
+          echo "📢 Envoi de la notification Discord..."
+          
+          # Script Node.js pour envoyer le changelog à Discord
+          cat > discord_notification.js << 'EOF'
+          const https = require('https');
+          const fs = require('fs');
+          
+          async function sendDiscordNotification() {
+            try {
+              const webhookUrl = process.env.DISCORD_CHANGELOG_WEBHOOK;
+              if (!webhookUrl) {
+                console.log('⚠️ DISCORD_CHANGELOG_WEBHOOK non configuré, notification ignorée');
+                return;
+              }
+              
+              const version = process.env.VERSION;
+              let embed = {
+                title: `🚀 PCR Bot v${version} déployé !`,
+                description: `Nouvelle version du PCR Bot déployée automatiquement via GitHub Actions.`,
+                color: 0x00ff00,
+                timestamp: new Date().toISOString(),
+                footer: {
+                  text: 'Déploiement automatique GitHub Actions',
+                  icon_url: 'https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png'
+                },
+                fields: []
+              };
+              
+              // Lire le changelog si disponible
+              if (fs.existsSync('changelog.json')) {
+                try {
+                  const changelog = JSON.parse(fs.readFileSync('changelog.json', 'utf8'));
+                  const release = changelog.releases.find(r => r.version === version);
+                  
+                  if (release && release.features) {
+                    embed.description = `${release.title || `Release ${version}`}\n\n${release.features.length} nouvelle(s) fonctionnalité(s) incluse(s).`;
+                    
+                    const featuresByType = release.features.reduce((acc, feature) => {
+                      if (!acc[feature.type]) acc[feature.type] = [];
+                      acc[feature.type].push(feature);
+                      return acc;
+                    }, {});
+                    
+                    Object.entries(featuresByType).forEach(([type, features]) => {
+                      const typeTitle = {
+                        'command': '⚡ Nouvelles Commandes',
+                        'event': '🎯 Nouveaux Événements',
+                        'feature': '✨ Nouvelles Fonctionnalités',
+                        'fix': '🐛 Corrections',
+                        'enhancement': '🔧 Améliorations'
+                      }[type] || '📋 Autres';
+                      
+                      const featureList = features.map(f => `• **${f.name}**: ${f.description}`).join('\n');
+                      
+                      embed.fields.push({
+                        name: typeTitle,
+                        value: featureList.length > 1024 ? featureList.substring(0, 1020) + '...' : featureList,
+                        inline: false
+                      });
+                    });
+                  }
+                } catch (error) {
+                  console.log('⚠️ Erreur lors de la lecture du changelog:', error.message);
+                }
+              }
+              
+              // Ajouter des liens utiles
+              embed.fields.push({
+                name: '🔗 Liens',
+                value: `• [Voir la release](https://github.com/${process.env.GITHUB_REPOSITORY}/releases/tag/v${version})\n• [Code source](https://github.com/${process.env.GITHUB_REPOSITORY})`,
+                inline: false
+              });
+              
+              const payload = JSON.stringify({ embeds: [embed] });
+              
+              const url = new URL(webhookUrl);
+              const options = {
+                hostname: url.hostname,
+                path: url.pathname + url.search,
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Content-Length': Buffer.byteLength(payload)
+                }
+              };
+              
+              return new Promise((resolve, reject) => {
+                const req = https.request(options, (res) => {
+                  console.log(`📢 Discord webhook status: ${res.statusCode}`);
+                  if (res.statusCode >= 200 && res.statusCode < 300) {
+                    console.log('✅ Notification Discord envoyée avec succès');
+                    resolve();
+                  } else {
+                    reject(new Error(`HTTP ${res.statusCode}`));
+                  }
+                });
+                
+                req.on('error', reject);
+                req.write(payload);
+                req.end();
+              });
+              
+            } catch (error) {
+              console.error('❌ Erreur notification Discord:', error.message);
+            }
+          }
+          
+          sendDiscordNotification();
+          EOF
+          
+          # Exécuter la notification
+          node discord_notification.js
+        env:
+          DISCORD_CHANGELOG_WEBHOOK: ${{ secrets.DISCORD_CHANGELOG_WEBHOOK }}
+          VERSION: ${{ steps.version.outputs.VERSION }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+
+      - name: ✅ Release Summary
+        if: success()
+        run: |
+          echo "🎉 Release v${{ steps.version.outputs.VERSION }} créée avec succès !"
+          echo ""
+          echo "📋 Résumé:"
+          echo "  • Version: ${{ steps.version.outputs.VERSION }}"
+          echo "  • Tag: v${{ steps.version.outputs.VERSION }}"
+          echo "  • Archive: pcr-bot-v${{ steps.version.outputs.VERSION }}.tar.gz"
+          echo "  • Release GitHub: https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.VERSION }}"
+          echo ""
+          echo "💡 Prochaines étapes:"
+          echo "  • La notification Discord a été envoyée (si configurée)"
+          echo "  • Les utilisateurs peuvent maintenant télécharger la nouvelle version"
+          echo "  • Le changelog est automatiquement publié"

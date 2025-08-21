@@ -418,6 +418,328 @@ list_feature_branches() {
     echo "  • git push origin <branche>  - Pousser une branche"
 }
 
+# ===== SYSTÈME DE CHANGELOG ET RELEASE =====
+
+# Fonction pour obtenir la version du projet depuis package.json
+get_project_version() {
+    if [[ -f "$PROJECT_DIR/package.json" ]]; then
+        grep '"version"' "$PROJECT_DIR/package.json" | sed 's/.*"version": *"\([^"]*\)".*/\1/'
+    else
+        echo "1.0.0"
+    fi
+}
+
+# Fonction pour ajouter une feature au changelog pending
+add_pending_feature() {
+    local type="$1"
+    local name="$2"
+    local description="$3"
+    
+    print_step "Ajout de la feature au changelog..."
+    
+    # Créer le script Node.js temporaire
+    local temp_script="/tmp/pcr_add_feature_$$"
+    cat > "$temp_script.js" << EOF
+import { addPendingFeature } from '${PROJECT_DIR}/modules/version-manager.js';
+
+try {
+    const feature = addPendingFeature({
+        type: '${type}',
+        name: '${name}',
+        description: '${description}'
+    });
+    
+    if (feature) {
+        console.log('✅ Feature ajoutée au changelog');
+    }
+} catch (error) {
+    console.error('❌ Erreur:', error.message);
+    process.exit(1);
+}
+EOF
+
+    cd "$PROJECT_DIR"
+    if node "$temp_script.js"; then
+        rm -f "$temp_script.js"
+        return 0
+    else
+        rm -f "$temp_script.js"
+        print_warning "Impossible d'ajouter la feature au changelog"
+        return 1
+    fi
+}
+
+# Fonction pour créer une release
+create_release() {
+    local version_type="$1"  # patch, minor, major
+    local title="$2"
+    
+    print_section "Création d'une nouvelle release"
+    
+    # Vérifier qu'on est sur main
+    local current_branch
+    current_branch=$(git branch --show-current 2>/dev/null || echo "unknown")
+    
+    if [[ "$current_branch" != "main" ]] && [[ "$current_branch" != "master" ]]; then
+        echo "⚠️  Vous n'êtes pas sur la branche principale (main/master)"
+        echo "Branche actuelle: $current_branch"
+        echo ""
+        echo "Voulez-vous continuer quand même? (o/N): "
+        read -n 1 continue_confirm
+        echo ""
+        if [[ ! "$continue_confirm" =~ ^[Oo]$ ]]; then
+            print_warning "Release annulée"
+            return 1
+        fi
+    fi
+    
+    # Créer le script Node.js temporaire
+    local temp_script="/tmp/pcr_release_$$"
+    cat > "$temp_script.js" << EOF
+import { createRelease, getChangelogStats, generateChangelogMarkdown } from '${PROJECT_DIR}/modules/version-manager.js';
+import fs from 'fs';
+
+try {
+    // Vérifier les features pending
+    const stats = getChangelogStats();
+    console.log(\`📊 Features en attente: \${stats.pendingFeatures}\`);
+    
+    if (stats.pendingFeatures === 0) {
+        console.log('⚠️  Aucune feature en attente pour la release');
+        process.exit(1);
+    }
+    
+    // Créer la release
+    const release = createRelease('${version_type}', '${title}');
+    
+    // Générer le changelog markdown
+    const markdown = generateChangelogMarkdown();
+    fs.writeFileSync('CHANGELOG.md', markdown);
+    
+    console.log(\`🎉 Release \${release.version} créée avec succès!\`);
+    console.log(\`📋 Features incluses: \${release.features.length}\`);
+    console.log('📝 CHANGELOG.md généré');
+    
+} catch (error) {
+    console.error('❌ Erreur:', error.message);
+    process.exit(1);
+}
+EOF
+
+    cd "$PROJECT_DIR"
+    if node "$temp_script.js"; then
+        rm -f "$temp_script.js"
+        
+        # Committer les changements
+        print_step "Commit des fichiers de release..."
+        git add changelog.json package.json CHANGELOG.md
+        
+        local new_version
+        new_version=$(get_project_version)
+        
+        if git commit -m "chore: release v${new_version}
+
+- Update version to ${new_version}
+- Add changelog entries
+- Generate CHANGELOG.md"; then
+            
+            print_success "✅ Release v${new_version} commitée"
+            
+            # Proposer de créer un tag
+            echo ""
+            echo "📌 Voulez-vous créer un tag Git pour cette release? (O/n): "
+            read -n 1 tag_confirm
+            echo ""
+            
+            if [[ "$tag_confirm" =~ ^[Oo]$ ]] || [[ -z "$tag_confirm" ]]; then
+                git tag -a "v${new_version}" -m "Release v${new_version}"
+                print_success "🏷️  Tag v${new_version} créé"
+            fi
+            
+            # Proposer de push
+            echo ""
+            echo "🚀 Voulez-vous pousser vers le dépôt distant? (O/n): "
+            read -n 1 push_confirm
+            echo ""
+            
+            if [[ "$push_confirm" =~ ^[Oo]$ ]] || [[ -z "$push_confirm" ]]; then
+                print_step "Push vers origin..."
+                if git push origin main; then
+                    if git tag -l "v${new_version}" >/dev/null 2>&1; then
+                        git push origin "v${new_version}"
+                        print_success "🏷️  Tag poussé - GitHub Actions va se déclencher!"
+                    fi
+                    print_success "🎉 Release publiée avec succès!"
+                    echo ""
+                    echo "🌐 Actions automatiques déclenchées:"
+                    echo "  • GitHub Actions Release workflow"
+                    echo "  • Publication automatique du changelog"
+                    echo "  • Notification Discord (si configurée)"
+                else
+                    print_warning "Erreur lors du push"
+                fi
+            fi
+        else
+            print_error "Erreur lors du commit de release"
+            rm -f "$temp_script.js"
+            return 1
+        fi
+    else
+        rm -f "$temp_script.js"
+        return 1
+    fi
+}
+
+# Fonction pour finaliser une feature (commit + push + merge)
+finalize_feature() {
+    local branch_name
+    branch_name=$(git branch --show-current 2>/dev/null)
+    
+    if [[ -z "$branch_name" ]]; then
+        print_error "Impossible de déterminer la branche actuelle"
+        return 1
+    fi
+    
+    if [[ "$branch_name" == "main" ]] || [[ "$branch_name" == "master" ]]; then
+        print_error "Vous êtes déjà sur la branche principale"
+        echo "💡 Cette commande est pour finaliser une feature branch"
+        return 1
+    fi
+    
+    print_section "Finalisation de la feature: $branch_name"
+    
+    # Détecter le type et le nom de la feature
+    local feature_type=""
+    local feature_name=""
+    local feature_description=""
+    
+    if [[ "$branch_name" =~ feature/command-(.+) ]]; then
+        feature_type="command"
+        feature_name="${BASH_REMATCH[1]}"
+        feature_description="Nouvelle commande Discord: /${feature_name}"
+    elif [[ "$branch_name" =~ feature/event-(.+) ]]; then
+        feature_type="event"
+        feature_name="${BASH_REMATCH[1]}"
+        feature_description="Nouvel événement Discord: ${feature_name}"
+    else
+        feature_type="feature"
+        feature_name="$branch_name"
+        feature_description="Nouvelle fonctionnalité: $branch_name"
+    fi
+    
+    echo "🔍 Feature détectée:"
+    echo "  • Type: $feature_type"
+    echo "  • Nom: $feature_name"
+    echo "  • Description: $feature_description"
+    echo ""
+    
+    # Demander confirmation
+    echo "Voulez-vous finaliser cette feature? (O/n): "
+    read -n 1 confirm
+    echo ""
+    
+    if [[ ! "$confirm" =~ ^[Oo]$ ]] && [[ -n "$confirm" ]]; then
+        print_warning "Finalisation annulée"
+        return 1
+    fi
+    
+    # 1. Commit des changements restants
+    if ! git diff --quiet || ! git diff --cached --quiet; then
+        print_step "Commit des derniers changements..."
+        git add .
+        git commit -m "feat: finalize $feature_type '$feature_name'
+
+- Complete implementation of $feature_name
+- Ready for merge to main" || {
+            print_warning "Aucun changement à committer ou erreur de commit"
+        }
+    fi
+    
+    # 2. Push de la branche
+    print_step "Push de la branche vers origin..."
+    if git push -u origin "$branch_name"; then
+        print_success "✅ Branche poussée vers origin"
+    else
+        print_warning "Erreur lors du push - continuons quand même"
+    fi
+    
+    # 3. Ajouter au changelog pending
+    print_step "Ajout au changelog..."
+    add_pending_feature "$feature_type" "$feature_name" "$feature_description"
+    
+    # 4. Merger vers main
+    print_step "Merge vers main..."
+    
+    # Récupérer les dernières modifications de main
+    git fetch origin main 2>/dev/null || true
+    
+    # Basculer sur main
+    git checkout main
+    git pull origin main 2>/dev/null || true
+    
+    # Merger la feature
+    if git merge --no-ff "$branch_name" -m "feat: merge $feature_type '$feature_name'
+
+- Merged feature branch: $branch_name
+- Added to changelog pending list"; then
+        
+        print_success "✅ Feature mergée vers main"
+        
+        # 5. Push main
+        print_step "Push de main..."
+        if git push origin main; then
+            print_success "✅ Main poussé vers origin"
+            
+            # 6. Nettoyer la branche
+            echo ""
+            echo "🧹 Voulez-vous supprimer la branche feature locale? (O/n): "
+            read -n 1 delete_confirm
+            echo ""
+            
+            if [[ "$delete_confirm" =~ ^[Oo]$ ]] || [[ -z "$delete_confirm" ]]; then
+                git branch -d "$branch_name"
+                print_success "🗑️  Branche locale supprimée"
+                
+                echo "Voulez-vous aussi supprimer la branche distante? (o/N): "
+                read -n 1 delete_remote_confirm
+                echo ""
+                
+                if [[ "$delete_remote_confirm" =~ ^[Oo]$ ]]; then
+                    git push origin --delete "$branch_name"
+                    print_success "🗑️  Branche distante supprimée"
+                fi
+            fi
+            
+            # 7. Proposer de créer une release
+            echo ""
+            echo "🎯 Feature finalisée avec succès!"
+            echo ""
+            echo "🚀 Voulez-vous créer une release maintenant? (o/N): "
+            read -n 1 release_confirm
+            echo ""
+            
+            if [[ "$release_confirm" =~ ^[Oo]$ ]]; then
+                echo "Type de release (patch/minor/major) [patch]: "
+                read version_type
+                version_type=${version_type:-patch}
+                
+                create_release "$version_type" "Release avec $feature_name"
+            else
+                echo "💡 Pour créer une release plus tard:"
+                echo "   pcr release --type patch"
+            fi
+            
+        else
+            print_error "Erreur lors du push de main"
+            return 1
+        fi
+    else
+        print_error "Erreur lors du merge"
+        echo "💡 Résolvez les conflits manuellement puis réessayez"
+        return 1
+    fi
+}
+
 # Fonction de commit automatique après création
 auto_commit_and_push() {
     local type="$1"      # "command" ou "event"
@@ -1303,6 +1625,134 @@ case "$1" in
             fi
         else
             print_warning "Réinitialisation annulée"
+        fi
+        ;;
+    finish|finalize)
+        validate_project_directory
+        finalize_feature
+        ;;
+    release)
+        validate_project_directory
+        shift
+        version_type="patch"
+        title=""
+        
+        while [[ $# -gt 0 ]]; do
+            case $1 in
+                --type)
+                    version_type="$2"
+                    shift 2
+                    ;;
+                --title)
+                    title="$2"
+                    shift 2
+                    ;;
+                *)
+                    print_error "Option inconnue: $1"
+                    echo "Usage: pcr release [--type patch|minor|major] [--title \"Titre\"]"
+                    exit 1
+                    ;;
+            esac
+        done
+        
+        create_release "$version_type" "$title"
+        ;;
+    changelog-status)
+        validate_project_directory
+        print_section "Statut du Changelog"
+        
+        # Créer le script Node.js temporaire
+        temp_script="/tmp/pcr_changelog_status_$$"
+        cat > "$temp_script.js" << EOF
+import { getChangelogStats } from '${PROJECT_DIR}/modules/version-manager.js';
+
+try {
+    const stats = getChangelogStats();
+    
+    if (stats.error) {
+        console.log('❌ Erreur:', stats.error);
+        process.exit(1);
+    }
+    
+    console.log('📊 Statistiques du Changelog');
+    console.log('════════════════════════════');
+    console.log(\`📦 Version actuelle: \${stats.currentVersion}\`);
+    console.log(\`🎯 Features en attente: \${stats.pendingFeatures}\`);
+    console.log(\`📋 Total releases: \${stats.totalReleases}\`);
+    
+    if (stats.lastRelease) {
+        console.log(\`🏷️  Dernière release: \${stats.lastRelease.version} (\${stats.lastRelease.date})\`);
+    }
+    
+    if (stats.pendingFeatures > 0) {
+        console.log('\\n⏳ Features en attente par type:');
+        Object.entries(stats.pendingByType).forEach(([type, count]) => {
+            const icon = type === 'command' ? '⚡' : type === 'event' ? '🎯' : '✨';
+            console.log(\`   \${icon} \${type}: \${count}\`);
+        });
+    }
+    
+    console.log('\\n💡 Commandes disponibles:');
+    console.log('  • pcr finish     - Finaliser la feature actuelle');
+    console.log('  • pcr release    - Créer une nouvelle release');
+    
+} catch (error) {
+    console.error('❌ Erreur:', error.message);
+    process.exit(1);
+}
+EOF
+
+        cd "$PROJECT_DIR"
+        node "$temp_script.js"
+        rm -f "$temp_script.js"
+        ;;
+    workflow)
+        print_section "Guide de Workflow PCR"
+        echo ""
+        echo "🚀 WORKFLOW DE DÉVELOPPEMENT PCR"
+        echo "════════════════════════════════"
+        echo ""
+        echo "1️⃣  CRÉER UNE NOUVELLE FEATURE:"
+        echo "   pcr command --name ma-commande    # Pour une nouvelle commande"
+        echo "   pcr event --name mon-event        # Pour un nouvel événement"
+        echo "   └─ Créé automatiquement une branche feature/type-nom"
+        echo ""
+        echo "2️⃣  DÉVELOPPER LA FEATURE:"
+        echo "   • Modifiez le fichier généré"
+        echo "   • Testez avec: pcr restart && pcr logs"
+        echo "   • Commitez vos changements au fur et à mesure"
+        echo ""
+        echo "3️⃣  FINALISER LA FEATURE:"
+        echo "   pcr finish"
+        echo "   └─ Commit final + push + merge vers main + ajout au changelog"
+        echo ""
+        echo "4️⃣  CRÉER UNE RELEASE:"
+        echo "   pcr release --type patch          # Version x.x.X+1"
+        echo "   pcr release --type minor          # Version x.X+1.0"
+        echo "   pcr release --type major          # Version X+1.0.0"
+        echo "   └─ Publie toutes les features pending + tag Git + GitHub Actions"
+        echo ""
+        echo "📊 VÉRIFIER LE STATUT:"
+        echo "   pcr changelog-status              # Voir les features en attente"
+        echo "   pcr branches                      # Voir les branches actives"
+        echo "   pcr status                        # Statut général du bot"
+        echo ""
+        echo "🎯 GITHUB ACTIONS AUTOMATIQUES:"
+        echo "   • Push d'un tag → Déclenche la release GitHub"
+        echo "   • Release créée → Publication automatique du changelog Discord"
+        echo "   • Tests automatiques sur chaque push"
+        echo ""
+        echo "💡 BONNES PRATIQUES:"
+        echo "   • Une feature = une branche"
+        echo "   • Testez avant de finish"
+        echo "   • Groupez plusieurs features dans une release"
+        echo "   • Utilisez des messages de commit clairs"
+        echo ""
+        current_branch=$(git branch --show-current 2>/dev/null || echo "unknown")
+        if [[ "$current_branch" != "main" ]] && [[ "$current_branch" != "master" ]]; then
+            echo "📍 SITUATION ACTUELLE:"
+            echo "   Branche: $current_branch"
+            echo "   Action suggérée: pcr finish (quand ready)"
         fi
         ;;
     *)
