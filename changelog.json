@@ -1,7 +1,21 @@
 {
-  "version": "1.0.3",
+  "version": "1.0.5",
   "lastUpdated": "2025-08-21T23:20:00.000Z",
-  "releases": [
+  "releases": [{
+      "version": "1.0.4",
+      "date": "2025-08-21",
+      "title": "Flemme",
+      "features": [
+        {
+          "type": "enhancement",
+          "name": "Flemme",
+          "description": "Flemme",
+          "author": "Sydnec",
+          "commit": "latest",
+          "timestamp": "2025-08-21T23:15:00.000Z"
+        }
+      ]
+    },
     {
       "version": "1.0.4",
       "date": "2025-08-21",

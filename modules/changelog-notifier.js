@@ -1,5 +1,6 @@
 import { EmbedBuilder } from 'discord.js';
 import { readChangelog } from './version-manager.js';
+import { log } from './utils.js';
 import fs from 'fs';
 import dotenv from 'dotenv';
 dotenv.config();
@@ -54,7 +55,7 @@ export async function checkAndAnnounceNewRelease(bot) {
     try {
         const changelogChannelId = process.env.CHANGELOG_CHANNEL_ID;
         if (!changelogChannelId) {
-            console.log('⚠️ CHANGELOG_CHANNEL_ID non configuré, notifications ignorées');
+            log('⚠️ CHANGELOG_CHANNEL_ID non configuré, notifications ignorées');
             return;
         }
 
@@ -64,13 +65,13 @@ export async function checkAndAnnounceNewRelease(bot) {
 
         // Si c'est la même version que la dernière annoncée, ne rien faire
         if (currentVersion === lastAnnouncedVersion) {
-            console.log(`📋 Version ${currentVersion} déjà annoncée`);
+            log(`📋 Version ${currentVersion} déjà annoncée`);
             return;
         }
 
         // Vérifier si c'est juste un patch
         if (lastAnnouncedVersion && isPatchRelease(currentVersion, lastAnnouncedVersion)) {
-            console.log(`🔧 Version ${currentVersion} est un patch, pas d'annonce Discord`);
+            log(`🔧 Version ${currentVersion} est un patch, pas d'annonce Discord`);
             // Mettre à jour quand même le fichier pour éviter de re-vérifier
             saveLastAnnouncedVersion(currentVersion);
             return;
@@ -79,7 +80,7 @@ export async function checkAndAnnounceNewRelease(bot) {
         // Trouver la release correspondante
         const currentRelease = changelog.releases.find(r => r.version === currentVersion);
         if (!currentRelease) {
-            console.log(`⚠️ Release ${currentVersion} non trouvée dans changelog.json`);
+            log(`⚠️ Release ${currentVersion} non trouvée dans changelog.json`);
             return;
         }
 
@@ -146,7 +147,7 @@ export async function checkAndAnnounceNewRelease(bot) {
         // Sauvegarder la version annoncée
         saveLastAnnouncedVersion(currentVersion);
         
-        console.log(`✅ Changelog v${currentVersion} annoncé dans Discord`);
+        log(`✅ Changelog v${currentVersion} annoncé dans Discord`);
 
     } catch (error) {
         console.error('❌ Erreur lors de l\'annonce du changelog:', error.message);
