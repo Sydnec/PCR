@@ -160,20 +160,105 @@ jobs:
           echo "✅ Release v${{ steps.version.outputs.VERSION }} créée avec succès"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: 🚀 Deploy to Production Server
+        id: deploy
+        run: |
+          echo "🚀 Déploiement automatique sur le serveur de production..."
+          
+          # Configuration SSH
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PROD_SSH_KEY }}" > ~/.ssh/prod_key
+          chmod 600 ~/.ssh/prod_key
+          
+          # Ajouter l'hôte aux known_hosts pour éviter les prompts
+          ssh-keyscan -H ${{ secrets.PROD_SSH_HOST }} >> ~/.ssh/known_hosts
+          
+          # Script de déploiement sur le serveur distant
+          ssh -i ~/.ssh/prod_key ${{ secrets.PROD_SSH_USER }}@${{ secrets.PROD_SSH_HOST }} << 'EOF'
+            set -e
+            echo "📍 Connexion au serveur de production établie"
+            
+            # Naviguer vers le répertoire du projet
+            cd ${{ secrets.PROD_PROJECT_PATH || '/home/sydnec/PCR' }}
+            echo "📁 Répertoire de projet: $(pwd)"
+            
+            # Sauvegarder l'état actuel
+            echo "💾 Sauvegarde de l'état actuel..."
+            git stash push -m "Auto-stash before deployment $(date)" || echo "Rien à sauvegarder"
+            
+            # Récupérer les dernières modifications et tags
+            echo "📥 Récupération des dernières modifications..."
+            git fetch origin --tags
+            
+            # Basculer vers le nouveau tag
+            echo "🏷️ Basculement vers le tag v${{ steps.version.outputs.VERSION }}..."
+            git checkout v${{ steps.version.outputs.VERSION }}
+            
+            # Mettre à jour les dépendances si nécessaire
+            if git diff HEAD~1 HEAD --name-only | grep -q package.json; then
+              echo "📦 package.json modifié, mise à jour des dépendances..."
+              npm install
+            fi
+            
+            # Redémarrer le bot avec PM2
+            echo "🔄 Redémarrage du bot PCR..."
+            pm2 restart pcr || {
+              echo "⚠️ Erreur lors du restart, tentative de start..."
+              pm2 start index.js --name pcr
+            }
+            
+            # Sauvegarder la configuration PM2
+            pm2 save
+            
+            # Vérifier que le bot est en ligne
+            sleep 5
+            if pm2 list | grep -q "pcr.*online"; then
+              echo "✅ Bot PCR redémarré avec succès sur la version v${{ steps.version.outputs.VERSION }}"
+            else
+              echo "❌ Erreur: Le bot n'est pas en ligne après le redémarrage"
+              pm2 logs pcr --lines 10
+              exit 1
+            fi
+            
+            echo "🎉 Déploiement automatique terminé avec succès !"
+          EOF
+          
+          # Nettoyer la clé SSH
+          rm -f ~/.ssh/prod_key
+          
+          echo "✅ Déploiement automatique réussi sur le serveur de production"
+        env:
+          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
 
       - name: ✅ Release Summary
         if: success()
         run: |
-          echo "🎉 Release v${{ steps.version.outputs.VERSION }} créée avec succès !"
+          echo "🎉 Release v${{ steps.version.outputs.VERSION }} créée et déployée avec succès !"
           echo ""
           echo "📋 Résumé:"
           echo "  • Version: ${{ steps.version.outputs.VERSION }}"
           echo "  • Tag: v${{ steps.version.outputs.VERSION }}"
           echo "  • Archive: pcr-bot-v${{ steps.version.outputs.VERSION }}.tar.gz"
           echo "  • Release GitHub: https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.VERSION }}"
+          echo "  • Déploiement: ✅ Automatique sur serveur de production"
           echo ""
-          echo "💡 Prochaines étapes:"
-          echo "  • Le bot détectera automatiquement la nouvelle version au redémarrage"
-          echo "  • Les notifications Discord seront envoyées par le bot (pour minor/major uniquement)"
-          echo "  • Les utilisateurs peuvent maintenant télécharger la nouvelle version"
-          echo "  • Le changelog est automatiquement publié"
+          echo "🚀 Actions automatiques réalisées:"
+          echo "  • ✅ Release GitHub créée"
+          echo "  • ✅ Code déployé sur le serveur de production"
+          echo "  • ✅ Bot PCR redémarré avec la nouvelle version"
+          echo "  • ✅ Notifications Discord prêtes (si configurées)"
+          echo ""
+          echo "💡 Le bot est maintenant opérationnel avec la version v${{ steps.version.outputs.VERSION }}"
+          
+      - name: ❌ Deploy Failure Notification
+        if: failure()
+        run: |
+          echo "❌ Échec du déploiement de la version v${{ steps.version.outputs.VERSION }}"
+          echo ""
+          echo "🔍 Vérifications nécessaires:"
+          echo "  • Connexion SSH au serveur de production"
+          echo "  • Configuration des secrets GitHub"
+          echo "  • État du serveur et de PM2"
+          echo ""
+          echo "📞 Action manuelle requise pour finaliser le déploiement"
