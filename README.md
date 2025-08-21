@@ -35,9 +35,16 @@ pcr monitor       # Monitoring complet
 #### 🔧 Développement
 ```bash
 pcr dev           # Mode développement avec nodemon
-pcr command --name <nom> [--desc <description>]  # Crée une nouvelle commande
-pcr event --name <nom>                           # Crée un nouvel événement
+pcr command --name <nom> [--desc <description>] [--no-git]  # Crée une nouvelle commande avec branche Git automatique
+pcr event --name <nom> [--no-git]                           # Crée un nouvel événement avec branche Git automatique
+pcr branches      # Liste les branches de fonctionnalités PCR
 ```
+
+**🌿 Workflow Git automatique :**
+- Génération automatique de branches `feature/command-<nom>` et `feature/event-<nom>`
+- Commits automatiques avec messages formatés
+- Option de push vers le dépôt distant
+- Gestion des conflits et branches existantes
 
 #### 🚀 Déploiement
 ```bash
