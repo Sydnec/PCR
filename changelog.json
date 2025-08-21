@@ -1,35 +1,19 @@
 {
-  "version": "1.0.1",
-  "lastUpdated": "2025-08-21T20:24:41.902Z",
+  "version": "1.0.0",
+  "lastUpdated": "2025-08-21T22:30:00.000Z",
   "releases": [
-    {
-      "version": "1.0.1",
-      "date": "2025-08-21",
-      "title": "Release 1.0.1",
-      "features": [
-        {
-          "type": "command",
-          "name": "hello",
-          "description": "Nouvelle commande Discord: /hello",
-          "author": "Développeur PCR",
-          "commit": "39866f0e",
-          "timestamp": "2025-08-21T20:23:21.569Z",
-          "branch": "feature/command-hello"
-        }
-      ]
-    },
     {
       "version": "1.0.0",
       "date": "2025-08-21",
-      "title": "Version initiale du PCR Bot",
+      "title": "🎉 Nouveau départ - PCR Bot avec workflow automatisé",
       "features": [
         {
-          "type": "feature",
-          "name": "Bot Discord PCR",
-          "description": "Version initiale du bot Discord PCR avec commandes de base et système de workflow automatisé",
+          "type": "feature", 
+          "name": "Notifications Discord automatiques",
+          "description": "Le bot publie automatiquement les changelogs dans Discord pour les releases",
           "author": "Sydnec",
-          "commit": "initial",
-          "timestamp": "2025-08-21T22:00:00.000Z"
+          "commit": "4e97749",
+          "timestamp": "2025-08-21T22:30:00.000Z"
         }
       ]
     }

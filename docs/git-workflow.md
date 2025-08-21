@@ -2,7 +2,7 @@
 
 ## 🌿 Génération automatique de branches
 
-Le script PCR génère automatiquement des branches Git pour faciliter le développement en équipe et le suivi des fonctionnalités.
+Le script PCR génère automatiquement des branches Git pour faciliter le développement en équipe et le suivi des fonctionnalités. Ce système s'intègre parfaitement avec les notifications Discord automatiques.
 
 ### 🔧 Création de commandes
 
@@ -19,6 +19,7 @@ pcr command --name ma-commande --desc "Description" --no-git
 - ✅ Fichier créé : `commands/ma-commande.js`
 - ✅ Commit automatique avec message formaté
 - ✅ Option de push vers le dépôt distant
+- 🎯 Prêt pour le workflow de release automatique
 
 ### ⚡ Création d'événements
 
@@ -35,6 +36,7 @@ pcr event --name messageUpdate --no-git
 - ✅ Fichier créé : `events/client/messageUpdate.js`
 - ✅ Commit automatique avec message formaté
 - ✅ Option de push vers le dépôt distant
+- 🎯 Intégration au système de changelog automatique
 
 ## 📋 Gestion des branches
 
@@ -77,11 +79,14 @@ Affiche toutes les branches `feature/command-*` et `feature/event-*` avec leurs 
    - Via GitHub/GitLab interface
    - Lien automatiquement fourni lors du push
 
-6. **Merger et nettoyer**
+6. **Finaliser et déployer**
    ```bash
-   git checkout main
-   git pull origin main
-   git branch -d feature/command-nouvelle-feature
+   # Finaliser la feature (nouveau dans v1.0.0)
+   pcr finish
+   
+   # Créer une release pour notification Discord automatique
+   pcr release --type minor  # Pour nouvelles features
+   pcr release --type patch  # Pour corrections (pas d'annonce Discord)
    ```
 
 ## 🔄 Convention de nommage des branches
@@ -154,7 +159,7 @@ git log --oneline --graph
 
 ## 📚 Exemples complets
 
-### Développement d'une nouvelle commande
+### Développement d'une nouvelle commande (Workflow v1.0.0)
 
 ```bash
 # 1. Créer la commande
@@ -164,20 +169,19 @@ pcr command --name ping --desc "Commande de test de latence"
 nano commands/ping.js
 
 # 3. Tester
-pcr dev
+pcr restart && pcr logs
 
 # 4. Commits supplémentaires
 git add commands/ping.js
 git commit -m "Ajout de la logique de ping"
 
-# 5. Push et PR
-git push origin feature/command-ping
-# Créer PR sur GitHub
+# 5. Finaliser la feature
+pcr finish
 
-# 6. Après merge, nettoyer
-git checkout main
-git pull origin main
-git branch -d feature/command-ping
+# 6. Créer une release minor (avec notification Discord)
+pcr release --type minor --title "Nouvelle commande ping"
+
+# ✅ Le bot publiera automatiquement dans Discord !
 ```
 
 ### Développement d'un événement
@@ -189,16 +193,22 @@ pcr event --name guildMemberJoin
 # 2. Développer (vous êtes sur feature/event-guildMemberJoin)
 nano events/client/guildMemberJoin.js
 
-# 3. Le reste suit le même workflow...
+# 3. Finaliser avec le nouveau workflow
+pcr finish
+
+# 4. Release patch (correction, pas d'annonce Discord)
+pcr release --type patch
 ```
 
 ## 🎯 Bonnes pratiques
 
 1. **Une fonctionnalité = Une branche** : Ne mélangez pas plusieurs fonctionnalités
 2. **Messages de commit clairs** : Décrivez précisément vos changements
-3. **Tests avant merge** : Testez votre fonctionnalité avec `pcr dev`
-4. **Nettoyage régulier** : Supprimez les branches mergées
-5. **Pull réguliers** : Maintenez votre branche `main` à jour
+3. **Tests avant finish** : Testez votre fonctionnalité avec `pcr restart && pcr logs`
+4. **Utilisez pcr finish** : Préférez `pcr finish` au merge manuel pour intégrer le changelog
+5. **Releases intelligentes** : `minor` pour features (annonce Discord), `patch` pour corrections
+6. **Pull réguliers** : Maintenez votre branche `main` à jour
+7. **Configuration Discord** : Assurez-vous que `CHANGELOG_CHANNEL_ID` est configuré
 
 ## 🆘 Dépannage
 

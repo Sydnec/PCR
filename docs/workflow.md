@@ -83,37 +83,69 @@ pcr branches
 pcr workflow
 ```
 
-## 🤖 GitHub Actions Automatique
+## 🤖 Notifications Discord Automatiques
 
 Quand vous faites `pcr release`, le workflow suivant se déclenche automatiquement :
 
 1. **Tag créé** → GitHub Actions se déclenche
 2. **Release GitHub** créée avec changelog
 3. **Archive** du projet générée 
-4. **Notification Discord** envoyée (si configurée)
-5. **CHANGELOG.md** mis à jour
+4. **CHANGELOG.md** mis à jour
+5. **Bot redémarre** → Détecte automatiquement la nouvelle version
+6. **Notification Discord** envoyée par le bot (uniquement pour minor/major)
+
+### 🎯 Règles de notification Discord
+
+- **🔧 Releases PATCH** (x.x.X+1) : **PAS de notification Discord**
+  - Corrections de bugs, petites améliorations
+  - Crée toujours la release GitHub
+  - Mais le bot ignore l'annonce Discord
+
+- **✨ Releases MINOR** (x.X+1.0) : **Notification Discord envoyée**
+  - Nouvelles fonctionnalités, nouvelles commandes
+  - Annonce publique dans le canal changelog
+
+- **🚀 Releases MAJOR** (X+1.0.0) : **Notification Discord envoyée**
+  - Changements majeurs, breaking changes
+  - Annonce publique importante
 
 ## 📁 Structure des fichiers
 
 ```
 PCR/
-├── changelog.json          # ← Tracking des features et releases
-├── CHANGELOG.md           # ← Généré automatiquement
-├── package.json           # ← Version synchronisée
+├── changelog.json              # ← Tracking des features et releases
+├── CHANGELOG.md               # ← Généré automatiquement
+├── package.json               # ← Version synchronisée
+├── last-announced-version.txt # ← Tracking des notifications Discord
 ├── modules/
-│   └── version-manager.js # ← Logique de gestion des versions
+│   ├── version-manager.js     # ← Logique de gestion des versions
+│   └── changelog-notifier.js  # ← Notifications Discord automatiques
+├── events/client/
+│   └── ready.js               # ← Vérification auto des releases
 └── .github/workflows/
-    └── release.yml        # ← Workflow GitHub Actions
+    └── release.yml            # ← Workflow GitHub Actions
 ```
 
 ## 🔧 Configuration
 
-### Discord Notifications (Optionnel)
+### Discord Notifications Automatiques
 Pour activer les notifications Discord automatiques lors des releases :
 
-1. Créez un webhook Discord dans votre canal changelog
-2. Ajoutez le secret `DISCORD_CHANGELOG_WEBHOOK` dans GitHub
+1. **Configurez le canal dans votre bot** :
+   ```bash
+   # Dans votre fichier .env
+   CHANGELOG_CHANNEL_ID="votre_channel_id_ici"
+   ```
 
+2. **Le bot s'occupe du reste** :
+   - Détection automatique des nouvelles versions au démarrage
+   - Publication d'un embed Discord avec les détails de la release
+   - Uniquement pour les versions minor/major (pas les patches)
+
+### Configuration obsolète (GitHub Webhook)
+⚠️ **Plus nécessaire** : Le système de webhook GitHub a été remplacé par les notifications directes du bot.
+
+**Ancien système (ne plus utiliser)** :
 ```bash
 # Settings → Secrets and variables → Actions → New repository secret
 Name: DISCORD_CHANGELOG_WEBHOOK  
@@ -152,6 +184,8 @@ Le système reconnaît automatiquement :
 3. **Groupez les releases** - Attendez d'avoir plusieurs features avant release
 4. **Messages clairs** - Utilisez des descriptions précises pour vos features
 5. **Vérifiez le statut** - `pcr changelog-status` avant release
+6. **Patch vs Minor** - Utilisez `patch` pour les corrections, `minor` pour les nouvelles features
+7. **Canal configuré** - Assurez-vous que `CHANGELOG_CHANNEL_ID` est défini pour les notifications Discord
 
 ## 🚨 Résolution de problèmes
 
@@ -185,4 +219,10 @@ pcr changelog-status
 
 ---
 
-*Ce workflow a été conçu pour automatiser complètement le cycle de développement du PCR Bot, de la création de features jusqu'au déploiement.*
+*Ce workflow a été conçu pour automatiser complètement le cycle de développement du PCR Bot, de la création de features jusqu'au déploiement et aux notifications Discord automatiques.*
+
+**Nouveautés v1.0.0 :**
+- 🤖 Notifications Discord intégrées au bot (plus besoin de webhooks)
+- 🎯 Notifications intelligentes (minor/major uniquement)
+- 📦 Système de tracking des annonces pour éviter les doublons
+- ✨ Workflow entièrement automatisé du développement au déploiement
