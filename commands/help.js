@@ -6,18 +6,19 @@ dotenv.config(); // process.env.CONSTANT
 export default {
     data: new SlashCommandBuilder()
         .setName('help')
-        .setDescription(`Description`)
-        .addStringOption((option) =>
-            option
-                .setName('option')
-                .setDescription('description')
-                .setRequired(true)
-        ),
+        .setDescription(`Fourni la liste des commandes disponibles avec ce bot`),
 
     async execute(interaction) {
-        interaction.reply({
-            content: '',
-            ephemeral: true,
-        });
+        try {
+            const commands = interaction.client.commands;
+            const commandList = commands.map(cmd => `• **/${cmd.data.name}**: ${cmd.data.description}`).join('\n');
+
+            await interaction.reply({
+                content: `Voici la liste des commandes disponibles:\n${commandList}`,
+                ephemeral: true,
+            });
+        } catch (error) {
+            handleException(error, interaction);
+        }
     },
 };
