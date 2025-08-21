@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, MessageFlags } from 'discord.js';
 import { handleException, updateThreadList } from '../modules/utils.js';
 import dotenv from 'dotenv';
 dotenv.config(); // process.env.CONSTANT
@@ -12,7 +12,7 @@ export default {
         try {
             await interaction.reply({
                 content: 'Mise à jour de la liste des threads en cours...',
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
             await updateThreadList(interaction.guild);
             await interaction.editReply({

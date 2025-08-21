@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, MessageFlags } from 'discord.js';
 import { handleException } from '../modules/utils.js';
 import dotenv from 'dotenv';
 dotenv.config(); // process.env.CONSTANT
@@ -32,7 +32,7 @@ export default {
             if (eligibleMembers.length < 2) {
                 interaction.reply({
                     content: "Pas assez de membres éligibles pour faire un ship !",
-                    ephemeral: true,
+                    flags: MessageFlags.Ephemeral,
                 });
                 return;
             }
@@ -50,7 +50,7 @@ export default {
         }
         interaction.reply({
             content: '',
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
         });
     },
 };

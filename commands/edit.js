@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, MessageFlags } from 'discord.js';
 import { autoAddEmojis } from '../modules/utils.js';
 import dotenv from 'dotenv';
 dotenv.config(); // process.env.CONSTANT
@@ -27,7 +27,7 @@ export default {
             autoAddEmojis(message).then(
                 interaction.reply({
                     content: 'Ça y est chef !',
-                    ephemeral: true,
+                    flags: MessageFlags.Ephemeral,
                 })
             );
         } catch (err) {

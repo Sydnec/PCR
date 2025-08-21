@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, MessageFlags } from 'discord.js';
 import { handleException } from '../modules/utils.js';
 import dotenv from 'dotenv';
 dotenv.config(); // process.env.CONSTANT
@@ -26,7 +26,7 @@ export default {
             .then((message) =>
                 interaction.reply({
                     content: 'Message envoyé ' + message.url,
-                    ephemeral: true,
+                    flags: MessageFlags.Ephemeral,
                 })
             );
     },

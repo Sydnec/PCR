@@ -21,7 +21,7 @@ async function execute(interaction, bot) {
             handleException(err);
             await interaction.reply({
                 content: `Erreur lors de l'execution de la commande.`,
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
     }

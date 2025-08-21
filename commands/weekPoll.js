@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, MessageFlags } from 'discord.js';
 import { handleException, log, autoAddEmojis } from '../modules/utils.js';
 import dotenv from 'dotenv';
 dotenv.config(); // process.env.CONSTANT
@@ -21,7 +21,7 @@ export default {
         await autoAddEmojis(pollMessage);
         await interaction.reply({
             content: 'Sondage créé',
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
         });
     },
 };

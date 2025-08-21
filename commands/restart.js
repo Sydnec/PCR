@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, MessageFlags } from 'discord.js';
 import { handleException, isAdmin } from '../modules/utils.js';
 import dotenv from 'dotenv';
 dotenv.config(); // process.env.CONSTANT
@@ -14,13 +14,13 @@ export default {
                 await interaction.reply({
                     content:
                         "Vous n'avez pas les autorisations nécessaires pour utiliser cette commande.",
-                    ephemeral: true,
+                    flags: MessageFlags.Ephemeral,
                 });
                 return;
             } else {
                 await interaction.reply({
                     content: 'Redémarrage en cours...',
-                    ephemeral: true,
+                    flags: MessageFlags.Ephemeral,
                 });
                 await bot.destroy();
                 process.exit(0);

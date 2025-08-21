@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, MessageFlags } from 'discord.js';
 import { handleException } from '../modules/utils.js';
 import dotenv from 'dotenv';
 dotenv.config();
@@ -22,7 +22,7 @@ export default {
         if (!match) {
             return interaction.reply({
                 content: "URL de message invalide.",
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
 
@@ -34,7 +34,7 @@ export default {
             if (!channel || !channel.isTextBased()) {
                 return interaction.reply({
                     content: "Impossible de trouver le salon.",
-                    ephemeral: true,
+                    flags: MessageFlags.Ephemeral,
                 });
             }
 
@@ -42,20 +42,20 @@ export default {
             if (!message) {
                 return interaction.reply({
                     content: "Message introuvable.",
-                    ephemeral: true,
+                    flags: MessageFlags.Ephemeral,
                 });
             }
 
             await message.pin();
             await interaction.reply({
                 content: "Message épinglé avec succès !",
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         } catch (error) {
             handleException(error);
             await interaction.reply({
                 content: "Une erreur est survenue lors de l'épinglage du message.",
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
     },

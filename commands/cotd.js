@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, MessageFlags } from 'discord.js';
 import axios from 'axios'; // Pour faire des requêtes HTTP
 import { handleException } from '../modules/utils.js';
 import dotenv from 'dotenv';
@@ -27,7 +27,7 @@ export default {
                 messageContent += '\nPour fêter ça, apéro !';
                 await interaction.reply({
                     content: messageContent,
-                    ephemeral: true,
+                    flags: MessageFlags.Ephemeral,
                 });
             }
         } catch (error) {

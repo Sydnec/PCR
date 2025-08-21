@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, MessageFlags } from 'discord.js';
 import { handleException, isAdmin } from '../modules/utils.js';
 import dotenv from 'dotenv';
 dotenv.config(); // process.env.CONSTANT
@@ -24,7 +24,7 @@ export default {
                 await interaction.reply({
                     content:
                         "Vous n'avez pas les autorisations nécessaires pour utiliser cette commande.",
-                    ephemeral: true,
+                    flags: MessageFlags.Ephemeral,
                 });
             } else {
                 if (
@@ -35,13 +35,13 @@ export default {
                 ) {
                     await interaction.reply({
                         content: 'Veuillez entrer un paramètre',
-                        ephemeral: true,
+                        flags: MessageFlags.Ephemeral,
                     });
                     return;
                 }
                 await interaction.reply({
                     content: "Je m'en occupe chef !",
-                    ephemeral: true,
+                    flags: MessageFlags.Ephemeral,
                 });
                 let numberMessages = interaction.options.getNumber('nombre');
                 if (numberMessages > 0) {

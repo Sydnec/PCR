@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, MessageFlags } from 'discord.js';
 import { handleException, log } from '../modules/utils.js';
 import dotenv from 'dotenv';
 dotenv.config(); // process.env.CONSTANT
@@ -51,7 +51,7 @@ export default {
         user.roles.add(coloredRole);
         interaction.reply({
             content: 'Ça y est, tu es tout.e beau/belle',
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
         });
     },
 };

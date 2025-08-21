@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, MessageFlags } from 'discord.js';
 import { handleException } from '../modules/utils.js';
 import dotenv from 'dotenv';
 dotenv.config(); // process.env.CONSTANT
@@ -15,7 +15,7 @@ export default {
 
             await interaction.reply({
                 content: `Voici la liste des commandes disponibles:\n${commandList}`,
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         } catch (error) {
             handleException(error, interaction);

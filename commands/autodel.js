@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, MessageFlags } from 'discord.js';
 import { handleException, log, dbAddDeleteMessage } from '../modules/utils.js';
 import sqlite3 from 'sqlite3';
 import { parse } from 'url';
@@ -100,7 +100,7 @@ export default {
 
                 await interaction.reply({
                     content: `Le message sera supprimé après ${days} jours.`,
-                    ephemeral: true,
+                    flags: MessageFlags.Ephemeral,
                 });
             }
         } catch (err) {

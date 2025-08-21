@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, MessageFlags } from 'discord.js';
 import dotenv from 'dotenv';
 dotenv.config(); // Charger les variables d'environnement
 
@@ -15,13 +15,13 @@ export default {
             // Envoyer l'ID du canal à l'utilisateur
             await interaction.reply({
                 content: `L'ID de ce canal est : ${channelId}`,
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         } catch (error) {
             console.error(`Erreur lors de la récupération de l'ID du canal : ${error}`);
             await interaction.reply({
                 content: `Une erreur est survenue lors de la récupération de l'ID du canal.`,
-                ephemeral: true,
+                flags: MessageFlags.Ephemeral,
             });
         }
     },
