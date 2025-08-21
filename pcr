@@ -305,6 +305,186 @@ update_function() {
     fi
 }
 
+# Fonction de création de branche Git automatique
+create_git_branch() {
+    local branch_type="$1"  # "command" ou "event"
+    local name="$2"
+    local branch_name="feature/${branch_type}-${name}"
+    
+    # Vérifier si on est dans un repo Git
+    if ! git rev-parse --git-dir > /dev/null 2>&1; then
+        print_warning "Pas dans un dépôt Git - ignorer la création de branche"
+        return 0
+    fi
+    
+    # Vérifier si on a des changements non committés
+    if ! git diff-index --quiet HEAD --; then
+        print_warning "Changements non committés détectés"
+        echo "Voulez-vous créer un commit avant de créer la nouvelle branche? (O/n): "
+        read -n 1 stash_confirm
+        echo ""
+        if [[ "$stash_confirm" =~ ^[Oo]$ ]] || [[ -z "$stash_confirm" ]]; then
+            git add -A
+            git commit -m "Sauvegarde automatique avant création de branche $branch_name"
+            print_success "Changements sauvegardés"
+        else
+            print_warning "Création de branche avec changements non committés"
+        fi
+    fi
+    
+    # Vérifier si la branche existe déjà
+    if git show-ref --verify --quiet refs/heads/"$branch_name"; then
+        print_warning "La branche '$branch_name' existe déjà"
+        echo "Voulez-vous basculer sur cette branche? (O/n): "
+        read -n 1 switch_confirm
+        echo ""
+        if [[ "$switch_confirm" =~ ^[Oo]$ ]] || [[ -z "$switch_confirm" ]]; then
+            git checkout "$branch_name"
+            print_success "Basculé sur la branche existante '$branch_name'"
+        fi
+        return 0
+    fi
+    
+    # Créer et basculer sur la nouvelle branche
+    print_step "Création de la branche Git '$branch_name'..."
+    if git checkout -b "$branch_name"; then
+        print_success "Branche '$branch_name' créée et activée"
+        return 0
+    else
+        print_error "Erreur lors de la création de la branche"
+        return 1
+    fi
+}
+
+# Fonction pour lister les branches de fonctionnalités
+list_feature_branches() {
+    if ! git rev-parse --git-dir > /dev/null 2>&1; then
+        print_error "Pas dans un dépôt Git"
+        return 1
+    fi
+    
+    print_section "Branches de fonctionnalités PCR"
+    
+    # Lister les branches feature/command-* et feature/event-*
+    local feature_branches
+    feature_branches=$(git branch | grep -E "(feature/command-|feature/event-)" | sed 's/^[* ] //')
+    
+    if [[ -z "$feature_branches" ]]; then
+        print_warning "Aucune branche de fonctionnalité trouvée"
+        echo ""
+        echo "💡 Pour créer une branche de fonctionnalité:"
+        echo "  • pcr command --name <nom>    - Nouvelle commande"
+        echo "  • pcr event --name <nom>      - Nouvel événement"
+        return 0
+    fi
+    
+    echo "🌿 Branches disponibles:"
+    echo "─────────────────────"
+    
+    local current_branch
+    current_branch=$(git branch --show-current)
+    
+    while IFS= read -r branch; do
+        local status_symbol=""
+        local branch_info=""
+        
+        if [[ "$branch" == "$current_branch" ]]; then
+            status_symbol="➤ "
+            branch_info=" (COURANTE)"
+        else
+            status_symbol="  "
+        fi
+        
+        # Extraire le type et le nom
+        if [[ "$branch" =~ feature/command-(.+) ]]; then
+            local cmd_name="${BASH_REMATCH[1]}"
+            echo "${status_symbol}🔧 $branch${branch_info}"
+            echo "    └─ Commande: $cmd_name"
+        elif [[ "$branch" =~ feature/event-(.+) ]]; then
+            local event_name="${BASH_REMATCH[1]}"
+            echo "${status_symbol}⚡ $branch${branch_info}"
+            echo "    └─ Événement: $event_name"
+        else
+            echo "${status_symbol}🌿 $branch${branch_info}"
+        fi
+        echo ""
+    done <<< "$feature_branches"
+    
+    echo "💡 Commandes utiles:"
+    echo "───────────────────"
+    echo "  • git checkout <branche>     - Basculer sur une branche"
+    echo "  • git checkout main          - Revenir à la branche principale"
+    echo "  • git branch -d <branche>    - Supprimer une branche"
+    echo "  • git push origin <branche>  - Pousser une branche"
+}
+
+# Fonction de commit automatique après création
+auto_commit_and_push() {
+    local type="$1"      # "command" ou "event"
+    local name="$2"
+    local file_path="$3"
+    local branch_name="feature/${type}-${name}"
+    
+    # Vérifier si on est dans un repo Git
+    if ! git rev-parse --git-dir > /dev/null 2>&1; then
+        return 0
+    fi
+    
+    print_step "Commit automatique du nouveau $type '$name'..."
+    
+    # Ajouter le fichier créé
+    git add "$file_path"
+    
+    # Créer le message de commit
+    local commit_msg
+    if [[ "$type" == "command" ]]; then
+        commit_msg="feat: add new Discord command '$name'
+
+- Generated using 'pcr command --name $name'
+- File: $(basename "$file_path")
+- Ready for implementation"
+    else
+        commit_msg="feat: add new Discord event '$name'
+
+- Generated using 'pcr event --name $name' 
+- File: $(basename "$file_path")
+- Ready for implementation"
+    fi
+    
+    # Effectuer le commit
+    if git commit -m "$commit_msg"; then
+        print_success "Commit effectué avec succès"
+        
+        # Demander si on veut push
+        echo ""
+        echo "Voulez-vous pousser la branche vers le dépôt distant? (O/n): "
+        read -n 1 push_confirm
+        echo ""
+        if [[ "$push_confirm" =~ ^[Oo]$ ]] || [[ -z "$push_confirm" ]]; then
+            print_step "Push de la branche '$branch_name'..."
+            if git push -u origin "$branch_name"; then
+                print_success "Branche poussée vers origin/$branch_name"
+                echo ""
+                echo "🌐 Actions suggérées:"
+                echo "  • Créer une Pull Request sur GitHub/GitLab"
+                echo "  • Continuer le développement sur cette branche"
+                echo "  • Merger quand prêt: git checkout main && git merge $branch_name"
+            else
+                print_warning "Erreur lors du push - vous pouvez le faire manuellement plus tard"
+                echo "  Commande: git push -u origin $branch_name"
+            fi
+        else
+            print_success "Branche créée localement (non poussée)"
+            echo ""
+            echo "💡 Pour pousser plus tard:"
+            echo "  git push -u origin $branch_name"
+        fi
+    else
+        print_error "Erreur lors du commit"
+        return 1
+    fi
+}
+
 # Fonction de création d'événement
 create_event() {
     local event_name="$1"
@@ -315,6 +495,9 @@ create_event() {
         echo "Exemple: pcr event --name messageUpdate"
         return 1
     fi
+    
+    # Créer la branche Git automatiquement
+    create_git_branch "event" "$event_name"
     
     # Vérifier que le nom est valide (alphanumeric + tirets)
     if [[ ! "$event_name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
@@ -353,6 +536,10 @@ create_event() {
     
     print_success "Événement '$event_name' créé avec succès!"
     print_success "Fichier: $new_event_file"
+    
+    # Commit automatique et push
+    auto_commit_and_push "event" "$event_name" "$new_event_file"
+    
     echo ""
     echo "📝 Prochaines étapes:"
     echo "───────────────────"
@@ -364,6 +551,11 @@ create_event() {
     echo "💡 Commandes utiles:"
     echo "  • Éditer: nano $new_event_file"
     echo "  • Voir les logs: pcr logs"
+    echo ""
+    echo "🌿 Git workflow:"
+    echo "  • Branche courante: feature/event-$event_name"
+    echo "  • Quand prêt: créer une Pull Request"
+    echo "  • Revenir à main: git checkout main"
     echo ""
     echo "📚 Événements Discord courants:"
     echo "  • ready, messageCreate, messageDelete"
@@ -383,6 +575,9 @@ create_command() {
         echo "Exemple: pcr command --name hello --desc \"Commande de salutation\""
         return 1
     fi
+    
+    # Créer la branche Git automatiquement
+    create_git_branch "command" "$command_name"
     
     # Vérifier que le nom est valide (alphanumeric + tirets)
     if [[ ! "$command_name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
@@ -426,6 +621,10 @@ create_command() {
     
     print_success "Commande '$command_name' créée avec succès!"
     print_success "Fichier: $new_command_file"
+    
+    # Commit automatique et push
+    auto_commit_and_push "command" "$command_name" "$new_command_file"
+    
     echo ""
     echo "📝 Prochaines étapes:"
     echo "───────────────────"
@@ -437,6 +636,11 @@ create_command() {
     echo "💡 Commandes utiles:"
     echo "  • Éditer: nano $new_command_file"
     echo "  • Voir les logs: pcr logs"
+    echo ""
+    echo "🌿 Git workflow:"
+    echo "  • Branche courante: feature/command-$command_name"
+    echo "  • Quand prêt: créer une Pull Request"
+    echo "  • Revenir à main: git checkout main"
 }
 
 # Fonction d'installation du script dans le PATH
@@ -648,6 +852,7 @@ case "$1" in
         
         # Parser les arguments
         event_name=""
+        no_git=false
         
         # Analyser les paramètres
         shift # Enlever 'event'
@@ -657,19 +862,30 @@ case "$1" in
                     event_name="$2"
                     shift 2
                     ;;
+                --no-git)
+                    no_git=true
+                    shift
+                    ;;
                 *)
                     print_error "Option inconnue: $1"
-                    echo "Usage: pcr event --name <nom_evenement>"
+                    echo "Usage: pcr event --name <nom_evenement> [--no-git]"
                     exit 1
                     ;;
             esac
         done
         
         if [[ -n "$event_name" ]]; then
+            if [[ "$no_git" == true ]]; then
+                # Sauvegarder les fonctions Git temporairement
+                create_git_branch() { return 0; }
+                auto_commit_and_push() { return 0; }
+            fi
             create_event "$event_name"
         else
-            print_error "Usage: pcr event --name <nom_evenement>"
+            print_error "Usage: pcr event --name <nom_evenement> [--no-git]"
             echo "Exemple: pcr event --name messageUpdate"
+            echo "Options:"
+            echo "  --no-git    Skip Git branch creation and commit"
             echo ""
             echo "Cette commande crée un nouvel événement Discord en utilisant"
             echo "le template du fichier 'example' dans le dossier events/client/"
@@ -687,6 +903,7 @@ case "$1" in
         # Parser les arguments
         command_name=""
         command_desc=""
+        no_git=false
         
         # Analyser les paramètres
         shift # Enlever 'command'
@@ -700,24 +917,39 @@ case "$1" in
                     command_desc="$2"
                     shift 2
                     ;;
+                --no-git)
+                    no_git=true
+                    shift
+                    ;;
                 *)
                     print_error "Option inconnue: $1"
-                    echo "Usage: pcr command --name <nom_commande> [--desc <description>]"
+                    echo "Usage: pcr command --name <nom_commande> [--desc <description>] [--no-git]"
                     exit 1
                     ;;
             esac
         done
         
         if [[ -n "$command_name" ]]; then
+            if [[ "$no_git" == true ]]; then
+                # Sauvegarder les fonctions Git temporairement
+                create_git_branch() { return 0; }
+                auto_commit_and_push() { return 0; }
+            fi
             create_command "$command_name" "$command_desc"
         else
-            print_error "Usage: pcr command --name <nom_commande> [--desc <description>]"
+            print_error "Usage: pcr command --name <nom_commande> [--desc <description>] [--no-git]"
             echo "Exemple: pcr command --name hello"
             echo "Exemple: pcr command --name hello --desc \"Commande de salutation\""
+            echo "Options:"
+            echo "  --no-git    Skip Git branch creation and commit"
             echo ""
             echo "Cette commande crée une nouvelle commande Discord en utilisant"
             echo "le template du fichier 'example' dans le dossier commands/"
         fi
+        ;;
+    branches)
+        validate_project_directory
+        list_feature_branches
         ;;
     install)
         install_script
@@ -858,10 +1090,11 @@ case "$1" in
         echo ""
         echo "🔧 Développement:"
         echo "  dev           - Lance le bot en mode développement (avec nodemon)"
-        echo "  command       - Crée une nouvelle commande Discord"
-        echo "                  Usage: pcr command --name <nom> [--desc <description>]"
-        echo "  event         - Crée un nouvel événement Discord"
-        echo "                  Usage: pcr event --name <nom>"
+        echo "  command       - Crée une nouvelle commande Discord avec branche Git"
+        echo "                  Usage: pcr command --name <nom> [--desc <description>] [--no-git]"
+        echo "  event         - Crée un nouvel événement Discord avec branche Git"
+        echo "                  Usage: pcr event --name <nom> [--no-git]"
+        echo "  branches      - Liste les branches de fonctionnalités PCR"
         echo ""
         echo "🚀 Déploiement:"
         echo "  deploy        - Déploiement complet du bot"
