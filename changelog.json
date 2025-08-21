@@ -1,7 +1,22 @@
 {
-  "version": "1.0.1",
-  "lastUpdated": "2025-08-21T20:55:44.664Z",
+  "version": "1.0.2",
+  "lastUpdated": "2025-08-21T21:26:31.751Z",
   "releases": [
+    {
+      "version": "1.0.2",
+      "date": "2025-08-21",
+      "title": "Test déploiement automatique self-hosted",
+      "features": [
+        {
+          "type": "enhancement",
+          "name": "Déploiement automatique self-hosted",
+          "description": "Migration du workflow GitHub Actions vers self-hosted runner pour déploiement automatique local",
+          "author": "Sydnec",
+          "commit": "5bb6d7d",
+          "timestamp": "2025-08-21T23:15:00.000Z"
+        }
+      ]
+    },
     {
       "version": "1.0.1",
       "date": "2025-08-21",
