@@ -3,3 +3,7 @@ node_modules
 commands/test.js
 *.db
 backups
+
+# Generated files
+CHANGELOG.md
+last-announced-version.txt
