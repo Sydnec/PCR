@@ -3,6 +3,21 @@
   "lastUpdated": "2025-08-21T23:20:00.000Z",
   "releases": [
     {
+      "version": "1.0.4",
+      "date": "2025-08-21",
+      "title": "Modification de ready vers clientReady",
+      "features": [
+        {
+          "type": "enhancement",
+          "name": "Modification de ready vers clientReady",
+          "description": "Assurer la compatibilité future",
+          "author": "Sydnec",
+          "commit": "5bb6d7d",
+          "timestamp": "2025-08-21T23:15:00.000Z"
+        }
+      ]
+    },
+    {
       "version": "1.0.3",
       "date": "2025-08-21",
       "title": "Test déploiement automatique self-hosted",
