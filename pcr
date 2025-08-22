@@ -367,7 +367,7 @@ list_feature_branches() {
     
     # Lister les branches feature/command-* et feature/event-*
     local feature_branches
-    feature_branches=$(git branch | grep -E "(feature/command-|feature/event-)" | sed 's/^[* ] //')
+    feature_branches=$(git branch | grep -E "(feature/command-|feature/event-|fix/|feature/)" | sed 's/^[* ] //')
     
     if [[ -z "$feature_branches" ]]; then
         print_warning "Aucune branche de fonctionnalité trouvée"
@@ -387,14 +387,14 @@ list_feature_branches() {
     while IFS= read -r branch; do
         local status_symbol=""
         local branch_info=""
-        
+
         if [[ "$branch" == "$current_branch" ]]; then
             status_symbol="➤ "
             branch_info=" (COURANTE)"
         else
             status_symbol="  "
         fi
-        
+
         # Extraire le type et le nom
         if [[ "$branch" =~ feature/command-(.+) ]]; then
             local cmd_name="${BASH_REMATCH[1]}"
@@ -404,6 +404,10 @@ list_feature_branches() {
             local event_name="${BASH_REMATCH[1]}"
             echo "${status_symbol}⚡ $branch${branch_info}"
             echo "    └─ Événement: $event_name"
+        elif [[ "$branch" =~ fix/(.+) ]]; then
+            local fix_name="${BASH_REMATCH[1]}"
+            echo "${status_symbol}🛠️ $branch${branch_info}"
+            echo "    └─ Correction: $fix_name"
         else
             echo "${status_symbol}🌿 $branch${branch_info}"
         fi
