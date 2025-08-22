@@ -2,7 +2,7 @@
   "version": "1.0.5",
   "lastUpdated": "2025-08-21T23:20:00.000Z",
   "releases": [{
-      "version": "1.0.4",
+      "version": "1.0.5",
       "date": "2025-08-21",
       "title": "Flemme",
       "features": [
@@ -11,7 +11,7 @@
           "name": "Flemme",
           "description": "Flemme",
           "author": "Sydnec",
-          "commit": "latest",
+          "commit": "9721616",
           "timestamp": "2025-08-21T23:15:00.000Z"
         }
       ]
@@ -26,7 +26,7 @@
           "name": "Modification de ready vers clientReady",
           "description": "Assurer la compatibilité future",
           "author": "Sydnec",
-          "commit": "5bb6d7d",
+          "commit": "fa16da8",
           "timestamp": "2025-08-21T23:15:00.000Z"
         }
       ]
@@ -41,7 +41,7 @@
           "name": "Déploiement automatique self-hosted",
           "description": "Migration du workflow GitHub Actions vers self-hosted runner pour déploiement automatique local",
           "author": "Sydnec",
-          "commit": "5bb6d7d",
+          "commit": "b408f90",
           "timestamp": "2025-08-21T23:15:00.000Z"
         }
       ]
@@ -56,7 +56,7 @@
           "name": "Déploiement automatique self-hosted",
           "description": "Migration du workflow GitHub Actions vers self-hosted runner pour déploiement automatique local",
           "author": "Sydnec",
-          "commit": "5bb6d7d",
+          "commit": "8392891",
           "timestamp": "2025-08-21T23:15:00.000Z"
         }
       ]
@@ -71,7 +71,7 @@
           "name": "Modernisation syntaxe Discord.js",
           "description": "Correction des avertissements de dépréciation - remplacement de 'ephemeral: true' par 'flags: MessageFlags.Ephemeral'",
           "author": "Sydnec",
-          "commit": "latest",
+          "commit": "1f1fc01",
           "timestamp": "2025-08-21T22:45:00.000Z"
         }
       ]
@@ -86,7 +86,7 @@
           "name": "Notifications Discord automatiques",
           "description": "Le bot publie automatiquement les changelogs dans Discord pour les releases",
           "author": "Sydnec",
-          "commit": "4e97749",
+          "commit": "b7a1081",
           "timestamp": "2025-08-21T22:30:00.000Z"
         }
       ]
