@@ -1,7 +1,23 @@
 {
-  "version": "1.0.5",
+  "version": "1.0.6",
   "lastUpdated": "2025-08-21T23:20:00.000Z",
-  "releases": [{
+  "releases": [
+    {
+      "version": "1.0.6",
+      "date": "2025-08-21",
+      "title": "fix reponses timeout",
+      "features": [
+        {
+          "type": "enhancement",
+          "name": "fix reponses timeout",
+          "description": "fix reponses timeout",
+          "author": "Sydnec",
+          "commit": "latest",
+          "timestamp": "2025-08-21T23:15:00.000Z"
+        }
+      ]
+    },
+    {
       "version": "1.0.5",
       "date": "2025-08-21",
       "title": "Flemme",
