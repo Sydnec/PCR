@@ -15,7 +15,7 @@ export default {
     ),
 
   async execute(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const user = interaction.member;
     const guild = interaction.guild;
     const code = interaction.options
@@ -43,9 +43,9 @@ export default {
       const colorRole = guild.roles.cache.get(process.env.COLOR_ROLE_ID);
       coloredRole = await guild.roles.create({
         name: "&" + code,
-        color: code,
         position: colorRole.position,
       });
+      await coloredRole.setColor(code);
     }
     user.roles.add(coloredRole);
     await interaction.editReply({

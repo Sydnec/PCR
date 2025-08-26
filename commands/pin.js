@@ -15,7 +15,7 @@ export default {
     ),
 
   async execute(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const messageUrl = interaction.options.getString("message_url");
     const regex = /https:\/\/discord\.com\/channels\/(\d+)\/(\d+)\/(\d+)/;
     const match = messageUrl.match(regex);

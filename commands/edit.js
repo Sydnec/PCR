@@ -17,7 +17,7 @@ export default {
     ),
 
   async execute(interaction) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const channel = interaction.channel;
     if (channel.parentId != process.env.POLL_CHANNEL_ID) return;
     try {

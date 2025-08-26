@@ -10,7 +10,7 @@ export default {
 
   async execute(interaction) {
     try {
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       const commands = interaction.client.commands;
       const commandList = commands
         .map((cmd) => `• **/${cmd.data.name}**: ${cmd.data.description}`)

@@ -1,7 +1,30 @@
 {
-  "version": "1.0.6",
-  "lastUpdated": "2025-08-21T23:20:00.000Z",
+  "version": "1.0.7",
+  "lastUpdated": "2025-08-26T00:00:00.000Z",
   "releases": [
+    {
+      "version": "1.0.7",
+      "date": "2025-08-26",
+      "title": "fix dépréciations discord.js + sécurité handleCommands",
+      "features": [
+        {
+          "type": "fix",
+          "name": "Suppression des warnings de dépréciation Discord.js",
+          "description": "Remplacement de 'ephemeral: true' par 'flags: MessageFlags.Ephemeral' et correction de l'usage de 'color' dans la création de rôles.",
+          "author": "Sydnec",
+          "commit": "e394a3f",
+          "timestamp": "2025-08-26T00:00:00.000Z"
+        },
+        {
+          "type": "fix",
+          "name": "Sécurisation de l'itération sur les commandes",
+          "description": "Ajout de la vérification Array.isArray pour éviter les plantages si la récupération des commandes échoue.",
+          "author": "Sydnec",
+          "commit": "e394a3f",
+          "timestamp": "2025-08-26T00:00:00.000Z"
+        }
+      ]
+    },
     {
       "version": "1.0.6",
       "date": "2025-08-21",

@@ -10,7 +10,7 @@ export default {
 
   async execute(interaction, bot) {
     try {
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       if (!isAdmin(interaction.member)) {
         await interaction.editReply({
           content:

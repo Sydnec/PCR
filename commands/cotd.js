@@ -11,7 +11,7 @@ export default {
 
   async execute(interaction) {
     try {
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       // Appel de la fonction handleCOTDOnTimer
       const url = "https://nominis.cef.fr/json/nominis.php";
       const response = await axios.get(url);

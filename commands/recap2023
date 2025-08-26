@@ -15,7 +15,7 @@ export default {
                 interaction.reply({
                     content:
                         'Le récapitulatif 2023 est en cours de génération ...',
-                    ephemeral: true,
+                    flags: MessageFlags.Ephemeral,
                 });
                 const result = await getMessageCount(interaction.channel.guild);
                 // Appeler la fonction pour chaque utilisateur

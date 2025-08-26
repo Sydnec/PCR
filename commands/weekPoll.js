@@ -15,7 +15,7 @@ export default {
     ),
 
   async execute(interaction, bot) {
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const input = interaction.options.getString("question");
     const daysOfTheWeek =
       "Lundi \nMardi \nMercredi \nJeudi \nVendredi \nSamedi \nDimanche";

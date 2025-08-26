@@ -49,21 +49,23 @@ async function deleteAllCommands(rest, clientId, guildId) {
         .get(Routes.applicationCommands(clientId))
         .catch(handleException);
 
-    for (const command of existingGlobalCommands) {
-        await rest
-            .delete(`${Routes.applicationCommands(clientId)}/${command.id}`)
-            .catch(handleException);
+    if (Array.isArray(existingGlobalCommands)) {
+        for (const command of existingGlobalCommands) {
+            await rest
+                .delete(`${Routes.applicationCommands(clientId)}/${command.id}`)
+                .catch(handleException);
+        }
     }
     const existingServerOnlyCommands = await rest
         .get(Routes.applicationGuildCommands(clientId, guildId))
         .catch(handleException);
-    for (const command of existingServerOnlyCommands) {
-        await rest
-            .delete(
-                `${Routes.applicationGuildCommands(clientId, guildId)}/${
-                    command.id
-                }`
-            )
-            .catch(handleException);
+    if (Array.isArray(existingServerOnlyCommands)) {
+        for (const command of existingServerOnlyCommands) {
+            await rest
+                .delete(
+                    `${Routes.applicationGuildCommands(clientId, guildId)}/${command.id}`
+                )
+                .catch(handleException);
+        }
     }
 }
