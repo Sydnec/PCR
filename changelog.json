@@ -1,7 +1,22 @@
 {
-  "version": "1.0.7",
-  "lastUpdated": "2025-08-26T00:00:00.000Z",
+  "version": "1.1.0",
+  "lastUpdated": "2025-08-29T00:00:00.000Z",
   "releases": [
+    {
+      "version": "1.1.0",
+      "date": "2025-08-29",
+      "title": "feat: gestion des stats annuelles",
+      "features": [
+        {
+          "type": "feature",
+          "name": "Statistiques annuelles et globales",
+          "description": "Chaque année possède sa propre base de données (botdata-AAAA.db). Statistiques détaillées que vous découvrirez un jour",
+          "author": "Sydnec",
+          "commit": "manual",
+          "timestamp": "2025-08-29T00:00:00.000Z"
+        }
+      ]
+    },
     {
       "version": "1.0.7",
       "date": "2025-08-26",
