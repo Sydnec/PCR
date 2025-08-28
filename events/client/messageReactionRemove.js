@@ -1,4 +1,5 @@
 import { handleException } from '../../modules/utils.js';
+import db from '../../modules/db.js';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -7,6 +8,33 @@ const once = false;
 async function execute(reaction, user) {
     if (user.id === process.env.CLIENT_ID) return;
     try {
+        // --- Statistiques réactions par utilisateur ---
+        db.run(
+            `UPDATE reaction_stats SET count = count - 1 WHERE user_id = ? AND count > 0`,
+            [user.id]
+        );
+        // --- Statistiques réactions globales serveur ---
+        db.run(
+            `UPDATE reaction_stats SET count = count - 1 WHERE user_id = ? AND count > 0`,
+            ['__global__']
+        );
+        // --- Statistiques réactions par message ---
+        db.run(
+            `UPDATE message_reactions SET count = count - 1 WHERE message_id = ? AND count > 0`,
+            [reaction.message.id]
+        );
+        // --- Statistiques emoji le plus utilisé (par réaction) ---
+        const emoji = reaction.emoji.identifier || reaction.emoji.name;
+        db.run(
+            `UPDATE emoji_stats SET count = count - 1 WHERE user_id = ? AND emoji = ? AND count > 0`,
+            [user.id, emoji]
+        );
+        db.run(
+            `UPDATE emoji_stats SET count = count - 1 WHERE user_id = ? AND emoji = ? AND count > 0`,
+            ['__global__', emoji]
+        );
+
+        // Gestion rôles (logique existante)
         if (reaction.message.id === process.env.ROLE_MESSAGE_ID) {
             const guildMember = await reaction.message.guild.members.cache.get(
                 user.id
