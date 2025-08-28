@@ -8,6 +8,17 @@ async function execute(interaction, bot) {
             log(
                 `/${interaction.commandName} par ${interaction.member.displayName}`
             );
+        // --- Statistiques commandes les plus utilisées ---
+        try {
+            const db = (await import('../../modules/db.js')).default;
+            db.run(
+                `INSERT INTO command_stats (command, count) VALUES (?, 1)
+                ON CONFLICT(command) DO UPDATE SET count = count + 1`,
+                [interaction.commandName]
+            );
+        } catch (err) {
+            handleException(err);
+        }
         const { commands } = bot;
         const { commandName } = interaction;
         const command = commands.get(commandName);
