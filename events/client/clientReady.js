@@ -30,8 +30,16 @@ async function execute(bot) {
         }
     });
 
+
     bot.handleUpdateRoleMessage();
     bot.handleCheckExpiredMessages(db);
+
+    // Remplir la BDD avec les événements passés avant le 29/08/2025 à 00:28
+    import('../../modules/db.js').then(mod => {
+        if (mod.remonterLeTemps) {
+            mod.remonterLeTemps(bot);
+        }
+    });
 
     // Vérifier et annoncer les nouvelles releases (après un délai pour s'assurer que le bot est prêt)
     setTimeout(async () => {
