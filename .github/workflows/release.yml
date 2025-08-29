@@ -165,41 +165,10 @@ jobs:
         id: deploy
         run: |
           echo "🚀 Déploiement automatique (self-hosted runner)..."
-          
-          # Naviguer vers le répertoire du projet (même serveur)
           cd ${{ github.workspace }}
           echo "📁 Répertoire de projet: $(pwd)"
-          
-          # Basculer vers le nouveau tag
-          echo "🏷️ Basculement vers le tag v${{ steps.version.outputs.VERSION }}..."
-          git checkout v${{ steps.version.outputs.VERSION }}
-          
-          # Mettre à jour les dépendances si nécessaire
-          if git diff HEAD~1 HEAD --name-only | grep -q package.json; then
-            echo "📦 package.json modifié, mise à jour des dépendances..."
-            npm install
-          fi
-          
-          # Redémarrer le bot avec PM2
-          echo "🔄 Redémarrage du bot PCR..."
-          pm2 restart pcr || {
-            echo "⚠️ Erreur lors du restart, tentative de start..."
-            pm2 start index.js --name pcr
-          }
-          
-          # Sauvegarder la configuration PM2
-          pm2 save
-          
-          # Vérifier que le bot est en ligne
-          sleep 5
-          if pm2 list | grep -q "pcr.*online"; then
-            echo "✅ Bot PCR redémarré avec succès sur la version v${{ steps.version.outputs.VERSION }}"
-          else
-            echo "❌ Erreur: Le bot n'est pas en ligne après le redémarrage"
-            pm2 logs pcr --lines 10
-            exit 1
-          fi
-          
+          echo "🔄 Mise à jour et redémarrage via ./pcr update..."
+          ./pcr update
           echo "🎉 Déploiement automatique terminé avec succès !"
 
       - name: ✅ Release Summary
