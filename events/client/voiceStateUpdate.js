@@ -2,15 +2,11 @@
 //
 import { handleException, log } from '../../modules/utils.js';
 import dotenv from 'dotenv';
+import db from '../../modules/db.js';
 dotenv.config();
 
 const name = 'voiceStateUpdate';
 const once = false;
-import db from '../../modules/db.js';
-
-
-
-
 
 async function execute(oldState, newState) {
 	try {

@@ -14,6 +14,7 @@ try {
             GatewayIntentBits.GuildMessageReactions,
             GatewayIntentBits.DirectMessages,
             GatewayIntentBits.MessageContent,
+            GatewayIntentBits.GuildVoiceStates,
         ],
     });
 
