@@ -34,6 +34,14 @@ async function execute(reaction, user) {
             ['__global__', emoji]
         );
 
+        // --- Si le message appartient à randomizabaise, décrémente le compteur
+        db.get('SELECT message_id FROM randomizabaise_stats WHERE message_id = ?', [reaction.message.id], (err, row) => {
+            if (err) return handleException(err);
+            if (row) {
+                db.run('UPDATE randomizabaise_stats SET reaction_count = reaction_count - 1 WHERE message_id = ? AND reaction_count > 0', [reaction.message.id]);
+            }
+        });
+
         // Gestion rôles (logique existante)
         if (reaction.message.id === process.env.ROLE_MESSAGE_ID) {
             const guildMember = await reaction.message.guild.members.cache.get(

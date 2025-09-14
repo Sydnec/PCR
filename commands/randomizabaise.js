@@ -2,6 +2,7 @@ import { SlashCommandBuilder, MessageFlags } from "discord.js";
 import { handleException } from "../modules/utils.js";
 import dotenv from "dotenv";
 dotenv.config(); // process.env.CONSTANT
+import db from '../modules/db.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -44,6 +45,18 @@ export default {
       await interaction.editReply({
         content: `💞 Aujourd'hui, je ship <@${member1.id}> et <@${member2.id}> !`,
       });
+      // Enregistrer en base la stat randomizabaise
+      try {
+        // messageId non disponible avant l'envoi ; on récupère le message envoyé par editReply
+        const sent = await interaction.fetchReply();
+        // Use INSERT OR IGNORE to avoid overwriting an existing row (idempotence)
+        db.run(
+          `INSERT OR IGNORE INTO randomizabaise_stats (message_id, user_a, user_b, reaction_count) VALUES (?, ?, ?, ?)`,
+          [sent.id, member1.id, member2.id, 0]
+        );
+      } catch (err) {
+        handleException(err);
+      }
     } catch (error) {
       handleException(error);
     }
