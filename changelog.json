@@ -1,7 +1,23 @@
 {
-  "version": "1.1.1",
-  "lastUpdated": "2025-09-14T12:34:48.000Z",
+  "version": "1.2.1",
+  "lastUpdated": "2025-09-25T12:00:00.000Z",
   "releases": [
+    {
+      "version": "1.2.1",
+      "date": "2025-09-25",
+      "title": "feat: ajout scraping des fêtes du jour au COTD",
+      "features": [
+        {
+          "type": "feature",
+          "name": "feature/cotd-fetes-scraping",
+          "description": "Ajout du scraping de journee-mondiale.com pour récupérer les fêtes du jour et les inclure dans le message COTD",
+          "author": "Sydnec",
+          "commit": "local",
+          "timestamp": "2025-09-25T12:00:00.000Z",
+          "branch": "feature/cotd-fetes-scraping"
+        }
+      ]
+    },
     {
       "version": "1.2.0",
       "date": "2025-09-14",
