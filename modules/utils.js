@@ -3,6 +3,8 @@ import { readdirSync } from 'fs';
 import { format } from 'date-fns';
 import { emojiRegex } from './regex.js';
 import dotenv from 'dotenv';
+import axios from 'axios';
+import { load } from 'cheerio';
 dotenv.config();
 
 function isAdmin(member) {
@@ -280,6 +282,25 @@ function splitMessage(text, maxLength = 2000) {
 	return messages;
 }
 
+async function fetchFetesDuJour(day, month) {
+	// Construit l'URL du format /date/DD-MM.htm
+	const dd = String(day).padStart(2, '0');
+	const mm = String(month).padStart(2, '0');
+	const url = `https://www.journee-mondiale.com/date/${dd}-${mm}.htm`;
+
+	const res = await axios.get(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PCR-bot/1.0)'} });
+	const $ = load(res.data);
+	const items = new Set();
+
+	// Cherche les <h2> dans la section #journeesDuJour (structure fournie)
+	$('#journeesDuJour article h2[itemprop="name"], #journeesDuJour article h2').each((i, el) => {
+		const text = $(el).text().replace(/\s+/g, ' ').trim();
+		if (text && text.length > 3) items.add(text);
+	});
+
+	return Array.from(items);
+}
+
 export {
 	isAdmin,
 	registerCommands,
@@ -291,4 +312,6 @@ export {
 	getRoleID,
 	dbAddDeleteMessage,
 	updateThreadList,
+	splitMessage,
+	fetchFetesDuJour,
 };

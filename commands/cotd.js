@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, MessageFlags } from "discord.js";
 import axios from "axios"; // Pour faire des requêtes HTTP
-import { handleException } from "../modules/utils.js";
+import { handleException, fetchFetesDuJour } from "../modules/utils.js";
 import dotenv from "dotenv";
 dotenv.config(); // Charger les variables d'environnement
 
@@ -33,6 +33,22 @@ export default {
             saints[name].sexe === "masculin" ? "Masculin" : "Féminin";
           messageContent += `\n- ${name} (${gender})`;
         });
+
+        // Récupérer et ajouter les fêtes du jour
+        try {
+          const fetes = await fetchFetesDuJour(
+            response.data.response.query.jour,
+            response.data.response.query.mois
+          );
+          if (fetes && fetes.length > 0) {
+            messageContent += '\n\nFêtes du jour :';
+            fetes.forEach((f) => {
+              messageContent += `\n- ${f}`;
+            });
+          }
+        } catch (e) {
+          handleException(e);
+        }
 
         messageContent += "\nPour fêter ça, apéro !";
         await interaction.editReply({
