@@ -24,7 +24,8 @@ async function execute(reaction, user) {
             [reaction.message.id]
         );
         // --- Statistiques emoji le plus utilisé (par réaction) ---
-        const emoji = reaction.emoji.identifier || reaction.emoji.name;
+        // Utiliser uniquement le nom pour normaliser les emojis (éviter les doublons avec IDs différents)
+        const emoji = reaction.emoji.name;
         db.run(
             `UPDATE emoji_stats SET count = count - 1 WHERE user_id = ? AND emoji = ? AND count > 0`,
             [user.id, emoji]
