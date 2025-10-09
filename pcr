@@ -488,13 +488,10 @@ create_release() {
         echo "⚠️  Vous n'êtes pas sur la branche principale (main/master)"
         echo "Branche actuelle: $current_branch"
         echo ""
-        echo "Voulez-vous continuer quand même? (o/N): "
-        read -n 1 continue_confirm
-        echo ""
-        if [[ ! "$continue_confirm" =~ ^[Oo]$ ]]; then
-            print_warning "Release annulée"
-            return 1
-        fi
+        echo "❌ Les releases doivent être créées depuis la branche main."
+        echo "💡 Utilisez 'git checkout main' pour basculer sur main."
+        print_warning "Release annulée"
+        return 1
     fi
     
     # Créer le script Node.js temporaire
@@ -568,7 +565,18 @@ EOF
             
             if [[ "$push_confirm" =~ ^[Oo]$ ]] || [[ -z "$push_confirm" ]]; then
                 print_step "Push vers origin..."
-                if git push origin main; then
+                
+                # S'assurer qu'on est bien sur main avant de push
+                local push_branch
+                push_branch=$(git branch --show-current 2>/dev/null || echo "unknown")
+                
+                if [[ "$push_branch" != "main" ]] && [[ "$push_branch" != "master" ]]; then
+                    print_error "Erreur: Tentative de push depuis $push_branch au lieu de main"
+                    print_error "Basculez sur main avec: git checkout main"
+                    return 1
+                fi
+                
+                if git push origin "$push_branch"; then
                     if git tag -l "v${new_version}" >/dev/null 2>&1; then
                         git push origin "v${new_version}"
                         print_success "🏷️  Tag poussé - GitHub Actions va se déclencher!"
@@ -723,6 +731,15 @@ finalize_feature() {
             echo ""
             
             if [[ "$release_confirm" =~ ^[Oo]$ ]]; then
+                # Vérifier qu'on est bien sur main
+                local current_release_branch
+                current_release_branch=$(git branch --show-current 2>/dev/null)
+                
+                if [[ "$current_release_branch" != "main" ]] && [[ "$current_release_branch" != "master" ]]; then
+                    echo "🔄 Basculement sur main pour créer la release..."
+                    git checkout main
+                fi
+                
                 echo "Type de release (patch/minor/major) [patch]: "
                 read version_type
                 version_type=${version_type:-patch}
