@@ -12,7 +12,7 @@
           "name": "release/bump-1.3.1",
           "description": "Bump version to 1.3.1 and minor fixes",
           "author": "Sydnec",
-          "commit": "local",
+          "commit": "3535f6d",
           "timestamp": "2025-09-25T12:30:00.000Z",
           "branch": "main"
         }
@@ -28,7 +28,7 @@
           "name": "feature/cotd-fetes-scraping",
           "description": "Ajout du scraping de journee-mondiale.com pour récupérer les fêtes du jour et les inclure dans le message COTD",
           "author": "Sydnec",
-          "commit": "b460a53",
+          "commit": "bd9dcd6",
           "timestamp": "2025-09-25T12:05:00.000Z",
           "branch": "main"
         }
@@ -44,7 +44,7 @@
           "name": "feature/cotd-fetes-scraping",
           "description": "Ajout du scraping de journee-mondiale.com pour récupérer les fêtes du jour et les inclure dans le message COTD",
           "author": "Sydnec",
-          "commit": "local",
+          "commit": "b460a53",
           "timestamp": "2025-09-25T12:00:00.000Z",
           "branch": "feature/cotd-fetes-scraping"
         }
