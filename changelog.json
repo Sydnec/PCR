@@ -1,7 +1,23 @@
 {
-  "version": "1.4.0",
+  "version": "1.4.1",
   "lastUpdated": "2025-10-09T08:01:29.245Z",
   "releases": [
+    {
+      "version": "1.4.1",
+      "date": "2025-10-09",
+      "title": "chore: release 1.4.1",
+      "features": [
+        {
+          "type": "chore",
+          "name": "update de sécurité",
+          "description": "npm update",
+          "author": "Sydnec",
+          "commit": "actual",
+          "timestamp": "2025-10-09T08:30:00.000Z",
+          "branch": "main"
+        }
+      ]
+    },
     {
       "version": "1.4.0",
       "date": "2025-10-09",
