@@ -7,4 +7,4 @@ backups
 # Generated files
 CHANGELOG.md
 last-announced-version.txt
-.env.dev
+.env.dev.env.prod
