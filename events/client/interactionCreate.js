@@ -37,8 +37,71 @@ async function execute(interaction, bot) {
         }
     }
     if (interaction.isButton()) {
-        const { buttons } = bot;
         const { customId } = interaction;
+        
+        // Gérer les boutons de rappel
+        if (customId.startsWith('rappel|')) {
+            try {
+                await interaction.deferReply({ ephemeral: true });
+                
+                const [, dateString, messageEncoded] = customId.split('|');
+                const message = decodeURIComponent(messageEncoded);
+                const userId = interaction.user.id;
+                const guildId = interaction.guild.id;
+                const channelId = interaction.channel.id;
+                
+                // Parser la date
+                const triggerAt = parseInt(dateString);
+                
+                // Vérifier que la date est toujours dans le futur
+                if (triggerAt <= Date.now()) {
+                    await interaction.editReply({
+                        content: '❌ Ce rappel est déjà passé !',
+                    });
+                    return;
+                }
+                
+                // Enregistrer le rappel en base de données
+                const db = (await import('../../modules/db.js')).default;
+                await new Promise((resolve, reject) => {
+                    db.run(
+                        `INSERT INTO reminders (user_id, guild_id, channel_id, message, trigger_at, created_at) 
+                         VALUES (?, ?, ?, ?, ?, ?)`,
+                        [userId, guildId, channelId, message, triggerAt, Date.now()],
+                        (err) => {
+                            if (err) reject(err);
+                            else resolve();
+                        }
+                    );
+                });
+                
+                const { EmbedBuilder } = await import('discord.js');
+                const formattedDate = `<t:${Math.floor(triggerAt / 1000)}:F>`;
+                const relativeTime = `<t:${Math.floor(triggerAt / 1000)}:R>`;
+                
+                const embed = new EmbedBuilder()
+                    .setColor('#00FF00')
+                    .setTitle('✅ Rappel créé !')
+                    .setDescription(`Je te rappellerai ${relativeTime}`)
+                    .addFields(
+                        { name: '📝 Message', value: message, inline: false },
+                        { name: '📅 Date', value: formattedDate, inline: false }
+                    )
+                    .setFooter({ text: 'Tu recevras un DM à l\'heure prévue' })
+                    .setTimestamp();
+                
+                await interaction.editReply({ embeds: [embed] });
+            } catch (error) {
+                handleException(error);
+                await interaction.editReply({
+                    content: '❌ Une erreur est survenue lors de la création du rappel.',
+                }).catch(() => {});
+            }
+            return;
+        }
+        
+        // Système de boutons classique
+        const { buttons } = bot;
         const button = buttons.get(customId);
         if (!button) {
             return new Error('there is no code for this button');
