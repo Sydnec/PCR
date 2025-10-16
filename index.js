@@ -61,6 +61,10 @@ try {
         bot.handleCOTDOnTimer();
     });
 
+    cron.schedule(process.env.ANNUAL_RECAP_CRON_TIMER, () => {
+        bot.handleAnnualRecapOnTimer();
+    });
+
     bot.on('error', (e) => {
         handleException(e);
     });

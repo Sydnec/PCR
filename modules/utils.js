@@ -1,4 +1,4 @@
-import { REST, Routes, PermissionsBitField, ChannelType } from 'discord.js';
+import { REST, Routes, PermissionsBitField, ChannelType, EmbedBuilder } from 'discord.js';
 import { readdirSync } from 'fs';
 import { format } from 'date-fns';
 import { emojiRegex } from './regex.js';
@@ -301,6 +301,89 @@ async function fetchFetesDuJour(day, month) {
 	return Array.from(items);
 }
 
+/**
+ * Split un embed trop long en plusieurs embeds
+ * Discord a une limite de 6000 caractères totaux par embed et 1024 caractères par field value
+ * @param {EmbedBuilder} embed - L'embed à potentiellement split
+ * @returns {Array<EmbedBuilder>} - Tableau d'embeds (1 ou plusieurs)
+ */
+function splitEmbed(embed) {
+	const embeds = [];
+	const data = embed.data;
+	
+	// Si l'embed est déjà valide (pas de fields trop longs), le retourner tel quel
+	const fields = data.fields || [];
+	const hasOversizedField = fields.some(f => f.value && f.value.length > 1024);
+	
+	if (!hasOversizedField) {
+		return [embed];
+	}
+	
+	// Créer un nouvel embed avec les métadonnées de base
+	let currentEmbed = new EmbedBuilder()
+		.setColor(data.color || null)
+		.setTitle(data.title || null)
+		.setDescription(data.description || null)
+		.setThumbnail(data.thumbnail?.url || null)
+		.setTimestamp(data.timestamp || null)
+		.setFooter(data.footer || null);
+	
+	// Traiter chaque field
+	for (const field of fields) {
+		if (field.value.length <= 1024) {
+			// Field normal, l'ajouter directement
+			currentEmbed.addFields(field);
+		} else {
+			// Field trop long, le split en plusieurs embeds
+			const lines = field.value.split('\n');
+			let currentValue = '';
+			let isFirstChunk = true;
+			
+			for (const line of lines) {
+				// Si ajouter cette ligne dépasse 1024 caractères
+				if ((currentValue + line + '\n').length > 1024) {
+					// Sauvegarder le chunk actuel
+					if (currentValue) {
+						currentEmbed.addFields({
+							name: isFirstChunk ? field.name : `${field.name} (suite)`,
+							value: currentValue,
+							inline: field.inline || false
+						});
+						isFirstChunk = false;
+					}
+					
+					// Sauvegarder l'embed actuel et en créer un nouveau
+					embeds.push(currentEmbed);
+					currentEmbed = new EmbedBuilder()
+						.setColor(data.color || null)
+						.setTimestamp(data.timestamp || null)
+						.setFooter(data.footer || null);
+					
+					currentValue = line + '\n';
+				} else {
+					currentValue += line + '\n';
+				}
+			}
+			
+			// Ajouter le dernier chunk
+			if (currentValue) {
+				currentEmbed.addFields({
+					name: isFirstChunk ? field.name : `${field.name} (suite)`,
+					value: currentValue,
+					inline: field.inline || false
+				});
+			}
+		}
+	}
+	
+	// Ajouter le dernier embed s'il contient des fields
+	if (currentEmbed.data.fields && currentEmbed.data.fields.length > 0) {
+		embeds.push(currentEmbed);
+	}
+	
+	return embeds.length > 0 ? embeds : [embed];
+}
+
 export {
 	isAdmin,
 	registerCommands,
@@ -314,4 +397,5 @@ export {
 	updateThreadList,
 	splitMessage,
 	fetchFetesDuJour,
+	splitEmbed,
 };
