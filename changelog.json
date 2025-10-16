@@ -1,7 +1,23 @@
 {
-  "version": "1.5.0",
-  "lastUpdated": "2025-10-16T11:11:56.190Z",
+  "version": "1.5.1",
+  "lastUpdated": "2025-10-16T11:38:00.000Z",
   "releases": [
+    {
+      "version": "1.5.1",
+      "date": "2025-10-16",
+      "title": "Fix système de rappels",
+      "features": [
+        {
+          "type": "fix",
+          "name": "rappel",
+          "description": "Correction du système de rappels (DM, logs, nettoyage auto)",
+          "author": "Sydnec",
+          "commit": "actual",
+          "timestamp": "2025-10-16T11:38:00.000Z",
+          "branch": "main"
+        }
+      ]
+    },
     {
       "version": "1.5.0",
       "date": "2025-10-16",
