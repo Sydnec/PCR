@@ -65,6 +65,11 @@ try {
         bot.handleAnnualRecapOnTimer();
     });
 
+    // Vérifier les rappels toutes les minutes
+    cron.schedule('* * * * *', () => {
+        bot.handleRemindersOnTimer();
+    });
+
     bot.on('error', (e) => {
         handleException(e);
     });
