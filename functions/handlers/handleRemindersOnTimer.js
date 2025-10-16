@@ -29,6 +29,9 @@ export default (bot) => {
         try {
             const now = Date.now();
 
+            // Nettoyer les rappels envoyés il y a plus de 7 jours
+            await cleanOldReminders();
+
             // Récupérer tous les rappels qui doivent être envoyés
             const reminders = await new Promise((resolve, reject) => {
                 db.all(
@@ -46,6 +49,11 @@ export default (bot) => {
             }
 
             console.log(`⏰ ${reminders.length} rappel(s) à envoyer...`);
+            
+            // Log des rappels à traiter
+            reminders.forEach(r => {
+                console.log(`  - Rappel #${r.id} pour user ${r.user_id}: "${r.message.substring(0, 30)}..."`);
+            });
 
             // Envoyer chaque rappel
             for (const reminder of reminders) {
@@ -109,6 +117,27 @@ function markReminderAsSent(reminderId) {
             (err) => {
                 if (err) reject(err);
                 else resolve();
+            }
+        );
+    });
+}
+
+// Nettoyer les rappels envoyés il y a plus de 7 jours
+function cleanOldReminders() {
+    return new Promise((resolve, reject) => {
+        const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+        db.run(
+            `DELETE FROM reminders WHERE sent = 1 AND sent_at < ?`,
+            [sevenDaysAgo],
+            function(err) {
+                if (err) {
+                    reject(err);
+                } else if (this.changes > 0) {
+                    console.log(`🗑️  ${this.changes} rappel(s) ancien(s) supprimé(s)`);
+                    resolve(this.changes);
+                } else {
+                    resolve(0);
+                }
             }
         );
     });

@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, MessageFlags } from 'discord.js';
 import { handleException } from '../modules/utils.js';
 import db from '../modules/db.js';
 
@@ -25,7 +25,7 @@ export default {
 
     async execute(interaction) {
         try {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
             const subcommand = interaction.options.getSubcommand();
             const userId = interaction.user.id;

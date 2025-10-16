@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder, MessageFlags } from 'discord.js';
 import { handleException } from '../modules/utils.js';
 import db from '../modules/db.js';
 import dotenv from 'dotenv';
@@ -24,7 +24,7 @@ export default {
 
     async execute(interaction) {
         try {
-            await interaction.deferReply({ ephemeral: true });
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
             const dateString = interaction.options.getString('date');
             const message = interaction.options.getString('message') || 'Rappel !';
@@ -32,10 +32,15 @@ export default {
             const guildId = interaction.guild.id;
             const channelId = interaction.channel.id;
 
+            console.log(`📝 Création rappel: date="${dateString}", message="${message}", user=${userId}`);
+
             // Parser la date
             const triggerAt = parseDateTime(dateString);
             
+            console.log(`🕒 Date parsée: triggerAt=${triggerAt} (${triggerAt ? new Date(triggerAt).toLocaleString('fr-FR') : 'invalide'})`);
+            
             if (!triggerAt) {
+                console.log('❌ Format de date invalide');
                 await interaction.editReply({
                     content: '❌ Format de date invalide. Utilise :\n• `JJ/MM/AAAA HH:MM` (ex: 25/12/2024 15:30)\n• `JJ/MM HH:MM` (ex: 25/12 15:30)',
                     ephemeral: true,
@@ -45,6 +50,7 @@ export default {
 
             // Vérifier que la date est dans le futur
             if (triggerAt <= Date.now()) {
+                console.log('❌ Date dans le passé');
                 await interaction.editReply({
                     content: '❌ La date doit être dans le futur !',
                     ephemeral: true,
@@ -55,6 +61,7 @@ export default {
             // Vérifier que la date n'est pas trop loin (max 1 an)
             const oneYearFromNow = Date.now() + (365 * 24 * 60 * 60 * 1000);
             if (triggerAt > oneYearFromNow) {
+                console.log('❌ Date trop loin dans le futur');
                 await interaction.editReply({
                     content: '❌ La date ne peut pas être à plus d\'un an dans le futur !',
                     ephemeral: true,
@@ -62,15 +69,22 @@ export default {
                 return;
             }
 
+            console.log(`💾 Enregistrement en base de données...`);
+
             // Enregistrer le rappel en base de données
             await new Promise((resolve, reject) => {
                 db.run(
                     `INSERT INTO reminders (user_id, guild_id, channel_id, message, trigger_at, created_at) 
                      VALUES (?, ?, ?, ?, ?, ?)`,
                     [userId, guildId, channelId, message, triggerAt, Date.now()],
-                    (err) => {
-                        if (err) reject(err);
-                        else resolve();
+                    function(err) {
+                        if (err) {
+                            console.error('❌ Erreur DB lors de l\'insertion:', err);
+                            reject(err);
+                        } else {
+                            console.log(`✅ Rappel créé avec ID: ${this.lastID}`);
+                            resolve();
+                        }
                     }
                 );
             });
@@ -93,6 +107,7 @@ export default {
             await interaction.editReply({ embeds: [embed] });
 
         } catch (error) {
+            console.error('❌ Erreur dans /rappel:', error);
             handleException(error);
             await interaction.editReply({
                 content: '❌ Une erreur est survenue lors de la création du rappel.',
