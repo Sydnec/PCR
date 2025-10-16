@@ -1,17 +1,17 @@
 {
-  "version": "1.4.2",
+  "version": "1.5.0",
   "lastUpdated": "2025-10-16T11:11:56.190Z",
   "releases": [
     {
-      "version": "1.4.2",
+      "version": "1.5.0",
       "date": "2025-10-16",
-      "title": "Release 1.4.2",
+      "title": "Release 1.5.0",
       "features": [
         {
           "type": "command",
           "name": "rappel",
           "description": "Nouvelle commande Discord: /rappel",
-          "author": "Développeur PCR",
+          "author": "Sydnec",
           "commit": "d72f2cf7",
           "timestamp": "2025-10-16T11:11:29.204Z",
           "branch": "feature/command-rappel"
