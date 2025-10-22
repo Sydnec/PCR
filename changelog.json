@@ -1,7 +1,23 @@
 {
-  "version": "1.5.2",
-  "lastUpdated": "2025-10-16T12:00:00.000Z",
+  "version": "1.5.3",
+  "lastUpdated": "2025-10-22T15:00:00.000Z",
   "releases": [
+    {
+      "version": "1.5.3",
+      "date": "2025-10-22",
+      "title": "Ajout statistique",
+      "features": [
+        {
+          "type": "feature",
+          "name": "annual-recap",
+          "description": "Ajout d'une statistique",
+          "author": "Sydnec",
+          "commit": "actual",
+          "timestamp": "2025-10-22T15:00:00.000Z",
+          "branch": "feature/annual-recap"
+        }
+      ]
+    },
     {
       "version": "1.5.2",
       "date": "2025-10-16",
