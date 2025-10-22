@@ -226,6 +226,7 @@ async function sendGlobalRecap(bot, channel, guild) {
     // Stats Randomizabaise
     const totalRandomizabaise = await getTotalRandomizabaise();
     const mostReactedShip = await getMostReactedShip(guild, bot);
+    const topBaiseur = await getTopBaiseur(guild, bot);
     const topRealizedShips = await getTopRealizedShips(guild, bot);
 
     const randomizabaiseEmbed = new EmbedBuilder()
@@ -238,6 +239,12 @@ async function sendGlobalRecap(bot, channel, guild) {
     randomizabaiseEmbed.addFields({
         name: '🔥 Randomizabaise ayant fait le plus réagir',
         value: mostReactedShip || 'Aucune donnée disponible',
+        inline: false,
+    });
+
+    randomizabaiseEmbed.addFields({
+        name: '<:hehe:1182374886544289832> Le plus gros baiseur',
+        value: topBaiseur || 'Aucune donnée disponible',
         inline: false,
     });
 
@@ -447,6 +454,7 @@ async function sendGlobalRecapToDM(bot, adminUser, guild, year) {
     // Stats Randomizabaise
     const totalRandomizabaise = await getTotalRandomizabaise();
     const mostReactedShip = await getMostReactedShip(guild, bot);
+    const topBaiseur = await getTopBaiseur(guild, bot);
     const topRealizedShips = await getTopRealizedShips(guild, bot);
 
     const randomizabaiseEmbed = new EmbedBuilder()
@@ -459,6 +467,12 @@ async function sendGlobalRecapToDM(bot, adminUser, guild, year) {
     randomizabaiseEmbed.addFields({
         name: '🔥 Randomizabaise ayant fait le plus réagir',
         value: mostReactedShip || 'Aucune donnée disponible',
+        inline: false,
+    });
+
+    randomizabaiseEmbed.addFields({
+        name: '<:hehe:1182374886544289832> Le plus gros baiseur',
+        value: topBaiseur || 'Aucune donnée disponible',
         inline: false,
     });
 
@@ -826,6 +840,34 @@ function getTopRealizedShips(guild, client) {
                         })
                     );
                     resolve(formatted.join("\n") || "Aucune donnée");
+                }
+            }
+        );
+    });
+}
+
+function getTopBaiseur(guild, client) {
+    return new Promise((resolve, reject) => {
+        db.all(
+            `SELECT user_id, COUNT(*) as count
+            FROM (
+                SELECT user_a as user_id FROM randomizabaise_stats
+                UNION ALL
+                SELECT user_b as user_id FROM randomizabaise_stats
+            )
+            GROUP BY user_id
+            ORDER BY count DESC
+            LIMIT 1`,
+            async (err, rows) => {
+                if (err) reject(err);
+                else {
+                    if (!rows || rows.length === 0) {
+                        resolve("Aucune donnée");
+                        return;
+                    }
+                    const topUser = rows[0];
+                    const userDisplay = await getUserDisplay(client, guild, topUser.user_id);
+                    resolve(`${userDisplay} (${topUser.count} apparitions)`);
                 }
             }
         );
