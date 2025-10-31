@@ -1,7 +1,23 @@
 {
-  "version": "1.5.3",
-  "lastUpdated": "2025-10-22T15:00:00.000Z",
+  "version": "1.6.0",
+  "lastUpdated": "2025-10-31T17:11:43.334Z",
   "releases": [
+    {
+      "version": "1.6.0",
+      "date": "2025-10-31",
+      "title": "Release 1.6.0",
+      "features": [
+        {
+          "type": "feature",
+          "name": "feature/integration_instagram",
+          "description": "Nouvelle fonctionnalité: feature/integration_instagram",
+          "author": "Développeur PCR",
+          "commit": "135fd44c",
+          "timestamp": "2025-10-31T17:11:16.838Z",
+          "branch": "feature/integration_instagram"
+        }
+      ]
+    },
     {
       "version": "1.5.3",
       "date": "2025-10-22",
