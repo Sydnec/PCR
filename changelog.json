@@ -1,83 +1,19 @@
 {
-  "version": "1.7.0",
-  "lastUpdated": "2025-11-14T15:00:00.000Z",
+  "version": "1.7.1",
+  "lastUpdated": "2025-11-14T14:00:00.000Z",
   "releases": [
     {
-      "version": "1.7.0",
+      "version": "1.7.1",
       "date": "2025-11-14",
-      "title": "Nouvelle commande /join",
+      "title": "Limite remplacement Instagram aux reels",
       "features": [
         {
-          "type": "feature",
-          "name": "join",
-          "description": "Nouvelle commande /join pour rejoindre automatiquement un fil Discord. Répond avec 👀 et gère les cas d'erreur (déjà membre, erreur d'ajout)",
+          "type": "fix",
+          "name": "instagram-reels",
+          "description": "Remplacement des liens Instagram limité aux reels uniquement",
           "author": "Sydnec",
-          "commit": "875d29b",
-          "timestamp": "2025-11-14T15:00:00.000Z",
-          "branch": "main"
-        }
-      ]
-    },
-    {
-      "version": "1.6.1",
-      "date": "2025-11-14",
-      "title": "Release 1.6.1",
-      "features": [
-        {
-          "type": "command",
-          "name": "join",
-          "description": "Nouvelle commande Discord: /join",
-          "author": "Développeur PCR",
-          "commit": "0af4d9f9",
-          "timestamp": "2025-11-14T09:24:18.716Z",
-          "branch": "feature/command-join"
-        }
-      ]
-    },
-    {
-      "version": "1.6.0",
-      "date": "2025-10-31",
-      "title": "Release 1.6.0",
-      "features": [
-        {
-          "type": "feature",
-          "name": "feature/integration_instagram",
-          "description": "Nouvelle fonctionnalité: feature/integration_instagram",
-          "author": "Sydnec",
-          "commit": "135fd44c",
-          "timestamp": "2025-10-31T17:11:16.838Z",
-          "branch": "feature/integration_instagram"
-        }
-      ]
-    },
-    {
-      "version": "1.5.3",
-      "date": "2025-10-22",
-      "title": "Ajout statistique",
-      "features": [
-        {
-          "type": "feature",
-          "name": "annual-recap",
-          "description": "Ajout d'une statistique",
-          "author": "Sydnec",
-          "commit": "actual",
-          "timestamp": "2025-10-22T15:00:00.000Z",
-          "branch": "feature/annual-recap"
-        }
-      ]
-    },
-    {
-      "version": "1.5.2",
-      "date": "2025-10-16",
-      "title": "Amélioration commande rappel",
-      "features": [
-        {
-          "type": "feature",
-          "name": "rappel",
-          "description": "Ajout d'un bouton interactif permettant aux autres utilisateurs de s'ajouter au même rappel",
-          "author": "Sydnec",
-          "commit": "actual",
-          "timestamp": "2025-10-16T12:00:00.000Z",
+          "commit": "0d0de6c",
+          "timestamp": "2025-11-14T14:00:00.000Z",
           "branch": "main"
         }
       ]
