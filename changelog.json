@@ -1,7 +1,23 @@
 {
-  "version": "1.6.0",
-  "lastUpdated": "2025-10-31T17:11:43.334Z",
+  "version": "1.6.1",
+  "lastUpdated": "2025-11-14T09:24:32.974Z",
   "releases": [
+    {
+      "version": "1.6.1",
+      "date": "2025-11-14",
+      "title": "Release 1.6.1",
+      "features": [
+        {
+          "type": "command",
+          "name": "join",
+          "description": "Nouvelle commande Discord: /join",
+          "author": "Développeur PCR",
+          "commit": "0af4d9f9",
+          "timestamp": "2025-11-14T09:24:18.716Z",
+          "branch": "feature/command-join"
+        }
+      ]
+    },
     {
       "version": "1.6.0",
       "date": "2025-10-31",
