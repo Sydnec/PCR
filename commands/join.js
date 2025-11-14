@@ -25,7 +25,7 @@ export default {
             await thread.members.add(user.id);
 
             // Répondre avec l'émoji eyes
-            await interaction.reply('👀');
+            await interaction.reply({ content: '👀', ephemeral: true });
 
         } catch (error) {
             handleException(error);
