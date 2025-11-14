@@ -83,40 +83,22 @@ async function execute(message) {
         .catch((err) => handleException(err));
     }
 
-    // --- Instagram to kkinstagram ---
+    // --- Instagram to kkinstagram (uniquement pour les reels) ---
     if (instagramRegex.test(messageContent)) {
-      // Extraire tous les liens Instagram du message
-      const instagramLinks = messageContent.match(/https:\/\/(www\.)?instagram\.com\/[^\s]*/gi);
-      
-      if (instagramLinks) {
-        let newMessageContent = messageContent;
-        
-        // Pour chaque lien Instagram trouvé
-        instagramLinks.forEach((originalLink) => {
-          // Extraire la partie après instagram.com/
-          const pathMatch = originalLink.match(/https:\/\/(www\.)?instagram\.com\/(.*)/i);
-          if (pathMatch) {
-            const path = pathMatch[2];
-            const kkinstagramLink = `https://kkinstagram.com/${path}`;
-            
-            // Créer le format : [instagram.com/](lien_original) [path](lien_kkinstagram)
-            const formattedLink = `[instagram.com/](${originalLink}) [${path}](${kkinstagramLink})`;
-            
-            // Remplacer le lien original par le format avec les deux liens
-            newMessageContent = newMessageContent.replace(originalLink, formattedLink);
-          }
-        });
-        
-        message.channel
-          .send("Ajout de lien kkinstagram")
-          .then((newMessage) => {
-            newMessage.edit(
-              `<@!${message.author.id}> a envoyé : \n${newMessageContent}`
-            );
-          })
-          .then(message.delete())
-          .catch((err) => handleException(err));
-      }
+      // Remplacer instagram.com par kkinstagram.com
+      const newMessageContent = messageContent.replace(
+        instagramRegex,
+        "https://kkinstagram.com/reel/"
+      );
+      message.channel
+        .send("Ajout de lien kkinstagram pour reel")
+        .then((newMessage) => {
+          newMessage.edit(
+            `<@!${message.author.id}> a envoyé : \n${newMessageContent}`
+          );
+        })
+        .then(message.delete())
+        .catch((err) => handleException(err));
     }
   } catch (err) {
     handleException(err);
