@@ -1,7 +1,23 @@
 {
-  "version": "1.6.1",
-  "lastUpdated": "2025-11-14T09:24:32.974Z",
+  "version": "1.7.0",
+  "lastUpdated": "2025-11-14T15:00:00.000Z",
   "releases": [
+    {
+      "version": "1.7.0",
+      "date": "2025-11-14",
+      "title": "Nouvelle commande /join",
+      "features": [
+        {
+          "type": "feature",
+          "name": "join",
+          "description": "Nouvelle commande /join pour rejoindre automatiquement un fil Discord. Répond avec 👀 et gère les cas d'erreur (déjà membre, erreur d'ajout)",
+          "author": "Sydnec",
+          "commit": "875d29b",
+          "timestamp": "2025-11-14T15:00:00.000Z",
+          "branch": "main"
+        }
+      ]
+    },
     {
       "version": "1.6.1",
       "date": "2025-11-14",
