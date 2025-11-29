@@ -1,41 +1,75 @@
-import { ButtonBuilder, ButtonStyle, ActionRowBuilder } from 'discord.js';
-
-const randomArray = [
-    13, 21, 14, 20, 6, 8, 12, 10, 4, 22, 2, 9, 15, 18, 23, 11, 19, 16, 1, 3, 17,
-    5, 24, 7,
-];
+import { readFile } from "fs/promises";
+import { handleException } from "../../modules/utils.js";
 
 export default (bot) => {
-    bot.handleAdventCalendarOnTimer = async () => {
-        const channel = bot.channels.cache.get(process.env.ADVENT_CHANNEL_ID);
-        createMatrix(channel);
-    };
-};
+  bot.handleAdventCalendarOnTimer = async () => {
+    try {
+      const channel = bot.channels.cache.get(process.env.ADVENT_CHANNEL_ID);
 
-async function createMatrix(channel) {
-    await clear(channel);
-    for (let rows = 0; rows < 5; rows++) {
-        let row = new ActionRowBuilder();
-        for (let buttons = 0; buttons < 5; buttons++) {
-            if (buttons + 5 * rows < 24) {
-                const button = new ButtonBuilder()
-                    .setCustomId(`${randomArray[buttons + 5 * rows]}`)
-                    .setLabel(`${randomArray[buttons + 5 * rows]}`);
-                if (randomArray[buttons + 5 * rows] <= new Date().getDate()) {
-                    button.setStyle(ButtonStyle.Primary);
-                } else {
-                    button.setStyle(ButtonStyle.Secondary);
-                }
-                row.addComponents(button);
-            }
-        }
-        channel.send({ components: [row] });
+      if (!channel) {
+        throw new Error("ADVENT_CHANNEL_ID not found");
+      }
+
+      // Récupérer le jour actuel (1-31)
+      const today = new Date().getDate();
+      const currentMonth = new Date().getMonth() + 1; // 1-12
+
+      // Vérifier si on est en décembre et entre le 1er et le 24
+      if (currentMonth !== 12 || today < 1 || today > 24) {
+        console.log(
+          `Calendrier de l'avent : Pas le bon moment (${today}/${currentMonth})`
+        );
+        return;
+      }
+
+      // Charger les questions du calendrier
+      const jsonData = await readFile("./modules/advent.json", "utf-8");
+      const adventData = JSON.parse(jsonData);
+
+      // Trouver la question du jour
+      const todayQuestion = adventData.find((item) => item.jour === today);
+
+      if (!todayQuestion || !todayQuestion.contenu) {
+        console.log(`Pas de contenu pour le jour ${today}`);
+        return;
+      }
+
+      // Créer un nouveau thread avec la question du jour
+      const threadName = `Jour ${today} - ${todayQuestion.contenu.substring(
+        0,
+        80
+      )}`;
+
+      const thread = await channel.threads.create({
+        name: threadName,
+        autoArchiveDuration: 1440, // 24 heures
+        reason: `Calendrier de l'avent - Jour ${today}`,
+      });
+
+      // Message d'introduction dans le thread
+      let messageContent = `# 🎄 Calendrier de l'Avent - Jour ${today}\n\n`;
+
+      if (todayQuestion.categorie) {
+        messageContent += `**${todayQuestion.categorie}**\n\n`;
+      }
+
+      messageContent += `${todayQuestion.contenu}\n\n`;
+      messageContent += `_Partagez vos réponses ci-dessous !_ ✨`;
+
+      // Envoyer le message dans le thread
+      const threadMessage = await thread.send(messageContent);
+
+      // Ajouter une image si elle existe
+      if (todayQuestion.image) {
+        await thread.send({ files: [todayQuestion.image] });
+      }
+
+      // Épingler le message d'introduction
+      await threadMessage.pin();
+
+      console.log(`Thread créé pour le jour ${today} : ${threadName}`);
+    } catch (error) {
+      handleException(error);
     }
-}
-
-async function clear(channel) {
-    const messages = await channel.messages.fetch({ limit: 100 });
-    const botMessages = messages.filter(message => message.author.id === channel.client.user.id);
-    const lastBotMessages = botMessages.last(5);
-    await channel.bulkDelete(lastBotMessages);
-}
+  };
+};

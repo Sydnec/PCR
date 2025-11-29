@@ -1,146 +1,146 @@
 [
-    {
-        "jour": 1,
-        "categorie": "",
-        "image": "",
-        "contenu": ""
-    },
-    {
-        "jour": 2,
-        "categorie": "",
-        "image": "",
-        "contenu": ""
-    },
-    {
-        "jour": 3,
-        "categorie": "",
-        "image": "",
-        "contenu": ""
-    },
-    {
-        "jour": 4,
-        "categorie": "",
-        "image": "",
-        "contenu": ""
-    },
-    {
-        "jour": 5,
-        "categorie": "",
-        "image": "",
-        "contenu": ""
-    },
-    {
-        "jour": 6,
-        "categorie": "",
-        "image": "",
-        "contenu": ""
-    },
-    {
-        "jour": 7,
-        "categorie": "",
-        "image": "",
-        "contenu": ""
-    },
-    {
-        "jour": 8,
-        "categorie": "",
-        "image": "",
-        "contenu": ""
-    },
-    {
-        "jour": 9,
-        "categorie": "",
-        "image": "",
-        "contenu": ""
-    },
-    {
-        "jour": 10,
-        "categorie": "",
-        "image": "",
-        "contenu": ""
-    },
-    {
-        "jour": 11,
-        "categorie": "",
-        "image": "",
-        "contenu": ""
-    },
-    {
-        "jour": 12,
-        "categorie": "",
-        "image": "",
-        "contenu": ""
-    },
-    {
-        "jour": 13,
-        "categorie": "",
-        "image": "",
-        "contenu": ""
-    },
-    {
-        "jour": 14,
-        "categorie": "",
-        "image": "",
-        "contenu": ""
-    },
-    {
-        "jour": 15,
-        "categorie": "",
-        "image": "",
-        "contenu": ""
-    },
-    {
-        "jour": 16,
-        "categorie": "",
-        "image": "",
-        "contenu": ""
-    },
-    {
-        "jour": 17,
-        "categorie": "",
-        "image": "",
-        "contenu": ""
-    },
-    {
-        "jour": 18,
-        "categorie": "",
-        "image": "",
-        "contenu": ""
-    },
-    {
-        "jour": 19,
-        "categorie": "",
-        "image": "",
-        "contenu": ""
-    },
-    {
-        "jour": 20,
-        "categorie": "",
-        "image": "",
-        "contenu": ""
-    },
-    {
-        "jour": 21,
-        "categorie": "",
-        "image": "",
-        "contenu": ""
-    },
-    {
-        "jour": 22,
-        "categorie": "",
-        "image": "",
-        "contenu": ""
-    },
-    {
-        "jour": 23,
-        "categorie": "",
-        "image": "",
-        "contenu": ""
-    },
-    {
-        "jour": 24,
-        "categorie": "",
-        "image": "",
-        "contenu": ""
-    }
+  {
+    "jour": 1,
+    "categorie": "",
+    "image": "",
+    "contenu": "3 films que tu as vus cette année"
+  },
+  {
+    "jour": 2,
+    "categorie": "",
+    "image": "",
+    "contenu": "3 musiques que tu as beaucoup écoutées"
+  },
+  {
+    "jour": 3,
+    "categorie": "",
+    "image": "",
+    "contenu": "Les 3 personnes avec qui tu as le plus parlé"
+  },
+  {
+    "jour": 4,
+    "categorie": "",
+    "image": "",
+    "contenu": "3 plats que tu as le plus appréciés cette année"
+  },
+  {
+    "jour": 5,
+    "categorie": "",
+    "image": "",
+    "contenu": "3 cadeaux ou attentions que tu as reçus et appréciés"
+  },
+  {
+    "jour": 6,
+    "categorie": "",
+    "image": "",
+    "contenu": "3 photos dans ton téléphone prises cette année (que tu apprécies / qui résument ton année)"
+  },
+  {
+    "jour": 7,
+    "categorie": "",
+    "image": "",
+    "contenu": "3 lieux que tu as visités"
+  },
+  {
+    "jour": 8,
+    "categorie": "",
+    "image": "",
+    "contenu": "3 jeux vidéo ou jeux de société auxquels tu as joué cette année"
+  },
+  {
+    "jour": 9,
+    "categorie": "",
+    "image": "",
+    "contenu": "3 vêtements / accessoires que tu as le plus portés"
+  },
+  {
+    "jour": 10,
+    "categorie": "",
+    "image": "",
+    "contenu": ""
+  },
+  {
+    "jour": 11,
+    "categorie": "",
+    "image": "",
+    "contenu": ""
+  },
+  {
+    "jour": 12,
+    "categorie": "",
+    "image": "",
+    "contenu": ""
+  },
+  {
+    "jour": 13,
+    "categorie": "",
+    "image": "",
+    "contenu": ""
+  },
+  {
+    "jour": 14,
+    "categorie": "",
+    "image": "",
+    "contenu": "3 choses que tu attends avec impatience pour l’an prochain"
+  },
+  {
+    "jour": 15,
+    "categorie": "",
+    "image": "",
+    "contenu": ""
+  },
+  {
+    "jour": 16,
+    "categorie": "",
+    "image": "",
+    "contenu": ""
+  },
+  {
+    "jour": 17,
+    "categorie": "",
+    "image": "",
+    "contenu": ""
+  },
+  {
+    "jour": 18,
+    "categorie": "",
+    "image": "",
+    "contenu": "3 séries que tu as regardées cette année"
+  },
+  {
+    "jour": 19,
+    "categorie": "",
+    "image": "",
+    "contenu": ""
+  },
+  {
+    "jour": 20,
+    "categorie": "",
+    "image": "",
+    "contenu": ""
+  },
+  {
+    "jour": 21,
+    "categorie": "",
+    "image": "",
+    "contenu": "3 streamers / évènements Twitch que tu as appréciés cette année"
+  },
+  {
+    "jour": 22,
+    "categorie": "",
+    "image": "",
+    "contenu": ""
+  },
+  {
+    "jour": 23,
+    "categorie": "",
+    "image": "",
+    "contenu": ""
+  },
+  {
+    "jour": 24,
+    "categorie": "",
+    "image": "",
+    "contenu": "3 traditions de Noël que tu vas faire cette année"
+  }
 ]
