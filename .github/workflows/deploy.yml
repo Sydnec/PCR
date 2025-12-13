@@ -3,7 +3,7 @@ name: Deploy to Production
 on:
   push:
     tags:
-      - 'v*' # Se déclenche uniquement sur les tags de version (ex: v1.0.0)
+      - "v*" # Se déclenche uniquement sur les tags de version (ex: v1.0.0)
 
 jobs:
   deploy:
@@ -13,21 +13,21 @@ jobs:
         run: |
           # Arrêt en cas d'erreur
           set -e
-          
+
           echo "🚀 Début du déploiement sur le serveur (Self-hosted)..."
-          
+
           # Aller dans le dossier du projet
           cd /home/sydnec/pcr
-          
+
           # Mettre à jour le code source (le tag qui vient d'être pushé)
           echo "📥 Récupération de la dernière version..."
           git fetch --all --tags
           git checkout main
           git pull origin main
-          
+
           # Lancer le script de déploiement interne
           # Cela gère npm install et le redémarrage PM2
           echo "🔄 Exécution du script de déploiement..."
           bash ./pcr deploy
-          
+
           echo "✅ Déploiement terminé avec succès !"

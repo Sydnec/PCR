@@ -64,12 +64,7 @@ try {
     bot.handleCOTDOnTimer();
   });
 
-  // Récap annuel : 1er janvier à 00:01
-  if (process.env.ANNUAL_RECAP_CRON_TIMER) {
-    cron.schedule(process.env.ANNUAL_RECAP_CRON_TIMER, () => {
-      bot.handleAnnualRecapOnTimer();
-    });
-  }
+
 
   // Vérifier les rappels toutes les minutes
   cron.schedule("* * * * *", () => {
