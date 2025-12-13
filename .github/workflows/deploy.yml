@@ -1,0 +1,43 @@
+name: Deploy to Production
+
+on:
+  push:
+    tags:
+      - 'v*' # Se déclenche uniquement sur les tags de version (ex: v1.0.0)
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SERVER_PORT || '22' }}
+          script: |
+            # Arrêt en cas d'erreur
+            set -e
+            
+            echo "🚀 Début du déploiement sur le serveur..."
+            
+            # Aller dans le dossier du projet
+            # NOTE: Assurez-vous que ce chemin est correct
+            cd /home/sydnec/pcr
+            
+            # Mettre à jour le code source (le tag qui vient d'être pushé)
+            echo "📥 Récupération de la dernière version..."
+            git fetch --all --tags
+            git checkout main
+            git pull origin main
+            
+            # Lancer le script de déploiement interne
+            # Cela gère npm install et le redémarrage PM2
+            echo "🔄 Exécution du script de déploiement..."
+            bash ./pcr deploy
+            
+            echo "✅ Déploiement terminé avec succès !"

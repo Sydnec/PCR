@@ -1,1934 +1,241 @@
 #!/bin/bash
 
-# 🤖 PCR Bot Discord - Script de gestion unifié
-# Usage: pcr [command]
-
-# Auto-détection du répertoire du projet
-# Si le script est dans /usr/local/bin, on utilise le répertoire courant
-# Sinon, on utilise le répertoire du script
-
-if [[ "$(realpath "$0")" == "/usr/local/bin/pcr" ]]; then
-    # Script installé globalement, utiliser le répertoire courant
-    PROJECT_DIR="$(pwd)"
-    # Vérifier si on est dans un projet PCR valide
-    if [[ ! -f "index.js" ]] || [[ ! -f "package.json" ]]; then
-        # Essayer de trouver le projet dans les répertoires parents
-        current_dir="$(pwd)"
-        found=false
-        while [[ "$current_dir" != "/" ]]; do
-            if [[ -f "$current_dir/index.js" ]] && [[ -f "$current_dir/package.json" ]] && [[ -f "$current_dir/pcr" ]]; then
-                PROJECT_DIR="$current_dir"
-                found=true
-                break
-            fi
-            current_dir="$(dirname "$current_dir")"
-        done
-        
-        if [[ "$found" != true ]]; then
-            PROJECT_DIR="/home/sydnec/PCR"  # Fallback
-        fi
-    fi
-else
-    # Script local, utiliser le répertoire du script
-    PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-fi
-
-LOG_DIR="$PROJECT_DIR/logs"
-BACKUP_DIR="$PROJECT_DIR/backups"
-
-# Validation du répertoire de projet
-validate_project_directory() {
-    if [[ ! -f "$PROJECT_DIR/index.js" ]] || [[ ! -f "$PROJECT_DIR/package.json" ]]; then
-        print_error "Ce répertoire ne semble pas être un projet PCR valide."
-        print_error "Fichiers attendus :"
-        print_error "  - index.js: $PROJECT_DIR/index.js"
-        print_error "  - package.json: $PROJECT_DIR/package.json"
-        print_error ""
-        print_error "Répertoire actuel détecté : $PROJECT_DIR"
-        print_error "Assurez-vous d'être dans le répertoire racine du projet ou que les fichiers existent."
-        exit 1
-    fi
-}
-
-# Création du répertoire de backup si nécessaire
-ensure_backup_dir() {
-    if [[ ! -d "$BACKUP_DIR" ]]; then
-        mkdir -p "$BACKUP_DIR"
-    fi
-}
-
-# Création du répertoire de logs si nécessaire
-ensure_log_dir() {
-    if [[ ! -d "$LOG_DIR" ]]; then
-        mkdir -p "$LOG_DIR"
-    fi
-}
-
-# Fonction pour trouver le chemin de la base de données
-find_database_path() {
-    local db_paths=(
-        "$PROJECT_DIR/messages.db"
-        "$PROJECT_DIR/database.db"
-        "$PROJECT_DIR/bot.db"
-    )
-    
-    for path in "${db_paths[@]}"; do
-        if [[ -f "$path" ]]; then
-            echo "$path"
-            return 0
-        fi
-    done
-    
-    # Retourner le chemin standard si aucun fichier trouvé
-    echo "$PROJECT_DIR/messages.db"
-    return 1
-}
-
-# Fonction de sauvegarde de la base de données
-backup_database() {
-    ensure_backup_dir
-    local backup_file="$BACKUP_DIR/db_backup_$(date +%Y%m%d_%H%M%S).db"
-    local db_path
-    
-    db_path=$(find_database_path)
-    
-    if [[ -f "$db_path" ]]; then
-        cp "$db_path" "$backup_file"
-        print_success "Base de données sauvegardée : $backup_file"
-        print_success "Source: $db_path"
-        return 0
-    else
-        print_warning "Aucune base de données trouvée"
-        print_warning "Emplacements vérifiés:"
-        print_warning "  - $PROJECT_DIR/messages.db"
-        print_warning "  - $PROJECT_DIR/database.db"
-        print_warning "  - $PROJECT_DIR/bot.db"
-        return 1
-    fi
-}
-
-# Fonction de restauration de la base de données
-restore_database() {
-    local backup_file="$1"
-    
-    if [[ -z "$backup_file" ]]; then
-        print_error "Fichier de sauvegarde requis"
-        echo "Usage: pcr restore <fichier_backup>"
-        echo "Sauvegardes disponibles:"
-        ls -la "$BACKUP_DIR"/*.db 2>/dev/null || echo "Aucune sauvegarde trouvée"
-        return 1
-    fi
-    
-    if [[ ! -f "$backup_file" ]]; then
-        print_error "Fichier de sauvegarde non trouvé: $backup_file"
-        return 1
-    fi
-    
-    local db_path
-    db_path=$(find_database_path)
-    
-    print_step "Arrêt du bot pour la restauration..."
-    pm2 stop pcr 2>/dev/null || echo "Bot déjà arrêté"
-    
-    print_step "Restauration de la base de données..."
-    cp "$backup_file" "$db_path"
-    print_success "Base de données restaurée vers: $db_path"
-    
-    print_step "Redémarrage du bot..."
-    pm2 start "$PROJECT_DIR/index.js" --name pcr
-    
-    if check_app_status; then
-        print_success "Base de données restaurée avec succès"
-    else
-        print_error "Erreur lors de la restauration"
-    fi
-}
+# Configuration
+APP_NAME="PCR"
+MAIN_FILE="index.js"
+REPO_URL="https://github.com/Sydnec/PCR.git"
 
 # Couleurs
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
-CYAN='\033[0;36m'
-NC='\033[0m'
+NC='\033[0m' # No Color
 
-print_section() {
-    echo -e "${CYAN}📊 $1${NC}"
-    echo "----------------------------"
-}
-
-print_step() {
-    echo -e "${GREEN}[ÉTAPE]${NC} $1"
-}
-
-print_success() {
-    echo -e "${GREEN}✅ $1${NC}"
-}
-
-print_warning() {
-    echo -e "${YELLOW}⚠️  $1${NC}"
-}
-
-print_error() {
-    echo -e "${RED}❌ $1${NC}"
-}
-
-# Fonction pour vérifier si le bot est en ligne
-check_app_status() {
-    if pm2 list 2>/dev/null | grep -q "pcr.*online"; then
-        return 0
-    else
-        return 1
-    fi
-}
-
-# Fonction de monitoring complète
-monitor_function() {
-    clear
-    echo -e "${PURPLE}🤖 PCR BOT DISCORD - MONITORING${NC}"
-    echo "================================="
+# Fonction d'aide
+show_help() {
+    echo -e "${BLUE}Usage: pcr [command] [options]${NC}"
     echo ""
-    
-    # 1. Statut PM2
-    print_section "Statut PM2"
-    if pm2 list 2>/dev/null | grep -q "pcr"; then
-        pm2 list
-        echo ""
-        if check_app_status; then
-            print_success "Bot PCR en ligne"
-        else
-            print_error "Bot PCR hors ligne"
-        fi
-    else
-        print_error "Aucun processus PM2 trouvé"
-    fi
+    echo "Lifecycle (PM2):"
+    echo "  start       Démarrer le bot via PM2"
+    echo "  stop        Arrêter le bot"
+    echo "  restart     Redémarrer le bot"
+    echo "  status      Voir le statut PM2"
+    echo "  logs        Voir les logs PM2"
+    echo "  monitor     Ouvrir le moniteur PM2"
+    echo "  deploy      Install dependencies + Start/Reload PM2 (CI/CD friendly)"
+    echo "  update      Git pull + deploy"
+    echo "  install     Installer ce script dans le PATH système"
     echo ""
-
-    # 2. Ressources système
-    print_section "Ressources système"
-    echo "💾 Mémoire: $(free -h | awk '/^Mem:/ {printf "Utilisée: %s/%s (%.2f%%)", $3, $2, ($3/$2)*100}')"
-    echo "🔥 CPU: $(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | sed 's/%us,//')% utilisé"
-    echo "💿 Disque: $(df -h / | awk 'NR==2 {printf "Utilisé: %s/%s (%s)", $3, $2, $5}')"
+    echo "Development:"
+    echo "  feature <type> <name>   Créer une branche et un fichier depuis l'exemple"
+    echo "                          Types: command, event, handler"
+    echo "  finish                  Merger la branche courante dans main et supprimer la branche"
+    echo "  release <type>          Créer une nouvelle version (major, minor, fix/patch)"
     echo ""
-
-    # 3. Informations de déploiement
-    print_section "Informations de déploiement"
-    echo "📁 Répertoire projet: $PROJECT_DIR"
-    echo "👤 Utilisateur: $(whoami)"
-    echo "🖥️  Hostname: $(hostname)"
-    echo "📝 Dernière modification: $(stat -c %y "$PROJECT_DIR/index.js" 2>/dev/null || stat -f %Sm "$PROJECT_DIR/index.js" 2>/dev/null || echo "Non disponible")"
-    echo ""
-
-    # 4. Logs récents
-    print_section "Logs récents (dernières 5 lignes)"
-    pm2 logs pcr --lines 5 --nostream 2>/dev/null || echo "Aucun log disponible"
-    echo ""
-
-    echo "🔄 Pour actualiser: pcr monitor"
-    echo "📊 Pour PM2 monitoring: pm2 monit"
-    echo "📋 Pour redémarrer: pcr restart"
 }
 
-# Fonction de mise à jour
-update_function() {
-    cd "$PROJECT_DIR" || {
-        print_error "Impossible d'accéder au répertoire $PROJECT_DIR"
-        exit 1
-    }
-
-    print_step "🔄 Mise à jour PCR Bot..."
-    
-    # Sauvegarde automatique avant mise à jour
-    print_step "Sauvegarde automatique avant mise à jour..."
-    backup_database || echo "Continuer sans sauvegarde..."
-
-    # Sauvegarde des logs
-    ensure_log_dir
-    print_step "Sauvegarde des logs actuels..."
-    if [ -f "$LOG_DIR/pcr.log" ]; then
-        cp "$LOG_DIR/pcr.log" "$LOG_DIR/pcr.log.backup.$(date +%Y%m%d_%H%M%S)"
-    fi
-
-    # Vérifier et arrêter PM2 si nécessaire
-    print_step "📋 Vérification du statut PM2..."
-    if pm2 describe pcr &> /dev/null; then
-        print_step "✅ Processus PM2 'pcr' trouvé"
-        print_step "Arrêt temporaire du bot..."
-        pm2 stop pcr
-    else
-        print_warning "⚠️ Processus PM2 'pcr' non trouvé"
-    fi
-
-    # Stash des changements locaux non commités (si il y en a)
-    if ! git diff-index --quiet HEAD -- 2>/dev/null; then
-        print_step "💾 Sauvegarde des changements locaux..."
-        git stash push -m "Auto-stash avant mise à jour $(date)"
-        stashed=true
-    else
-        stashed=false
-    fi
-
-    # Git pull
-    print_step "Récupération des dernières modifications..."
-    git fetch origin
-    git pull origin main || print_warning "Impossible de faire git pull"
-
-    # Vérifier si package.json a été modifié
-    if git diff HEAD@{1} HEAD --name-only 2>/dev/null | grep -q "package.json"; then
-        print_step "📦 package.json modifié, mise à jour des dépendances..."
-        npm install
-    else
-        print_step "Installation/mise à jour des dépendances..."
-        npm install
-    fi
-
-    # Restaurer les changements stashés si nécessaire
-    if [ "$stashed" = true ]; then
-        print_step "🔄 Restauration des changements locaux sauvegardés..."
-        git stash pop
-    fi
-
-    # Redémarrage
-    print_step "Redémarrage du bot..."
-    pm2 restart pcr || pm2 start index.js --name pcr
-    pm2 save
-
-    # Vérification finale
-    sleep 5
-    if check_app_status; then
-        print_success "🎉 Mise à jour terminée avec succès!"
-        print_success "Le bot PCR est en ligne"
-    else
-        print_error "❌ Problème lors de la mise à jour"
-        echo "Vérifiez les logs avec: pcr logs"
-    fi
-}
-
-# Fonction de création de branche Git automatique
-create_git_branch() {
-    local branch_type="$1"  # "command" ou "event"
-    local name="$2"
-    local branch_name="feature/${branch_type}-${name}"
-    
-    # Vérifier si on est dans un repo Git
-    if ! git rev-parse --git-dir > /dev/null 2>&1; then
-        print_warning "Pas dans un dépôt Git - ignorer la création de branche"
-        return 0
-    fi
-    
-    # Vérifier si on a des changements non committés
-    if ! git diff-index --quiet HEAD --; then
-        print_warning "Changements non committés détectés"
-        echo "Voulez-vous créer un commit avant de créer la nouvelle branche? (O/n): "
-        read -n 1 stash_confirm
-        echo ""
-        if [[ "$stash_confirm" =~ ^[Oo]$ ]] || [[ -z "$stash_confirm" ]]; then
-            git add -A
-            git commit -m "Sauvegarde automatique avant création de branche $branch_name"
-            print_success "Changements sauvegardés"
-        else
-            print_warning "Création de branche avec changements non committés"
-        fi
-    fi
-    
-    # Vérifier si la branche existe déjà
-    if git show-ref --verify --quiet refs/heads/"$branch_name"; then
-        print_warning "La branche '$branch_name' existe déjà"
-        echo "Voulez-vous basculer sur cette branche? (O/n): "
-        read -n 1 switch_confirm
-        echo ""
-        if [[ "$switch_confirm" =~ ^[Oo]$ ]] || [[ -z "$switch_confirm" ]]; then
-            git checkout "$branch_name"
-            print_success "Basculé sur la branche existante '$branch_name'"
-        fi
-        return 0
-    fi
-    
-    # Créer et basculer sur la nouvelle branche
-    print_step "Création de la branche Git '$branch_name'..."
-    if git checkout -b "$branch_name"; then
-        print_success "Branche '$branch_name' créée et activée"
-        return 0
-    else
-        print_error "Erreur lors de la création de la branche"
-        return 1
-    fi
-}
-
-# Fonction pour lister les branches de fonctionnalités
-list_feature_branches() {
-    if ! git rev-parse --git-dir > /dev/null 2>&1; then
-        print_error "Pas dans un dépôt Git"
-        return 1
-    fi
-    
-    print_section "Branches de fonctionnalités PCR"
-    
-    # Lister les branches feature/command-* et feature/event-*
-    local feature_branches
-    feature_branches=$(git branch | grep -E "(feature/command-|feature/event-|fix/|feature/)" | sed 's/^[* ] //')
-    
-    if [[ -z "$feature_branches" ]]; then
-        print_warning "Aucune branche de fonctionnalité trouvée"
-        echo ""
-        echo "💡 Pour créer une branche de fonctionnalité:"
-        echo "  • pcr command --name <nom>    - Nouvelle commande"
-        echo "  • pcr event --name <nom>      - Nouvel événement"
-        return 0
-    fi
-    
-    echo "🌿 Branches disponibles:"
-    echo "─────────────────────"
-    
-    local current_branch
-    current_branch=$(git branch --show-current)
-    
-    while IFS= read -r branch; do
-        local status_symbol=""
-        local branch_info=""
-
-        if [[ "$branch" == "$current_branch" ]]; then
-            status_symbol="➤ "
-            branch_info=" (COURANTE)"
-        else
-            status_symbol="  "
-        fi
-
-        # Extraire le type et le nom
-        if [[ "$branch" =~ feature/command-(.+) ]]; then
-            local cmd_name="${BASH_REMATCH[1]}"
-            echo "${status_symbol}🔧 $branch${branch_info}"
-            echo "    └─ Commande: $cmd_name"
-        elif [[ "$branch" =~ feature/event-(.+) ]]; then
-            local event_name="${BASH_REMATCH[1]}"
-            echo "${status_symbol}⚡ $branch${branch_info}"
-            echo "    └─ Événement: $event_name"
-        elif [[ "$branch" =~ fix/(.+) ]]; then
-            local fix_name="${BASH_REMATCH[1]}"
-            echo "${status_symbol}🛠️ $branch${branch_info}"
-            echo "    └─ Correction: $fix_name"
-        else
-            echo "${status_symbol}🌿 $branch${branch_info}"
-        fi
-        echo ""
-    done <<< "$feature_branches"
-    
-    echo "💡 Commandes utiles:"
-    echo "───────────────────"
-    echo "  • git checkout <branche>     - Basculer sur une branche"
-    echo "  • git checkout main          - Revenir à la branche principale"
-    echo "  • git branch -d <branche>    - Supprimer une branche"
-    echo "  • git push origin <branche>  - Pousser une branche"
-}
-
-# ===== SYSTÈME DE CHANGELOG ET RELEASE =====
-
-# Fonction pour obtenir la version du projet depuis package.json
-get_project_version() {
-    if [[ -f "$PROJECT_DIR/package.json" ]]; then
-        grep '"version"' "$PROJECT_DIR/package.json" | sed 's/.*"version": *"\([^"]*\)".*/\1/'
-    else
-        echo "1.0.0"
-    fi
-}
-
-# Fonction pour ajouter une feature au changelog pending
-add_pending_feature() {
-    local type="$1"
-    local name="$2"
-    local description="$3"
-    
-    print_step "Ajout de la feature au changelog..."
-    
-    # Créer le script Node.js temporaire
-    local temp_script="/tmp/pcr_add_feature_$$"
-    cat > "$temp_script.js" << EOF
-import { addPendingFeature } from '${PROJECT_DIR}/modules/version-manager.js';
-
-try {
-    const feature = addPendingFeature({
-        type: '${type}',
-        name: '${name}',
-        description: '${description}'
-    });
-    
-    if (feature) {
-        console.log('✅ Feature ajoutée au changelog');
-    }
-} catch (error) {
-    console.error('❌ Erreur:', error.message);
-    process.exit(1);
-}
-EOF
-
-    cd "$PROJECT_DIR"
-    if node "$temp_script.js"; then
-        rm -f "$temp_script.js"
-        return 0
-    else
-        rm -f "$temp_script.js"
-        print_warning "Impossible d'ajouter la feature au changelog"
-        return 1
-    fi
-}
-
-# Fonction pour créer une release
-create_release() {
-    local version_type="$1"  # patch, minor, major
-    local title="$2"
-    
-    print_section "Création d'une nouvelle release"
-    
-    # Vérifier qu'on est sur main
-    local current_branch
-    current_branch=$(git branch --show-current 2>/dev/null || echo "unknown")
-    
-    if [[ "$current_branch" != "main" ]] && [[ "$current_branch" != "master" ]]; then
-        echo "⚠️  Vous n'êtes pas sur la branche principale (main/master)"
-        echo "Branche actuelle: $current_branch"
-        echo ""
-        echo "❌ Les releases doivent être créées depuis la branche main."
-        echo "💡 Utilisez 'git checkout main' pour basculer sur main."
-        print_warning "Release annulée"
-        return 1
-    fi
-    
-    # Créer le script Node.js temporaire
-    local temp_script="/tmp/pcr_release_$$"
-    cat > "$temp_script.js" << EOF
-import { createRelease, getChangelogStats, generateChangelogMarkdown } from '${PROJECT_DIR}/modules/version-manager.js';
-import fs from 'fs';
-
-try {
-    // Vérifier les features pending
-    const stats = getChangelogStats();
-    console.log(\`📊 Features en attente: \${stats.pendingFeatures}\`);
-    
-    if (stats.pendingFeatures === 0) {
-        console.log('⚠️  Aucune feature en attente pour la release');
-        process.exit(1);
-    }
-    
-    // Créer la release
-    const release = createRelease('${version_type}', '${title}');
-    
-    // Générer le changelog markdown
-    const markdown = generateChangelogMarkdown();
-    fs.writeFileSync('CHANGELOG.md', markdown);
-    
-    console.log(\`🎉 Release \${release.version} créée avec succès!\`);
-    console.log(\`📋 Features incluses: \${release.features.length}\`);
-    console.log('📝 CHANGELOG.md généré');
-    
-} catch (error) {
-    console.error('❌ Erreur:', error.message);
-    process.exit(1);
-}
-EOF
-
-    cd "$PROJECT_DIR"
-    if node "$temp_script.js"; then
-        rm -f "$temp_script.js"
-        
-        # Committer les changements
-        print_step "Commit des fichiers de release..."
-        git add changelog.json package.json CHANGELOG.md
-        
-        local new_version
-        new_version=$(get_project_version)
-        
-        if git commit -m "chore: release v${new_version}
-
-- Update version to ${new_version}
-- Add changelog entries
-- Generate CHANGELOG.md"; then
-            
-            print_success "✅ Release v${new_version} commitée"
-            
-            # Proposer de créer un tag
-            echo ""
-            echo "📌 Voulez-vous créer un tag Git pour cette release? (O/n): "
-            read -n 1 tag_confirm
-            echo ""
-            
-            if [[ "$tag_confirm" =~ ^[Oo]$ ]] || [[ -z "$tag_confirm" ]]; then
-                git tag -a "v${new_version}" -m "Release v${new_version}"
-                print_success "🏷️  Tag v${new_version} créé"
-            fi
-            
-            # Proposer de push
-            echo ""
-            echo "🚀 Voulez-vous pousser vers le dépôt distant? (O/n): "
-            read -n 1 push_confirm
-            echo ""
-            
-            if [[ "$push_confirm" =~ ^[Oo]$ ]] || [[ -z "$push_confirm" ]]; then
-                print_step "Push vers origin..."
-                
-                # S'assurer qu'on est bien sur main avant de push
-                local push_branch
-                push_branch=$(git branch --show-current 2>/dev/null || echo "unknown")
-                
-                if [[ "$push_branch" != "main" ]] && [[ "$push_branch" != "master" ]]; then
-                    print_error "Erreur: Tentative de push depuis $push_branch au lieu de main"
-                    print_error "Basculez sur main avec: git checkout main"
-                    return 1
-                fi
-                
-                if git push origin "$push_branch"; then
-                    if git tag -l "v${new_version}" >/dev/null 2>&1; then
-                        git push origin "v${new_version}"
-                        print_success "🏷️  Tag poussé - GitHub Actions va se déclencher!"
-                    fi
-                    print_success "🎉 Release publiée avec succès!"
-                    echo ""
-                    echo "🌐 Actions automatiques déclenchées:"
-                    echo "  • GitHub Actions Release workflow"
-                    echo "  • Publication automatique du changelog"
-                    echo "  • Notification Discord (si configurée)"
-                else
-                    print_warning "Erreur lors du push"
-                fi
-            fi
-        else
-            print_error "Erreur lors du commit de release"
-            rm -f "$temp_script.js"
-            return 1
-        fi
-    else
-        rm -f "$temp_script.js"
-        return 1
-    fi
-}
-
-# Fonction pour finaliser une feature (commit + push + merge)
-finalize_feature() {
-    local branch_name
-    branch_name=$(git branch --show-current 2>/dev/null)
-    
-    if [[ -z "$branch_name" ]]; then
-        print_error "Impossible de déterminer la branche actuelle"
-        return 1
-    fi
-    
-    if [[ "$branch_name" == "main" ]] || [[ "$branch_name" == "master" ]]; then
-        print_error "Vous êtes déjà sur la branche principale"
-        echo "💡 Cette commande est pour finaliser une feature branch"
-        return 1
-    fi
-    
-    print_section "Finalisation de la feature: $branch_name"
-    
-    # Détecter le type et le nom de la feature
-    local feature_type=""
-    local feature_name=""
-    local feature_description=""
-    
-    if [[ "$branch_name" =~ feature/command-(.+) ]]; then
-        feature_type="command"
-        feature_name="${BASH_REMATCH[1]}"
-        feature_description="Nouvelle commande Discord: /${feature_name}"
-    elif [[ "$branch_name" =~ feature/event-(.+) ]]; then
-        feature_type="event"
-        feature_name="${BASH_REMATCH[1]}"
-        feature_description="Nouvel événement Discord: ${feature_name}"
-    else
-        feature_type="feature"
-        feature_name="$branch_name"
-        feature_description="Nouvelle fonctionnalité: $branch_name"
-    fi
-    
-    echo "🔍 Feature détectée:"
-    echo "  • Type: $feature_type"
-    echo "  • Nom: $feature_name"
-    echo "  • Description: $feature_description"
-    echo ""
-    
-    # Demander confirmation
-    echo "Voulez-vous finaliser cette feature? (O/n): "
-    read -n 1 confirm
-    echo ""
-    
-    if [[ ! "$confirm" =~ ^[Oo]$ ]] && [[ -n "$confirm" ]]; then
-        print_warning "Finalisation annulée"
-        return 1
-    fi
-    
-    # 1. Commit des changements restants
-    if ! git diff --quiet || ! git diff --cached --quiet; then
-        print_step "Commit des derniers changements..."
-        git add .
-        git commit -m "feat: finalize $feature_type '$feature_name'
-
-- Complete implementation of $feature_name
-- Ready for merge to main" || {
-            print_warning "Aucun changement à committer ou erreur de commit"
-        }
-    fi
-    
-    # 2. Push de la branche
-    print_step "Push de la branche vers origin..."
-    if git push -u origin "$branch_name"; then
-        print_success "✅ Branche poussée vers origin"
-    else
-        print_warning "Erreur lors du push - continuons quand même"
-    fi
-    
-    # 3. Ajouter au changelog pending
-    print_step "Ajout au changelog..."
-    add_pending_feature "$feature_type" "$feature_name" "$feature_description"
-    
-    # 4. Merger vers main
-    print_step "Merge vers main..."
-    
-    # Récupérer les dernières modifications de main
-    git fetch origin main 2>/dev/null || true
-    
-    # Basculer sur main
-    git checkout main
-    git pull origin main 2>/dev/null || true
-    
-    # Merger la feature
-    if git merge --no-ff "$branch_name" -m "feat: merge $feature_type '$feature_name'
-
-- Merged feature branch: $branch_name
-- Added to changelog pending list"; then
-        
-        print_success "✅ Feature mergée vers main"
-        
-        # 5. Push main
-        print_step "Push de main..."
-        if git push origin main; then
-            print_success "✅ Main poussé vers origin"
-            
-            # 6. Nettoyer la branche
-            echo ""
-            echo "🧹 Voulez-vous supprimer la branche feature locale? (O/n): "
-            read -n 1 delete_confirm
-            echo ""
-            
-            if [[ "$delete_confirm" =~ ^[Oo]$ ]] || [[ -z "$delete_confirm" ]]; then
-                git branch -d "$branch_name"
-                print_success "🗑️  Branche locale supprimée"
-                
-                echo "Voulez-vous aussi supprimer la branche distante? (o/N): "
-                read -n 1 delete_remote_confirm
-                echo ""
-                
-                if [[ "$delete_remote_confirm" =~ ^[Oo]$ ]]; then
-                    git push origin --delete "$branch_name"
-                    print_success "🗑️  Branche distante supprimée"
-                fi
-            fi
-            
-            # 7. Proposer de créer une release
-            echo ""
-            echo "🎯 Feature finalisée avec succès!"
-            echo ""
-            echo "🚀 Voulez-vous créer une release maintenant? (o/N): "
-            read -n 1 release_confirm
-            echo ""
-            
-            if [[ "$release_confirm" =~ ^[Oo]$ ]]; then
-                # Vérifier qu'on est bien sur main
-                local current_release_branch
-                current_release_branch=$(git branch --show-current 2>/dev/null)
-                
-                if [[ "$current_release_branch" != "main" ]] && [[ "$current_release_branch" != "master" ]]; then
-                    echo "🔄 Basculement sur main pour créer la release..."
-                    git checkout main
-                fi
-                
-                echo "Type de release (patch/minor/major) [patch]: "
-                read version_type
-                version_type=${version_type:-patch}
-                
-                create_release "$version_type" "Release avec $feature_name"
-            else
-                echo "💡 Pour créer une release plus tard:"
-                echo "   pcr release --type patch"
-            fi
-            
-        else
-            print_error "Erreur lors du push de main"
-            return 1
-        fi
-    else
-        print_error "Erreur lors du merge"
-        echo "💡 Résolvez les conflits manuellement puis réessayez"
-        return 1
-    fi
-}
-
-# Fonction de commit automatique après création
-auto_commit_and_push() {
-    local type="$1"      # "command" ou "event"
-    local name="$2"
-    local file_path="$3"
-    local description="$4"  # Description optionnelle
-    local branch_name="feature/${type}-${name}"
-    
-    # Vérifier si on est dans un repo Git
-    if ! git rev-parse --git-dir > /dev/null 2>&1; then
-        return 0
-    fi
-    
-    print_step "Commit automatique du nouveau $type '$name'..."
-    
-    # Ajouter le fichier créé
-    git add "$file_path"
-    
-    # Créer le message de commit
-    local commit_msg
-    if [[ "$type" == "command" ]]; then
-        commit_msg="feat: add new Discord command '$name'
-
-- Generated using 'pcr command --name $name'
-- File: $(basename "$file_path")
-- Ready for implementation"
-    else
-        commit_msg="feat: add new Discord event '$name'
-
-- Generated using 'pcr event --name $name' 
-- File: $(basename "$file_path")
-- Ready for implementation"
-    fi
-    
-    # Effectuer le commit
-    if git commit -m "$commit_msg"; then
-        print_success "Commit effectué avec succès"
-        
-        # Demander si on veut push
-        echo ""
-        echo "Voulez-vous pousser la branche vers le dépôt distant? (O/n): "
-        read -n 1 push_confirm
-        echo ""
-        if [[ "$push_confirm" =~ ^[Oo]$ ]] || [[ -z "$push_confirm" ]]; then
-            print_step "Push de la branche '$branch_name'..."
-            if git push -u origin "$branch_name"; then
-                print_success "Branche poussée vers origin/$branch_name"
-                echo ""
-                echo "🌐 Actions suggérées:"
-                echo "  • Créer une Pull Request sur GitHub/GitLab"
-                echo "  • Continuer le développement sur cette branche"
-                echo "  • Merger quand prêt: git checkout main && git merge $branch_name"
-                echo ""
-                print_success "✅ Feature créée et prête pour le développement"
-                echo "💡 Utilisez 'pcr finish' quand vous aurez terminé le développement"
-                
-            else
-                print_warning "Erreur lors du push - vous pouvez le faire manuellement plus tard"
-                echo "  Commande: git push -u origin $branch_name"
-            fi
-        else
-            print_success "Branche créée localement (non poussée)"
-            echo ""
-            echo "💡 Pour pousser plus tard:"
-            echo "  git push -u origin $branch_name"
-            echo ""
-            print_success "✅ Feature créée et prête pour le développement"
-            echo "💡 Utilisez 'pcr finish' quand vous aurez terminé le développement"
-        fi
-    else
-        print_error "Erreur lors du commit"
-        return 1
-    fi
-}
-
-# Fonction pour publier un changelog manuel
-publish_manual_changelog() {
-    local version="$1"
-    local title="$2"
-    
-    print_step "Analyse des commits récents pour le changelog..."
-    
-    # Récupérer les commits depuis le dernier tag ou les 10 derniers
-    local last_tag
-    last_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-    
-    local commits_range
-    if [[ -n "$last_tag" ]]; then
-        commits_range="${last_tag}..HEAD"
-        echo "📍 Analyse depuis le tag: $last_tag"
-    else
-        commits_range="HEAD~10..HEAD"
-        echo "📍 Analyse des 10 derniers commits"
-    fi
-    
-    # Analyser les commits pour extraire les fonctionnalités
-    local features_json="/tmp/pcr_features_$$"
-    cat > "${features_json}.js" << EOF
-import { Client, GatewayIntentBits } from 'discord.js';
-import { announceChangelog } from '${PROJECT_DIR}/modules/changelog.js';
-import dotenv from 'dotenv';
-import { execSync } from 'child_process';
-dotenv.config();
-
-const client = new Client({
-    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages]
-});
-
-client.once('ready', async () => {
-    console.log('🤖 Bot connecté pour le changelog...');
-    
-    try {
-        // Récupérer les commits
-        const commits = execSync('git log ${commits_range} --oneline --grep="feat:" || true', {
-            cwd: '${PROJECT_DIR}',
-            encoding: 'utf8'
-        }).trim().split('\n').filter(line => line.length > 0);
-        
-        const features = [];
-        
-        commits.forEach(commit => {
-            const match = commit.match(/feat: add new Discord (command|event) '([^']+)'/);
-            if (match) {
-                const [, type, name] = match;
-                features.push({
-                    type: type,
-                    name: name,
-                    description: \`Nouvelle fonctionnalité: \${name}\`
-                });
-            } else if (commit.includes('feat:')) {
-                // Autres types de fonctionnalités
-                const name = commit.split(' ').slice(1).join(' ').replace(/^feat: /, '');
-                features.push({
-                    type: 'feature',
-                    name: name.substring(0, 50) + (name.length > 50 ? '...' : ''),
-                    description: name
-                });
-            }
-        });
-        
-        if (features.length === 0) {
-            console.log('⚠️  Aucune nouvelle fonctionnalité trouvée dans les commits récents');
-            process.exit(0);
-        }
-        
-        await announceChangelog(client, {
-            version: '${version}',
-            title: '${title:-Changelog PCR Bot}',
-            features: features
-        });
-        
-        console.log(\`✅ Changelog publié avec \${features.length} fonctionnalité(s)\`);
-    } catch (error) {
-        console.error('❌ Erreur lors du changelog:', error.message);
-    }
-    
-    process.exit(0);
-});
-
-client.login(process.env.DISCORD_TOKEN).catch(error => {
-    console.error('❌ Erreur de connexion Discord:', error.message);
-    console.log('⚠️  Assurez-vous que DISCORD_TOKEN est configuré dans .env');
-    process.exit(1);
-});
-EOF
-
-    # Vérifier si le bot peut se connecter
-    if [[ -f "$PROJECT_DIR/.env" ]] && grep -q "DISCORD_TOKEN=" "$PROJECT_DIR/.env"; then
-        echo ""
-        echo "📊 Fonctionnalités détectées depuis les commits récents:"
-        git log $commits_range --oneline --grep="feat:" | head -5 || echo "Aucune fonctionnalité détectée"
-        echo ""
-        echo "📢 Voulez-vous publier le changelog version $version? (O/n): "
-        read -n 1 publish_confirm
-        echo ""
-        
-        if [[ "$publish_confirm" =~ ^[Oo]$ ]] || [[ -z "$publish_confirm" ]]; then
-            cd "$PROJECT_DIR"
-            timeout 30s node "${features_json}.js" 2>/dev/null || {
-                print_warning "Impossible de publier le changelog automatiquement"
-                echo "💡 Vérifiez la configuration Discord et réessayez"
-            }
-        fi
-    else
-        print_warning "Token Discord non configuré"
-        echo "💡 Configurez DISCORD_TOKEN dans .env pour publier des changelogs"
-    fi
-    
-    # Nettoyer le fichier temporaire
-    rm -f "${features_json}.js"
-}
-
-# Fonction de création d'événement
-create_event() {
-    local event_name="$1"
-    
-    if [[ -z "$event_name" ]]; then
-        print_error "Nom d'événement requis"
-        echo "Usage: pcr event --name <nom_evenement>"
-        echo "Exemple: pcr event --name messageUpdate"
-        return 1
-    fi
-    
-    # Créer la branche Git automatiquement
-    create_git_branch "event" "$event_name"
-    
-    # Vérifier que le nom est valide (alphanumeric + tirets)
-    if [[ ! "$event_name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-        print_error "Nom d'événement invalide. Utilisez uniquement des lettres, chiffres, tirets et underscores."
-        return 1
-    fi
-    
-    local events_dir="$PROJECT_DIR/events/client"
-    local example_file="$events_dir/example"
-    local new_event_file="$events_dir/$event_name.js"
-    
-    # Vérifier si le fichier example existe
-    if [[ ! -f "$example_file" ]]; then
-        print_error "Fichier template non trouvé: $example_file"
-        return 1
-    fi
-    
-    # Vérifier si l'événement existe déjà
-    if [[ -f "$new_event_file" ]]; then
-        print_error "L'événement '$event_name' existe déjà"
-        print_warning "Fichier existant: $new_event_file"
-        return 1
-    fi
-    
-    print_step "Création de l'événement '$event_name'..."
-    
-    # Copier le template et remplacer les valeurs par défaut
-    cp "$example_file" "$new_event_file"
-    
-    # Remplacer 'name' par le nom de l'événement
-    sed -i "s/const name = 'name'/const name = '$event_name'/g" "$new_event_file"
-    
-    # Ajouter un commentaire d'identification
-    sed -i "1i// Événement: $event_name" "$new_event_file"
-    sed -i "2i//" "$new_event_file"
-    
-    print_success "Événement '$event_name' créé avec succès!"
-    print_success "Fichier: $new_event_file"
-    
-    # Commit automatique et push
-    auto_commit_and_push "event" "$event_name" "$new_event_file" "Nouvel événement Discord pour gérer $event_name"
-    
-    echo ""
-    echo "📝 Prochaines étapes:"
-    echo "───────────────────"
-    echo "  1. Éditez le fichier pour personnaliser l'événement"
-    echo "  2. Modifiez la propriété 'once' (true/false)"
-    echo "  3. Implémentez la logique dans la fonction execute"
-    echo "  4. Redémarrez le bot: pcr restart"
-    echo ""
-    echo "💡 Commandes utiles:"
-    echo "  • Éditer: nano $new_event_file"
-    echo "  • Voir les logs: pcr logs"
-    echo ""
-    echo "🌿 Git workflow:"
-    echo "  • Branche courante: feature/event-$event_name"
-    echo "  • Quand prêt: pcr finish"
-    echo "  • Revenir à main: git checkout main"
-    echo ""
-    echo "📚 Événements Discord courants:"
-    echo "  • ready, messageCreate, messageDelete"
-    echo "  • guildMemberAdd, guildMemberRemove"
-    echo "  • interactionCreate, messageReactionAdd"
-}
-
-# Fonction de création de commande
-create_command() {
-    local command_name="$1"
-    local command_desc="$2"
-    
-    if [[ -z "$command_name" ]]; then
-        print_error "Nom de commande requis"
-        echo "Usage: pcr command --name <nom_commande> [--desc <description>]"
-        echo "Exemple: pcr command --name hello"
-        echo "Exemple: pcr command --name hello --desc \"Commande de salutation\""
-        return 1
-    fi
-    
-    # Créer la branche Git automatiquement
-    create_git_branch "command" "$command_name"
-    
-    # Vérifier que le nom est valide (alphanumeric + tirets)
-    if [[ ! "$command_name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-        print_error "Nom de commande invalide. Utilisez uniquement des lettres, chiffres, tirets et underscores."
-        return 1
-    fi
-    
-    local commands_dir="$PROJECT_DIR/commands"
-    local example_file="$commands_dir/example"
-    local new_command_file="$commands_dir/$command_name.js"
-    
-    # Vérifier si le fichier example existe
-    if [[ ! -f "$example_file" ]]; then
-        print_error "Fichier template non trouvé: $example_file"
-        return 1
-    fi
-    
-    # Vérifier si la commande existe déjà
-    if [[ -f "$new_command_file" ]]; then
-        print_error "La commande '$command_name' existe déjà"
-        print_warning "Fichier existant: $new_command_file"
-        return 1
-    fi
-    
-    print_step "Création de la commande '$command_name'..."
-    
-    # Copier le template et remplacer les valeurs par défaut
-    cp "$example_file" "$new_command_file"
-    
-    # Remplacer 'name' par le nom de la commande
-    sed -i "s/\.setName('name')/\.setName('$command_name')/g" "$new_command_file"
-    
-    # Remplacer 'Description' par une description personnalisée
-    if [[ -n "$command_desc" ]]; then
-        # Utiliser la description fournie
-        sed -i "s/\.setDescription('Description')/\.setDescription('$command_desc')/g" "$new_command_file"
-    else
-        # Utiliser une description par défaut
-        sed -i "s/\.setDescription('Description')/\.setDescription('Description de la commande $command_name')/g" "$new_command_file"
-    fi
-    
-    print_success "Commande '$command_name' créée avec succès!"
-    print_success "Fichier: $new_command_file"
-    
-    # Commit automatique et push
-    local desc_for_changelog="${command_desc:-Nouvelle commande Discord: $command_name}"
-    auto_commit_and_push "command" "$command_name" "$new_command_file" "$desc_for_changelog"
-    
-    echo ""
-    echo "📝 Prochaines étapes:"
-    echo "───────────────────"
-    echo "  1. Éditez le fichier pour personnaliser la commande"
-    echo "  2. Modifiez la description et les options"
-    echo "  3. Implémentez la logique dans la fonction execute"
-    echo "  4. Redémarrez le bot: pcr restart"
-    echo ""
-    echo "💡 Commandes utiles:"
-    echo "  • Éditer: nano $new_command_file"
-    echo "  • Voir les logs: pcr logs"
-    echo ""
-    echo "🌿 Git workflow:"
-    echo "  • Branche courante: feature/command-$command_name"
-    echo "  • Quand prêt: pcr finish"
-    echo "  • Revenir à main: git checkout main"
-}
-
-# Fonction de création de feature branch (nouvelle)
-create_feature_branch() {
-    local feature_name="$1"
-    
-    if [[ -z "$feature_name" ]]; then
-        print_error "Nom de feature requis"
-        echo "Usage: pcr feature <nom_feature>"
-        echo "Exemple: pcr feature user-profile-system"
-        return 1
-    fi
-    
-    # Vérifier que le nom est valide (alphanumeric + tirets)
-    if [[ ! "$feature_name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-        print_error "Nom de feature invalide. Utilisez uniquement des lettres, chiffres, tirets et underscores."
-        return 1
-    fi
-    
-    local branch_name="feature/$feature_name"
-    
-    print_section "Création de la feature branch '$feature_name'"
-    
-    # Vérifier si on est dans un repo Git
-    if ! git rev-parse --git-dir > /dev/null 2>&1; then
-        print_error "Pas dans un dépôt Git"
-        return 1
-    fi
-    
-    # Vérifier si la branche existe déjà
-    if git show-ref --verify --quiet refs/heads/"$branch_name"; then
-        print_warning "La branche '$branch_name' existe déjà"
-        echo "Voulez-vous basculer sur cette branche? (O/n): "
-        read -n 1 switch_confirm
-        echo ""
-        if [[ "$switch_confirm" =~ ^[Oo]$ ]] || [[ -z "$switch_confirm" ]]; then
-            git checkout "$branch_name"
-            print_success "Basculé sur la branche existante '$branch_name'"
-        fi
-        return 0
-    fi
-    
-    # Vérifier si on a des changements non committés
-    if ! git diff-index --quiet HEAD --; then
-        print_warning "Changements non committés détectés"
-        echo "Voulez-vous créer un commit avant de créer la nouvelle branche? (O/n): "
-        read -n 1 stash_confirm
-        echo ""
-        if [[ "$stash_confirm" =~ ^[Oo]$ ]] || [[ -z "$stash_confirm" ]]; then
-            git add -A
-            git commit -m "WIP: sauvegarde automatique avant feature $feature_name"
-            print_success "Changements sauvegardés"
-        fi
-    fi
-    
-    # S'assurer qu'on est sur main et à jour
-    print_step "Mise à jour de la branche main..."
-    git checkout main 2>/dev/null || git checkout master 2>/dev/null
-    git pull origin main 2>/dev/null || git pull origin master 2>/dev/null || true
-    
-    # Créer et basculer sur la nouvelle branche
-    print_step "Création de la branche feature '$branch_name'..."
-    if git checkout -b "$branch_name"; then
-        print_success "✅ Branche '$branch_name' créée et activée"
-        echo ""
-        echo "🌿 Feature branch créée:"
-        echo "  • Nom: $branch_name"
-        echo "  • Base: main"
-        echo "  • Statut: Prêt pour le développement"
-        echo ""
-        echo "💡 Prochaines étapes:"
-        echo "  • Développez votre feature"
-        echo "  • Committez vos changements: git add . && git commit -m 'feat: ...'"
-        echo "  • Pushez quand prêt: git push -u origin $branch_name"
-        echo "  • Finalisez avec: pcr finish"
-        echo ""
-        return 0
-    else
-        print_error "Erreur lors de la création de la branche"
-        return 1
-    fi
-}
-
-# Fonction de création de fix branch (nouvelle)
-create_fix_branch() {
-    local fix_name="$1"
-    
-    if [[ -z "$fix_name" ]]; then
-        print_error "Nom de fix requis"
-        echo "Usage: pcr fix <nom_fix>"
-        echo "Exemple: pcr fix login-validation-error"
-        return 1
-    fi
-    
-    # Vérifier que le nom est valide (alphanumeric + tirets)
-    if [[ ! "$fix_name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-        print_error "Nom de fix invalide. Utilisez uniquement des lettres, chiffres, tirets et underscores."
-        return 1
-    fi
-    
-    local branch_name="fix/$fix_name"
-    
-    print_section "Création de la fix branch '$fix_name'"
-    
-    # Vérifier si on est dans un repo Git
-    if ! git rev-parse --git-dir > /dev/null 2>&1; then
-        print_error "Pas dans un dépôt Git"
-        return 1
-    fi
-    
-    # Vérifier si la branche existe déjà
-    if git show-ref --verify --quiet refs/heads/"$branch_name"; then
-        print_warning "La branche '$branch_name' existe déjà"
-        echo "Voulez-vous basculer sur cette branche? (O/n): "
-        read -n 1 switch_confirm
-        echo ""
-        if [[ "$switch_confirm" =~ ^[Oo]$ ]] || [[ -z "$switch_confirm" ]]; then
-            git checkout "$branch_name"
-            print_success "Basculé sur la branche existante '$branch_name'"
-        fi
-        return 0
-    fi
-    
-    # Vérifier si on a des changements non committés
-    if ! git diff-index --quiet HEAD --; then
-        print_warning "Changements non committés détectés"
-        echo "Voulez-vous créer un commit avant de créer la nouvelle branche? (O/n): "
-        read -n 1 stash_confirm
-        echo ""
-        if [[ "$stash_confirm" =~ ^[Oo]$ ]] || [[ -z "$stash_confirm" ]]; then
-            git add -A
-            git commit -m "WIP: sauvegarde automatique avant fix $fix_name"
-            print_success "Changements sauvegardés"
-        fi
-    fi
-    
-    # S'assurer qu'on est sur main et à jour
-    print_step "Mise à jour de la branche main..."
-    git checkout main 2>/dev/null || git checkout master 2>/dev/null
-    git pull origin main 2>/dev/null || git pull origin master 2>/dev/null || true
-    
-    # Créer et basculer sur la nouvelle branche
-    print_step "Création de la branche fix '$branch_name'..."
-    if git checkout -b "$branch_name"; then
-        print_success "✅ Branche '$branch_name' créée et activée"
-        echo ""
-        echo "🔧 Fix branch créée:"
-        echo "  • Nom: $branch_name"
-        echo "  • Base: main"  
-        echo "  • Type: Correction de bug"
-        echo "  • Statut: Prêt pour le développement"
-        echo ""
-        echo "💡 Prochaines étapes:"
-        echo "  • Corrigez le problème"
-        echo "  • Committez vos changements: git add . && git commit -m 'fix: ...'"
-        echo "  • Pushez quand prêt: git push -u origin $branch_name"
-        echo "  • Mergez directement (les fixes ne vont pas dans le changelog)"
-        echo ""
-        echo "⚠️  Note: Les fixes ne sont pas ajoutés au changelog automatiquement"
-        echo ""
-        return 0
-    else
-        print_error "Erreur lors de la création de la branche"
-        return 1
-    fi
-}
-
-# Fonction d'installation du script dans le PATH
-install_script() {
-    local script_path="/usr/local/bin/pcr"
-    
-    if [[ -f "$script_path" ]]; then
-        echo -n "Le script est déjà installé. Voulez-vous le mettre à jour? (O/n): "
-        read -n 1 confirmation
-        echo ""
-        if [[ ! "$confirmation" =~ ^[Oo]$ ]] && [[ -n "$confirmation" ]]; then
-            print_warning "Installation annulée"
-            return 1
-        fi
-    fi
-    
-    print_step "Installation du script pcr dans /usr/local/bin..."
-    
-    # Copier le script
-    if sudo cp "$PROJECT_DIR/pcr" "$script_path"; then
-        sudo chmod +x "$script_path"
-        print_success "Script installé avec succès!"
-        print_success "Vous pouvez maintenant utiliser 'pcr' depuis n'importe où"
-        echo ""
-        echo "💡 Conseils:"
-        echo "  - Utilisez 'pcr' depuis le répertoire du projet ou ses sous-répertoires"
-        echo "  - Le script détectera automatiquement le bon répertoire de projet"
-        echo "  - Pour désinstaller: sudo rm /usr/local/bin/pcr"
-    else
-        print_error "Erreur lors de l'installation (permissions sudo requises)"
-        return 1
-    fi
-}
-
+# Commandes
 case "$1" in
-    dev)
-        validate_project_directory
-        echo "🚀 Lancement du mode développement..."
-        echo ""
-        print_step "Démarrage du bot en mode développement..."
-        cd "$PROJECT_DIR"
-        npm run dev
-        ;;
     start)
-        validate_project_directory
-        print_section "Démarrage du Bot PCR"
-        cd "$PROJECT_DIR"
-        pm2 start index.js --name pcr 2>/dev/null || {
-            print_warning "Processus déjà en cours, tentative de redémarrage..."
-            pm2 restart pcr
-        }
-        pm2 save
-        sleep 2
-        echo ""
-        if check_app_status; then
-            print_success "🎉 Bot PCR démarré avec succès!"
-            echo ""
-            echo "📊 Informations du bot:"
-            echo "─────────────────────"
-            echo "🤖 Nom: PCR Discord Bot"
-            echo "📁 Répertoire: $PROJECT_DIR"
-            echo ""
-            echo "💡 Commandes utiles:"
-            echo "  • pcr status   - Vérifier l'état"
-            echo "  • pcr logs     - Voir les logs"
-            echo "  • pcr monitor  - Monitoring complet"
-        else
-            print_error "❌ Échec du démarrage"
-            echo ""
-            echo "🔍 Vérifications suggérées:"
-            echo "  • Vérifiez les logs: pcr logs"
-            echo "  • Vérifiez les permissions"
-            echo "  • Redémarrez: pcr restart"
-        fi
+        echo -e "${GREEN}Démarrage de $APP_NAME avec PM2...${NC}"
+        pm2 start "$MAIN_FILE" --name "$APP_NAME"
         ;;
+
     stop)
-        print_section "Arrêt du Bot PCR"
-        pm2 stop pcr 2>/dev/null || print_warning "Bot déjà arrêté"
-        echo ""
-        print_success "🛑 Bot PCR arrêté avec succès"
-        echo ""
-        echo "💡 Pour redémarrer:"
-        echo "  • pcr start    - Démarrer le bot"
-        echo "  • pcr restart  - Redémarrer directement"
+        echo -e "${YELLOW}Arrêt de $APP_NAME...${NC}"
+        pm2 stop "$APP_NAME"
         ;;
+
     restart)
-        print_section "Redémarrage du Bot PCR"
-        cd "$PROJECT_DIR"
-        pm2 restart pcr 2>/dev/null || {
-            print_warning "Processus non trouvé, démarrage..."
-            pm2 start index.js --name pcr
-        }
-        pm2 save
-        sleep 2
-        echo ""
-        if check_app_status; then
-            print_success "🔄 Bot PCR redémarré avec succès!"
-            echo ""
-            echo "📊 Informations du bot:"
-            echo "─────────────────────"
-            echo "🤖 Nom: PCR Discord Bot"
-            echo "📁 Répertoire: $PROJECT_DIR"
-            echo ""
-            echo "💡 Commandes utiles:"
-            echo "  • pcr logs     - Voir les logs"
-            echo "  • pcr monitor  - Monitoring complet"
-        else
-            print_error "❌ Échec du redémarrage"
-            echo ""
-            echo "🔍 Vérifications suggérées:"
-            echo "  • Vérifiez les logs: pcr logs"
-            echo "  • Essayez un arrêt/démarrage: pcr stop && pcr start"
-        fi
+        echo -e "${YELLOW}Redémarrage de $APP_NAME...${NC}"
+        pm2 restart "$APP_NAME"
         ;;
+
     status)
-        print_section "Statut du Bot PCR"
-        if check_app_status; then
-            print_success "🟢 Bot PCR en ligne"
-            echo ""
-            echo "📊 Informations rapides:"
-            echo "─────────────────────"
-            echo "🤖 Processus PM2: Actif"
-            echo "📁 Répertoire: $PROJECT_DIR"
-            echo ""
-            echo "💡 Commandes utiles:"
-            echo "  • pcr logs     - Voir les logs en temps réel"
-            echo "  • pcr monitor  - Monitoring détaillé"
-        else
-            print_error "🔴 Bot PCR hors ligne"
-            echo ""
-            echo "🔍 Actions suggérées:"
-            echo "───────────────────"
-            echo "  • pcr start    - Démarrer le bot"
-            echo "  • pcr logs     - Vérifier les erreurs"
-            echo "  • pcr deploy   - Redéployer si nécessaire"
-        fi
+        pm2 status "$APP_NAME"
         ;;
+
     logs)
-        print_section "Logs du Bot PCR"
-        echo "📋 Affichage en temps réel (Ctrl+C pour arrêter)"
-        echo "═════════════════════════════════════════════"
-        echo ""
-        pm2 logs pcr 2>/dev/null || {
-            print_error "Impossible d'accéder aux logs"
-            echo ""
-            echo "🔍 Vérifications:"
-            echo "  • Le bot est-il démarré? pcr status"
-            echo "  • Essayez de redémarrer: pcr restart"
-        }
+        pm2 logs "$APP_NAME"
         ;;
+
     monitor)
-        monitor_function
+        pm2 monit
         ;;
-    update)
-        update_function
-        ;;
+
     deploy)
-        echo "🚀 Déploiement du bot PCR..."
-        cd "$PROJECT_DIR"
-        
-        # Sauvegarde automatique avant déploiement
-        print_step "Sauvegarde automatique avant déploiement..."
-        backup_database || echo "Continuer sans sauvegarde..."
-        
-        # Vérification et création du fichier .env
-        print_step "Vérification de la configuration d'environnement..."
-        if [ ! -f ".env" ]; then
-            if [ -f ".env.example" ]; then
-                print_step "Copie de .env.example vers .env..."
-                cp .env.example .env
-                print_success "Fichier .env créé à partir de .env.example"
-                print_warning "N'oubliez pas de configurer vos tokens dans .env"
-            else
-                print_warning "Ni .env ni .env.example trouvés"
-                print_warning "Assurez-vous d'avoir configuré vos variables d'environnement"
-            fi
-        else
-            print_success "Fichier .env déjà présent"
-        fi
-        
-        # Arrêt de l'application
-        print_step "Arrêt du bot si il est en cours d'exécution..."
-        pm2 stop pcr 2>/dev/null || echo "Bot pas encore démarré"
-
-        # Installation des dépendances
-        print_step "Installation des dépendances..."
+        echo -e "${BLUE}Installation des dépendances...${NC}"
         npm install
-
-        # Démarrage du bot avec PM2
-        print_step "Démarrage du bot avec PM2..."
-        pm2 start index.js --name pcr
-
-        # Sauvegarde de la configuration PM2
-        print_step "Sauvegarde de la configuration PM2..."
+        
+        echo -e "${BLUE}Vérification de PM2...${NC}"
+        if pm2 describe "$APP_NAME" > /dev/null 2>&1; then
+            echo -e "${GREEN}Application existante détectée. Rechargement...${NC}"
+            pm2 reload "$APP_NAME" --update-env
+        else
+            echo -e "${GREEN}Premier lancement de l'application...${NC}"
+            pm2 start "$MAIN_FILE" --name "$APP_NAME"
+        fi
+        
+        echo -e "${BLUE}Sauvegarde de la liste des processus PM2...${NC}"
         pm2 save
+        echo -e "${GREEN}Déploiement terminé.${NC}"
+        ;;
 
-        # Vérification finale
-        sleep 5
-        if check_app_status; then
-            print_success "🎉 Déploiement terminé avec succès!"
-            print_success "Bot PCR Discord en ligne"
-        else
-            print_error "❌ Problème lors du déploiement"
-        fi
-        ;;
-    event)
-        # Gestion des options pour la commande event
-        validate_project_directory
-        
-        # Parser les arguments
-        event_name=""
-        no_git=false
-        
-        # Analyser les paramètres
-        shift # Enlever 'event'
-        while [[ $# -gt 0 ]]; do
-            case $1 in
-                --name)
-                    event_name="$2"
-                    shift 2
-                    ;;
-                --no-git)
-                    no_git=true
-                    shift
-                    ;;
-                *)
-                    print_error "Option inconnue: $1"
-                    echo "Usage: pcr event --name <nom_evenement> [--no-git]"
-                    exit 1
-                    ;;
-            esac
-        done
-        
-        if [[ -n "$event_name" ]]; then
-            if [[ "$no_git" == true ]]; then
-                # Sauvegarder les fonctions Git temporairement
-                create_git_branch() { return 0; }
-                auto_commit_and_push() { return 0; }
-            fi
-            create_event "$event_name"
-        else
-            print_error "Usage: pcr event --name <nom_evenement> [--no-git]"
-            echo "Exemple: pcr event --name messageUpdate"
-            echo "Options:"
-            echo "  --no-git    Skip Git branch creation and commit"
-            echo ""
-            echo "Cette commande crée un nouvel événement Discord en utilisant"
-            echo "le template du fichier 'example' dans le dossier events/client/"
-            echo ""
-            echo "📚 Événements Discord courants:"
-            echo "  • ready, messageCreate, messageDelete, messageUpdate"
-            echo "  • guildMemberAdd, guildMemberRemove, guildMemberUpdate"
-            echo "  • interactionCreate, messageReactionAdd, messageReactionRemove"
-        fi
-        ;;
-    command)
-        # Gestion des options pour la commande command
-        validate_project_directory
-        
-        # Parser les arguments
-        command_name=""
-        command_desc=""
-        no_git=false
-        
-        # Analyser les paramètres
-        shift # Enlever 'command'
-        while [[ $# -gt 0 ]]; do
-            case $1 in
-                --name)
-                    command_name="$2"
-                    shift 2
-                    ;;
-                --desc)
-                    command_desc="$2"
-                    shift 2
-                    ;;
-                --no-git)
-                    no_git=true
-                    shift
-                    ;;
-                *)
-                    print_error "Option inconnue: $1"
-                    echo "Usage: pcr command --name <nom_commande> [--desc <description>] [--no-git]"
-                    exit 1
-                    ;;
-            esac
-        done
-        
-        if [[ -n "$command_name" ]]; then
-            if [[ "$no_git" == true ]]; then
-                # Sauvegarder les fonctions Git temporairement
-                create_git_branch() { return 0; }
-                auto_commit_and_push() { return 0; }
-            fi
-            create_command "$command_name" "$command_desc"
-        else
-            print_error "Usage: pcr command --name <nom_commande> [--desc <description>] [--no-git]"
-            echo "Exemple: pcr command --name hello"
-            echo "Exemple: pcr command --name hello --desc \"Commande de salutation\""
-            echo "Options:"
-            echo "  --no-git    Skip Git branch creation and commit"
-            echo ""
-            echo "Cette commande crée une nouvelle commande Discord en utilisant"
-            echo "le template du fichier 'example' dans le dossier commands/"
-        fi
-        ;;
-    branches)
-        validate_project_directory
-        list_feature_branches
-        ;;
-    feature)
-        validate_project_directory
-        if [[ -n "$2" ]]; then
-            create_feature_branch "$2"
-        else
-            print_error "Usage: pcr feature <nom_feature>"
-            echo "Exemple: pcr feature user-profile-system"
-            echo ""
-            echo "Cette commande crée une nouvelle branche feature/<nom_feature>"
-            echo "depuis main, sans toucher aux fichiers de changelog."
-            echo ""
-            echo "💡 Différence avec 'pcr command' et 'pcr event':"
-            echo "  • pcr feature : Crée juste la branche Git"
-            echo "  • pcr command : Crée la branche + fichier de commande + changelog"
-            echo "  • pcr event   : Crée la branche + fichier d'événement + changelog"
-            echo ""
-            echo "🎯 Utilisez 'pcr feature' pour des développements généraux"
-            echo "   qui ne sont pas spécifiquement des commandes ou événements Discord."
-        fi
-        ;;
-    fix)
-        validate_project_directory
-        if [[ -n "$2" ]]; then
-            create_fix_branch "$2"
-        else
-            print_error "Usage: pcr fix <nom_fix>"
-            echo "Exemple: pcr fix login-validation-error"
-            echo ""
-            echo "Cette commande crée une nouvelle branche fix/<nom_fix>"
-            echo "depuis main, pour corriger des bugs."
-            echo ""
-            echo "⚠️  Important:"
-            echo "  • Les fixes ne sont PAS ajoutés au changelog automatiquement"
-            echo "  • Mergez directement vers main une fois corrigé"
-            echo "  • Utilisez des messages de commit avec 'fix:' au début"
-            echo ""
-            echo "🔧 Workflow suggéré:"
-            echo "  1. pcr fix mon-bug"
-            echo "  2. Corriger le problème" 
-            echo "  3. git add . && git commit -m 'fix: correction du bug xyz'"
-            echo "  4. git push -u origin fix/mon-bug"
-            echo "  5. Merger directement vers main"
-        fi
-        ;;
-    install)
-        install_script
-        ;;
     backup)
-        validate_project_directory
-        print_section "Sauvegarde de la Base de Données"
-        if backup_database; then
-            echo ""
-            echo "💡 Commandes utiles:"
-            echo "───────────────────"
-            echo "  • pcr restore <fichier>  - Restaurer une sauvegarde"
-            echo "  • ls -la $BACKUP_DIR     - Voir toutes les sauvegardes"
-        else
-            echo ""
-            echo "🔍 Vérifications:"
-            echo "───────────────"
-            echo "  • La base de données existe-t-elle?"
-            echo "  • Le bot a-t-il été initialisé? pcr deploy"
-        fi
-        ;;
-    restore)
-        validate_project_directory
-        if [[ -n "$2" ]]; then
-            print_section "Restauration de la Base de Données"
-            restore_database "$2"
-        else
-            print_section "Sauvegardes Disponibles"
-            if ls "$BACKUP_DIR"/*.db 1> /dev/null 2>&1; then
-                ls -la "$BACKUP_DIR"/*.db
-                echo ""
-                echo "Usage: pcr restore <fichier_backup>"
-                echo "Exemple:"
-                echo "  pcr restore $BACKUP_DIR/$(ls "$BACKUP_DIR"/*.db 2>/dev/null | head -1 | xargs basename)"
-            else
-                print_warning "Aucune sauvegarde trouvée"
-                echo ""
-                echo "💡 Pour créer une sauvegarde:"
-                echo "  pcr backup"
-            fi
-        fi
-        ;;
-    reset)
-        # Vérifier si l'option --y ou -y est présente
-        auto_confirm=false
-        if [[ "$2" == "--y" ]] || [[ "$2" == "-y" ]]; then
-            auto_confirm=true
-        fi
+        BACKUP_DIR="backups"
+        DATE=$(date +%Y%m%d_%H%M%S)
+        FILENAME="backup_${APP_NAME}_${DATE}.tar.gz"
         
-        echo "🔄 Réinitialisation complète du bot PCR..."
-        echo ""
-        echo -e "${YELLOW}⚠️  ATTENTION: Cette action va supprimer toutes les données!${NC}"
-        echo -e "${YELLOW}⚠️  Les messages, configurations et données du bot seront perdues!${NC}"
-        echo ""
+        mkdir -p "$BACKUP_DIR"
+        echo -e "${BLUE}Création de la sauvegarde $FILENAME...${NC}"
         
-        # Sauvegarde de sécurité avant reset
-        if [[ "$auto_confirm" != true ]]; then
-            echo "💾 Création d'une sauvegarde de sécurité avant reset..."
-            backup_database || echo "Continuer sans sauvegarde..."
-            echo ""
-        fi
-        
-        if [ "$auto_confirm" = true ]; then
-            echo "Mode automatique activé (--y), confirmation ignorée"
-            confirmation="o"
-        else
-            echo -n "Êtes-vous sûr de vouloir continuer? (O/n): "
-            read -n 1 confirmation
-            echo ""
-        fi
-        
-        if [[ "$confirmation" =~ ^[Oo]$ ]] || [ -z "$confirmation" ]; then
-            cd "$PROJECT_DIR" || {
-                print_error "Impossible d'accéder au répertoire $PROJECT_DIR"
-                exit 1
-            }
-
-            # Suppression des logs
-            print_step "Suppression des logs..."
-            if [ -d "$LOG_DIR" ]; then
-                rm -rf "$LOG_DIR"/*
-                print_success "Logs supprimés et répertoire recréé"
-            else
-                mkdir -p "$LOG_DIR"
-            fi
-
-            # Suppression de la base de données
-            print_step "Suppression de la base de données..."
-            db_path=$(find_database_path)
-            if [[ -f "$db_path" ]]; then
-                rm -f "$db_path"
-                print_success "Base de données supprimée"
-            fi
-
-            # Arrêt et suppression du processus PM2
-            print_step "Arrêt du processus PM2..."
-            pm2 stop pcr 2>/dev/null || echo "Processus déjà arrêté"
-            pm2 delete pcr 2>/dev/null || echo "Processus non trouvé"
-
-            # Réinstallation des dépendances
-            print_step "Réinstallation des dépendances..."
-            rm -rf node_modules package-lock.json
-            npm install
-
-            # Redémarrage
-            print_step "Redémarrage du bot..."
-            pm2 start index.js --name pcr
-            pm2 save
+        # Exclure node_modules, .git, backups et les logs
+        tar -czf "$BACKUP_DIR/$FILENAME" \
+            --exclude="node_modules" \
+            --exclude=".git" \
+            --exclude="$BACKUP_DIR" \
+            --exclude="*.log" \
+            .
             
-            sleep 2
-            if check_app_status; then
-                print_success "🎉 Réinitialisation terminée avec succès!"
-                print_success "Bot PCR redémarré avec une configuration propre"
-            else
-                print_error "❌ Erreur lors de la réinitialisation"
-            fi
+        echo -e "${GREEN}Sauvegarde terminée : $BACKUP_DIR/$FILENAME${NC}"
+        # Garder seulement les 5 dernières sauvegardes
+        ls -t "$BACKUP_DIR"/backup_*.tar.gz | tail -n +6 | xargs -r rm
+        ;;
+
+    update)
+        echo -e "${BLUE}Mise à jour depuis git...${NC}"
+        git pull
+        $0 deploy
+        echo -e "${GREEN}Mise à jour terminée.${NC}"
+        ;;
+
+    install)
+        SCRIPT_PATH=$(readlink -f "$0")
+        echo -e "${BLUE}Installation du script pcr dans /usr/local/bin...${NC}"
+        if [ -w /usr/local/bin ]; then
+            ln -sf "$SCRIPT_PATH" /usr/local/bin/pcr
         else
-            print_warning "Réinitialisation annulée"
+            echo -e "${YELLOW}Permission refusée. Tentative avec sudo...${NC}"
+            sudo ln -sf "$SCRIPT_PATH" /usr/local/bin/pcr
         fi
+        chmod +x "$SCRIPT_PATH"
+        echo -e "${GREEN}Installé ! Vous pouvez maintenant taper 'pcr' n'importe où.${NC}"
         ;;
-    finish|finalize)
-        validate_project_directory
-        finalize_feature
+
+    feature)
+        TYPE=$2
+        NAME=$3
+        
+        if [ -z "$TYPE" ] || [ -z "$NAME" ]; then
+            echo -e "${RED}Erreur: Arguments manquants.${NC}"
+            echo "Usage: pcr feature <command|event|handler> <name>"
+            exit 1
+        fi
+
+        # Création de la branche
+        BRANCH_NAME="feature/$NAME"
+        echo -e "${BLUE}Création de la branche $BRANCH_NAME...${NC}"
+        git checkout -b "$BRANCH_NAME"
+
+        # Copie des fichiers exemples
+        case "$TYPE" in
+            command)
+                cp "commands/example" "commands/$NAME.js"
+                echo -e "${GREEN}Fichier créé: commands/$NAME.js${NC}"
+                ;;
+            event)
+                cp "events/client/example" "events/client/$NAME.js"
+                echo -e "${GREEN}Fichier créé: events/client/$NAME.js${NC}"
+                ;;
+            handler)
+                cp "functions/handlers/example" "functions/handlers/$NAME.js"
+                echo -e "${GREEN}Fichier créé: functions/handlers/$NAME.js${NC}"
+                ;;
+            *)
+                echo -e "${RED}Type inconnu: $TYPE. Utilisez command, event ou handler.${NC}"
+                ;;
+        esac
         ;;
+
+    finish)
+        CURRENT_BRANCH=$(git branch --show-current)
+        if [ "$CURRENT_BRANCH" == "main" ] || [ "$CURRENT_BRANCH" == "master" ]; then
+            echo -e "${RED}Vous êtes déjà sur la branche principale.${NC}"
+            exit 1
+        fi
+
+        echo -e "${BLUE}Finalisation de la feature $CURRENT_BRANCH...${NC}"
+        git checkout main || git checkout master
+        git pull
+        git merge "$CURRENT_BRANCH"
+        
+        read -p "Voulez-vous supprimer la branche locale $CURRENT_BRANCH ? (y/n) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            git branch -d "$CURRENT_BRANCH"
+        fi
+        echo -e "${GREEN}Feature terminée et mergée !${NC}"
+        ;;
+
     release)
-        validate_project_directory
-        shift
-        version_type="patch"
-        title=""
-        
-        while [[ $# -gt 0 ]]; do
-            case $1 in
-                --type)
-                    version_type="$2"
-                    shift 2
-                    ;;
-                --title)
-                    title="$2"
-                    shift 2
-                    ;;
-                *)
-                    print_error "Option inconnue: $1"
-                    echo "Usage: pcr release [--type patch|minor|major] [--title \"Titre\"]"
-                    exit 1
-                    ;;
-            esac
-        done
-        
-        create_release "$version_type" "$title"
-        ;;
-    changelog-status)
-        validate_project_directory
-        print_section "Statut du Changelog"
-        
-        # Créer le script Node.js temporaire
-        temp_script="/tmp/pcr_changelog_status_$$"
-        cat > "$temp_script.js" << EOF
-import { getChangelogStats } from '${PROJECT_DIR}/modules/version-manager.js';
+        RELEASE_TYPE=$2 # major, minor, or patch (fix)
+        if [[ "$RELEASE_TYPE" == "fix" ]]; then RELEASE_TYPE="patch"; fi
 
-try {
-    const stats = getChangelogStats();
-    
-    if (stats.error) {
-        console.log('❌ Erreur:', stats.error);
-        process.exit(1);
-    }
-    
-    console.log('📊 Statistiques du Changelog');
-    console.log('════════════════════════════');
-    console.log(\`📦 Version actuelle: \${stats.currentVersion}\`);
-    console.log(\`🎯 Features en attente: \${stats.pendingFeatures}\`);
-    console.log(\`📋 Total releases: \${stats.totalReleases}\`);
-    
-    if (stats.lastRelease) {
-        console.log(\`🏷️  Dernière release: \${stats.lastRelease.version} (\${stats.lastRelease.date})\`);
-    }
-    
-    if (stats.pendingFeatures > 0) {
-        console.log('\\n⏳ Features en attente par type:');
-        Object.entries(stats.pendingByType).forEach(([type, count]) => {
-            const icon = type === 'command' ? '⚡' : type === 'event' ? '🎯' : '✨';
-            console.log(\`   \${icon} \${type}: \${count}\`);
-        });
-    }
-    
-    console.log('\\n💡 Commandes disponibles:');
-    console.log('  • pcr finish     - Finaliser la feature actuelle');
-    console.log('  • pcr release    - Créer une nouvelle release');
-    
-} catch (error) {
-    console.error('❌ Erreur:', error.message);
-    process.exit(1);
-}
-EOF
-
-        cd "$PROJECT_DIR"
-        node "$temp_script.js"
-        rm -f "$temp_script.js"
-        ;;
-    workflow)
-        print_section "Guide de Workflow PCR"
-        echo ""
-        echo "🚀 WORKFLOW DE DÉVELOPPEMENT PCR"
-        echo "════════════════════════════════"
-        echo ""
-        echo "1️⃣  CRÉER UNE NOUVELLE FEATURE:"
-        echo "   pcr command --name ma-commande    # Pour une nouvelle commande"
-        echo "   pcr event --name mon-event        # Pour un nouvel événement"
-        echo "   └─ Créé automatiquement une branche feature/type-nom"
-        echo ""
-        echo "2️⃣  DÉVELOPPER LA FEATURE:"
-        echo "   • Modifiez le fichier généré"
-        echo "   • Testez avec: pcr restart && pcr logs"
-        echo "   • Commitez vos changements au fur et à mesure"
-        echo ""
-        echo "3️⃣  FINALISER LA FEATURE:"
-        echo "   pcr finish"
-        echo "   └─ Commit final + push + merge vers main + ajout au changelog"
-        echo ""
-        echo "4️⃣  CRÉER UNE RELEASE:"
-        echo "   pcr release --type patch          # Version x.x.X+1"
-        echo "   pcr release --type minor          # Version x.X+1.0"
-        echo "   pcr release --type major          # Version X+1.0.0"
-        echo "   └─ Publie toutes les features pending + tag Git + GitHub Actions"
-        echo ""
-        echo "📊 VÉRIFIER LE STATUT:"
-        echo "   pcr changelog-status              # Voir les features en attente"
-        echo "   pcr branches                      # Voir les branches actives"
-        echo "   pcr status                        # Statut général du bot"
-        echo ""
-        echo "🎯 GITHUB ACTIONS AUTOMATIQUES:"
-        echo "   • Push d'un tag → Déclenche la release GitHub"
-        echo "   • Release créée → Publication automatique du changelog Discord"
-        echo "   • Tests automatiques sur chaque push"
-        echo ""
-        echo "💡 BONNES PRATIQUES:"
-        echo "   • Une feature = une branche"
-        echo "   • Testez avant de finish"
-        echo "   • Groupez plusieurs features dans une release"
-        echo "   • Utilisez des messages de commit clairs"
-        echo ""
-        current_branch=$(git branch --show-current 2>/dev/null || echo "unknown")
-        if [[ "$current_branch" != "main" ]] && [[ "$current_branch" != "master" ]]; then
-            echo "📍 SITUATION ACTUELLE:"
-            echo "   Branche: $current_branch"
-            echo "   Action suggérée: pcr finish (quand ready)"
+        if [[ ! "$RELEASE_TYPE" =~ ^(major|minor|patch)$ ]]; then
+            echo -e "${RED}Type de release invalide. Utilisez: major, minor, ou fix (patch)${NC}"
+            exit 1
         fi
+
+        # Vérifier que le repo est propre
+        if [ -n "$(git status --porcelain)" ]; then
+            echo -e "${RED}Le répertoire de travail n'est pas propre. Veuillez commit ou stash vos changements.${NC}"
+            exit 1
+        fi
+
+        echo -e "${BLUE}Préparation de la release $RELEASE_TYPE...${NC}"
+
+        # 1. Bump version npm (sans git tag pour l'instant pour pouvoir modifier le changelog)
+        NEW_VERSION=$(npm version $RELEASE_TYPE --no-git-tag-version)
+        VERSION_NUM=${NEW_VERSION#v} # Enlever le 'v'
+
+        echo -e "${BLUE}Nouvelle version: $VERSION_NUM${NC}"
+
+        # 2. Mise à jour du changelog.json via Node
+        node -e "
+        const fs = require('fs');
+        const path = './changelog.json';
+        const changelog = require(path);
+        
+        const newRelease = {
+            version: '$VERSION_NUM',
+            date: new Date().toISOString().split('T')[0],
+            title: 'Release $VERSION_NUM',
+            features: []
+        };
+        
+        changelog.version = '$VERSION_NUM';
+        changelog.lastUpdated = new Date().toISOString();
+        changelog.releases.unshift(newRelease);
+        
+        fs.writeFileSync(path, JSON.stringify(changelog, null, 2));
+        console.log('Changelog mis à jour.');
+        "
+
+        # 3. Commit et Tag
+        echo -e "${BLUE}Commit et Tag...${NC}"
+        git add package.json package-lock.json changelog.json
+        git commit -m "chore(release): version $VERSION_NUM"
+        git tag -a "$NEW_VERSION" -m "Release $VERSION_NUM"
+
+        # 4. Push
+        echo -e "${BLUE}Push vers le remote...${NC}"
+        git push origin main --follow-tags
+
+        echo -e "${GREEN}Release $VERSION_NUM déployée avec succès !${NC}"
         ;;
-    *)
-        echo -e "${PURPLE}🤖 PCR BOT DISCORD - Script de gestion unifié${NC}"
-        echo "============================================="
-        echo ""
-        echo "Usage: pcr [commande]"
-        echo ""
-        echo "Commandes disponibles:"
-        echo ""
-        echo "🚀 Gestion du bot:"
-        echo "  start         - Démarre le bot"
-        echo "  stop          - Arrête le bot"
-        echo "  restart       - Redémarre le bot"
-        echo "  status        - Affiche le statut du bot"
-        echo ""
-        echo "📊 Monitoring et logs:"
-        echo "  logs          - Affiche les logs PM2 du bot en temps réel"
-        echo "  monitor       - Monitoring complet avec ressources système"
-        echo ""
-        echo "🔧 Développement:"
-        echo "  dev           - Lance le bot en mode développement (avec nodemon)"
-        echo "  feature       - Crée une nouvelle branche feature (sans fichiers)"
-        echo "                  Usage: pcr feature <nom_feature>"
-        echo "  fix           - Crée une nouvelle branche fix (sans changelog)"
-        echo "                  Usage: pcr fix <nom_fix>"
-        echo "  command       - Crée une nouvelle commande Discord avec branche Git"
-        echo "                  Usage: pcr command --name <nom> [--desc <description>] [--no-git]"
-        echo "  event         - Crée un nouvel événement Discord avec branche Git"
-        echo "                  Usage: pcr event --name <nom> [--no-git]"
-        echo "  branches      - Liste les branches de fonctionnalités PCR"
-        echo "  finish        - Finalise une feature branch (commit/merge/push)"
-        echo "  release       - Crée une release avec changelog"
-        echo "                  Usage: pcr release [--type patch|minor|major] [--title titre]"
-        echo "  changelog-status - Affiche le statut du système de changelog"
-        echo "  workflow      - Affiche le guide du workflow de développement"
-        echo ""
-        echo "🚀 Déploiement:"
-        echo "  deploy        - Déploiement complet du bot"
-        echo "  update        - Mise à jour du bot depuis Git"
-        echo ""
-        echo "💾 Sauvegarde et restauration:"
-        echo "  backup        - Sauvegarde la base de données"
-        echo "  restore       - Restaure une sauvegarde (pcr restore <fichier>)"
-        echo ""
-        echo "⚙️ Configuration:"
-        echo "  install       - Installe le script dans le PATH global"
-        echo "  reset         - Réinitialise complètement le bot (⚠️ SUPPRIME TOUTES LES DONNÉES)"
-        echo "                  Options: --y ou -y pour confirmer automatiquement"
-        echo ""
-        echo "Architecture:"
-        echo "  📁 Bot Discord : PCR - Gestion communautaire"
-        echo "  📁 Base de données : SQLite (messages.db)"
-        echo "  📁 Logs : PM2 + fichiers locaux"
-        echo ""
-        exit 1
+
+    help|*)
+        show_help
         ;;
 esac
