@@ -1,7 +1,13 @@
 {
-  "version": "1.7.3",
-  "lastUpdated": "2025-12-13T23:19:35.670Z",
+  "version": "1.8.0",
+  "lastUpdated": "2025-12-13T23:57:26.242Z",
   "releases": [
+    {
+      "version": "1.8.0",
+      "date": "2025-12-13",
+      "title": "Release 1.8.0",
+      "features": []
+    },
     {
       "version": "1.7.3",
       "date": "2025-12-13",
