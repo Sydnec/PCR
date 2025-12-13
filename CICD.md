@@ -21,19 +21,17 @@ Le déploiement est **automatisé** et déclenché par la création d'un **Tag G
 
 3.  **Déploiement (GitHub Actions)** :
     *   Le workflow `.github/workflows/deploy.yml` détecte le nouveau tag `v*`.
-    *   Il se connecte au serveur de production via SSH.
+    *   Il est exécuté directement sur votre serveur via un **Self-hosted Runner**.
     *   Il exécute la commande : `cd /home/sydnec/pcr && ./pcr update` (ou `deploy`).
 
-## 🔑 Configuration des Secrets GitHub
+## 🔑 Configuration
 
-Pour que la CI/CD fonctionne, les secrets suivants doivent être définis dans le dépôt GitHub (**Settings > Secrets and variables > Actions**) :
+Puisque vous utilisez un **Self-hosted Runner**, vous n'avez **pas besoin** de configurer les secrets SSH (`SERVER_HOST`, `SSH_PRIVATE_KEY`, etc.).
 
-| Nom du Secret | Description |
-|---------------|-------------|
-| `SERVER_HOST` | Adresse IP ou nom de domaine du serveur VPS. |
-| `SERVER_USER` | Nom d'utilisateur SSH (ex: `sydnec`). |
-| `SERVER_PORT` | Port SSH (par défaut 22). |
-| `SSH_PRIVATE_KEY` | Contenu de la clé privée SSH (celle qui correspond à la clé publique dans `~/.ssh/authorized_keys` sur le serveur). |
+Assurez-vous simplement que :
+1.  Le runner est bien installé et "Active" dans les paramètres GitHub du dépôt.
+2.  L'utilisateur qui fait tourner le runner a les droits d'écriture dans `/home/sydnec/pcr`.
+3.  L'utilisateur a les droits d'exécuter `pm2` et `git`.
 
 ## 📂 Structure des fichiers CI/CD
 
