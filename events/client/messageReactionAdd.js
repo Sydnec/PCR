@@ -1,5 +1,6 @@
 import { handleException } from '../../modules/utils.js';
 import db from '../../modules/db.js';
+import pointsDb from '../../modules/points-db.js';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -8,6 +9,15 @@ const once = false;
 async function execute(reaction, user) {
     if (user.id === process.env.CLIENT_ID) return;
     try {
+        // --- Système de points (1 point par réaction) ---
+        pointsDb.run(
+            "INSERT INTO points (user_id, balance) VALUES (?, 1) ON CONFLICT(user_id) DO UPDATE SET balance = balance + 1",
+            [user.id],
+            (err) => {
+                if (err) handleException("Erreur ajout points réaction :", err);
+            }
+        );
+
         // --- Statistiques réactions par utilisateur ---
         db.run(
             `INSERT INTO reaction_stats (user_id, count) VALUES (?, 1)

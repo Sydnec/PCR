@@ -8,7 +8,7 @@ PCR est un bot Discord modulaire conçu pour animer et gérer la communauté. Il
 
 - **COTD (Celebration of the Day)** : Annonce quotidienne des fêtes et saints du jour.
 - **Calendrier de l'Avent** : Système automatique de threads quotidiens en décembre.
-
+- **Récapitulatifs Annuels** : Génération de statistiques et souvenirs de l'année (`/recap`).
 - **Sondages** :
   - `/poll` : Création de sondages simples.
   - `/weekPoll` : Sondages hebdomadaires automatisés.

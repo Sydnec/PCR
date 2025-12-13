@@ -1,5 +1,6 @@
 import { handleException } from "../../modules/utils.js";
 import db from "../../modules/db.js";
+import pointsDb from "../../modules/points-db.js";
 import { emojiRegex } from "../../modules/regex.js";
 import { twitterRegex } from "../../modules/regex.js";
 import { instagramRegex } from "../../modules/regex.js";
@@ -27,6 +28,15 @@ async function execute(message) {
       `INSERT INTO message_stats (user_id, channel_id, date, count) VALUES (?, ?, ?, 1)
             ON CONFLICT(user_id, channel_id, date) DO UPDATE SET count = count + 1`,
       ["__global__", "__global__", date]
+    );
+
+    // --- Système de points (3 points par message) ---
+    pointsDb.run(
+      "INSERT INTO points (user_id, balance) VALUES (?, 3) ON CONFLICT(user_id) DO UPDATE SET balance = balance + 3",
+      [userId],
+      (err) => {
+        if (err) handleException("Erreur ajout points message :", err);
+      }
     );
 
     // --- Statistiques mots les plus utilisés ---
