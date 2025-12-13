@@ -170,6 +170,34 @@ case "$1" in
         git pull
         git merge "$CURRENT_BRANCH"
         
+        # Demander les infos pour le changelog
+        echo -e "${YELLOW}Ajout au changelog (pending)...${NC}"
+        read -p "Type de changement (feature/fix/enhancement/chore): " CHANGE_TYPE
+        read -p "Nom court de la feature: " CHANGE_NAME
+        read -p "Description: " CHANGE_DESC
+        
+        node -e "
+        const fs = require('fs');
+        const path = './changelog.json';
+        const changelog = require(path);
+        
+        changelog.pending.push({
+            type: '$CHANGE_TYPE' || 'feature',
+            name: '$CHANGE_NAME' || '$CURRENT_BRANCH',
+            description: '$CHANGE_DESC',
+            author: 'Sydnec',
+            commit: 'pending',
+            timestamp: new Date().toISOString(),
+            branch: '$CURRENT_BRANCH'
+        });
+        
+        fs.writeFileSync(path, JSON.stringify(changelog, null, 2));
+        console.log('Ajouté aux changements en attente.');
+        "
+        
+        git add changelog.json
+        git commit -m "docs: update changelog pending list"
+
         read -p "Voulez-vous supprimer la branche locale $CURRENT_BRANCH ? (y/n) " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
@@ -211,15 +239,16 @@ case "$1" in
             version: '$VERSION_NUM',
             date: new Date().toISOString().split('T')[0],
             title: 'Release $VERSION_NUM',
-            features: []
+            features: [...changelog.pending]
         };
         
         changelog.version = '$VERSION_NUM';
         changelog.lastUpdated = new Date().toISOString();
         changelog.releases.unshift(newRelease);
+        changelog.pending = []; // Clear pending
         
         fs.writeFileSync(path, JSON.stringify(changelog, null, 2));
-        console.log('Changelog mis à jour.');
+        console.log('Changelog mis à jour avec les features en attente.');
         "
 
         # 3. Commit et Tag

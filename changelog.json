@@ -6,7 +6,17 @@
       "version": "1.8.0",
       "date": "2025-12-13",
       "title": "Release 1.8.0",
-      "features": []
+      "features": [
+        {
+          "type": "feature",
+          "name": "Système de points et paris",
+          "description": "Ajout d'un système de points (messages, réactions), commandes /solde, /classement et /bet",
+          "author": "Sydnec",
+          "commit": "f35a734",
+          "timestamp": "2025-12-13T23:57:26.242Z",
+          "branch": "main"
+        }
+      ]
     },
     {
       "version": "1.7.3",
