@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from "discord.js";
+import { SlashCommandBuilder, MessageFlags } from "discord.js";
 import { handleException } from "../modules/utils.js";
 import { readFileSync } from "fs";
 
