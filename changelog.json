@@ -401,5 +401,15 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "fix",
+      "name": "Déploiement CI/CD",
+      "description": "Correction du conflit de tag sur le runner de déploiement",
+      "author": "Sydnec",
+      "commit": "manual",
+      "timestamp": "2025-12-14T00:20:00.000Z",
+      "branch": "main"
+    }
+  ]
 }
