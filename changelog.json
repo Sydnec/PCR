@@ -369,5 +369,15 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Amélioration UX Paris",
+      "description": "Refonte de /bet create avec options séparées et participation via boutons + modal",
+      "author": "Sydnec",
+      "commit": "c2a5518",
+      "timestamp": "2025-12-14T00:10:00.000Z",
+      "branch": "main"
+    }
+  ]
 }
