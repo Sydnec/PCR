@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, MessageFlags, EmbedBuilder } from "discord.js";
+import { SlashCommandBuilder, MessageFlags, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from "discord.js";
 import { handleException } from "../modules/utils.js";
 import db from "../modules/points-db.js";
 
@@ -12,21 +12,30 @@ export default {
         .setDescription("Créer un nouveau pari")
         .addStringOption((option) =>
           option
-            .setName("title")
-            .setDescription("Le titre du pari")
+            .setName("question")
+            .setDescription("La question du pari")
             .setRequired(true)
         )
         .addStringOption((option) =>
-          option
-            .setName("options")
-            .setDescription("Les options séparées par des virgules (ex: Oui, Non)")
-            .setRequired(true)
+          option.setName("option1").setDescription("Option 1").setRequired(true)
+        )
+        .addStringOption((option) =>
+          option.setName("option2").setDescription("Option 2").setRequired(true)
+        )
+        .addStringOption((option) =>
+          option.setName("option3").setDescription("Option 3").setRequired(false)
+        )
+        .addStringOption((option) =>
+          option.setName("option4").setDescription("Option 4").setRequired(false)
+        )
+        .addStringOption((option) =>
+          option.setName("option5").setDescription("Option 5").setRequired(false)
         )
     )
     .addSubcommand((subcommand) =>
       subcommand
         .setName("join")
-        .setDescription("Participer à un pari")
+        .setDescription("Participer à un pari (Alternative aux boutons)")
         .addIntegerOption((option) =>
           option
             .setName("id")
@@ -82,9 +91,12 @@ export default {
 };
 
 async function handleCreate(interaction) {
-  const title = interaction.options.getString("title");
-  const optionsString = interaction.options.getString("options");
-  const options = optionsString.split(",").map((s) => s.trim()).filter(s => s.length > 0);
+  const question = interaction.options.getString("question");
+  const options = [];
+  for (let i = 1; i <= 5; i++) {
+    const opt = interaction.options.getString(`option${i}`);
+    if (opt) options.push(opt);
+  }
 
   if (options.length < 2) {
     return interaction.reply({
@@ -95,7 +107,7 @@ async function handleCreate(interaction) {
 
   db.run(
     "INSERT INTO bets (creator_id, title) VALUES (?, ?)",
-    [interaction.user.id, title],
+    [interaction.user.id, question],
     function (err) {
       if (err) {
         handleException(err);
@@ -112,11 +124,22 @@ async function handleCreate(interaction) {
       let optionsText = options.map((opt, i) => `${i + 1}. ${opt}`).join("\n");
       
       const embed = new EmbedBuilder()
-        .setTitle(`Nouveau Pari #${betId}: ${title}`)
-        .setDescription(`Utilisez \`/bet join id:${betId} option:<numéro> amount:<montant>\` pour participer.\n\n**Options:**\n${optionsText}`)
-        .setColor(0x00ff00);
+        .setTitle(`Nouveau Pari #${betId}: ${question}`)
+        .setDescription(`Cliquez sur les boutons ci-dessous pour participer !\n\n**Options:**\n${optionsText}`)
+        .setColor(0x00ff00)
+        .setFooter({ text: `Créé par ${interaction.user.username}` });
 
-      interaction.reply({ embeds: [embed] });
+      const row = new ActionRowBuilder();
+      options.forEach((opt, index) => {
+        row.addComponents(
+          new ButtonBuilder()
+            .setCustomId(`bet_join|${betId}|${index + 1}`)
+            .setLabel(`${index + 1}. ${opt}`)
+            .setStyle(ButtonStyle.Primary)
+        );
+      });
+
+      interaction.reply({ embeds: [embed], components: [row] });
     }
   );
 }
