@@ -1,7 +1,23 @@
 {
-  "version": "1.8.1",
-  "lastUpdated": "2025-12-13T23:59:39.314Z",
+  "version": "1.8.2",
+  "lastUpdated": "2025-12-14T00:11:49.466Z",
   "releases": [
+    {
+      "version": "1.8.2",
+      "date": "2025-12-14",
+      "title": "Release 1.8.2",
+      "features": [
+        {
+          "type": "enhancement",
+          "name": "Amélioration UX Paris",
+          "description": "Refonte de /bet create avec options séparées et participation via boutons + modal",
+          "author": "Sydnec",
+          "commit": "c2a5518",
+          "timestamp": "2025-12-14T00:10:00.000Z",
+          "branch": "main"
+        }
+      ]
+    },
     {
       "version": "1.8.1",
       "date": "2025-12-13",
@@ -369,15 +385,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "enhancement",
-      "name": "Amélioration UX Paris",
-      "description": "Refonte de /bet create avec options séparées et participation via boutons + modal",
-      "author": "Sydnec",
-      "commit": "c2a5518",
-      "timestamp": "2025-12-14T00:10:00.000Z",
-      "branch": "main"
-    }
-  ]
+  "pending": []
 }
