@@ -13,6 +13,7 @@ export default {
     try {
       await interaction.reply({
         content: `La version actuelle du bot est : **v${packageJson.version}**`,
+        flags: MessageFlags.Ephemeral,
       });
     } catch (error) {
       handleException(error);

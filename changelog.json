@@ -1,7 +1,23 @@
 {
-  "version": "1.8.2",
-  "lastUpdated": "2025-12-14T00:11:49.466Z",
+  "version": "1.8.3",
+  "lastUpdated": "2025-12-14T00:17:37.977Z",
   "releases": [
+    {
+      "version": "1.8.3",
+      "date": "2025-12-14",
+      "title": "Release 1.8.3",
+      "features": [
+        {
+          "type": "feature",
+          "name": "Commande /version",
+          "description": "Ajout de la commande /version pour afficher la version actuelle du bot",
+          "author": "Sydnec",
+          "commit": "76392ab",
+          "timestamp": "2025-12-14T00:15:00.000Z",
+          "branch": "main"
+        }
+      ]
+    },
     {
       "version": "1.8.2",
       "date": "2025-12-14",
@@ -385,15 +401,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "feature",
-      "name": "Commande /version",
-      "description": "Ajout de la commande /version pour afficher la version actuelle du bot",
-      "author": "Sydnec",
-      "commit": "76392ab",
-      "timestamp": "2025-12-14T00:15:00.000Z",
-      "branch": "main"
-    }
-  ]
+  "pending": []
 }
