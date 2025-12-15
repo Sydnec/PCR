@@ -36,9 +36,20 @@ async function registerCommands() {
 	);
 	try {
 		log('Started refreshing application (/) commands.');
+		// Supprime les commandes globales (en mettant une liste vide)
 		await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), {
-			body: commands,
+			body: [],
 		});
+
+		await rest.put(
+			Routes.applicationGuildCommands(
+				process.env.CLIENT_ID,
+				process.env.GUILD_ID
+			),
+			{
+				body: commands,
+			}
+		);
 		log('Successfully reloaded application (/) commands.');
 	} catch (e) {
 		handleException(e);
