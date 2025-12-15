@@ -11,17 +11,17 @@ export default (bot) => {
 
         const { commands, commandsArray } = bot;
         for (const file of commandsFiles) {
-            import(`../../commands/${file}`)
-                .then((commandModule) => {
-                    const command = commandModule.default || commandModule;
-                    commands.set(command.data.name, command);
-                    commandsArray.push(command.data.toJSON());
-                    log(
-                        `Command: ${command.data.name} has passed through the handler`
-                    );
-                })
-                .catch(handleException);
-
+            try {
+                const commandModule = await import(`../../commands/${file}`);
+                const command = commandModule.default || commandModule;
+                commands.set(command.data.name, command);
+                commandsArray.push(command.data.toJSON());
+                log(
+                    `Command: ${command.data.name} has passed through the handler`
+                );
+            } catch (error) {
+                handleException(error);
+            }
         }
 
         const clientId = process.env.CLIENT_ID;

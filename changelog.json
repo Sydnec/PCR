@@ -433,5 +433,15 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "fix",
+      "name": "Enregistrement des slash commands",
+      "description": "Correction du chargement asynchrone des commandes pour garantir leur enregistrement au démarrage",
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2025-12-15T09:00:00.000Z",
+      "branch": "main"
+    }
+  ]
 }
