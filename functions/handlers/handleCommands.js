@@ -37,35 +37,17 @@ export default (bot) => {
     };
 };
 async function refreshCommands(rest, clientId, guildId, bot) {
-    await deleteAllCommands(rest, clientId, guildId);
-    await rest.put(Routes.applicationGuildCommands(clientId, guildId), {
-        body: bot.commandsArray,
-    });
-    log('Successuflly reloaded applications (/) commands');
-}
+    try {
+        // Supprime les commandes globales (en mettant une liste vide)
+        await rest.put(Routes.applicationCommands(clientId), { body: [] });
 
-async function deleteAllCommands(rest, clientId, guildId) {
-    const existingGlobalCommands = await rest
-        .get(Routes.applicationCommands(clientId))
-        .catch(handleException);
+        // Ajoute les commandes à la guilde spécifique
+        await rest.put(Routes.applicationGuildCommands(clientId, guildId), {
+            body: bot.commandsArray,
+        });
 
-    if (Array.isArray(existingGlobalCommands)) {
-        for (const command of existingGlobalCommands) {
-            await rest
-                .delete(`${Routes.applicationCommands(clientId)}/${command.id}`)
-                .catch(handleException);
-        }
-    }
-    const existingServerOnlyCommands = await rest
-        .get(Routes.applicationGuildCommands(clientId, guildId))
-        .catch(handleException);
-    if (Array.isArray(existingServerOnlyCommands)) {
-        for (const command of existingServerOnlyCommands) {
-            await rest
-                .delete(
-                    `${Routes.applicationGuildCommands(clientId, guildId)}/${command.id}`
-                )
-                .catch(handleException);
-        }
+        log('Successfully reloaded application (/) commands.');
+    } catch (error) {
+        handleException(error);
     }
 }
