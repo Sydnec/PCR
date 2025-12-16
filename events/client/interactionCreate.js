@@ -44,22 +44,27 @@ async function execute(interaction, bot) {
         // Gérer les boutons de pari
         if (customId.startsWith('bet_join|')) {
             const [, betId, optionIndex] = customId.split('|');
+            const userId = interaction.user.id;
             
-            const modal = new ModalBuilder()
-                .setCustomId(`bet_modal|${betId}|${optionIndex}`)
-                .setTitle('Miser sur ce pari');
+            pointsDb.get("SELECT balance FROM points WHERE user_id = ?", [userId], async (err, row) => {
+                const balance = row ? row.balance : 0;
 
-            const amountInput = new TextInputBuilder()
-                .setCustomId('amount')
-                .setLabel("Montant de la mise")
-                .setStyle(TextInputStyle.Short)
-                .setPlaceholder("Ex: 100")
-                .setRequired(true);
+                const modal = new ModalBuilder()
+                    .setCustomId(`bet_modal|${betId}|${optionIndex}`)
+                    .setTitle(`Miser (Solde: ${balance})`);
 
-            const firstActionRow = new ActionRowBuilder().addComponents(amountInput);
-            modal.addComponents(firstActionRow);
+                const amountInput = new TextInputBuilder()
+                    .setCustomId('amount')
+                    .setLabel("Montant de la mise")
+                    .setStyle(TextInputStyle.Short)
+                    .setPlaceholder(`Max: ${balance}`)
+                    .setRequired(true);
 
-            await interaction.showModal(modal);
+                const firstActionRow = new ActionRowBuilder().addComponents(amountInput);
+                modal.addComponents(firstActionRow);
+
+                await interaction.showModal(modal);
+            });
             return;
         }
 
@@ -87,6 +92,12 @@ async function execute(interaction, bot) {
                                     .setLabel(`${opt.option_index}. ${opt.label}`)
                                     .setValue(opt.option_index.toString())
                             )
+                        )
+                        .addOptions(
+                            new StringSelectMenuOptionBuilder()
+                                .setLabel("❌ Annuler le pari")
+                                .setDescription("Rembourse tous les participants")
+                                .setValue("cancel")
                         );
 
                     const row = new ActionRowBuilder().addComponents(selectMenu);
@@ -178,13 +189,53 @@ async function execute(interaction, bot) {
     if (interaction.isStringSelectMenu()) {
         if (interaction.customId.startsWith('bet_resolve_select|')) {
             const [, betId, messageId] = interaction.customId.split('|');
-            const winnerIndex = parseInt(interaction.values[0]);
+            const selectedValue = interaction.values[0];
             const userId = interaction.user.id;
 
             pointsDb.get("SELECT * FROM bets WHERE id = ?", [betId], (err, bet) => {
                 if (err || !bet) return interaction.reply({ content: "Pari introuvable.", flags: MessageFlags.Ephemeral });
                 if (bet.creator_id !== userId) return interaction.reply({ content: "Seul le créateur peut terminer le pari.", flags: MessageFlags.Ephemeral });
                 if (bet.status !== "OPEN") return interaction.reply({ content: "Ce pari est déjà terminé.", flags: MessageFlags.Ephemeral });
+
+                if (selectedValue === 'cancel') {
+                    pointsDb.all("SELECT user_id, amount FROM bet_participations WHERE bet_id = ?", [betId], (err, parts) => {
+                        if (err) {
+                            handleException(err);
+                            return interaction.reply({ content: "Erreur lors de la récupération des participations.", flags: MessageFlags.Ephemeral });
+                        }
+
+                        pointsDb.serialize(async () => {
+                            pointsDb.run("UPDATE bets SET status = 'CANCELLED' WHERE id = ?", [betId]);
+                            
+                            parts.forEach(p => {
+                                pointsDb.run("UPDATE points SET balance = balance + ? WHERE user_id = ?", [p.amount, p.user_id]);
+                            });
+
+                            interaction.update({ content: "Le pari a été annulé et les mises remboursées.", components: [] });
+                            
+                            if (messageId) {
+                                try {
+                                    const originalMessage = await interaction.channel.messages.fetch(messageId);
+                                    if (originalMessage) {
+                                        const { EmbedBuilder } = await import('discord.js');
+                                        const oldEmbed = originalMessage.embeds[0];
+                                        const newEmbed = new EmbedBuilder(oldEmbed.data)
+                                            .setTitle(`🚫 PARI ANNULÉ: ${bet.title}`)
+                                            .setColor('#FF0000')
+                                            .setDescription("Ce pari a été annulé par son créateur. Toutes les mises ont été remboursées.");
+                                        
+                                        await originalMessage.edit({ embeds: [newEmbed], components: [] });
+                                    }
+                                } catch (e) {
+                                    // Message deleted or not found
+                                }
+                            }
+                        });
+                    });
+                    return;
+                }
+
+                const winnerIndex = parseInt(selectedValue);
 
                 pointsDb.get("SELECT label FROM bet_options WHERE bet_id = ? AND option_index = ?", [betId, winnerIndex], (err, winningOption) => {
                     if (err || !winningOption) return interaction.reply({ content: "Option gagnante invalide.", flags: MessageFlags.Ephemeral });
