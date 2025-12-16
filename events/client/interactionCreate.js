@@ -1,5 +1,5 @@
 import { handleException, log } from '../../modules/utils.js';
-import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, MessageFlags } from 'discord.js';
+import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, MessageFlags, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } from 'discord.js';
 import pointsDb from '../../modules/points-db.js';
 
 const name = 'interactionCreate';
@@ -60,6 +60,44 @@ async function execute(interaction, bot) {
             modal.addComponents(firstActionRow);
 
             await interaction.showModal(modal);
+            return;
+        }
+
+        // Gérer le bouton de résolution de pari
+        if (customId.startsWith('bet_resolve_modal|')) {
+            const [, betId] = customId.split('|');
+            const messageId = interaction.message.id;
+            
+            // Vérifier si l'utilisateur est le créateur du pari
+            pointsDb.get("SELECT creator_id, status FROM bets WHERE id = ?", [betId], async (err, bet) => {
+                if (err || !bet) return interaction.reply({ content: "Pari introuvable.", flags: MessageFlags.Ephemeral });
+                if (bet.creator_id !== interaction.user.id) return interaction.reply({ content: "Seul le créateur peut terminer le pari.", flags: MessageFlags.Ephemeral });
+                if (bet.status !== "OPEN") return interaction.reply({ content: "Ce pari est déjà terminé.", flags: MessageFlags.Ephemeral });
+
+                // Récupérer les options du pari
+                pointsDb.all("SELECT option_index, label FROM bet_options WHERE bet_id = ? ORDER BY option_index ASC", [betId], async (err, options) => {
+                    if (err || !options || options.length === 0) return interaction.reply({ content: "Options introuvables.", flags: MessageFlags.Ephemeral });
+
+                    const selectMenu = new StringSelectMenuBuilder()
+                        .setCustomId(`bet_resolve_select|${betId}|${messageId}`)
+                        .setPlaceholder('Sélectionnez l\'option gagnante')
+                        .addOptions(
+                            options.map(opt => 
+                                new StringSelectMenuOptionBuilder()
+                                    .setLabel(`${opt.option_index}. ${opt.label}`)
+                                    .setValue(opt.option_index.toString())
+                            )
+                        );
+
+                    const row = new ActionRowBuilder().addComponents(selectMenu);
+
+                    await interaction.reply({
+                        content: 'Veuillez sélectionner le résultat du pari :',
+                        components: [row],
+                        flags: MessageFlags.Ephemeral
+                    });
+                });
+            });
             return;
         }
         
@@ -137,6 +175,115 @@ async function execute(interaction, bot) {
         }
     }
 
+    if (interaction.isStringSelectMenu()) {
+        if (interaction.customId.startsWith('bet_resolve_select|')) {
+            const [, betId, messageId] = interaction.customId.split('|');
+            const winnerIndex = parseInt(interaction.values[0]);
+            const userId = interaction.user.id;
+
+            pointsDb.get("SELECT * FROM bets WHERE id = ?", [betId], (err, bet) => {
+                if (err || !bet) return interaction.reply({ content: "Pari introuvable.", flags: MessageFlags.Ephemeral });
+                if (bet.creator_id !== userId) return interaction.reply({ content: "Seul le créateur peut terminer le pari.", flags: MessageFlags.Ephemeral });
+                if (bet.status !== "OPEN") return interaction.reply({ content: "Ce pari est déjà terminé.", flags: MessageFlags.Ephemeral });
+
+                pointsDb.get("SELECT label FROM bet_options WHERE bet_id = ? AND option_index = ?", [betId, winnerIndex], (err, winningOption) => {
+                    if (err || !winningOption) return interaction.reply({ content: "Option gagnante invalide.", flags: MessageFlags.Ephemeral });
+
+                    // Calculate results
+                    pointsDb.all("SELECT user_id, option_index, amount FROM bet_participations WHERE bet_id = ?", [betId], (err, parts) => {
+                        if (err) {
+                            handleException(err);
+                            return interaction.reply({ content: "Erreur lors de la récupération des participations.", flags: MessageFlags.Ephemeral });
+                        }
+
+                        const totalPool = parts.reduce((acc, p) => acc + p.amount, 0);
+                        const winners = parts.filter(p => p.option_index === winnerIndex);
+                        const totalWinningAmount = winners.reduce((acc, p) => acc + p.amount, 0);
+
+                        pointsDb.serialize(() => {
+                            pointsDb.run("UPDATE bets SET status = 'CLOSED', winning_option_index = ? WHERE id = ?", [winnerIndex, betId]);
+
+                            // Calcul des statistiques pour l'affichage
+                            const totalPoints = parts.reduce((acc, p) => acc + p.amount, 0);
+                            const stats = {};
+                            parts.forEach(p => {
+                                if (!stats[p.option_index]) stats[p.option_index] = 0;
+                                stats[p.option_index] += p.amount;
+                            });
+
+                            // Récupérer toutes les options pour l'affichage
+                            pointsDb.all("SELECT option_index, label FROM bet_options WHERE bet_id = ? ORDER BY option_index ASC", [betId], async (err, allOptions) => {
+                                if (err) {
+                                    handleException(err);
+                                    return;
+                                }
+
+                                const { EmbedBuilder } = await import('discord.js');
+                                const resultEmbed = new EmbedBuilder()
+                                    .setTitle(`Résultat du pari : ${bet.title}`)
+                                    .setColor('#FFD700')
+                                    .setDescription(`La réponse gagnante est ... || **${winningOption.label}** || !`);
+
+                                let statsDescription = "";
+                                allOptions.forEach(opt => {
+                                    const amount = stats[opt.option_index] || 0;
+                                    const percentage = totalPoints > 0 ? Math.round((amount / totalPoints) * 100) : 0;
+                                    const isWinner = opt.option_index === winnerIndex;
+                                    const icon = isWinner ? "✅" : "❌";
+                                    
+                                    // Barre de progression visuelle
+                                    const filled = Math.round(percentage / 10);
+                                    const empty = 10 - filled;
+                                    const progressBar = "🟩".repeat(filled) + "⬛".repeat(empty);
+
+                                    statsDescription += `${icon} **${opt.label}** : ${percentage}% (${amount} pts)\n${progressBar}\n\n`;
+                                });
+                                resultEmbed.addFields({ name: "Statistiques", value: statsDescription });
+
+                                if (winners.length > 0) {
+                                    winners.forEach(winner => {
+                                        const share = winner.amount / totalWinningAmount;
+                                        const winnings = Math.floor(share * totalPool);
+                                        pointsDb.run("UPDATE points SET balance = balance + ? WHERE user_id = ?", [winnings, winner.user_id]);
+                                    });
+
+                                    const winnerNames = winners.slice(0, 3).map(w => `<@${w.user_id}>`).join(", ");
+                                    const otherWinnersCount = Math.max(0, winners.length - 3);
+                                    const winnersText = otherWinnersCount > 0 
+                                        ? `${winnerNames} et ${otherWinnersCount} autres` 
+                                        : winnerNames;
+
+                                    resultEmbed.addFields({ 
+                                        name: "Gagnants", 
+                                        value: `${winnersText} se répartissent **${totalPool}** points !` 
+                                    });
+                                } else {
+                                    resultEmbed.addFields({ name: "Gagnants", value: "Personne n'avait parié sur cette option. La banque gagne tout ! 💸" });
+                                }
+
+                                interaction.update({ content: `Pari terminé !`, components: [] });
+                                // Répondre au message original du pari si possible, sinon envoyer dans le channel
+                                interaction.channel.send({ embeds: [resultEmbed] });
+
+                                // Supprimer les boutons du message original
+                                if (messageId) {
+                                    try {
+                                        const originalMessage = await interaction.channel.messages.fetch(messageId);
+                                        if (originalMessage) {
+                                            await originalMessage.edit({ components: [] });
+                                        }
+                                    } catch (e) {
+                                        // Le message a peut-être été supprimé
+                                    }
+                                }
+                            });
+                        });
+                    });
+                });
+            });
+        }
+    }
+
     if (interaction.isModalSubmit()) {
         if (interaction.customId.startsWith('bet_modal|')) {
             const [, betId, optionIndex] = interaction.customId.split('|');
@@ -183,6 +330,50 @@ async function execute(interaction, bot) {
                                         return interaction.reply({ content: "Vous avez déjà parié sur ce pari ou une erreur est survenue.", flags: MessageFlags.Ephemeral });
                                     }
                                     interaction.reply({ content: `Vous avez misé **${amount}** points sur l'option **${optionIndex}** du pari #${betId}.`, flags: MessageFlags.Ephemeral });
+
+                                    // Mise à jour de l'affichage du pari en cours
+                                    pointsDb.all("SELECT option_index, amount FROM bet_participations WHERE bet_id = ?", [betId], (err, rows) => {
+                                        if (err) return;
+                                        const stats = {};
+                                        let totalBetPoints = 0;
+                                        rows.forEach(r => {
+                                            if (!stats[r.option_index]) stats[r.option_index] = 0;
+                                            stats[r.option_index] += r.amount;
+                                            totalBetPoints += r.amount;
+                                        });
+
+                                        pointsDb.all("SELECT option_index, label FROM bet_options WHERE bet_id = ? ORDER BY option_index ASC", [betId], async (err, options) => {
+                                            if (err) return;
+                                            
+                                            try {
+                                                const { EmbedBuilder } = await import('discord.js');
+                                                if (!interaction.message) return;
+                                                
+                                                const oldEmbed = interaction.message.embeds[0];
+                                                if (!oldEmbed) return;
+
+                                                const newEmbed = new EmbedBuilder(oldEmbed.data);
+                                                
+                                                let description = `Cliquez sur les boutons ci-dessous pour participer !\n\n**Options:**\n`;
+                                                options.forEach(opt => {
+                                                    const amount = stats[opt.option_index] || 0;
+                                                    const percentage = totalBetPoints > 0 ? Math.round((amount / totalBetPoints) * 100) : 0;
+                                                    
+                                                    const filled = Math.round(percentage / 10);
+                                                    const empty = 10 - filled;
+                                                    const progressBar = "🟩".repeat(filled) + "⬛".repeat(empty);
+                                                    
+                                                    description += `${opt.option_index}. ${opt.label}\n${progressBar} **${percentage}%** (${amount} pts)\n\n`;
+                                                });
+                                                
+                                                newEmbed.setDescription(description);
+                                                
+                                                await interaction.message.edit({ embeds: [newEmbed] });
+                                            } catch (e) {
+                                                // Ignorer les erreurs d'édition
+                                            }
+                                        });
+                                    });
                                 }
                             );
                         });
