@@ -93,7 +93,10 @@ async function handleCreate(interaction) {
           .setStyle(ButtonStyle.Secondary)
       );
 
-      interaction.reply({ embeds: [embed], components: [row, resolveRow] });
+      const roleId = process.env.DISCORD_BET_ROLE_ID;
+      const content = roleId ? `<@&${roleId}>` : undefined;
+
+      interaction.reply({ content, embeds: [embed], components: [row, resolveRow] });
     }
   );
 }
