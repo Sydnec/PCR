@@ -49,21 +49,44 @@ async function execute(interaction, bot) {
             pointsDb.get("SELECT balance FROM points WHERE user_id = ?", [userId], async (err, row) => {
                 const balance = row ? row.balance : 0;
 
-                const modal = new ModalBuilder()
-                    .setCustomId(`bet_modal|${betId}|${optionIndex}`)
-                    .setTitle(`Miser (Solde: ${balance})`);
+                // Vérifier si l'utilisateur a déjà parié
+                pointsDb.get("SELECT option_index, amount FROM bet_participations WHERE bet_id = ? AND user_id = ?", [betId, userId], async (err, participation) => {
+                    if (err) {
+                        handleException(err);
+                        return interaction.reply({ content: "Erreur lors de la vérification de votre participation.", flags: MessageFlags.Ephemeral });
+                    }
 
-                const amountInput = new TextInputBuilder()
-                    .setCustomId('amount')
-                    .setLabel("Montant de la mise")
-                    .setStyle(TextInputStyle.Short)
-                    .setPlaceholder(`Max: ${balance}`)
-                    .setRequired(true);
+                    if (participation) {
+                        if (participation.option_index.toString() !== optionIndex) {
+                            // L'utilisateur a parié sur une autre option
+                            pointsDb.get("SELECT label FROM bet_options WHERE bet_id = ? AND option_index = ?", [betId, participation.option_index], (err, opt) => {
+                                const optionLabel = opt ? opt.label : `Option ${participation.option_index}`;
+                                return interaction.reply({ 
+                                    content: `Vous avez déjà parié sur **${optionLabel}**. Vous ne pouvez pas changer d'option.`, 
+                                    flags: MessageFlags.Ephemeral 
+                                });
+                            });
+                            return;
+                        }
+                        // L'utilisateur a parié sur la même option, on lui permet d'ajouter des points
+                    }
 
-                const firstActionRow = new ActionRowBuilder().addComponents(amountInput);
-                modal.addComponents(firstActionRow);
+                    const modal = new ModalBuilder()
+                        .setCustomId(`bet_modal|${betId}|${optionIndex}`)
+                        .setTitle(participation ? `Ajouter à la mise (Solde: ${balance})` : `Miser (Solde: ${balance})`);
 
-                await interaction.showModal(modal);
+                    const amountInput = new TextInputBuilder()
+                        .setCustomId('amount')
+                        .setLabel(participation ? "Montant à ajouter" : "Montant de la mise")
+                        .setStyle(TextInputStyle.Short)
+                        .setPlaceholder(`Max: ${balance}`)
+                        .setRequired(true);
+
+                    const firstActionRow = new ActionRowBuilder().addComponents(amountInput);
+                    modal.addComponents(firstActionRow);
+
+                    await interaction.showModal(modal);
+                });
             });
             return;
         }
@@ -371,67 +394,92 @@ async function execute(interaction, bot) {
                         // Deduct points and add participation
                         pointsDb.serialize(() => {
                             pointsDb.run("UPDATE points SET balance = balance - ? WHERE user_id = ?", [amount, userId]);
-                            pointsDb.run(
-                                "INSERT INTO bet_participations (bet_id, user_id, option_index, amount) VALUES (?, ?, ?, ?)",
-                                [betId, userId, optionIndex, amount],
-                                (err) => {
-                                    if (err) {
-                                        // Refund if insert fails (e.g. already bet)
-                                        pointsDb.run("UPDATE points SET balance = balance + ? WHERE user_id = ?", [amount, userId]);
-                                        return interaction.reply({ content: "Vous avez déjà parié sur ce pari ou une erreur est survenue.", flags: MessageFlags.Ephemeral });
-                                    }
-                                    interaction.reply({ content: `Vous avez misé **${amount}** points sur l'option **${optionIndex}** du pari #${betId}.`, flags: MessageFlags.Ephemeral });
-
-                                    // Mise à jour de l'affichage du pari en cours
-                                    pointsDb.all("SELECT option_index, amount FROM bet_participations WHERE bet_id = ?", [betId], (err, rows) => {
-                                        if (err) return;
-                                        const stats = {};
-                                        let totalBetPoints = 0;
-                                        rows.forEach(r => {
-                                            if (!stats[r.option_index]) stats[r.option_index] = 0;
-                                            stats[r.option_index] += r.amount;
-                                            totalBetPoints += r.amount;
-                                        });
-
-                                        pointsDb.all("SELECT option_index, label FROM bet_options WHERE bet_id = ? ORDER BY option_index ASC", [betId], async (err, options) => {
-                                            if (err) return;
-                                            
-                                            try {
-                                                const { EmbedBuilder } = await import('discord.js');
-                                                if (!interaction.message) return;
-                                                
-                                                const oldEmbed = interaction.message.embeds[0];
-                                                if (!oldEmbed) return;
-
-                                                const newEmbed = new EmbedBuilder(oldEmbed.data);
-                                                
-                                                let description = `Cliquez sur les boutons ci-dessous pour participer !\n\n**Options:**\n`;
-                                                options.forEach(opt => {
-                                                    const amount = stats[opt.option_index] || 0;
-                                                    const percentage = totalBetPoints > 0 ? Math.round((amount / totalBetPoints) * 100) : 0;
-                                                    
-                                                    const filled = Math.round(percentage / 10);
-                                                    const empty = 10 - filled;
-                                                    const progressBar = "🟩".repeat(filled) + "⬛".repeat(empty);
-                                                    
-                                                    description += `${opt.option_index}. ${opt.label}\n${progressBar} **${percentage}%** (${amount} pts)\n\n`;
-                                                });
-                                                
-                                                newEmbed.setDescription(description);
-                                                
-                                                await interaction.message.edit({ embeds: [newEmbed] });
-                                            } catch (e) {
-                                                // Ignorer les erreurs d'édition
+                            
+                            // Check if user already participated to update or insert
+                            pointsDb.get("SELECT amount FROM bet_participations WHERE bet_id = ? AND user_id = ?", [betId, userId], (err, existing) => {
+                                if (existing) {
+                                    // Update existing participation
+                                    pointsDb.run(
+                                        "UPDATE bet_participations SET amount = amount + ? WHERE bet_id = ? AND user_id = ?",
+                                        [amount, betId, userId],
+                                        (err) => {
+                                            if (err) {
+                                                // Refund if update fails
+                                                pointsDb.run("UPDATE points SET balance = balance + ? WHERE user_id = ?", [amount, userId]);
+                                                return interaction.reply({ content: "Erreur lors de la mise à jour de votre pari.", flags: MessageFlags.Ephemeral });
                                             }
-                                        });
-                                    });
+                                            interaction.reply({ content: `Vous avez ajouté **${amount}** points à votre mise sur l'option **${optionIndex}** du pari #${betId}. Total misé: **${existing.amount + amount}**.`, flags: MessageFlags.Ephemeral });
+                                            updateBetEmbed(interaction, betId);
+                                        }
+                                    );
+                                } else {
+                                    // Insert new participation
+                                    pointsDb.run(
+                                        "INSERT INTO bet_participations (bet_id, user_id, option_index, amount) VALUES (?, ?, ?, ?)",
+                                        [betId, userId, optionIndex, amount],
+                                        (err) => {
+                                            if (err) {
+                                                // Refund if insert fails
+                                                pointsDb.run("UPDATE points SET balance = balance + ? WHERE user_id = ?", [amount, userId]);
+                                                return interaction.reply({ content: "Erreur lors de l'enregistrement de votre pari.", flags: MessageFlags.Ephemeral });
+                                            }
+                                            interaction.reply({ content: `Vous avez misé **${amount}** points sur l'option **${optionIndex}** du pari #${betId}.`, flags: MessageFlags.Ephemeral });
+                                            updateBetEmbed(interaction, betId);
+                                        }
+                                    );
                                 }
-                            );
+                            });
                         });
                     });
                 });
             });
         }
+    }
+
+    // Helper function to update bet embed
+    function updateBetEmbed(interaction, betId) {
+        pointsDb.all("SELECT option_index, amount FROM bet_participations WHERE bet_id = ?", [betId], (err, rows) => {
+            if (err) return;
+            const stats = {};
+            let totalBetPoints = 0;
+            rows.forEach(r => {
+                if (!stats[r.option_index]) stats[r.option_index] = 0;
+                stats[r.option_index] += r.amount;
+                totalBetPoints += r.amount;
+            });
+
+            pointsDb.all("SELECT option_index, label FROM bet_options WHERE bet_id = ? ORDER BY option_index ASC", [betId], async (err, options) => {
+                if (err) return;
+                
+                try {
+                    const { EmbedBuilder } = await import('discord.js');
+                    if (!interaction.message) return;
+                    
+                    const oldEmbed = interaction.message.embeds[0];
+                    if (!oldEmbed) return;
+
+                    const newEmbed = new EmbedBuilder(oldEmbed.data);
+                    
+                    let description = `Cliquez sur les boutons ci-dessous pour participer !\n\n**Options:**\n`;
+                    options.forEach(opt => {
+                        const amount = stats[opt.option_index] || 0;
+                        const percentage = totalBetPoints > 0 ? Math.round((amount / totalBetPoints) * 100) : 0;
+                        
+                        const filled = Math.round(percentage / 10);
+                        const empty = 10 - filled;
+                        const progressBar = "🟩".repeat(filled) + "⬛".repeat(empty);
+                        
+                        description += `${opt.option_index}. ${opt.label}\n${progressBar} **${percentage}%** (${amount} pts)\n\n`;
+                    });
+                    
+                    newEmbed.setDescription(description);
+                    
+                    await interaction.message.edit({ embeds: [newEmbed] });
+                } catch (e) {
+                    // Ignorer les erreurs d'édition
+                }
+            });
+        });
     }
 
     if (interaction.isContextMenuCommand()) {
