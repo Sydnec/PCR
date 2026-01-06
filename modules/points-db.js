@@ -14,9 +14,26 @@ const db = new sqlite3.Database(dbPath, (err) => {
   } else {
     // Table des points utilisateurs
     db.run(
-      "CREATE TABLE IF NOT EXISTS points (user_id TEXT PRIMARY KEY, balance INTEGER DEFAULT 0)",
+      `CREATE TABLE IF NOT EXISTS points (
+        user_id TEXT PRIMARY KEY, 
+        balance INTEGER DEFAULT 0,
+        last_message_at INTEGER DEFAULT 0,
+        messages_today_count INTEGER DEFAULT 0,
+        last_reset_date TEXT
+      )`,
       (err) => {
         if (err) handleException("Erreur création table points :", err);
+        else {
+            // Migration (add columns if not exists for old DBs)
+            const addColumn = (colName, colType) => {
+                db.run(`ALTER TABLE points ADD COLUMN ${colName} ${colType}`, (err) => {
+                    // Ignore duplicate column error
+                });
+            }
+            addColumn("last_message_at", "INTEGER DEFAULT 0");
+            addColumn("messages_today_count", "INTEGER DEFAULT 0");
+            addColumn("last_reset_date", "TEXT");
+        }
       }
     );
 

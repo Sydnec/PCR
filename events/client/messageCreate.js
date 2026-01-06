@@ -5,7 +5,15 @@ import { emojiRegex } from "../../modules/regex.js";
 import { twitterRegex } from "../../modules/regex.js";
 import { instagramRegex } from "../../modules/regex.js";
 import dotenv from "dotenv";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from 'url';
+
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const configPath = path.join(__dirname, "../../config.json");
 
 const name = "messageCreate";
 const once = false;
@@ -30,14 +38,76 @@ async function execute(message) {
       ["__global__", "__global__", date]
     );
 
-    // --- Système de points (3 points par message) ---
-    pointsDb.run(
-      "INSERT INTO points (user_id, balance) VALUES (?, 3) ON CONFLICT(user_id) DO UPDATE SET balance = balance + 3",
-      [userId],
-      (err) => {
-        if (err) handleException("Erreur ajout points message :", err);
-      }
-    );
+    // --- Système de points (Nouveau système équilibré) ---
+    // Logique: Max 1 message valide / heure.
+    // Gains: 1er: 100, 2eme: 80, 3eme: 50, 4eme: 30, 5eme: 20, 6eme: 10, 7eme: 5, Suivants: 0
+    
+    const now = Date.now();
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    
+    pointsDb.get("SELECT last_message_at, messages_today_count, last_reset_date FROM points WHERE user_id = ?", [userId], (err, row) => {
+        if (err) return handleException("Erreur lecture points", err);
+        
+        // Initialisation si l'utilisateur n'existe pas dans la table (ou champs null pour anciens users)
+        let lastMessageAt = row && row.last_message_at ? row.last_message_at : 0;
+        let countToday = row && row.messages_today_count ? row.messages_today_count : 0;
+        let lastResetDate = row && row.last_reset_date ? row.last_reset_date : "";
+
+        // Si on a changé de jour, reset du compteur
+        if (lastResetDate !== today) {
+            countToday = 0;
+            lastResetDate = today;
+            // On peut reset lastMessageAt pour permettre le premier message du jour (évite d'attendre 1h après minuit si msg à 23h30)
+            lastMessageAt = 0;
+        }
+
+        const oneHour = 60 * 60 * 1000;
+        
+        // Si moins d'une heure s'est écoulée depuis le dernier message récompensé
+        if (now - lastMessageAt < oneHour && lastMessageAt !== 0) {
+            // Pas de points, pas de mise à jour du compteur
+            return;
+        }
+
+        // Calcul des points en fonction du rang du message dans la journée
+        // countToday est le nombre de messages DEJA récompensés aujourd'hui (0 pour le 1er message)
+        let pointsToAdd = 0;
+        const rank = countToday + 1; // Le rang de CE message
+
+        try {
+            const configFile = fs.readFileSync(configPath, 'utf8');
+            const config = JSON.parse(configFile);
+            const distribution = config.messagePointsDistribution;
+            
+            if (distribution[rank]) {
+                pointsToAdd = distribution[rank];
+            } else {
+                pointsToAdd = distribution.default;
+            }
+        } catch (e) {
+            handleException(e);
+            pointsToAdd = 5; // Fallback
+        }
+
+        if (pointsToAdd > 0) {
+            pointsDb.serialize(() => {
+                // Update tracking et ajout points
+                pointsDb.run(
+                    `INSERT INTO points (user_id, balance, last_message_at, messages_today_count, last_reset_date) 
+                     VALUES (?, ?, ?, ?, ?)
+                     ON CONFLICT(user_id) DO UPDATE SET 
+                        balance = balance + ?,
+                        last_message_at = ?, 
+                        messages_today_count = ?, 
+                        last_reset_date = ?`,
+                    [userId, pointsToAdd, now, rank, today, pointsToAdd, now, rank, today],
+                    (err) => {
+                        if (err) handleException("Erreur update points message équilibrés", err);
+                    }
+                );
+            });
+        }
+    });
 
     // --- Statistiques mots les plus utilisés ---
     const words = messageContent
