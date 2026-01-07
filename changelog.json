@@ -1,7 +1,41 @@
 {
-  "version": "1.8.11",
-  "lastUpdated": "2026-01-06T09:51:13.678Z",
+  "version": "1.9.0",
+  "lastUpdated": "2026-01-07T10:42:23.303Z",
   "releases": [
+    {
+      "version": "1.9.0",
+      "date": "2026-01-07",
+      "title": "Release 1.9.0",
+      "features": [
+        {
+          "type": "feature",
+          "name": "Verrouillage des paris",
+          "description": "Le créateur d'un pari peut désormais clôturer les mises (verrouiller) sans déclarer immédiatement le résultat.",
+          "author": "Sydnec",
+          "commit": "5e33760",
+          "timestamp": "2026-01-07T10:45:00.000Z",
+          "branch": "main"
+        },
+        {
+          "type": "enhancement",
+          "name": "Amélioration UX Paris",
+          "description": "Ajout de la possibilité de rajouter des points sur une mise existante. Empêchement de changer d'option une fois parié.",
+          "author": "Sydnec",
+          "commit": "5e33760",
+          "timestamp": "2026-01-07T10:45:00.000Z",
+          "branch": "main"
+        },
+        {
+          "type": "fix",
+          "name": "Anti-triche Créateur",
+          "description": "Le créateur d'un pari ne peut plus participer à son propre pari.",
+          "author": "Sydnec",
+          "commit": "5e33760",
+          "timestamp": "2026-01-07T10:45:00.000Z",
+          "branch": "main"
+        }
+      ]
+    },
     {
       "version": "1.8.11",
       "date": "2026-01-06",
