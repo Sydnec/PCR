@@ -1,5 +1,5 @@
 import { handleException, log } from '../../modules/utils.js';
-import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, MessageFlags, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } from 'discord.js';
+import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, MessageFlags, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import pointsDb from '../../modules/points-db.js';
 
 const name = 'interactionCreate';
@@ -46,46 +46,54 @@ async function execute(interaction, bot) {
             const [, betId, optionIndex] = customId.split('|');
             const userId = interaction.user.id;
             
-            pointsDb.get("SELECT balance FROM points WHERE user_id = ?", [userId], async (err, row) => {
-                const balance = row ? row.balance : 0;
+            // Check if user is creator
+            pointsDb.get("SELECT creator_id FROM bets WHERE id = ?", [betId], (err, bet) => {
+                if (err || !bet) return interaction.reply({ content: "Pari introuvable.", flags: MessageFlags.Ephemeral });
+                if (bet.creator_id === userId) {
+                    return interaction.reply({ content: "❌ Vous ne pouvez pas parier sur votre propre pari !", flags: MessageFlags.Ephemeral });
+                }
 
-                // Vérifier si l'utilisateur a déjà parié
-                pointsDb.get("SELECT option_index, amount FROM bet_participations WHERE bet_id = ? AND user_id = ?", [betId, userId], async (err, participation) => {
-                    if (err) {
-                        handleException(err);
-                        return interaction.reply({ content: "Erreur lors de la vérification de votre participation.", flags: MessageFlags.Ephemeral });
-                    }
+                pointsDb.get("SELECT balance FROM points WHERE user_id = ?", [userId], async (err, row) => {
+                    const balance = row ? row.balance : 0;
 
-                    if (participation) {
-                        if (participation.option_index.toString() !== optionIndex) {
-                            // L'utilisateur a parié sur une autre option
-                            pointsDb.get("SELECT label FROM bet_options WHERE bet_id = ? AND option_index = ?", [betId, participation.option_index], (err, opt) => {
-                                const optionLabel = opt ? opt.label : `Option ${participation.option_index}`;
-                                return interaction.reply({ 
-                                    content: `Vous avez déjà parié sur **${optionLabel}**. Vous ne pouvez pas changer d'option.`, 
-                                    flags: MessageFlags.Ephemeral 
-                                });
-                            });
-                            return;
+                    // Vérifier si l'utilisateur a déjà parié
+                    pointsDb.get("SELECT option_index, amount FROM bet_participations WHERE bet_id = ? AND user_id = ?", [betId, userId], async (err, participation) => {
+                        if (err) {
+                            handleException(err);
+                            return interaction.reply({ content: "Erreur lors de la vérification de votre participation.", flags: MessageFlags.Ephemeral });
                         }
-                        // L'utilisateur a parié sur la même option, on lui permet d'ajouter des points
-                    }
 
-                    const modal = new ModalBuilder()
-                        .setCustomId(`bet_modal|${betId}|${optionIndex}`)
-                        .setTitle(participation ? `Ajouter à la mise (Solde: ${balance})` : `Miser (Solde: ${balance})`);
+                        if (participation) {
+                            if (participation.option_index.toString() !== optionIndex) {
+                                // L'utilisateur a parié sur une autre option
+                                pointsDb.get("SELECT label FROM bet_options WHERE bet_id = ? AND option_index = ?", [betId, participation.option_index], (err, opt) => {
+                                    const optionLabel = opt ? opt.label : `Option ${participation.option_index}`;
+                                    return interaction.reply({ 
+                                        content: `Vous avez déjà parié sur **${optionLabel}**. Vous ne pouvez pas changer d'option.`, 
+                                        flags: MessageFlags.Ephemeral 
+                                    });
+                                });
+                                return;
+                            }
+                            // L'utilisateur a parié sur la même option, on lui permet d'ajouter des points
+                        }
 
-                    const amountInput = new TextInputBuilder()
-                        .setCustomId('amount')
-                        .setLabel(participation ? "Montant à ajouter" : "Montant de la mise")
-                        .setStyle(TextInputStyle.Short)
-                        .setPlaceholder(`Max: ${balance}`)
-                        .setRequired(true);
+                        const modal = new ModalBuilder()
+                            .setCustomId(`bet_modal|${betId}|${optionIndex}`)
+                            .setTitle(participation ? `Ajouter à la mise (Solde: ${balance})` : `Miser (Solde: ${balance})`);
 
-                    const firstActionRow = new ActionRowBuilder().addComponents(amountInput);
-                    modal.addComponents(firstActionRow);
+                        const amountInput = new TextInputBuilder()
+                            .setCustomId('amount')
+                            .setLabel(participation ? "Montant à ajouter" : "Montant de la mise")
+                            .setStyle(TextInputStyle.Short)
+                            .setPlaceholder(`Max: ${balance}`)
+                            .setRequired(true);
 
-                    await interaction.showModal(modal);
+                        const firstActionRow = new ActionRowBuilder().addComponents(amountInput);
+                        modal.addComponents(firstActionRow);
+
+                        await interaction.showModal(modal);
+                    });
                 });
             });
             return;
@@ -100,7 +108,9 @@ async function execute(interaction, bot) {
             pointsDb.get("SELECT creator_id, status FROM bets WHERE id = ?", [betId], async (err, bet) => {
                 if (err || !bet) return interaction.reply({ content: "Pari introuvable.", flags: MessageFlags.Ephemeral });
                 if (bet.creator_id !== interaction.user.id) return interaction.reply({ content: "Seul le créateur peut terminer le pari.", flags: MessageFlags.Ephemeral });
-                if (bet.status !== "OPEN") return interaction.reply({ content: "Ce pari est déjà terminé.", flags: MessageFlags.Ephemeral });
+                
+                // Autoriser la gestion si OPEN ou LOCKED
+                if (bet.status !== "OPEN" && bet.status !== "LOCKED") return interaction.reply({ content: "Ce pari est déjà terminé.", flags: MessageFlags.Ephemeral });
 
                 // Récupérer les options du pari
                 pointsDb.all("SELECT option_index, label FROM bet_options WHERE bet_id = ? ORDER BY option_index ASC", [betId], async (err, options) => {
@@ -115,8 +125,19 @@ async function execute(interaction, bot) {
                                     .setLabel(`${opt.option_index}. ${opt.label}`)
                                     .setValue(opt.option_index.toString())
                             )
-                        )
-                        .addOptions(
+                        );
+                    
+                    // Option pour clore les paris sans résultat
+                    if (bet.status === "OPEN") {
+                        selectMenu.addOptions(
+                            new StringSelectMenuOptionBuilder()
+                                .setLabel("🔒 Clôturer les paris")
+                                .setDescription("Empêche de nouveaux paris sans déclarer de vainqueur")
+                                .setValue("lock")
+                        );
+                    }
+
+                    selectMenu.addOptions(
                             new StringSelectMenuOptionBuilder()
                                 .setLabel("❌ Annuler le pari")
                                 .setDescription("Rembourse tous les participants")
@@ -218,7 +239,42 @@ async function execute(interaction, bot) {
             pointsDb.get("SELECT * FROM bets WHERE id = ?", [betId], (err, bet) => {
                 if (err || !bet) return interaction.reply({ content: "Pari introuvable.", flags: MessageFlags.Ephemeral });
                 if (bet.creator_id !== userId) return interaction.reply({ content: "Seul le créateur peut terminer le pari.", flags: MessageFlags.Ephemeral });
-                if (bet.status !== "OPEN") return interaction.reply({ content: "Ce pari est déjà terminé.", flags: MessageFlags.Ephemeral });
+                
+                // Autoriser si OPEN ou LOCKED
+                if (bet.status !== "OPEN" && bet.status !== "LOCKED") return interaction.reply({ content: "Ce pari est déjà terminé.", flags: MessageFlags.Ephemeral });
+
+                if (selectedValue === 'lock') {
+                    pointsDb.run("UPDATE bets SET status = 'LOCKED' WHERE id = ?", [betId]);
+                    interaction.update({ content: "Les paris sont désormais clos.", components: [] });
+                    
+                    if (messageId) {
+                        try {
+                            (async () => {
+                                const originalMessage = await interaction.channel.messages.fetch(messageId);
+                                if (originalMessage) {
+                                    const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = await import('discord.js');
+                                    const oldEmbed = originalMessage.embeds[0];
+                                    const newEmbed = new EmbedBuilder(oldEmbed.data)
+                                       .setTitle(`🔒 PARI CLOS: ${bet.title}`)
+                                       .setColor('#FFA500'); // Orange
+                                    
+                                    // Garder seulement le bouton de résolution
+                                    const resolveRow = new ActionRowBuilder().addComponents(
+                                       new ButtonBuilder()
+                                         .setCustomId(`bet_resolve_modal|${betId}`)
+                                         .setLabel("Déclarer le résultat")
+                                         .setStyle(ButtonStyle.Secondary)
+                                     );
+       
+                                    await originalMessage.edit({ embeds: [newEmbed], components: [resolveRow] });
+                                }
+                            })();
+                        } catch (e) {
+                            handleException(e);
+                        }
+                    }
+                    return;
+                }
 
                 if (selectedValue === 'cancel') {
                     pointsDb.all("SELECT user_id, amount FROM bet_participations WHERE bet_id = ?", [betId], (err, parts) => {
