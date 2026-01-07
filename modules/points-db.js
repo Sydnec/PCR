@@ -44,10 +44,15 @@ const db = new sqlite3.Database(dbPath, (err) => {
         creator_id TEXT,
         title TEXT,
         status TEXT DEFAULT 'OPEN',
-        winning_option_index INTEGER
+        winning_option_index INTEGER,
+        is_estimation INTEGER DEFAULT 0
       )`,
       (err) => {
         if (err) handleException("Erreur création table bets :", err);
+        else {
+             // Migration for type
+             db.run(`ALTER TABLE bets ADD COLUMN is_estimation INTEGER DEFAULT 0`, (err) => {});
+        }
       }
     );
 
@@ -72,11 +77,16 @@ const db = new sqlite3.Database(dbPath, (err) => {
         user_id TEXT,
         option_index INTEGER,
         amount INTEGER,
+        prediction_value INTEGER,
         PRIMARY KEY(bet_id, user_id),
         FOREIGN KEY(bet_id) REFERENCES bets(id)
       )`,
       (err) => {
         if (err) handleException("Erreur création table bet_participations :", err);
+        else {
+             // Migration for prediction_value
+             db.run(`ALTER TABLE bet_participations ADD COLUMN prediction_value INTEGER`, (err) => {});
+        }
       }
     );
   }

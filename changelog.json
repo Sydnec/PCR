@@ -1,7 +1,28 @@
 {
-  "version": "1.9.0",
-  "lastUpdated": "2026-01-07T10:42:23.303Z",
+  "version": "1.9.1",
+  "lastUpdated": "2026-01-07T11:00:00.000Z",
   "releases": [
+    {
+      "version": "1.9.1",
+      "date": "2026-01-07",
+      "title": "Release 1.9.1",
+      "features": [
+        {
+          "type": "feature",
+          "name": "Paris Estimation (/estimate)",
+          "description": "Nouveau type de pari 'Le Juste Prix' ! Proposez un nombre, le plus proche du résultat gagne la cagnotte.",
+          "author": "Sydnec",
+          "announce": true
+        },
+        {
+          "type": "fix",
+          "name": "Bugs mineurs Paris",
+          "description": "Correction de légers bugs d'interaction sur les paris classiques.",
+          "author": "Sydnec",
+          "announce": false
+        }
+      ]
+    },
     {
       "version": "1.9.0",
       "date": "2026-01-07",

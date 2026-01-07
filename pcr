@@ -175,7 +175,21 @@ case "$1" in
         read -p "Type de changement (feature/fix/enhancement/chore): " CHANGE_TYPE
         read -p "Nom court de la feature: " CHANGE_NAME
         read -p "Description: " CHANGE_DESC
+        read -p "Annoncer ce changement sur Discord ? (y/n, défaut: y pour feature, n pour fix): " ANNOUNCE_INPUT
         
+        # Logique par défaut pour announce
+        if [ -z "$ANNOUNCE_INPUT" ]; then
+            if [ "$CHANGE_TYPE" == "fix" ] || [ "$CHANGE_TYPE" == "chore" ]; then
+                SHOULD_ANNOUNCE="false"
+            else
+                SHOULD_ANNOUNCE="true"
+            fi
+        elif [[ "$ANNOUNCE_INPUT" =~ ^[Nn] ]]; then
+            SHOULD_ANNOUNCE="false"
+        else
+            SHOULD_ANNOUNCE="true"
+        fi
+
         node -e "
         const fs = require('fs');
         const path = './changelog.json';
@@ -185,6 +199,7 @@ case "$1" in
             type: '$CHANGE_TYPE' || 'feature',
             name: '$CHANGE_NAME' || '$CURRENT_BRANCH',
             description: '$CHANGE_DESC',
+            announce: $SHOULD_ANNOUNCE,
             author: 'Sydnec',
             commit: 'pending',
             timestamp: new Date().toISOString(),
@@ -192,7 +207,7 @@ case "$1" in
         });
         
         fs.writeFileSync(path, JSON.stringify(changelog, null, 2));
-        console.log('Ajouté aux changements en attente.');
+        console.log('Ajouté aux changements en attente (announce: ' + $SHOULD_ANNOUNCE + ').');
         "
         
         git add changelog.json

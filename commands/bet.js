@@ -5,7 +5,7 @@ import db from "../modules/points-db.js";
 export default {
   data: new SlashCommandBuilder()
     .setName("bet")
-    .setDescription("Créer un nouveau pari")
+    .setDescription("Créer un nouveau pari à choix multiples")
     .addStringOption((option) =>
       option
         .setName("question")
@@ -40,16 +40,17 @@ export default {
 async function handleCreate(interaction) {
   const question = interaction.options.getString("question");
   const options = [];
+
   for (let i = 1; i <= 5; i++) {
-    const opt = interaction.options.getString(`option${i}`);
-    if (opt) options.push(opt);
+      const opt = interaction.options.getString(`option${i}`);
+      if (opt) options.push(opt);
   }
 
   if (options.length < 2) {
-    return interaction.reply({
-      content: "Il faut au moins 2 options pour créer un pari.",
+      return interaction.reply({
+      content: "Il faut au moins 2 options pour créer un pari à choix multiples.",
       flags: MessageFlags.Ephemeral,
-    });
+      });
   }
 
   db.run(

@@ -69,19 +69,36 @@ export async function checkAndAnnounceNewRelease(bot) {
             return;
         }
 
-        // Vérifier si c'est juste un patch
-        if (lastAnnouncedVersion && isPatchRelease(currentVersion, lastAnnouncedVersion)) {
-            log(`🔧 Version ${currentVersion} est un patch, pas d'annonce Discord`);
-            // Mettre à jour quand même le fichier pour éviter de re-vérifier
-            saveLastAnnouncedVersion(currentVersion);
-            return;
-        }
-
         // Trouver la release correspondante
         const currentRelease = changelog.releases.find(r => r.version === currentVersion);
         if (!currentRelease) {
             log(`⚠️ Release ${currentVersion} non trouvée dans changelog.json`);
             return;
+        }
+
+        // Filtrer les features qui doivent être annoncées
+        // Par défaut (si property manquante), on annonce tout sauf si c'est explicitement false
+        // OU si l'ancienne méthode (patch release detection) s'applique
+        const announceableFeatures = currentRelease.features.filter(f => f.announce !== false);
+        
+        const hasAnnounceableContent = announceableFeatures.length > 0;
+        const manualPatchDetection = lastAnnouncedVersion && isPatchRelease(currentVersion, lastAnnouncedVersion);
+
+        // Si aucune feature n'est marquée "announce: true" (ou défaut) ET que c'est un patch...
+        // MAIS si une feature a "announce: true" explicite, on l'annonce même si c'est un patch.
+        const explicitlyRequestsAnnounce = currentRelease.features.some(f => f.announce === true);
+
+        if (!explicitlyRequestsAnnounce && !hasAnnounceableContent && manualPatchDetection) {
+             log(`🔧 Version ${currentVersion} est un patch sans fonctionnalité majeure, pas d'annonce Discord`);
+             saveLastAnnouncedVersion(currentVersion);
+             return;
+        }
+        
+        // Si vraiment rien à dire
+        if (announceableFeatures.length === 0 && !explicitlyRequestsAnnounce) {
+             log(`Skipping announcement for ${currentVersion} (no announceable features).`);
+             saveLastAnnouncedVersion(currentVersion);
+             return;
         }
 
         // Récupérer le canal Discord
@@ -111,6 +128,10 @@ export async function checkAndAnnounceNewRelease(bot) {
             }, {});
 
             Object.entries(featuresByType).forEach(([type, features]) => {
+                // Filtrer pour l'affichage uniquement celles qu'on veut annoncer
+                const featuresToDisplay = features.filter(f => f.announce !== false);
+                if (featuresToDisplay.length === 0) return;
+
                 const typeTitle = {
                     'command': '⚡ Nouvelles Commandes',
                     'event': '🎯 Nouveaux Événements',
@@ -119,7 +140,7 @@ export async function checkAndAnnounceNewRelease(bot) {
                     'enhancement': '🔧 Améliorations'
                 }[type] || '📋 Autres';
 
-                const featureList = features
+                const featureList = featuresToDisplay
                     .map(f => `• **${f.name}**: ${f.description}`)
                     .join('\n');
 
@@ -135,9 +156,10 @@ export async function checkAndAnnounceNewRelease(bot) {
             });
 
             // Ajouter un résumé
+            const count = announceableFeatures.length;
             embed.setDescription(
                 `${currentRelease.title || `Release ${currentVersion}`}\n\n` +
-                `${currentRelease.features.length} nouvelle(s) fonctionnalité(s) incluse(s).`
+                `${count} nouvelle(s) fonctionnalité(s) incluse(s).`
             );
         }
 

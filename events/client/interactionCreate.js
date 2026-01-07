@@ -41,6 +41,53 @@ async function execute(interaction, bot) {
     if (interaction.isButton()) {
         const { customId } = interaction;
 
+        // Gérer les boutons de pari ("Estimation")
+        if (customId.startsWith('bet_estimate_join|')) {
+            const [, betId] = customId.split('|');
+            const userId = interaction.user.id;
+
+            pointsDb.get("SELECT creator_id FROM bets WHERE id = ?", [betId], (err, bet) => {
+                if (err || !bet) return interaction.reply({ content: "Pari introuvable.", flags: MessageFlags.Ephemeral });
+                if (bet.creator_id === userId) {
+                    return interaction.reply({ content: "❌ Vous ne pouvez pas parier sur votre propre estimation !", flags: MessageFlags.Ephemeral });
+                }
+
+                pointsDb.get("SELECT balance FROM points WHERE user_id = ?", [userId], (err, row) => {
+                    const balance = row ? row.balance : 0;
+                    
+                    pointsDb.get("SELECT amount, prediction_value FROM bet_participations WHERE bet_id = ? AND user_id = ?", [betId, userId], (err, participation) => {
+                        
+                        const modal = new ModalBuilder()
+                            .setCustomId(`bet_estimate_modal|${betId}`)
+                            .setTitle(participation ? `Modifier votre estimation` : `Proposer une estimation`);
+
+                        const predictionInput = new TextInputBuilder()
+                            .setCustomId('prediction')
+                            .setLabel("Votre estimation")
+                            .setStyle(TextInputStyle.Short)
+                            .setRequired(true)
+                            .setValue(participation ? participation.prediction_value.toString() : "");
+
+                        const amountInput = new TextInputBuilder()
+                            .setCustomId('amount')
+                            .setLabel("Montant de la mise")
+                            .setStyle(TextInputStyle.Short)
+                            .setPlaceholder(`Solde: ${balance}`)
+                            .setRequired(true)
+                            .setValue(participation ? participation.amount.toString() : "");
+
+                        modal.addComponents(
+                            new ActionRowBuilder().addComponents(predictionInput),
+                            new ActionRowBuilder().addComponents(amountInput)
+                        );
+
+                        interaction.showModal(modal);
+                    });
+                });
+            });
+            return;
+        }
+
         // Gérer les boutons de pari
         if (customId.startsWith('bet_join|')) {
             const [, betId, optionIndex] = customId.split('|');
@@ -105,12 +152,28 @@ async function execute(interaction, bot) {
             const messageId = interaction.message.id;
             
             // Vérifier si l'utilisateur est le créateur du pari
-            pointsDb.get("SELECT creator_id, status FROM bets WHERE id = ?", [betId], async (err, bet) => {
+            pointsDb.get("SELECT * FROM bets WHERE id = ?", [betId], async (err, bet) => {
                 if (err || !bet) return interaction.reply({ content: "Pari introuvable.", flags: MessageFlags.Ephemeral });
                 if (bet.creator_id !== interaction.user.id) return interaction.reply({ content: "Seul le créateur peut terminer le pari.", flags: MessageFlags.Ephemeral });
                 
                 // Autoriser la gestion si OPEN ou LOCKED
                 if (bet.status !== "OPEN" && bet.status !== "LOCKED") return interaction.reply({ content: "Ce pari est déjà terminé.", flags: MessageFlags.Ephemeral });
+
+                if (bet.is_estimation) {
+                    const modal = new ModalBuilder()
+                        .setCustomId(`bet_estimate_resolve_submit|${betId}|${messageId}`)
+                        .setTitle("Résultat de l'estimation");
+
+                    const resultInput = new TextInputBuilder()
+                        .setCustomId('result')
+                        .setLabel("La bonne réponse")
+                        .setStyle(TextInputStyle.Short)
+                        .setRequired(true);
+
+                     modal.addComponents(new ActionRowBuilder().addComponents(resultInput));
+                     await interaction.showModal(modal);
+                     return;
+                }
 
                 // Récupérer les options du pari
                 pointsDb.all("SELECT option_index, label FROM bet_options WHERE bet_id = ? ORDER BY option_index ASC", [betId], async (err, options) => {
@@ -415,6 +478,124 @@ async function execute(interaction, bot) {
     }
 
     if (interaction.isModalSubmit()) {
+        if (interaction.customId.startsWith('bet_estimate_resolve_submit|')) {
+            const [, betId, messageId] = interaction.customId.split('|');
+            const resultValueStr = interaction.fields.getTextInputValue('result');
+            const resultValue = parseInt(resultValueStr);
+
+            if (isNaN(resultValue)) {
+                return interaction.reply({ content: "La réponse doit être un nombre entier.", flags: MessageFlags.Ephemeral });
+            }
+
+            pointsDb.get("SELECT title FROM bets WHERE id = ?", [betId], (err, bet) => {
+                 if (err || !bet) return interaction.reply({ content: "Pari introuvable.", flags: MessageFlags.Ephemeral });
+
+                 pointsDb.all("SELECT user_id, amount, prediction_value FROM bet_participations WHERE bet_id = ?", [betId], (err, parts) => {
+                    if (err) {
+                        handleException(err);
+                        return interaction.reply({ content: "Erreur récupération participations.", flags: MessageFlags.Ephemeral });
+                    }
+                    
+                    const totalPool = parts.reduce((acc, p) => acc + p.amount, 0);
+                    let resultText = `La réponse correcte était **${resultValue}**.\n\n`;
+                    
+                    if (parts.length === 0) {
+                        pointsDb.run("UPDATE bets SET status = 'CLOSED', winning_option_index = ? WHERE id = ?", [resultValue, betId]);
+                        interaction.reply({ content: "Pari terminé (aucun participant).", flags: MessageFlags.Ephemeral });
+                        if (interaction.channel) {
+                             interaction.channel.send(`Le pari **"${bet.title}"** est terminé ! La réponse était **${resultValue}**. Aucun participant.`);
+                        }
+                        return;
+                    }
+
+                    // Calculate close winners
+                    const diffs = parts.map(p => ({ ...p, diff: Math.abs(p.prediction_value - resultValue) }));
+                    diffs.sort((a, b) => a.diff - b.diff);
+                    
+                    const minDiff = diffs[0].diff;
+                    const winners = diffs.filter(d => d.diff === minDiff);
+                    const totalWinningAmount = winners.reduce((acc, w) => acc + w.amount, 0);
+
+                    pointsDb.serialize(async () => {
+                         pointsDb.run("UPDATE bets SET status = 'CLOSED', winning_option_index = ? WHERE id = ?", [resultValue, betId]);
+
+                         winners.forEach(winner => {
+                             const share = winner.amount / totalWinningAmount;
+                             const winnings = Math.floor(share * totalPool);
+                             pointsDb.run("UPDATE points SET balance = balance + ? WHERE user_id = ?", [winnings, winner.user_id]);
+                             resultText += `<@${winner.user_id}> gagne **${winnings}** points (Estimé: ${winner.prediction_value}, Diff: ${winner.diff})\n`;
+                         });
+
+                         // Create Embed
+                         const { EmbedBuilder } = await import('discord.js');
+                         const resultEmbed = new EmbedBuilder()
+                            .setTitle(`Résultat: ${bet.title}`)
+                            .setDescription(`La bonne réponse était **${resultValue}**.\n\n${resultText}`)
+                            .setColor('#FFD700')
+                            .setFooter({ text: `Total en jeu: ${totalPool} points` });
+                        
+                        await interaction.reply({ content: "Résultats publiés !", flags: MessageFlags.Ephemeral });
+                        await interaction.channel.send({ embeds: [resultEmbed] });
+                        
+                         // Update original message
+                         if (messageId) {
+                            try {
+                                const originalMessage = await interaction.channel.messages.fetch(messageId);
+                                if (originalMessage) await originalMessage.edit({ components: [] });
+                            } catch (e) {}
+                         }
+                    });
+                 });
+            });
+            return;
+        }
+
+        if (interaction.customId.startsWith('bet_estimate_modal|')) {
+            const [, betId] = interaction.customId.split('|');
+            const predictionStr = interaction.fields.getTextInputValue('prediction');
+            const amountStr = interaction.fields.getTextInputValue('amount');
+            const userId = interaction.user.id;
+
+            const prediction = parseInt(predictionStr);
+            const amount = parseInt(amountStr);
+
+            if (isNaN(prediction)) return interaction.reply({ content: "L'estimation doit être un nombre entier.", flags: MessageFlags.Ephemeral });
+            if (isNaN(amount) || amount <= 0) return interaction.reply({ content: "La mise doit être un nombre positif.", flags: MessageFlags.Ephemeral });
+
+            pointsDb.get("SELECT balance FROM points WHERE user_id = ?", [userId], (err, row) => {
+                if (err) return interaction.reply({ content: "Erreur BD.", flags: MessageFlags.Ephemeral });
+                const balance = row ? row.balance : 0;
+                
+                // Check if updating
+                pointsDb.get("SELECT amount FROM bet_participations WHERE bet_id = ? AND user_id = ?", [betId, userId], (err, existing) => {
+                     const previousAmount = existing ? existing.amount : 0;
+                     const cost = amount - previousAmount; // Can be negative if reducing bet, but we usually only allow adding? The prompt said "participants by providing a value".
+                     // If I allow changing prediction, I must account for amount differences.
+                     // The user can change amount. If amount > previousAmount, they pay more.
+                     // If amount < previousAmount, they get refund? Let's check logic.
+                     
+                     if (balance < cost) {
+                         return interaction.reply({ content: `Solde insuffisant. Manque ${cost - balance} points.`, flags: MessageFlags.Ephemeral });
+                     }
+
+                     pointsDb.serialize(() => {
+                         // Update balance
+                         pointsDb.run("UPDATE points SET balance = balance - ? WHERE user_id = ?", [cost, userId]);
+                         
+                         if (existing) {
+                             pointsDb.run("UPDATE bet_participations SET amount = ?, prediction_value = ? WHERE bet_id = ? AND user_id = ?", [amount, prediction, betId, userId]);
+                             interaction.reply({ content: `Estimation mise à jour: **${prediction}** avec **${amount}** points.`, flags: MessageFlags.Ephemeral });
+                         } else {
+                             pointsDb.run("INSERT INTO bet_participations (bet_id, user_id, option_index, amount, prediction_value) VALUES (?, ?, 0, ?, ?)", [betId, userId, amount, prediction]);
+                             interaction.reply({ content: `Estimation enregistrée: **${prediction}** avec **${amount}** points.`, flags: MessageFlags.Ephemeral });
+                         }
+                         updateEstimateEmbed(interaction, betId);
+                     });
+                });
+            });
+            return;
+        }
+
         if (interaction.customId.startsWith('bet_modal|')) {
             const [, betId, optionIndex] = interaction.customId.split('|');
             const amount = parseInt(interaction.fields.getTextInputValue('amount'));
@@ -535,6 +716,38 @@ async function execute(interaction, bot) {
                     // Ignorer les erreurs d'édition
                 }
             });
+        });
+    }
+
+    async function updateEstimateEmbed(interaction, betId) {
+        pointsDb.all("SELECT user_id, amount, prediction_value FROM bet_participations WHERE bet_id = ?", [betId], async (err, rows) => {
+            if (err) return;
+            try {
+                const { EmbedBuilder } = await import('discord.js');
+                // Try to get message from interaction if possible
+                let message = interaction.message;
+                if (!message && interaction.channel) {
+                     // Can't easily find message without ID, but for buttons interaction.message is set.
+                }
+                if (!message) return;
+
+                const oldEmbed = message.embeds[0];
+                if (!oldEmbed) return;
+
+                const newEmbed = new EmbedBuilder(oldEmbed.data);
+                let description = `Cliquez sur le bouton ci-dessous pour proposer votre estimation !\nLe gagnant sera celui qui sera le plus proche du résultat.\n\n**Participations:**\n`;
+
+                if (!rows || rows.length === 0) {
+                     description += "(Aucune pour le moment)";
+                } else {
+                     description += rows.map(r => `<@${r.user_id}> : **${r.prediction_value}** (${r.amount} pts)`).join('\n');
+                }
+
+                newEmbed.setDescription(description);
+                await message.edit({ embeds: [newEmbed] });
+            } catch (e) {
+                // ignore
+            }
         });
     }
 
