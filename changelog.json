@@ -1,7 +1,21 @@
 {
-  "version": "1.9.2",
-  "lastUpdated": "2026-01-08T10:00:00.000Z",
+  "version": "1.9.3",
+  "lastUpdated": "2026-01-08T12:00:00.000Z",
   "releases": [
+    {
+      "version": "1.9.3",
+      "date": "2026-01-08",
+      "title": "Release 1.9.3",
+      "features": [
+        {
+          "type": "fix",
+          "name": "Précision des statistiques",
+          "description": "Les statistiques de paris (total misé) sont désormais comptabilisées à la fin du pari pour éviter de compter les paris annulés.",
+          "author": "Sydnec",
+          "announce": false
+        }
+      ]
+    },
     {
       "version": "1.9.2",
       "date": "2026-01-08",
