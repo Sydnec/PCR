@@ -1,7 +1,21 @@
 {
-  "version": "1.9.1",
-  "lastUpdated": "2026-01-07T11:00:00.000Z",
+  "version": "1.9.2",
+  "lastUpdated": "2026-01-08T10:00:00.000Z",
   "releases": [
+    {
+      "version": "1.9.2",
+      "date": "2026-01-08",
+      "title": "Release 1.9.2",
+      "features": [
+        {
+          "type": "feature",
+          "name": "Statistiques de Paris (/betstats)",
+          "description": "Suivi des points misés et victoire max par joueur et pour le serveur.",
+          "author": "Sydnec",
+          "announce": false
+        }
+      ]
+    },
     {
       "version": "1.9.1",
       "date": "2026-01-07",
