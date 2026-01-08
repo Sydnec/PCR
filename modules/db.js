@@ -100,6 +100,15 @@ const db = new sqlite3.Database(dbPath, (err) => {
         }
       }
     );
+    // Table pour stats de paris (Bet Stats)
+    db.run(
+      "CREATE TABLE IF NOT EXISTS bet_stats (user_id TEXT PRIMARY KEY, total_wagered INTEGER DEFAULT 0, max_win INTEGER DEFAULT 0)",
+      (err) => {
+        if (err) {
+          handleException("Erreur lors de la création de la table bet_stats :", err);
+        }
+      }
+    );
     // Table pour stats mots les plus utilisés par utilisateur
     db.run(
       "CREATE TABLE IF NOT EXISTS word_stats (user_id TEXT, word TEXT, count INTEGER DEFAULT 0, PRIMARY KEY(user_id, word))",

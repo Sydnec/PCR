@@ -393,8 +393,11 @@ async function execute(interaction, bot) {
                         const winners = parts.filter(p => p.option_index === winnerIndex);
                         const totalWinningAmount = winners.reduce((acc, p) => acc + p.amount, 0);
 
-                        pointsDb.serialize(() => {
+                        pointsDb.serialize(async() => {
                             pointsDb.run("UPDATE bets SET status = 'CLOSED', winning_option_index = ? WHERE id = ?", [winnerIndex, betId]);
+
+                            // Import stats DB
+                            const statsDb = (await import('../../modules/db.js')).default;
 
                             // Calcul des statistiques pour l'affichage
                             const totalPoints = parts.reduce((acc, p) => acc + p.amount, 0);
@@ -438,6 +441,13 @@ async function execute(interaction, bot) {
                                         const share = winner.amount / totalWinningAmount;
                                         const winnings = Math.floor(share * totalPool);
                                         pointsDb.run("UPDATE points SET balance = balance + ? WHERE user_id = ?", [winnings, winner.user_id]);
+                                        
+                                        // Update MAX WIN stats
+                                        statsDb.run(
+                                            `INSERT INTO bet_stats (user_id, max_win) VALUES (?, ?) 
+                                             ON CONFLICT(user_id) DO UPDATE SET max_win = MAX(max_win, ?)`,
+                                            [winner.user_id, winnings, winnings]
+                                         );
                                     });
 
                                     const winnerNames = winners.slice(0, 3).map(w => `<@${w.user_id}>`).join(", ");
@@ -519,11 +529,21 @@ async function execute(interaction, bot) {
                     pointsDb.serialize(async () => {
                          pointsDb.run("UPDATE bets SET status = 'CLOSED', winning_option_index = ? WHERE id = ?", [resultValue, betId]);
 
+                         // import DB for stats
+                         const statsDb = (await import('../../modules/db.js')).default;
+
                          winners.forEach(winner => {
                              const share = winner.amount / totalWinningAmount;
                              const winnings = Math.floor(share * totalPool);
                              pointsDb.run("UPDATE points SET balance = balance + ? WHERE user_id = ?", [winnings, winner.user_id]);
                              resultText += `<@${winner.user_id}> gagne **${winnings}** points (Estimé: ${winner.prediction_value}, Diff: ${winner.diff})\n`;
+                             
+                             // Update MAX WIN stats
+                             statsDb.run(
+                                `INSERT INTO bet_stats (user_id, max_win) VALUES (?, ?) 
+                                 ON CONFLICT(user_id) DO UPDATE SET max_win = MAX(max_win, ?)`,
+                                [winner.user_id, winnings, winnings]
+                             );
                          });
 
                          // Create Embed
@@ -578,10 +598,13 @@ async function execute(interaction, bot) {
                          return interaction.reply({ content: `Solde insuffisant. Manque ${cost - balance} points.`, flags: MessageFlags.Ephemeral });
                      }
 
-                     pointsDb.serialize(() => {
+                     pointsDb.serialize(async () => {
                          // Update balance
                          pointsDb.run("UPDATE points SET balance = balance - ? WHERE user_id = ?", [cost, userId]);
                          
+                         // Import stats DB
+                         const statsDb = (await import('../../modules/db.js')).default;
+                     
                          if (existing) {
                              pointsDb.run("UPDATE bet_participations SET amount = ?, prediction_value = ? WHERE bet_id = ? AND user_id = ?", [amount, prediction, betId, userId]);
                              interaction.reply({ content: `Estimation mise à jour: **${prediction}** avec **${amount}** points.`, flags: MessageFlags.Ephemeral });
@@ -589,6 +612,23 @@ async function execute(interaction, bot) {
                              pointsDb.run("INSERT INTO bet_participations (bet_id, user_id, option_index, amount, prediction_value) VALUES (?, ?, 0, ?, ?)", [betId, userId, amount, prediction]);
                              interaction.reply({ content: `Estimation enregistrée: **${prediction}** avec **${amount}** points.`, flags: MessageFlags.Ephemeral });
                          }
+                         
+                         // Update TOTAL WAGERED stats (only added cost matters, if cost > 0 user spends, if cost < 0 user is refunded theoretically but logic above only handles positive bet changes mostly or I assume cost represents net change)
+                         // The logic: cost = newAmount - oldAmount. 
+                         // If cost > 0, we add 'cost' to total_wagered.
+                         // If cost < 0, user reduced bet, we should probably NOT decrease total_wagered as stats usually count "volume" but consistency is better.
+                         // Let's assume we track "active wagered" or "volume"? Usually volume never goes down.
+                         // But if user cancels bet? 
+                         // Let's stick to: we only increment when they SPEND points.
+                         
+                         if (cost > 0) {
+                             statsDb.run(
+                                `INSERT INTO bet_stats (user_id, total_wagered) VALUES (?, ?) 
+                                 ON CONFLICT(user_id) DO UPDATE SET total_wagered = total_wagered + ?`,
+                                [userId, cost, cost]
+                             );
+                         }
+
                          updateEstimateEmbed(interaction, betId);
                      });
                 });
@@ -629,8 +669,11 @@ async function execute(interaction, bot) {
                         if (err || !opt) return interaction.reply({ content: "Option invalide.", flags: MessageFlags.Ephemeral });
 
                         // Deduct points and add participation
-                        pointsDb.serialize(() => {
+                        pointsDb.serialize(async () => {
                             pointsDb.run("UPDATE points SET balance = balance - ? WHERE user_id = ?", [amount, userId]);
+                            
+                            // Import stats DB
+                            const statsDb = (await import('../../modules/db.js')).default;
                             
                             // Check if user already participated to update or insert
                             pointsDb.get("SELECT amount FROM bet_participations WHERE bet_id = ? AND user_id = ?", [betId, userId], (err, existing) => {
@@ -645,6 +688,14 @@ async function execute(interaction, bot) {
                                                 pointsDb.run("UPDATE points SET balance = balance + ? WHERE user_id = ?", [amount, userId]);
                                                 return interaction.reply({ content: "Erreur lors de la mise à jour de votre pari.", flags: MessageFlags.Ephemeral });
                                             }
+                                            
+                                            // Update TOTAL WAGERED stats
+                                            statsDb.run(
+                                                `INSERT INTO bet_stats (user_id, total_wagered) VALUES (?, ?) 
+                                                ON CONFLICT(user_id) DO UPDATE SET total_wagered = total_wagered + ?`,
+                                                [userId, amount, amount]
+                                            );
+                                            
                                             interaction.reply({ content: `Vous avez ajouté **${amount}** points à votre mise sur l'option **${optionIndex}** du pari #${betId}. Total misé: **${existing.amount + amount}**.`, flags: MessageFlags.Ephemeral });
                                             updateBetEmbed(interaction, betId);
                                         }
@@ -660,6 +711,14 @@ async function execute(interaction, bot) {
                                                 pointsDb.run("UPDATE points SET balance = balance + ? WHERE user_id = ?", [amount, userId]);
                                                 return interaction.reply({ content: "Erreur lors de l'enregistrement de votre pari.", flags: MessageFlags.Ephemeral });
                                             }
+                                            
+                                            // Update TOTAL WAGERED stats
+                                            statsDb.run(
+                                                `INSERT INTO bet_stats (user_id, total_wagered) VALUES (?, ?) 
+                                                ON CONFLICT(user_id) DO UPDATE SET total_wagered = total_wagered + ?`,
+                                                [userId, amount, amount]
+                                            );
+
                                             interaction.reply({ content: `Vous avez misé **${amount}** points sur l'option **${optionIndex}** du pari #${betId}.`, flags: MessageFlags.Ephemeral });
                                             updateBetEmbed(interaction, betId);
                                         }
