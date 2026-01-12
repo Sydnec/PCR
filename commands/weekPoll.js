@@ -16,7 +16,9 @@ export default {
     .addStringOption((option) =>
       option
         .setName("jour")
-        .setDescription("Jour de la semaine pour commencer (prochaine occurrence)")
+        .setDescription(
+          "Jour de la semaine pour commencer (prochaine occurrence)"
+        )
         .setRequired(false)
         .addChoices(
           { name: "Lundi", value: "lundi" },
@@ -54,27 +56,27 @@ export default {
 
     // Mapping des jours en français vers leur index (0 = Dimanche, 1 = Lundi, etc.)
     const dayMapping = {
-      "dimanche": 0,
-      "lundi": 1,
-      "mardi": 2,
-      "mercredi": 3,
-      "jeudi": 4,
-      "vendredi": 5,
-      "samedi": 6
+      dimanche: 0,
+      lundi: 1,
+      mardi: 2,
+      mercredi: 3,
+      jeudi: 4,
+      vendredi: 5,
+      samedi: 6,
     };
 
     // Si un jour est choisi, calculer la prochaine occurrence
     if (dayChoice && !startDateStr && !endDateStr) {
       const targetDay = dayMapping[dayChoice];
       const currentDay = now.getDay();
-      
+
       startDate = new Date(now);
       let daysToAdd = (targetDay - currentDay + 7) % 7;
       if (daysToAdd === 0) {
         daysToAdd = 7; // Si c'est le même jour, prendre la semaine prochaine
       }
       startDate.setDate(startDate.getDate() + daysToAdd);
-      
+
       endDate = new Date(startDate);
       endDate.setDate(endDate.getDate() + 6); // 7 jours au total
     }
@@ -92,16 +94,25 @@ export default {
           const parts = startDateStr.split("/");
           if (parts.length === 2) {
             // Format JJ/MM
-            startDate = new Date(currentYear, parseInt(parts[1]) - 1, parseInt(parts[0]));
+            startDate = new Date(
+              currentYear,
+              parseInt(parts[1]) - 1,
+              parseInt(parts[0])
+            );
           } else if (parts.length === 3) {
             // Format JJ/MM/AAAA
-            startDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+            startDate = new Date(
+              parseInt(parts[2]),
+              parseInt(parts[1]) - 1,
+              parseInt(parts[0])
+            );
           } else {
             throw new Error("Format invalide");
           }
         } catch (e) {
           await interaction.editReply({
-            content: "❌ Format de date de début invalide. Utilisez JJ/MM ou JJ/MM/AAAA",
+            content:
+              "❌ Format de date de début invalide. Utilisez JJ/MM ou JJ/MM/AAAA",
           });
           return;
         }
@@ -115,16 +126,25 @@ export default {
           const parts = endDateStr.split("/");
           if (parts.length === 2) {
             // Format JJ/MM
-            endDate = new Date(currentYear, parseInt(parts[1]) - 1, parseInt(parts[0]));
+            endDate = new Date(
+              currentYear,
+              parseInt(parts[1]) - 1,
+              parseInt(parts[0])
+            );
           } else if (parts.length === 3) {
             // Format JJ/MM/AAAA
-            endDate = new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+            endDate = new Date(
+              parseInt(parts[2]),
+              parseInt(parts[1]) - 1,
+              parseInt(parts[0])
+            );
           } else {
             throw new Error("Format invalide");
           }
         } catch (e) {
           await interaction.editReply({
-            content: "❌ Format de date de fin invalide. Utilisez JJ/MM ou JJ/MM/AAAA",
+            content:
+              "❌ Format de date de fin invalide. Utilisez JJ/MM ou JJ/MM/AAAA",
           });
           return;
         }
@@ -137,25 +157,32 @@ export default {
     // Validation : la date de début doit être avant ou égale à la date de fin
     if (startDate > endDate) {
       await interaction.editReply({
-        content: "❌ La date de début doit être avant ou égale à la date de fin !",
+        content:
+          "❌ La date de début doit être avant ou égale à la date de fin !",
       });
       return;
     }
 
     // Générer la liste des jours
-    const daysOfWeek = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+    const daysOfWeek = [
+      "Dimanche",
+      "Lundi",
+      "Mardi",
+      "Mercredi",
+      "Jeudi",
+      "Vendredi",
+      "Samedi",
+    ];
     let daysOfTheWeek = "";
     let currentDate = new Date(startDate);
-    let dayNumber = 1;
 
     while (currentDate <= endDate) {
       const dayName = daysOfWeek[currentDate.getDay()];
       const dayStr = String(currentDate.getDate()).padStart(2, "0");
       const monthStr = String(currentDate.getMonth() + 1).padStart(2, "0");
-      daysOfTheWeek += `${dayNumber}. ${dayName} ${dayStr}/${monthStr}\n`;
-      
+      daysOfTheWeek += `${dayName} ${dayStr}/${monthStr}\n`;
+
       currentDate.setDate(currentDate.getDate() + 1);
-      dayNumber++;
     }
 
     let pollMessage = await interaction.channel.send(

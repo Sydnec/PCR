@@ -1,7 +1,21 @@
 {
-  "version": "1.9.4",
-  "lastUpdated": "2026-01-08T13:17:27.703Z",
+  "version": "1.9.5",
+  "lastUpdated": "2026-01-12T20:11:16.413Z",
   "releases": [
+    {
+      "version": "1.9.5",
+      "date": "2026-01-12",
+      "title": "Release 1.9.5",
+      "features": [
+        {
+          "type": "fix",
+          "name": "Formatage WeekPoll",
+          "description": "Suppression de la numérotation des jours dans la commande /weekpoll.",
+          "author": "Sydnec",
+          "announce": false
+        }
+      ]
+    },
     {
       "version": "1.9.4",
       "date": "2026-01-08",
