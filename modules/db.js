@@ -136,12 +136,30 @@ const db = new sqlite3.Database(dbPath, (err) => {
     );
     // Table pour stats de la commande randomizabaise
     db.run(
-      "CREATE TABLE IF NOT EXISTS randomizabaise_stats (message_id TEXT PRIMARY KEY, user_a TEXT, user_b TEXT, reaction_count INTEGER DEFAULT 0)",
+      "CREATE TABLE IF NOT EXISTS randomizabaise_stats (message_id TEXT PRIMARY KEY, user_a TEXT, user_b TEXT, user_c TEXT, reaction_count INTEGER DEFAULT 0, is_shiny INTEGER DEFAULT 0)",
       (err) => {
         if (err) {
           handleException(
             "Erreur lors de la création de la table randomizabaise_stats :",
             err
+          );
+        } else {
+          // Migration : ajouter user_c et is_shiny si la table existe en ancien format
+          db.run(
+            "ALTER TABLE randomizabaise_stats ADD COLUMN user_c TEXT",
+            (err) => {
+              if (err && !err.message.includes("duplicate column")) {
+                handleException("Erreur lors de l'ajout de user_c :", err);
+              }
+            }
+          );
+          db.run(
+            "ALTER TABLE randomizabaise_stats ADD COLUMN is_shiny INTEGER DEFAULT 0",
+            (err) => {
+              if (err && !err.message.includes("duplicate column")) {
+                handleException("Erreur lors de l'ajout de is_shiny :", err);
+              }
+            }
           );
         }
       }

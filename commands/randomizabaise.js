@@ -38,12 +38,19 @@ export default {
         return;
       }
 
-      // Choisit 2 membres au hasard
+      // Choisit 2 ou 3 membres au hasard (1/1024 de chance shiny = 3 personnes)
+      const isShiny = Math.random() < 1 / 1024;
+      const memberCount = isShiny ? 3 : 2;
+
       const shuffled = eligibleMembers.sort(() => 0.5 - Math.random());
-      const [member1, member2] = shuffled;
+      const selectedMembers = shuffled.slice(0, memberCount);
+
+      let content = isShiny
+        ? `✨ **SHINY RANDOMIZABAISE!** ✨\n💞 Aujourd'hui, je ship <@${selectedMembers[0].id}>, <@${selectedMembers[1].id}> et <@${selectedMembers[2].id}> !`
+        : `💞 Aujourd'hui, je ship <@${selectedMembers[0].id}> et <@${selectedMembers[1].id}> !`;
 
       await interaction.editReply({
-        content: `💞 Aujourd'hui, je ship <@${member1.id}> et <@${member2.id}> !`,
+        content: content,
       });
       // Enregistrer en base la stat randomizabaise
       try {
@@ -51,8 +58,8 @@ export default {
         const sent = await interaction.fetchReply();
         // Use INSERT OR IGNORE to avoid overwriting an existing row (idempotence)
         db.run(
-          `INSERT OR IGNORE INTO randomizabaise_stats (message_id, user_a, user_b, reaction_count) VALUES (?, ?, ?, ?)`,
-          [sent.id, member1.id, member2.id, 0]
+          `INSERT OR IGNORE INTO randomizabaise_stats (message_id, user_a, user_b, user_c, reaction_count, is_shiny) VALUES (?, ?, ?, ?, ?, ?)`,
+          [sent.id, selectedMembers[0].id, selectedMembers[1].id, selectedMembers[2]?.id || null, 0, isShiny ? 1 : 0]
         );
       } catch (err) {
         handleException(err);

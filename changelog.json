@@ -1,7 +1,21 @@
 {
-  "version": "1.9.6",
+  "version": "1.9.7",
   "lastUpdated": "2026-01-12T20:12:49.210Z",
   "releases": [
+    {
+      "version": "1.9.7",
+      "date": "2026-06-01",
+      "title": "Release 1.9.7",
+      "features": [
+        {
+          "type": "feature",
+          "name": "Shiny Randomizabaise",
+          "description": "Ajout d'une chance 1/1024 d'avoir un ship de 3 personnes au lieu de 2.",
+          "author": "Sydnec",
+          "announce": false
+        }
+      ]
+    },
     {
       "version": "1.9.6",
       "date": "2026-01-12",
