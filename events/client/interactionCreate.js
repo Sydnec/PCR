@@ -1,6 +1,7 @@
 import { handleException, log } from '../../modules/utils.js';
 import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, MessageFlags, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import pointsDb from '../../modules/points-db.js';
+import { handlePokemonButton } from '../../modules/pokemon/interactions.js';
 
 const name = 'interactionCreate';
 const once = false;
@@ -38,8 +39,30 @@ async function execute(interaction, bot) {
             });
         }
     }
+    // Autocomplétion : branche générique, utilisable par n'importe quelle
+    // commande exportant une méthode `autocomplete`.
+    if (interaction.isAutocomplete()) {
+        const command = bot.commands.get(interaction.commandName);
+        if (!command || typeof command.autocomplete !== 'function') return;
+        try {
+            await command.autocomplete(interaction, bot);
+        } catch (err) {
+            handleException(err);
+        }
+        return;
+    }
     if (interaction.isButton()) {
         const { customId } = interaction;
+
+        // Système Pokémon : toute la logique vit dans modules/pokemon/.
+        if (customId.startsWith('poke_')) {
+            try {
+                await handlePokemonButton(interaction, bot);
+            } catch (err) {
+                handleException(err);
+            }
+            return;
+        }
 
         // Gérer les boutons de pari ("Estimation")
         if (customId.startsWith('bet_estimate_join|')) {

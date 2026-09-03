@@ -8,6 +8,7 @@
     "start": "node ./index.js",
     "dev": "nodemon ./index.js",
     "test": "echo \"Error: no test specified\" && exit 0",
+    "gen:pokemon": "node ./scripts/generate-pokemon-data.js",
     "lint": "echo 'Linting code...' && node -c index.js",
     "update": "bash ./pcr update",
     "deploy": "bash ./pcr deploy",

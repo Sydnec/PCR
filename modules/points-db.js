@@ -89,6 +89,150 @@ const db = new sqlite3.Database(dbPath, (err) => {
         }
       }
     );
+
+    // ================== SYSTÈME POKÉMON ==================
+    // Ces tables vivent dans points.db (persistante) et surtout pas dans
+    // modules/db.js, dont le fichier change chaque 1er janvier : les
+    // collections des dresseurs seraient effacées tous les ans.
+
+    // État global du système. Une seule ligne, qui sert de point de
+    // sérialisation au déclenchement des spawns (cf. pokemon/spawn.js).
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_state (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        message_count INTEGER NOT NULL DEFAULT 0,
+        last_spawn_at INTEGER NOT NULL DEFAULT 0,
+        spawning INTEGER NOT NULL DEFAULT 0,
+        total_spawns INTEGER NOT NULL DEFAULT 0
+      )`,
+      (err) => {
+        if (err) return handleException("Erreur création table pokemon_state :", err);
+        db.run("INSERT OR IGNORE INTO pokemon_state (id) VALUES (1)", (err) => {
+          if (err) handleException("Erreur initialisation pokemon_state :", err);
+        });
+      }
+    );
+
+    // Spawns. catch_rate est figé à l'apparition : régénérer le dataset ou
+    // changer la config ne doit jamais modifier les chances d'un spawn en cours.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_spawns (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        species_id INTEGER NOT NULL,
+        is_shiny INTEGER NOT NULL DEFAULT 0,
+        catch_rate INTEGER NOT NULL,
+        rarity TEXT,
+        channel_id TEXT,
+        message_id TEXT,
+        status TEXT NOT NULL DEFAULT 'ACTIVE',
+        spawned_at INTEGER NOT NULL,
+        throw_count INTEGER NOT NULL DEFAULT 0,
+        caught_by TEXT,
+        caught_at INTEGER,
+        caught_ball TEXT,
+        ended_at INTEGER
+      )`,
+      (err) => {
+        if (err) return handleException("Erreur création table pokemon_spawns :", err);
+        // Garantie au niveau base : jamais deux spawns actifs en même temps.
+        db.run(
+          `CREATE UNIQUE INDEX IF NOT EXISTS idx_pokemon_spawn_active
+             ON pokemon_spawns(status) WHERE status = 'ACTIVE'`,
+          (err) => {
+            if (err) handleException("Erreur création index pokemon_spawn_active :", err);
+          }
+        );
+      }
+    );
+
+    // Journal des lancers : alimente l'embed en direct, les statistiques, et
+    // sert de piste d'audit pour les remboursements (result = 'VOID').
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_throws (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        spawn_id INTEGER NOT NULL,
+        user_id TEXT NOT NULL,
+        ball TEXT NOT NULL,
+        cost INTEGER NOT NULL,
+        probability REAL,
+        result TEXT NOT NULL,
+        thrown_at INTEGER NOT NULL
+      )`,
+      (err) => {
+        if (err) return handleException("Erreur création table pokemon_throws :", err);
+        db.run(
+          "CREATE INDEX IF NOT EXISTS idx_pokemon_throws_spawn ON pokemon_throws(spawn_id, id)",
+          (err) => {
+            if (err) handleException("Erreur création index pokemon_throws_spawn :", err);
+          }
+        );
+      }
+    );
+
+    // Collection. is_shiny fait partie de la clé : un shiny est une entrée de
+    // Pokédex distincte. Une ligne peut retomber à count = 0 après une fusion
+    // ou un échange ; on la garde pour préserver first_caught_at, donc TOUTE
+    // lecture doit filtrer sur count > 0.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_collection (
+        user_id TEXT NOT NULL,
+        species_id INTEGER NOT NULL,
+        is_shiny INTEGER NOT NULL DEFAULT 0,
+        count INTEGER NOT NULL DEFAULT 0,
+        first_caught_at INTEGER,
+        last_caught_at INTEGER,
+        PRIMARY KEY (user_id, species_id, is_shiny)
+      )`,
+      (err) => {
+        if (err) return handleException("Erreur création table pokemon_collection :", err);
+        db.run(
+          "CREATE INDEX IF NOT EXISTS idx_pokemon_collection_user ON pokemon_collection(user_id)",
+          (err) => {
+            if (err) handleException("Erreur création index pokemon_collection_user :", err);
+          }
+        );
+      }
+    );
+
+    // Offres d'échange. expires_at permet une expiration paresseuse dans le
+    // WHERE de l'acceptation : aucun cron n'est nécessaire à la correction.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_trades (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        from_user_id TEXT NOT NULL,
+        to_user_id TEXT NOT NULL,
+        offer_species_id INTEGER NOT NULL,
+        offer_is_shiny INTEGER NOT NULL DEFAULT 0,
+        request_species_id INTEGER NOT NULL,
+        request_is_shiny INTEGER NOT NULL DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'PENDING',
+        created_at INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL,
+        resolved_at INTEGER,
+        channel_id TEXT,
+        message_id TEXT
+      )`,
+      (err) => {
+        if (err) handleException("Erreur création table pokemon_trades :", err);
+      }
+    );
+
+    // Journal des fusions (audit et statistiques).
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_fusions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        from_species_id INTEGER NOT NULL,
+        to_species_id INTEGER NOT NULL,
+        is_shiny INTEGER NOT NULL DEFAULT 0,
+        duplicates_spent INTEGER NOT NULL,
+        points_spent INTEGER NOT NULL,
+        created_at INTEGER NOT NULL
+      )`,
+      (err) => {
+        if (err) handleException("Erreur création table pokemon_fusions :", err);
+      }
+    );
   }
 });
 
