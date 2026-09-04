@@ -1,7 +1,21 @@
 {
-  "version": "1.9.7",
-  "lastUpdated": "2026-01-12T20:12:49.210Z",
+  "version": "1.10.0",
+  "lastUpdated": "2026-09-04T06:58:45.105Z",
   "releases": [
+    {
+      "version": "1.10.0",
+      "date": "2026-09-04",
+      "title": "Release 1.10.0",
+      "features": [
+        {
+          "type": "feature",
+          "name": "Capture de Pokémon",
+          "description": "Des Pokémon de 1re génération apparaissent dans un salon dédié au rythme de l'activité du serveur. Chaque lancer de ball coûte des points, réussi ou non : Poké Ball, Super Ball, Hyper Ball et Master Ball. Le premier jet réussi remporte le Pokémon. Ajout de /pokedex, /pokeclassement, /pokeinfo, /evolution, /echange et /pokespawn (admin, pour les événements).",
+          "author": "Sydnec",
+          "announce": true
+        }
+      ]
+    },
     {
       "version": "1.9.7",
       "date": "2026-06-01",
@@ -602,13 +616,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "feature",
-      "name": "Capture de Pokémon",
-      "description": "Des Pokémon de 1re génération apparaissent dans un salon dédié au rythme de l'activité du serveur. Chaque lancer de ball coûte des points, réussi ou non : Poké Ball, Super Ball, Hyper Ball et Master Ball. Le premier jet réussi remporte le Pokémon. Ajout de /pokedex, /pokeclassement, /pokeinfo, /evolution, /echange et /pokespawn (admin, pour les événements).",
-      "author": "Sydnec",
-      "announce": true
-    }
-  ]
+  "pending": []
 }
