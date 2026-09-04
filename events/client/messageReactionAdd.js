@@ -6,7 +6,22 @@ dotenv.config();
 const name = 'messageReactionAdd';
 const once = false;
 async function execute(reaction, user) {
-    if (user.id === process.env.CLIENT_ID) return;
+    try {
+        // Avec les partials activés (cf. index.js), Discord.js émet désormais
+        // l'événement pour les messages hors cache — c'est ce qui manquait pour
+        // que le message des rôles, forcément ancien, réagisse après un
+        // redémarrage. La contrepartie : il faut compléter l'objet partiel.
+        if (reaction.partial) await reaction.fetch();
+        if (reaction.message.partial) await reaction.message.fetch();
+        if (user.partial) await user.fetch();
+    } catch (err) {
+        // Message supprimé entre-temps : rien à comptabiliser.
+        return;
+    }
+
+    // `user.bot` couvre tous les bots, pas seulement celui-ci : l'ancien test
+    // sur CLIENT_ID laissait les autres bots polluer les statistiques.
+    if (user.bot) return;
     try {
         // --- Statistiques réactions par utilisateur ---
         db.run(
@@ -50,14 +65,15 @@ async function execute(reaction, user) {
 
         // Gestion rôles (logique existante)
         if (reaction.message.id === process.env.ROLE_MESSAGE_ID) {
-            const guildMember = await reaction.message.guild.members.cache.get(
-                user.id
+            const guild = reaction.message.guild;
+            // `members.cache.get` renvoyait undefined pour un membre hors cache,
+            // et l'accès à .roles levait alors une TypeError.
+            const guildMember = await guild?.members.fetch(user.id).catch(() => null);
+            if (!guildMember) return;
+            const matchingRoles = guild.roles.cache.filter((role) =>
+                role.name.startsWith(reaction.emoji.name)
             );
-            const matchingRoles =
-                await reaction.message.guild.roles.cache.filter((role) =>
-                    role.name.startsWith(reaction.emoji.name)
-                );
-            await guildMember.roles.add(matchingRoles);
+            if (matchingRoles.size) await guildMember.roles.add(matchingRoles);
         }
     } catch (err) {
         handleException(err);

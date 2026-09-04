@@ -14,14 +14,21 @@ export default {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
       // Appel de la fonction handleCOTDOnTimer
       const url = "https://nominis.cef.fr/json/nominis.php";
-      const response = await axios.get(url);
+      const response = await axios.get(url, { timeout: 10000 });
 
+      // Si la réponse n'a pas la forme attendue, on répondait… rien : la
+      // commande restait « en attente » jusqu'à expiration du jeton.
       if (
-        response.data &&
-        response.data.response &&
-        response.data.response.prenoms &&
-        response.data.response.prenoms.majeurs
+        !response.data?.response?.prenoms?.majeurs ||
+        !response.data.response.query
       ) {
+        await interaction.editReply({
+          content: "❌ Le service des saints du jour est indisponible.",
+        });
+        return;
+      }
+
+      {
         const saints = response.data.response.prenoms.majeurs;
         let messageContent = `Nous sommes le ${formatDate(
           response.data.response.query.jour,
@@ -57,6 +64,11 @@ export default {
       }
     } catch (error) {
       handleException(error); // Utilisation de ton module d'erreur personnalisé
+      await interaction
+        .editReply({
+          content: "❌ Impossible de récupérer les saints du jour.",
+        })
+        .catch(() => {});
     }
   },
 };

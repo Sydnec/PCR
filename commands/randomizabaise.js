@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, MessageFlags } from "discord.js";
+import { SlashCommandBuilder } from "discord.js";
 import { handleException } from "../modules/utils.js";
 import dotenv from "dotenv";
 dotenv.config(); // process.env.CONSTANT
@@ -38,11 +38,22 @@ export default {
         return;
       }
 
-      // Choisit 2 ou 3 membres au hasard (1/1024 de chance shiny = 3 personnes)
-      const isShiny = Math.random() < 1 / 1024;
+      // Choisit 2 ou 3 membres au hasard (1/1024 de chance shiny = 3 personnes).
+      // Le tirage shiny n'est retenu que s'il y a assez de monde : avec
+      // exactement deux membres éligibles, selectedMembers[2] était undefined et
+      // la commande levait une TypeError en laissant la réponse en attente.
+      const isShiny =
+        Math.random() < 1 / 1024 && eligibleMembers.length >= 3;
       const memberCount = isShiny ? 3 : 2;
 
-      const shuffled = eligibleMembers.sort(() => 0.5 - Math.random());
+      // Mélange de Fisher-Yates : `sort(() => 0.5 - Math.random())` s'appuie sur
+      // un comparateur incohérent, dont le résultat n'est ni uniforme ni
+      // spécifié — certains membres sortaient bien plus souvent que d'autres.
+      const shuffled = [...eligibleMembers];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
       const selectedMembers = shuffled.slice(0, memberCount);
 
       let content = isShiny

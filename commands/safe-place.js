@@ -14,20 +14,35 @@ export default {
                 .setRequired(true)
         ),
     async execute(interaction, bot) {
-        const channel = await bot.channels
-            .fetch(process.env.SAFE_PLACE_CHANNEL_ID)
-            .catch(handleException);
-        channel
-            .send(
-                `Ce message a été envoyé anonymement en utilisant la commande \/safe-place : \n${interaction.options.getString(
+        // L'ancien `.catch(handleException)` avalait l'erreur et laissait
+        // `channel` à undefined : l'appel suivant levait une TypeError, sans
+        // jamais répondre à l'utilisateur.
+        try {
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+            const channel = await bot.channels
+                .fetch(process.env.SAFE_PLACE_CHANNEL_ID)
+                .catch(() => null);
+            if (!channel?.isTextBased?.()) {
+                await interaction.editReply({
+                    content: "❌ Le salon safe-place est introuvable ou inaccessible.",
+                });
+                return;
+            }
+
+            const message = await channel.send(
+                `Ce message a été envoyé anonymement en utilisant la commande /safe-place : \n${interaction.options.getString(
                     'message'
                 )}`
-            )
-            .then((message) =>
-                interaction.reply({
-                    content: 'Message envoyé ' + message.url,
-                    flags: MessageFlags.Ephemeral,
-                })
             );
+            await interaction.editReply({
+                content: 'Message envoyé ' + message.url,
+            });
+        } catch (error) {
+            handleException(error);
+            await interaction
+                .editReply({ content: "❌ Le message n'a pas pu être envoyé." })
+                .catch(() => {});
+        }
     },
 };

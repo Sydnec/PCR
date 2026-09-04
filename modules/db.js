@@ -1,6 +1,6 @@
 import sqlite3 from "sqlite3";
 import path from "path";
-import { log, handleException } from "./utils.js";
+import { handleException } from "./utils.js";
 import { fileURLToPath } from "url";
 
 // Pour compatibilité ESM si besoin
@@ -119,6 +119,38 @@ const db = new sqlite3.Database(dbPath, (err) => {
             err
           );
         }
+      }
+    );
+
+    // Table des rappels (/rappel, /mesrappels).
+    // Créée ici, avec toutes les autres : elle vivait dans le handler
+    // handleRemindersOnTimer, chargé après l'enregistrement des commandes, si
+    // bien qu'un /rappel lancé dans la première seconde échouait.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS reminders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        guild_id TEXT NOT NULL,
+        channel_id TEXT NOT NULL,
+        message TEXT NOT NULL,
+        trigger_at INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        sent BOOLEAN DEFAULT 0,
+        sent_at INTEGER
+      )`,
+      (err) => {
+        if (err) {
+          return handleException(
+            "Erreur lors de la création de la table reminders :",
+            err
+          );
+        }
+        db.run(
+          "CREATE INDEX IF NOT EXISTS idx_reminders_due ON reminders(sent, trigger_at)",
+          (err) => {
+            if (err) handleException("Erreur création index reminders :", err);
+          }
+        );
       }
     );
 

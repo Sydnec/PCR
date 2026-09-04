@@ -1,7 +1,6 @@
-import { REST, Routes, PermissionsBitField, ChannelType, EmbedBuilder } from 'discord.js';
-import { readdirSync } from 'fs';
+import { PermissionsBitField, ChannelType, EmbedBuilder } from 'discord.js';
 import { format } from 'date-fns';
-import { emojiRegex } from './regex.js';
+import { emojiRegexGlobal } from './regex.js';
 import dotenv from 'dotenv';
 import axios from 'axios';
 import { load } from 'cheerio';
@@ -12,49 +11,6 @@ function isAdmin(member) {
 }
 const getCommand = (message = '') =>
 	message.replace(/\s+/, '\x01').split('\x01'); // Créer un tableau avec le séparateur ' '
-async function registerCommands() {
-	const commandFiles = readdirSync('./commands/').filter((file) =>
-		file.endsWith('.js')
-	);
-
-	const commands = [];
-	for (const file of commandFiles) {
-		try {
-			const commandModule = await import(`../commands/${file}`);
-			const { slashData, onlyAdmin } =
-				commandModule.default || commandModule;
-			if (slashData && !onlyAdmin) {
-				commands.push(slashData.toJSON());
-			}
-		} catch (error) {
-			console.error(`Erreur lors de l'import du fichier ${file}:`, error);
-		}
-	}
-
-	const rest = new REST({ version: '10' }).setToken(
-		process.env.DISCORD_TOKEN
-	);
-	try {
-		log('Started refreshing application (/) commands.');
-		// Supprime les commandes globales (en mettant une liste vide)
-		await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), {
-			body: [],
-		});
-
-		await rest.put(
-			Routes.applicationGuildCommands(
-				process.env.CLIENT_ID,
-				process.env.GUILD_ID
-			),
-			{
-				body: commands,
-			}
-		);
-		log('Successfully reloaded application (/) commands.');
-	} catch (e) {
-		handleException(e);
-	}
-}
 function environmentIsProd() {
 	return process.env.ENV === 'production';
 }
@@ -84,45 +40,84 @@ function formatDate() {
 	const currentDate = new Date();
 	return format(currentDate, 'dd/MM/yyyy HH:mm:ss');
 }
+// Numérote les lignes d'un sondage et pose les réactions correspondantes.
+//
+// Le jeu de puces s'arrête à 20, la limite de réactions d'un message Discord.
+// Auparavant il n'y en avait que dix : au-delà, `numbers[i]` valait undefined,
+// la ligne était préfixée par « undefined » et `message.react(undefined)`
+// levait une erreur — un sondage de plus de dix lignes (une quinzaine de jours
+// avec /week, par exemple) était donc cassé.
+const REACTION_SLOTS = [
+	'1\uFE0F\u20E3',
+	'2\uFE0F\u20E3',
+	'3\uFE0F\u20E3',
+	'4\uFE0F\u20E3',
+	'5\uFE0F\u20E3',
+	'6\uFE0F\u20E3',
+	'7\uFE0F\u20E3',
+	'8\uFE0F\u20E3',
+	'9\uFE0F\u20E3',
+	'\uD83D\uDD1F',
+	// Au-delà de dix, on continue avec des lettres régionales : Discord accepte
+	// vingt réactions par message, pas une de plus.
+	...'ABCDEFGHIJ'
+		.split('')
+		.map((letter) =>
+			String.fromCodePoint(0x1f1e6 + letter.charCodeAt(0) - 65)
+		),
+];
+const MAX_REACTIONS = REACTION_SLOTS.length;
+
+// Pose les réactions une par une : lancées toutes ensemble, elles se faisaient
+// limiter par l'API et une partie était perdue. Les doublons sont ignorés, un
+// même emoji ne pouvant être ajouté deux fois.
+async function addReactions(message, emojis) {
+	const seen = new Set();
+	for (const emoji of emojis) {
+		if (!emoji || seen.has(emoji)) continue;
+		seen.add(emoji);
+		try {
+			await message.react(emoji);
+		} catch (e) {
+			error(`Réaction ${emoji} impossible :`, e.message);
+		}
+	}
+}
+
 async function autoAddEmojis(message) {
 	try {
-		const numbers = [
-			'1️⃣',
-			'2️⃣',
-			'3️⃣',
-			'4️⃣',
-			'5️⃣',
-			'6️⃣',
-			'7️⃣',
-			'8️⃣',
-			'9️⃣',
-			'🔟',
-		];
 		const content = message.content.split('\n'); //Sépare chaque ligne dans un tableau
 
 		let i = 0;
-		let emojisArray = [];
 		let newEmojisArray = [];
 		let newMessageString = '';
 		let noEmojiLine = false;
 
-		content.forEach((line) => {
+		for (const line of content) {
 			if (line[0] === '#') {
 				newMessageString += ' ' + line + '\n';
-				return;
+				continue;
 			}
 
+			// Plus de puce disponible : la ligne est conservée telle quelle,
+			// sans numéro ni réaction, plutôt que préfixée d'un « undefined ».
+			const slot = i < MAX_REACTIONS ? REACTION_SLOTS[i] : null;
+
 			//Analyse ligne par ligne le message d'origine
-			emojisArray = line.match(emojiRegex);
+			const emojisArray = line.match(emojiRegexGlobal());
 			if (emojisArray === null) {
 				//Aucun emoji sur la ligne
-				newEmojisArray.push(numbers[i]);
-				newMessageString += numbers[i] + ' ' + line + '\n';
-				noEmojiLine = true;
+				if (slot) {
+					newEmojisArray.push(slot);
+					newMessageString += slot + ' ' + line + '\n';
+					noEmojiLine = true;
+				} else {
+					newMessageString += ' ' + line + '\n';
+				}
 			} else {
 				//La ligne contient un/des emoji.s
 				if (
-					message.guild.emojis.cache.find(
+					message.guild?.emojis.cache.find(
 						(emoji) => emoji.name === emojisArray[0].split(':')[1]
 					) !== undefined ||
 					!emojisArray[0].startsWith('<:')
@@ -132,32 +127,35 @@ async function autoAddEmojis(message) {
 					newMessageString += ' ' + line + '\n';
 				} else {
 					//L'emoji n'est pas accessible
-					newEmojisArray.push(numbers[i]);
-					newMessageString +=
-						numbers[i] + ' ' + line.split('>')[1] + '\n';
-					noEmojiLine = true;
+					if (slot) {
+						newEmojisArray.push(slot);
+						newMessageString +=
+							slot + ' ' + line.split('>')[1] + '\n';
+						noEmojiLine = true;
+					} else {
+						newMessageString += ' ' + line + '\n';
+					}
 				}
 			}
 			i++;
-		});
+		}
+
 		if (noEmojiLine === true) {
 			//Il y a au moins une ligne sans emoji ou avec un emoji innaccessible
-			if (message.author.id === process.env.CLIENT_ID) {
-				message.edit(newMessageString);
-				newEmojisArray.forEach((emoji) => {
-					message.react(emoji); //Ajoute les reactions
-				});
-			} else {
+			if (message.author.id === message.client.user.id) {
+				await message.edit(newMessageString);
+				await addReactions(message, newEmojisArray);
+			} else if (message.thread) {
 				const newMessage = await message.thread.send(newMessageString); //Message écrit par le bot
-				newEmojisArray.forEach((emoji) => {
-					newMessage.react(emoji); //Ajoute les reactions
-				});
+				await addReactions(newMessage, newEmojisArray);
 				await message.delete(); //Supprime le message de base
+			} else {
+				// Pas de fil où republier : on se contente d'ajouter les
+				// réactions, au lieu de lever sur `message.thread.send`.
+				await addReactions(message, newEmojisArray);
 			}
 		} else {
-			newEmojisArray.forEach((emoji) => {
-				message.react(emoji); //Ajoute les reactions
-			});
+			await addReactions(message, newEmojisArray);
 		}
 	} catch (e) {
 		error(e);
@@ -276,23 +274,37 @@ async function updateThreadList(guild) {
 	for (const [, message] of fetched) {
 		await message.delete();
 	}
-	let listMessage;
 	for (const msg of messages) {
-		listMessage = await channel.send(msg);
+		await channel.send(msg);
 	}
 }
+// Découpe un texte en messages respectant la limite de Discord.
+//
+// L'ancienne version poussait un morceau vide quand la première ligne dépassait
+// déjà la limite, et laissait passer telle quelle toute ligne plus longue que
+// `maxLength` — que l'API refusait ensuite.
 function splitMessage(text, maxLength = 2000) {
-	const lines = text.split('\n');
 	const messages = [];
 	let current = '';
-	for (const line of lines) {
-		if ((current + line + '\n').length > maxLength) {
-			messages.push(current);
-			current = '';
+
+	const flush = () => {
+		if (current.length > 0) messages.push(current);
+		current = '';
+	};
+
+	for (const line of String(text).split('\n')) {
+		// Une ligne trop longue à elle seule est coupée en tranches.
+		let rest = line;
+		while (rest.length + 1 > maxLength) {
+			flush();
+			messages.push(rest.slice(0, maxLength));
+			rest = rest.slice(maxLength);
 		}
-		current += line + '\n';
+		if ((current + rest + '\n').length > maxLength) flush();
+		current += rest + '\n';
 	}
-	if (current) messages.push(current);
+
+	flush();
 	return messages;
 }
 
@@ -302,7 +314,12 @@ async function fetchFetesDuJour(day, month) {
 	const mm = String(month).padStart(2, '0');
 	const url = `https://www.journee-mondiale.com/date/${dd}-${mm}.htm`;
 
-	const res = await axios.get(url, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PCR-bot/1.0)'} });
+	// Sans timeout, une requête bloquée retenait indéfiniment l'appelant — donc
+	// la tâche cron quotidienne comme l'interaction /cotd.
+	const res = await axios.get(url, {
+		timeout: 10000,
+		headers: { 'User-Agent': 'Mozilla/5.0 (compatible; PCR-bot/1.0)' },
+	});
 	const $ = load(res.data);
 	const items = new Set();
 
@@ -400,7 +417,6 @@ function splitEmbed(embed) {
 
 export {
 	isAdmin,
-	registerCommands,
 	getCommand,
 	environmentIsProd,
 	handleException,

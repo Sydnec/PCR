@@ -1,54 +1,45 @@
 import { handleException, log } from '../../modules/utils.js';
-import { parse } from 'url';
+import {
+	resolveMessageFromLink,
+	scheduleMessageDeletion,
+} from '../../modules/message-expiry.js';
 
+// Réarme au démarrage les suppressions programmées par /autodel.
+//
+// Les minuteurs vivent en mémoire : sans ce balayage, un redémarrage les perdait
+// tous. Il lit la même base que /autodel (modules/db.js) — auparavant la
+// commande écrivait dans un fichier ./messages.db séparé, que rien ne relisait.
 export default (bot) => {
 	bot.handleCheckExpiredMessages = async (db) => {
-		db.all('SELECT * FROM messages', async (err, rows) => {
+		db.all('SELECT id, link, expire_at FROM messages', async (err, rows) => {
 			if (err) {
-				console.error(
+				handleException(
 					'Erreur lors de la récupération des messages expirés :',
 					err
 				);
-			} else {
-				for (const row of rows) {
-					const { id, link, expire_at } = row;
-					try {
-                        const urlParts = parse(link, true);
-                        const pathSegments = urlParts.pathname.split('/');
+				return;
+			}
 
-                        if (pathSegments.length < 5) {
-                            throw new Error("Le lien de message fourni n'est pas valide.");
-                        }
-
-                        const guildId = pathSegments[2];
-                        const channelId = pathSegments[3];
-                        const messageId = pathSegments[4];
-
-                        const guild = await bot.guilds.fetch(guildId);
-                        const channel = await guild.channels.resolve(channelId);
-
-                        if (!channel) {
-                            throw new Error("Le canal spécifié n'est pas un canal de texte valide.");
-                        }
-
-                        const message = await channel.messages.fetch(messageId);
-                        const delay = expire_at - Date.now();
-                        if (delay > 0) {
-                            setTimeout(async () => {
-                                await message.delete();
-                                log(`Message supprimé : ${link}`);
-                                db.run('DELETE FROM messages WHERE id = ?', [id]);
-                            }, delay);
-                        } else {
-                            await message.delete();
-                            log(`Message supprimé immédiatement : ${link}`);
-                            db.run('DELETE FROM messages WHERE id = ?', [id]);
-                        }
-                    } catch (err) {
-                        handleException(err);
-                    }
+			let rearmed = 0;
+			for (const row of rows || []) {
+				try {
+					const message = await resolveMessageFromLink(bot, row.link);
+					if (!message) {
+						// Message ou salon disparu : la ligne ne sert plus à rien
+						// et serait retentée à chaque démarrage.
+						db.run('DELETE FROM messages WHERE id = ?', [row.id], (err) => {
+							if (err) handleException('Nettoyage de la table messages :', err);
+						});
+						continue;
+					}
+					scheduleMessageDeletion(message, row.expire_at, row.link);
+					rearmed++;
+				} catch (err) {
+					handleException(err);
 				}
 			}
+
+			if (rearmed) log(`${rearmed} suppression(s) programmée(s) réarmée(s)`);
 		});
 	};
 };

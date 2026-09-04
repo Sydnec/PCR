@@ -37,8 +37,10 @@ export default {
       const dateString = interaction.options.getString("date");
       const message = interaction.options.getString("message") || "Rappel !";
       const userId = interaction.user.id;
-      const guildId = interaction.guild.id;
-      const channelId = interaction.channel.id;
+      // L'intention DirectMessages est active : en message privé,
+      // `interaction.guild` est null et l'accès direct à .id levait.
+      const guildId = interaction.guildId ?? "";
+      const channelId = interaction.channelId ?? "";
 
       // Parser la date
       const triggerAt = parseDateTime(dateString);
@@ -47,7 +49,6 @@ export default {
         await interaction.editReply({
           content:
             "❌ Format de date invalide. Utilise :\n• `JJ/MM/AAAA HH:MM` (ex: 25/12/2024 15:30)\n• `JJ/MM HH:MM` (ex: 25/12 15:30)",
-          ephemeral: true,
         });
         return;
       }
@@ -56,7 +57,6 @@ export default {
       if (triggerAt <= Date.now()) {
         await interaction.editReply({
           content: "❌ La date doit être dans le futur !",
-          ephemeral: true,
         });
         return;
       }
@@ -66,20 +66,19 @@ export default {
       if (triggerAt > oneYearFromNow) {
         await interaction.editReply({
           content: "❌ La date ne peut pas être à plus d'un an dans le futur !",
-          ephemeral: true,
         });
         return;
       }
 
       // Enregistrer le rappel en base de données
-      await new Promise((resolve, reject) => {
+      const reminderId = await new Promise((resolve, reject) => {
         db.run(
           `INSERT INTO reminders (user_id, guild_id, channel_id, message, trigger_at, created_at) 
                      VALUES (?, ?, ?, ?, ?, ?)`,
           [userId, guildId, channelId, message, triggerAt, Date.now()],
-          (err) => {
+          function (err) {
             if (err) reject(err);
-            else resolve();
+            else resolve(this.lastID);
           }
         );
       });
@@ -101,9 +100,14 @@ export default {
         })
         .setTimestamp();
 
-      // Créer un bouton pour que d'autres utilisateurs puissent s'ajouter
+      // Créer un bouton pour que d'autres utilisateurs puissent s'ajouter.
+      //
+      // Le customId ne porte que l'identifiant du rappel : il embarquait
+      // auparavant le message encodé, or un customId est limité à 100
+      // caractères alors que l'option en accepte 500. Tout rappel dont le
+      // message dépassait ~80 caractères échouait donc à la création.
       const button = new ButtonBuilder()
-        .setCustomId(`rappel|${triggerAt}|${encodeURIComponent(message)}`)
+        .setCustomId(`rappel|${reminderId}`)
         .setLabel("Me rappeler aussi")
         .setEmoji("🔔")
         .setStyle(ButtonStyle.Primary);
@@ -116,7 +120,6 @@ export default {
       const replyMethod = interaction.deferred ? "editReply" : "reply";
       await interaction[replyMethod]({
         content: "❌ Une erreur est survenue lors de la création du rappel.",
-        ephemeral: true,
       }).catch(() => {});
     }
   },

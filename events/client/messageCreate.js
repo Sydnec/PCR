@@ -2,19 +2,20 @@ import { handleException } from "../../modules/utils.js";
 import db from "../../modules/db.js";
 import pointsDb from "../../modules/points-db.js";
 import { registerMessageForSpawn } from "../../modules/pokemon/spawn.js";
-import { emojiRegex } from "../../modules/regex.js";
-import { twitterRegex } from "../../modules/regex.js";
-import { instagramRegex } from "../../modules/regex.js";
+import {
+  emojiRegex,
+  instagramRegex,
+  instagramRegexGlobal,
+  twitterRegex,
+  twitterRegexGlobal,
+} from "../../modules/regex.js";
+import { readAppConfig } from "../../modules/app-config.js";
 import dotenv from "dotenv";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from 'url';
 
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const configPath = path.join(__dirname, "../../config.json");
+// Rangs de points par défaut si config.json est absent ou illisible.
+const FALLBACK_POINTS_DISTRIBUTION = { default: 5 };
 
 const name = "messageCreate";
 const once = false;
@@ -75,20 +76,17 @@ async function execute(message) {
         let pointsToAdd = 0;
         const rank = countToday + 1; // Le rang de CE message
 
-        try {
-            const configFile = fs.readFileSync(configPath, 'utf8');
-            const config = JSON.parse(configFile);
-            const distribution = config.messagePointsDistribution;
-            
-            if (distribution[rank]) {
-                pointsToAdd = distribution[rank];
-            } else {
-                pointsToAdd = distribution.default;
-            }
-        } catch (e) {
-            handleException(e);
-            pointsToAdd = 5; // Fallback
-        }
+        const config = readAppConfig();
+        const distribution =
+            (config && config.messagePointsDistribution) ||
+            FALLBACK_POINTS_DISTRIBUTION;
+        // Number.isFinite : une valeur 0 configurée doit rester 0, pas
+        // retomber sur le défaut comme le faisait le test de véracité.
+        pointsToAdd = Number.isFinite(distribution[rank])
+            ? distribution[rank]
+            : Number.isFinite(distribution.default)
+            ? distribution.default
+            : FALLBACK_POINTS_DISTRIBUTION.default;
 
         if (pointsToAdd > 0) {
             pointsDb.serialize(() => {
@@ -151,41 +149,45 @@ async function execute(message) {
     }
 
     // --- Twitter to vxtwitter ---
+    // Les regex sans `g` servent aux tests d'existence ; `.replace()` reçoit
+    // une instance neuve, car une regex globale partagée conserve son
+    // `lastIndex` et ne remplacerait qu'un message sur deux.
     if (twitterRegex.test(messageContent)) {
-      // Remplacez les occurrences trouvées par "fxtwitter.com"
-      const newMessageContent = messageContent.replace(
-        twitterRegex,
-        "https://vxtwitter.com"
+      await republishWithRewrittenLinks(
+        message,
+        "Remplacement de lien twitter",
+        messageContent.replace(twitterRegexGlobal(), "https://vxtwitter.com")
       );
-      message.channel
-        .send("Remplacement de lien twitter")
-        .then((newMessage) => {
-          // Modifiez le message en ajoutant une mention
-          newMessage.edit(
-            `<@!${message.author.id}> a envoyé : \n${newMessageContent}`
-          );
-        })
-        .then(message.delete())
-        .catch((err) => handleException(err));
+      return;
     }
 
     // --- Instagram to kkinstagram (uniquement pour les reels) ---
     if (instagramRegex.test(messageContent)) {
-      // Remplacer instagram.com par kkinstagram.com
-      const newMessageContent = messageContent.replace(
-        instagramRegex,
-        "https://kkinstagram.com/reel/"
+      await republishWithRewrittenLinks(
+        message,
+        "Ajout de lien kkinstagram pour reel",
+        messageContent.replace(
+          instagramRegexGlobal(),
+          "https://kkinstagram.com/reel/"
+        )
       );
-      message.channel
-        .send("Ajout de lien kkinstagram pour reel")
-        .then((newMessage) => {
-          newMessage.edit(
-            `<@!${message.author.id}> a envoyé : \n${newMessageContent}`
-          );
-        })
-        .then(message.delete())
-        .catch((err) => handleException(err));
     }
+  } catch (err) {
+    handleException(err);
+  }
+}
+
+// Republie le message avec les liens réécrits, puis supprime l'original.
+//
+// L'ancienne version enchaînait `.then(message.delete())` : l'appel partait
+// immédiatement, en parallèle de l'édition, et sa promesse échappait au
+// `.catch()` (un argument non-fonction est ignoré par `.then`). Une suppression
+// refusée devenait donc un rejet non géré.
+async function republishWithRewrittenLinks(message, placeholder, content) {
+  try {
+    const sent = await message.channel.send(placeholder);
+    await sent.edit(`<@${message.author.id}> a envoyé : \n${content}`);
+    await message.delete();
   } catch (err) {
     handleException(err);
   }

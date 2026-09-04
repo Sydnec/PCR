@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, MessageFlags } from "discord.js";
-import { handleException, log, autoAddEmojis } from "../modules/utils.js";
+import { handleException, autoAddEmojis } from "../modules/utils.js";
 import dotenv from "dotenv";
 dotenv.config(); // process.env.CONSTANT
 
@@ -43,7 +43,8 @@ export default {
         .setRequired(false)
     ),
 
-  async execute(interaction, bot) {
+  async execute(interaction) {
+   try {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const input = interaction.options.getString("question");
     const dayChoice = interaction.options.getString("jour");
@@ -90,26 +91,8 @@ export default {
     } else {
       // Parser la date de début
       if (startDateStr) {
-        try {
-          const parts = startDateStr.split("/");
-          if (parts.length === 2) {
-            // Format JJ/MM
-            startDate = new Date(
-              currentYear,
-              parseInt(parts[1]) - 1,
-              parseInt(parts[0])
-            );
-          } else if (parts.length === 3) {
-            // Format JJ/MM/AAAA
-            startDate = new Date(
-              parseInt(parts[2]),
-              parseInt(parts[1]) - 1,
-              parseInt(parts[0])
-            );
-          } else {
-            throw new Error("Format invalide");
-          }
-        } catch (e) {
+        startDate = parseDayMonth(startDateStr, currentYear);
+        if (!startDate) {
           await interaction.editReply({
             content:
               "❌ Format de date de début invalide. Utilisez JJ/MM ou JJ/MM/AAAA",
@@ -122,26 +105,8 @@ export default {
 
       // Parser la date de fin
       if (endDateStr) {
-        try {
-          const parts = endDateStr.split("/");
-          if (parts.length === 2) {
-            // Format JJ/MM
-            endDate = new Date(
-              currentYear,
-              parseInt(parts[1]) - 1,
-              parseInt(parts[0])
-            );
-          } else if (parts.length === 3) {
-            // Format JJ/MM/AAAA
-            endDate = new Date(
-              parseInt(parts[2]),
-              parseInt(parts[1]) - 1,
-              parseInt(parts[0])
-            );
-          } else {
-            throw new Error("Format invalide");
-          }
-        } catch (e) {
+        endDate = parseDayMonth(endDateStr, currentYear);
+        if (!endDate) {
           await interaction.editReply({
             content:
               "❌ Format de date de fin invalide. Utilisez JJ/MM ou JJ/MM/AAAA",
@@ -159,6 +124,17 @@ export default {
       await interaction.editReply({
         content:
           "❌ La date de début doit être avant ou égale à la date de fin !",
+      });
+      return;
+    }
+
+    // Une plage trop large produisait un message au-delà de la limite de
+    // Discord, et plus de puces que les vingt réactions permises.
+    const dayCount =
+      Math.round((endDate - startDate) / (24 * 60 * 60 * 1000)) + 1;
+    if (dayCount > MAX_DAYS) {
+      await interaction.editReply({
+        content: `❌ La période ne peut pas dépasser ${MAX_DAYS} jours (${dayCount} demandés).`,
       });
       return;
     }
@@ -192,5 +168,37 @@ export default {
     await interaction.editReply({
       content: "Sondage créé ✅",
     });
+   } catch (error) {
+    handleException(error);
+    await interaction
+      .editReply({ content: "❌ Le sondage n'a pas pu être créé." })
+      .catch(() => {});
+   }
   },
 };
+
+// Le maximum de puces posables par autoAddEmojis : au-delà, les derniers jours
+// seraient listés sans réaction associée.
+const MAX_DAYS = 20;
+
+// `new Date(2024, NaN, NaN)` ne lève pas : il renvoie une date invalide, que
+// l'ancien try/catch ne détectait donc jamais. On valide explicitement.
+function parseDayMonth(input, fallbackYear) {
+  const match = /^(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?$/.exec(String(input).trim());
+  if (!match) return null;
+
+  const day = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10) - 1;
+  const year = match[3] ? parseInt(match[3], 10) : fallbackYear;
+
+  const date = new Date(year, month, day);
+  // Rejette les dates qui « débordent » (31/02 devient le 2 ou 3 mars).
+  if (
+    date.getDate() !== day ||
+    date.getMonth() !== month ||
+    date.getFullYear() !== year
+  ) {
+    return null;
+  }
+  return date;
+}

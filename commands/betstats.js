@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
+import { SlashCommandBuilder, EmbedBuilder, MessageFlags } from "discord.js";
 import { handleException } from "../modules/utils.js";
 import db from "../modules/db.js";
 
@@ -14,27 +14,28 @@ export default {
     async execute(interaction) {
         try {
             const targetUser = interaction.options.getUser("user") || interaction.user;
-            const isSelf = targetUser.id === interaction.user.id;
 
             // 1. Get User Stats
             db.get("SELECT total_wagered, max_win FROM bet_stats WHERE user_id = ?", [targetUser.id], (err, userStats) => {
                 if (err) {
                     handleException(err);
-                    return interaction.reply({ content: "Erreur lors de la récupération des stats.", ephemeral: true });
+                    return interaction.reply({ content: "Erreur lors de la récupération des stats.", flags: MessageFlags.Ephemeral });
                 }
 
-                const totalWagered = userStats ? userStats.total_wagered : 0;
-                const maxWin = userStats ? userStats.max_win : 0;
+                // `?? 0` et non un ternaire sur la ligne : une colonne NULL
+                // renvoyait null, et `null.toLocaleString()` levait plus bas.
+                const totalWagered = userStats?.total_wagered ?? 0;
+                const maxWin = userStats?.max_win ?? 0;
 
                 // 2. Get Server Global Stats
                 db.get("SELECT SUM(total_wagered) as server_total, MAX(max_win) as server_max_win FROM bet_stats", (err, serverStats) => {
                     if (err) {
                         handleException(err);
-                        return interaction.reply({ content: "Erreur lors de la récupération des stats globales.", ephemeral: true });
+                        return interaction.reply({ content: "Erreur lors de la récupération des stats globales.", flags: MessageFlags.Ephemeral });
                     }
                     
-                    const serverTotal = serverStats.server_total || 0;
-                    const serverMaxWin = serverStats.server_max_win || 0;
+                    const serverTotal = serverStats?.server_total ?? 0;
+                    const serverMaxWin = serverStats?.server_max_win ?? 0;
 
                     // 3. Get Top Winner Name
                     db.get("SELECT user_id FROM bet_stats WHERE max_win = ?", [serverMaxWin], (err, topWinner) => {

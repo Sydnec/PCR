@@ -16,22 +16,26 @@ export default (bot) => {
                             .then((eventModule) => {
                                 const event =
                                     eventModule.default || eventModule;
+                                // `execute` est asynchrone : un try/catch
+                                // synchrone n'attrape que ce qui échoue avant le
+                                // premier await. Tout le reste partait en rejet
+                                // non géré, sans indiquer l'événement fautif.
+                                const invoke = (...args) => {
+                                    try {
+                                        const result = event.execute(...args, bot);
+                                        if (result && typeof result.then === 'function') {
+                                            result.catch((e) =>
+                                                handleException(`Événement ${event.name} :`, e)
+                                            );
+                                        }
+                                    } catch (e) {
+                                        handleException(`Événement ${event.name} :`, e);
+                                    }
+                                };
                                 if (event.once) {
-                                    bot.once(event.name, (...args) => {
-                                        try {
-                                            event.execute(...args, bot);
-                                        } catch (e) {
-                                            handleException(e);
-                                        }
-                                    });
+                                    bot.once(event.name, invoke);
                                 } else {
-                                    bot.on(event.name, (...args) => {
-                                        try {
-                                            event.execute(...args, bot);
-                                        } catch (e) {
-                                            handleException(e);
-                                        }
-                                    });
+                                    bot.on(event.name, invoke);
                                 }
                                 log(`Registered event: ${file}`);
                             })

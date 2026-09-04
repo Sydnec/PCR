@@ -12,7 +12,8 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [18.x, 20.x]
+        # sqlite3 6.x et discord.js 14.27 requièrent Node 20 ou plus récent.
+        node-version: [20.x, 22.x]
 
     steps:
       - uses: actions/checkout@v4
@@ -26,5 +27,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Auparavant : `node -c index.js`, qui ne vérifiait la syntaxe que d'un
+      # seul fichier. ESLint couvre tout le projet et signale notamment les
+      # identifiants non définis (`no-undef`).
       - name: Lint
         run: npm run lint
+
+      - name: Audit des dépendances de production
+        run: npm audit --omit=dev --audit-level=high

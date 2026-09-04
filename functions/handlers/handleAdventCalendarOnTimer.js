@@ -1,5 +1,11 @@
 import { readFile } from "fs/promises";
+import path from "path";
+import { fileURLToPath } from "url";
 import { handleException } from "../../modules/utils.js";
+
+// Résolu depuis ce fichier plutôt que depuis le répertoire courant.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ADVENT_FILE = path.join(__dirname, "../../modules/advent.json");
 
 export default (bot) => {
   bot.handleAdventCalendarOnTimer = async () => {
@@ -23,7 +29,7 @@ export default (bot) => {
       }
 
       // Charger les questions du calendrier
-      const jsonData = await readFile("./modules/advent.json", "utf-8");
+      const jsonData = await readFile(ADVENT_FILE, "utf-8");
       const adventData = JSON.parse(jsonData);
 
       // Trouver la question du jour

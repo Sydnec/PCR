@@ -1,4 +1,4 @@
-import { log, updateThreadList } from '../../modules/utils.js';
+import { log } from '../../modules/utils.js';
 import { checkAndAnnounceNewRelease } from '../../modules/changelog-notifier.js';
 import db from '../../modules/db.js';
 import { rehydratePokemon } from '../../modules/pokemon/spawn.js';

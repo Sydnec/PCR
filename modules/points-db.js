@@ -1,10 +1,19 @@
 import sqlite3 from "sqlite3";
 import path from "path";
-import { log, handleException } from "./utils.js";
+import { handleException } from "./utils.js";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Une migration ALTER TABLE relancée sur une base déjà à jour échoue avec
+// « duplicate column name » : c'est le seul cas normal, tout le reste doit se
+// voir dans les logs.
+const ignoreDuplicateColumn = (column) => (err) => {
+  if (err && !err.message.includes("duplicate column")) {
+    handleException(`Migration de la colonne ${column} :`, err);
+  }
+};
 // Persistent DB for points (does not reset yearly)
 const dbPath = path.join(__dirname, "../points.db");
 
@@ -24,11 +33,12 @@ const db = new sqlite3.Database(dbPath, (err) => {
       (err) => {
         if (err) handleException("Erreur création table points :", err);
         else {
-            // Migration (add columns if not exists for old DBs)
+            // Migration (add columns if not exists for old DBs).
+            // Seule l'erreur « colonne déjà présente » est attendue : toutes
+            // les autres étaient avalées en silence, laissant une base dans un
+            // état incohérent sans le moindre message.
             const addColumn = (colName, colType) => {
-                db.run(`ALTER TABLE points ADD COLUMN ${colName} ${colType}`, (err) => {
-                    // Ignore duplicate column error
-                });
+                db.run(`ALTER TABLE points ADD COLUMN ${colName} ${colType}`, ignoreDuplicateColumn(colName));
             }
             addColumn("last_message_at", "INTEGER DEFAULT 0");
             addColumn("messages_today_count", "INTEGER DEFAULT 0");
@@ -51,7 +61,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
         if (err) handleException("Erreur création table bets :", err);
         else {
              // Migration for type
-             db.run(`ALTER TABLE bets ADD COLUMN is_estimation INTEGER DEFAULT 0`, (err) => {});
+             db.run(`ALTER TABLE bets ADD COLUMN is_estimation INTEGER DEFAULT 0`, ignoreDuplicateColumn("is_estimation"));
         }
       }
     );
@@ -85,7 +95,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
         if (err) handleException("Erreur création table bet_participations :", err);
         else {
              // Migration for prediction_value
-             db.run(`ALTER TABLE bet_participations ADD COLUMN prediction_value INTEGER`, (err) => {});
+             db.run(`ALTER TABLE bet_participations ADD COLUMN prediction_value INTEGER`, ignoreDuplicateColumn("prediction_value"));
         }
       }
     );

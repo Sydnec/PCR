@@ -1,16 +1,10 @@
 // Lecture à chaud des réglages Pokémon.
 //
-// config.json est relu à chaque appel (comme dans messageCreate.js) et jamais
-// importé : tous les nombres du jeu — prix, multiplicateurs, taux de shiny,
-// cadence, coûts de fusion — sont donc ajustables sans redémarrer le bot.
-// Un fichier cassé ne doit jamais arrêter le bot : on retombe sur DEFAULTS.
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-import { handleException } from "../utils.js";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const configPath = path.join(__dirname, "../../config.json");
+// config.json est relu dès que le fichier change (cf. modules/app-config.js) et
+// jamais importé : tous les nombres du jeu — prix, multiplicateurs, taux de
+// shiny, cadence, coûts de fusion — sont donc ajustables sans redémarrer le
+// bot. Un fichier cassé ne doit jamais arrêter le bot : on retombe sur DEFAULTS.
+import { readAppConfig } from "../app-config.js";
 
 export const DEFAULTS = {
   enabled: true,
@@ -58,25 +52,30 @@ function merge(defaults, override) {
   if (!isPlainObject(override)) return defaults;
   const result = { ...defaults };
   for (const [key, value] of Object.entries(override)) {
+    // `JSON.parse` produit un `__proto__` en propriété propre : l'assigner
+    // par crochets changerait le prototype de `result`.
+    if (key === "__proto__" || key === "constructor") continue;
     result[key] = isPlainObject(defaults[key]) ? merge(defaults[key], value) : value;
   }
   return result;
 }
 
 export function getPokemonConfig() {
-  try {
-    const raw = JSON.parse(fs.readFileSync(configPath, "utf8"));
-    return merge(DEFAULTS, raw.pokemon);
-  } catch (error) {
-    handleException("Lecture de la config Pokémon impossible :", error);
-    return DEFAULTS;
-  }
+  const raw = readAppConfig();
+  return raw ? merge(DEFAULTS, raw.pokemon) : DEFAULTS;
 }
 
 // Renvoie la définition d'une ball, ou null si la clé est inconnue.
+// La clé vient d'un customId : on n'interroge que les propriétés propres de
+// l'objet, sinon `getBall("constructor")` renverrait une pseudo-ball.
 export function getBall(key) {
-  const ball = getPokemonConfig().capture.balls[key];
-  return ball ? { key, ...ball } : null;
+  const balls = getPokemonConfig().capture.balls;
+  if (!Object.prototype.hasOwnProperty.call(balls, key)) return null;
+  const ball = balls[key];
+  if (!isPlainObject(ball) || !Number.isInteger(ball.price) || ball.price < 0) {
+    return null;
+  }
+  return { key, ...ball };
 }
 
 export function getBalls() {

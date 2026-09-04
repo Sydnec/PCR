@@ -41,7 +41,6 @@ export default {
             handleException(error);
             await interaction.editReply({
                 content: '❌ Une erreur est survenue.',
-                ephemeral: true,
             }).catch(() => {});
         }
     },
@@ -62,10 +61,15 @@ async function listReminders(interaction, userId) {
     if (reminders.length === 0) {
         await interaction.editReply({
             content: '📭 Tu n\'as aucun rappel actif.',
-            ephemeral: true,
         });
         return;
     }
+
+    // Un embed Discord accepte au plus 25 champs : au-delà, l'API rejetait la
+    // requête et l'utilisateur ne voyait aucun rappel.
+    const MAX_FIELDS = 25;
+    const shown = reminders.slice(0, MAX_FIELDS);
+    const hidden = reminders.length - shown.length;
 
     const embed = new EmbedBuilder()
         .setColor('#5865F2')
@@ -73,21 +77,32 @@ async function listReminders(interaction, userId) {
         .setDescription('Voici la liste de tes rappels actifs')
         .setTimestamp();
 
-    reminders.forEach((reminder, index) => {
+    shown.forEach((reminder) => {
         const relativeTime = `<t:${Math.floor(reminder.trigger_at / 1000)}:R>`;
         const fullDate = `<t:${Math.floor(reminder.trigger_at / 1000)}:F>`;
-        
+
+        // Un champ est plafonné à 1024 caractères ; le message d'un rappel peut
+        // en faire 500, les libellés et dates font le reste.
+        const message =
+            reminder.message.length > 800
+                ? reminder.message.slice(0, 797) + '...'
+                : reminder.message;
+
         embed.addFields({
             name: `🔔 Rappel #${reminder.id}`,
-            value: 
-                `**Message:** ${reminder.message}\n` +
+            value:
+                `**Message:** ${message}\n` +
                 `**Quand:** ${relativeTime}\n` +
                 `**Date:** ${fullDate}`,
             inline: false
         });
     });
 
-    embed.setFooter({ text: 'Utilise /mesrappels supprimer <id> pour supprimer un rappel' });
+    embed.setFooter({
+        text: hidden > 0
+            ? `${hidden} rappel(s) supplémentaire(s) non affiché(s) · /mesrappels supprimer <id>`
+            : 'Utilise /mesrappels supprimer <id> pour supprimer un rappel'
+    });
 
     await interaction.editReply({ embeds: [embed] });
 }
@@ -108,7 +123,6 @@ async function deleteReminder(interaction, userId, reminderId) {
     if (!reminder) {
         await interaction.editReply({
             content: '❌ Ce rappel n\'existe pas ou ne t\'appartient pas.',
-            ephemeral: true,
         });
         return;
     }

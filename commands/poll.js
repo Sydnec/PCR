@@ -1,4 +1,5 @@
 import { SlashCommandBuilder, MessageFlags } from 'discord.js';
+import { handleException } from '../modules/utils.js';
 import dotenv from 'dotenv';
 dotenv.config(); // process.env.CONSTANT
 
@@ -26,30 +27,54 @@ for (let i = 1; i <= 10; i++) {
 export default {
     data,
     async execute(interaction, bot) {
-        const input = interaction.options.getString('question');
+        // Sans try/catch, la moindre erreur (salon introuvable, permissions)
+        // laissait l'interaction sans réponse.
+        try {
+            await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-        let options = '';
-        for (let i = 1; i <= 10; i++) {
-            const option = interaction.options.getString(`option${i}`);
-            if (option) {
-                options += option + '\n';
+            const input = interaction.options.getString('question');
+
+            let options = '';
+            for (let i = 1; i <= 10; i++) {
+                const option = interaction.options.getString(`option${i}`);
+                if (option) {
+                    options += option + '\n';
+                }
             }
-        }
 
-        const pollChannel = await bot.channels.fetch(
-            process.env.POLL_CHANNEL_ID
-        );
-        const newThread = await pollChannel.threads.create({
-            name: input.substr(0, 99),
-            message: { content: options },
-            autoArchiveDuration: 60,
-        });
-        newThread.members.add(interaction.member.id);
-        if (input.length > 99)
-            newThread.send('La question était trop longue : \n' + input);
-        await interaction.reply({
-            content: 'Sondage créé',
-            flags: MessageFlags.Ephemeral,
-        });
+            // Un fil ne peut pas être créé avec un message vide : sans option,
+            // l'API rejetait la requête.
+            if (!options) {
+                await interaction.editReply({
+                    content: '❌ Ajoute au moins une option au sondage.',
+                });
+                return;
+            }
+
+            const pollChannel = await bot.channels
+                .fetch(process.env.POLL_CHANNEL_ID)
+                .catch(() => null);
+            if (!pollChannel?.threads) {
+                await interaction.editReply({
+                    content: '❌ Le salon de sondage est introuvable ou inaccessible.',
+                });
+                return;
+            }
+
+            const newThread = await pollChannel.threads.create({
+                name: input.slice(0, 99),
+                message: { content: options },
+                autoArchiveDuration: 60,
+            });
+            await newThread.members.add(interaction.user.id).catch(() => {});
+            if (input.length > 99)
+                await newThread.send('La question était trop longue : \n' + input);
+            await interaction.editReply({ content: 'Sondage créé' });
+        } catch (error) {
+            handleException(error);
+            await interaction
+                .editReply({ content: '❌ Le sondage n\'a pas pu être créé.' })
+                .catch(() => {});
+        }
     },
 };

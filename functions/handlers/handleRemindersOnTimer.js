@@ -3,29 +3,16 @@ import { EmbedBuilder } from 'discord.js';
 import { handleException } from '../../modules/utils.js';
 import db from '../../modules/db.js';
 
+// La table reminders est créée dans modules/db.js, avec toutes les autres.
 export default (bot) => {
-    // Créer la table reminders si elle n'existe pas
-    db.run(`
-        CREATE TABLE IF NOT EXISTS reminders (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id TEXT NOT NULL,
-            guild_id TEXT NOT NULL,
-            channel_id TEXT NOT NULL,
-            message TEXT NOT NULL,
-            trigger_at INTEGER NOT NULL,
-            created_at INTEGER NOT NULL,
-            sent BOOLEAN DEFAULT 0,
-            sent_at INTEGER
-        )
-    `, (err) => {
-        if (err) {
-            console.error('❌ Erreur création table reminders:', err);
-        } else {
-            console.log('✅ Table reminders prête');
-        }
-    });
+    // Le cron déclenche chaque minute : si un envoi traîne (DM lents, plusieurs
+    // rappels), la passe suivante relisait les mêmes lignes non encore marquées
+    // et envoyait le rappel en double.
+    let running = false;
 
     bot.handleRemindersOnTimer = async () => {
+        if (running) return;
+        running = true;
         try {
             const now = Date.now();
 
@@ -102,8 +89,9 @@ export default (bot) => {
             }
 
         } catch (error) {
-            handleException(error);
-            console.error('❌ Erreur lors de la vérification des rappels:', error);
+            handleException('Erreur lors de la vérification des rappels :', error);
+        } finally {
+            running = false;
         }
     };
 };

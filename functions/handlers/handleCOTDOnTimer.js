@@ -7,7 +7,7 @@ export default (bot) => {
     bot.handleCOTDOnTimer = async () => {
         try {
             const url = 'https://nominis.cef.fr/json/nominis.php';
-            const response = await axios.get(url);
+            const response = await axios.get(url, { timeout: 10000 });
 
             // Vérifier si la réponse contient des prénoms majeurs
             if (response.data && response.data.response && response.data.response.prenoms && response.data.response.prenoms.majeurs) {
@@ -36,8 +36,16 @@ export default (bot) => {
                 }
 
                 messageContent += '\nPour fêter ça, apéro !';
-                const channel = await bot.channels.cache.get(process.env.COTD_CHANNEL_ID);
-                channel.send(messageContent);
+                // `channels.cache.get` renvoie undefined tant que le salon n'a
+                // pas été vu : on le récupère depuis l'API.
+                const channel = await bot.channels
+                    .fetch(process.env.COTD_CHANNEL_ID)
+                    .catch(() => null);
+                if (!channel?.isTextBased?.()) {
+                    handleException('COTD_CHANNEL_ID introuvable ou non textuel');
+                    return;
+                }
+                await channel.send(messageContent);
             }
         } catch (error) {
             handleException(error); // Utilisation de ton module d'erreur personnalisé

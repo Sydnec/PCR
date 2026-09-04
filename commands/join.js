@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChannelType } from 'discord.js';
+import { SlashCommandBuilder, MessageFlags } from 'discord.js';
 import { handleException } from '../modules/utils.js';
 import dotenv from 'dotenv';
 dotenv.config();
@@ -14,7 +14,7 @@ export default {
             if (!interaction.channel.isThread()) {
                 return interaction.reply({
                     content: '❌ Cette commande ne peut être utilisée que dans un fil de discussion.',
-                    ephemeral: true,
+                    flags: MessageFlags.Ephemeral,
                 });
             }
 
@@ -25,23 +25,23 @@ export default {
             await thread.members.add(user.id);
 
             // Répondre avec l'émoji eyes
-            await interaction.reply({ content: '👀', ephemeral: true });
+            await interaction.reply({ content: '👀', flags: MessageFlags.Ephemeral });
 
         } catch (error) {
             handleException(error);
             
+            // Répondre une seconde fois lèverait à son tour : on ne tente la
+            // réponse que si l'interaction n'a pas encore été honorée.
+            if (interaction.replied || interaction.deferred) return;
+
             // Gérer le cas où l'utilisateur est déjà dans le fil
-            if (error.code === 50055) {
-                return interaction.reply({
-                    content: '✅ Tu es déjà membre de ce fil !',
-                    ephemeral: true,
-                });
-            }
-            
-            await interaction.reply({
-                content: '❌ Une erreur est survenue lors de l\'ajout au fil.',
-                ephemeral: true,
-            }).catch(() => {});
+            const content =
+                error.code === 50055
+                    ? '✅ Tu es déjà membre de ce fil !'
+                    : '❌ Une erreur est survenue lors de l\'ajout au fil.';
+            await interaction
+                .reply({ content, flags: MessageFlags.Ephemeral })
+                .catch(() => {});
         }
     },
 };

@@ -190,24 +190,33 @@ case "$1" in
             SHOULD_ANNOUNCE="true"
         fi
 
+        # Les valeurs passent par l'environnement, jamais par le source JS.
+        # Interpolées entre apostrophes comme auparavant, une simple apostrophe
+        # dans la description fermait la chaîne : le reste de la saisie était
+        # alors exécuté comme du code Node (injection).
+        CHANGE_TYPE="$CHANGE_TYPE" \
+        CHANGE_NAME="$CHANGE_NAME" \
+        CHANGE_DESC="$CHANGE_DESC" \
+        CURRENT_BRANCH="$CURRENT_BRANCH" \
+        SHOULD_ANNOUNCE="$SHOULD_ANNOUNCE" \
         node -e "
         const fs = require('fs');
         const path = './changelog.json';
-        const changelog = require(path);
-        
+        const changelog = JSON.parse(fs.readFileSync(path, 'utf8'));
+
         changelog.pending.push({
-            type: '$CHANGE_TYPE' || 'feature',
-            name: '$CHANGE_NAME' || '$CURRENT_BRANCH',
-            description: '$CHANGE_DESC',
-            announce: $SHOULD_ANNOUNCE,
+            type: process.env.CHANGE_TYPE || 'feature',
+            name: process.env.CHANGE_NAME || process.env.CURRENT_BRANCH,
+            description: process.env.CHANGE_DESC || '',
+            announce: process.env.SHOULD_ANNOUNCE === 'true',
             author: 'Sydnec',
             commit: 'pending',
             timestamp: new Date().toISOString(),
-            branch: '$CURRENT_BRANCH'
+            branch: process.env.CURRENT_BRANCH
         });
-        
+
         fs.writeFileSync(path, JSON.stringify(changelog, null, 2));
-        console.log('Ajouté aux changements en attente (announce: ' + $SHOULD_ANNOUNCE + ').');
+        console.log('Ajouté aux changements en attente (announce: ' + process.env.SHOULD_ANNOUNCE + ').');
         "
         
         git add changelog.json
@@ -245,23 +254,27 @@ case "$1" in
         echo -e "${BLUE}Nouvelle version: $VERSION_NUM${NC}"
 
         # 2. Mise à jour du changelog.json via Node
-        node -e "
+        # Même principe : la version transite par l'environnement.
+        # `require()` mettait en plus le changelog en cache — une seconde
+        # lecture dans le même processus aurait renvoyé la version périmée.
+        VERSION_NUM="$VERSION_NUM" node -e "
         const fs = require('fs');
         const path = './changelog.json';
-        const changelog = require(path);
-        
+        const changelog = JSON.parse(fs.readFileSync(path, 'utf8'));
+        const version = process.env.VERSION_NUM;
+
         const newRelease = {
-            version: '$VERSION_NUM',
+            version,
             date: new Date().toISOString().split('T')[0],
-            title: 'Release $VERSION_NUM',
+            title: 'Release ' + version,
             features: [...changelog.pending]
         };
-        
-        changelog.version = '$VERSION_NUM';
+
+        changelog.version = version;
         changelog.lastUpdated = new Date().toISOString();
         changelog.releases.unshift(newRelease);
         changelog.pending = []; // Clear pending
-        
+
         fs.writeFileSync(path, JSON.stringify(changelog, null, 2));
         console.log('Changelog mis à jour avec les features en attente.');
         "
