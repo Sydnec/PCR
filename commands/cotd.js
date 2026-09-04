@@ -30,8 +30,8 @@ export default {
 
         Object.keys(saints).forEach((name) => {
           const gender =
-            saints[name].sexe === "masculin" ? "Masculin" : "Féminin";
-          messageContent += `\n- ${name} (${gender})`;
+            saints[name].sexe === "mixte" ? " (Mixte)" : "";
+          messageContent += `\n- ${name}${gender}`;
         });
 
         // Récupérer et ajouter les fêtes du jour

@@ -15,8 +15,9 @@ export default (bot) => {
                 let messageContent = `Nous sommes le ${formatDate(response.data.response.query.jour, response.data.response.query.mois)} et nous célébrons les :`;
 
                 Object.keys(saints).forEach(name => {
-                    const gender = saints[name].sexe === 'masculin' ? 'Masculin' : 'Féminin';
-                    messageContent += `\n- ${name} (${gender})`;
+                    const gender =
+                    saints[name].sexe === "mixte" ? " (Mixte)" : "";
+                    messageContent += `\n- ${name}${gender}`;
                 });
 
                 // Récupérer les fêtes du jour depuis journee-mondiale.com via utilitaire
