@@ -17,6 +17,7 @@ import { getBall, getPokemonConfig } from "./config.js";
 import { catchProbability, getSpecies } from "./data.js";
 import { displayName } from "./embeds.js";
 import { finalizeCaughtSpawn, refreshSpawnEmbed } from "./spawn.js";
+import { recordSpawnEnd, recordThrow } from "./stats.js";
 
 // Anti-spam. Entièrement synchrone, donc atomique dans la boucle d'événements :
 // l'écriture a lieu avant le moindre await, aucun entrelacement possible.
@@ -163,6 +164,14 @@ export async function throwBall(interaction, spawnId, ballKey) {
             }
 
             logThrow(spawnId, userId, ball.key, ball.price, probability, "MISS");
+            recordThrow({
+              userId,
+              speciesId: spawn.species_id,
+              ball: ball.key,
+              cost: ball.price,
+              probability,
+              result: "MISS",
+            });
             refreshSpawnEmbed(interaction.client, spawnId);
             interaction
               .editReply({
@@ -192,6 +201,19 @@ export async function throwBall(interaction, spawnId, ballKey) {
           }
 
           logThrow(spawnId, userId, ball.key, ball.price, probability, "CATCH");
+          recordThrow({
+            userId,
+            speciesId: spawn.species_id,
+            ball: ball.key,
+            cost: ball.price,
+            probability,
+            result: "CATCH",
+          });
+          recordSpawnEnd(spawn, species, {
+            caughtBy: userId,
+            ball: ball.label,
+            probability,
+          });
           creditCollection(userId, spawn.species_id, spawn.is_shiny, () => {
             finalizeCaughtSpawn(interaction.client, spawnId, userId, ball.key);
             log(

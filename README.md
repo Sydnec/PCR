@@ -49,6 +49,13 @@ plus ou moins difficile tout en préservant la hiérarchie entre espèces.
 **Données** : `modules/pokemon-gen1.json` est généré une fois par `npm run gen:pokemon` depuis le
 dataset PokéAPI et commité — la production ne fait aucun appel réseau.
 
+**Statistiques annuelles** : le jeu alimente en continu `botdata-<ANNÉE>.db` (tables `pokemon_stats`,
+`pokemon_ball_stats`, `pokemon_species_stats`, `pokemon_highlights`, `pokemon_daily_stats`). Comme ce
+fichier change au 1ᵉʳ janvier, la base **est** le périmètre de l'année : un récap de fin d'année n'a
+qu'à lire ces tables, sans aucun filtre de date. La ligne `__global__` porte les totaux du serveur,
+comme pour `message_stats`. Points brûlés, captures attendues contre captures réelles (donc la chance
+de chacun), records personnels, shinies et légendaires capturés : tout y est.
+
 ### 🛠️ Utilitaires & Communauté
 
 - **Rappels** :

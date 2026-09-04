@@ -8,6 +8,7 @@ import { spendPoints } from "../economy.js";
 import { handleException } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
 import { evolutionTargets, getSpecies } from "./data.js";
+import { recordFusion, recordTrade } from "./stats.js";
 
 export function getCollection(userId, cb) {
   db.all(
@@ -161,6 +162,11 @@ export function evolve(userId, speciesId, isShiny, chosenTargetId, cb) {
             [userId, speciesId, target.id, isShiny ? 1 : 0, plan.duplicates, plan.points, Date.now()],
             (err) => {
               if (err) handleException("Journal de fusion :", err);
+              recordFusion({
+                userId,
+                duplicates: plan.duplicates,
+                points: plan.points,
+              });
               cb(null, { ok: true, target, plan });
             }
           );
@@ -290,7 +296,13 @@ export function acceptTrade(tradeId, cb) {
                       trade.from_user_id,
                       trade.request_species_id,
                       trade.request_is_shiny,
-                      (err) => cb(err, { ok: true, trade })
+                      (err) => {
+                        recordTrade({
+                          fromUserId: trade.from_user_id,
+                          toUserId: trade.to_user_id,
+                        });
+                        cb(err, { ok: true, trade });
+                      }
                     );
                   }
                 );

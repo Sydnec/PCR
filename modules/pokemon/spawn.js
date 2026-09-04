@@ -14,6 +14,7 @@ import {
   buildFledEmbed,
   buildSpawnEmbed,
 } from "./embeds.js";
+import { recordSpawn, recordSpawnEnd } from "./stats.js";
 
 // Rafraîchissements différés par spawn. Discord limite les éditions d'un même
 // message à 5 par 5 secondes ; une salve de lancers les dépasserait largement.
@@ -147,10 +148,17 @@ export async function doSpawn(client, options = {}) {
       db.run(
         "UPDATE pokemon_spawns SET status = 'FLED', ended_at = ? WHERE id = ? AND status = 'ACTIVE'",
         [Date.now(), previous.id],
-        (err) => {
+        function (err) {
           if (err) {
             handleException("Fuite du spawn précédent :", err);
             return releaseSpawnSlot();
+          }
+          // La statistique suit l'événement de jeu, pas l'affichage : le message
+          // de l'ancien spawn a pu être supprimé, la fuite compte quand même.
+          // La garde sur le statut évite de compter deux fois.
+          if (this.changes === 1) {
+            const previousSpecies = getSpecies(previous.species_id);
+            if (previousSpecies) recordSpawnEnd(previous, previousSpecies);
           }
           insertNew();
         }
@@ -213,6 +221,8 @@ function createSpawn(client, channel, species, isShiny, announcement, ping, prev
             if (err) handleException("Fin du spawn :", err);
           }
         );
+
+        recordSpawn(spawn, species);
 
         log(
           `Spawn #${spawnId} : ${species.name}${isShiny ? " ✨" : ""} (${rarity}, rate ${species.catchRate})`
