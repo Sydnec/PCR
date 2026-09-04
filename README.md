@@ -16,6 +16,46 @@ PCR est un bot Discord modulaire conçu pour animer et gérer la communauté. Il
   - `/ecaflip` : Pile ou face (ou choix multiple aléatoire).
   - `/randomizabaise` : Commande fun aléatoire (Easter egg communautaire).
 
+### 🔴 Pokémon — Capture & Pokédex
+
+Système de capture qui sert de **puits à points** : chaque lancer de ball débite des points,
+que la capture réussisse ou non.
+
+- **Spawns automatiques** : un Pokémon de 1ʳᵉ génération apparaît dans un salon dédié au rythme de
+  l'activité du serveur (~40 messages, 1 h minimum entre deux). Le spawn précédent s'enfuit quand le
+  suivant arrive, donc un seul Pokémon est disponible à la fois.
+- **Course à un vainqueur** : tout le monde peut lancer autant de balls qu'il veut, le premier jet
+  réussi remporte le Pokémon. Les balls ratées sont définitivement perdues.
+- **4 balls** : Poké Ball (×1), Super Ball (×2), Hyper Ball (×4) et Master Ball (capture garantie,
+  avec confirmation obligatoire). Les probabilités suivent la formule officielle de la génération 3,
+  à partir du taux de capture réel de chaque espèce.
+- **Shiny** (~1/500) comptant comme une entrée de Pokédex distincte.
+- **Commandes** :
+  - `/pokedex [membre]` : collection, doublons, shinies et progression.
+  - `/pokeclassement` : classement des dresseurs par espèces distinctes.
+  - `/pokeinfo <pokemon>` : fiche, rareté et chances de capture par ball.
+  - `/evolution <pokemon>` : fait évoluer un Pokémon en sacrifiant des doublons. Les lignées à
+    embranchement (Évoli) peuvent évoluer au hasard, ou vers une cible choisie pour plus cher.
+  - `/echange <membre> <je_donne> <je_recois>` : échange entre dresseurs.
+  - `/pokespawn` *(Admin)* : déclenche une apparition pour organiser un événement. Donne accès aux
+    espèces hors pool naturel (légendaires et évolutions par échange), avec forçage du shiny, texte
+    d'annonce et mention de rôle.
+
+**Réglages** : tous les nombres (prix, multiplicateurs, taux de shiny, cadence, poids de rareté,
+coûts de fusion) vivent dans le bloc `pokemon` de `config.json`, relu à l'exécution — ils sont donc
+modifiables **sans redémarrer le bot**. Le curseur `capture.globalMultiplier` rend l'ensemble du jeu
+plus ou moins difficile tout en préservant la hiérarchie entre espèces.
+
+**Données** : `modules/pokemon-gen1.json` est généré une fois par `npm run gen:pokemon` depuis le
+dataset PokéAPI et commité — la production ne fait aucun appel réseau.
+
+**Statistiques annuelles** : le jeu alimente en continu `botdata-<ANNÉE>.db` (tables `pokemon_stats`,
+`pokemon_ball_stats`, `pokemon_species_stats`, `pokemon_highlights`, `pokemon_daily_stats`). Comme ce
+fichier change au 1ᵉʳ janvier, la base **est** le périmètre de l'année : un récap de fin d'année n'a
+qu'à lire ces tables, sans aucun filtre de date. La ligne `__global__` porte les totaux du serveur,
+comme pour `message_stats`. Points brûlés, captures attendues contre captures réelles (donc la chance
+de chacun), records personnels, shinies et légendaires capturés : tout y est.
+
 ### 🛠️ Utilitaires & Communauté
 
 - **Rappels** :
@@ -130,7 +170,9 @@ Pour plus de détails sur la configuration CI/CD, voir [CICD.md](./CICD.md).
 ├── commands/       # Commandes Slash Discord (ecaflip, poll, safe-place...)
 ├── events/         # Événements Discord (client, guild, interactions...)
 ├── functions/      # Handlers (timers, events, commands...)
-├── modules/        # Modules partagés (DB, Utils, Regex, WordAnalysis...)
+├── modules/        # Modules partagés (DB, Utils, Regex, Economy...)
+│   └── pokemon/    # Système de capture (données, spawns, capture, collection)
+├── scripts/        # Scripts ponctuels (génération du dataset Pokémon)
 ├── pcr             # Script CLI de gestion
 ├── CICD.md         # Documentation du déploiement
 └── index.js        # Point d'entrée

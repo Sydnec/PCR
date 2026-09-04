@@ -164,6 +164,108 @@ const db = new sqlite3.Database(dbPath, (err) => {
         }
       }
     );
+
+    // ============ STATISTIQUES POKÉMON ============
+    // Le jeu lui-même vit dans points.db (persistante). Ces tables-ci sont les
+    // statistiques de l'année : elles suivent le fichier botdata-<ANNÉE>.db et
+    // repartent donc de zéro chaque 1er janvier, ce qui donne exactement le
+    // périmètre d'un récap annuel. Comme pour message_stats et emoji_stats, la
+    // ligne "__global__" porte les totaux du serveur.
+
+    // Agrégats par dresseur.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_stats (
+        user_id TEXT PRIMARY KEY,
+        throws INTEGER DEFAULT 0,
+        catches INTEGER DEFAULT 0,
+        points_spent INTEGER DEFAULT 0,
+        points_burned INTEGER DEFAULT 0,
+        expected_catches REAL DEFAULT 0,
+        shiny_catches INTEGER DEFAULT 0,
+        legendary_catches INTEGER DEFAULT 0,
+        best_catch_probability REAL,
+        best_catch_species INTEGER,
+        fastest_catch_ms INTEGER,
+        most_throws_on_one_spawn INTEGER DEFAULT 0,
+        fusions INTEGER DEFAULT 0,
+        duplicates_spent INTEGER DEFAULT 0,
+        fusion_points INTEGER DEFAULT 0,
+        trades INTEGER DEFAULT 0
+      )`,
+      (err) => {
+        if (err) handleException("Erreur lors de la création de la table pokemon_stats :", err);
+      }
+    );
+
+    // Usage des balls, par dresseur et en global.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_ball_stats (
+        user_id TEXT,
+        ball TEXT,
+        count INTEGER DEFAULT 0,
+        cost INTEGER DEFAULT 0,
+        PRIMARY KEY (user_id, ball)
+      )`,
+      (err) => {
+        if (err) handleException("Erreur lors de la création de la table pokemon_ball_stats :", err);
+      }
+    );
+
+    // Agrégats par espèce : le plus vu, le plus capturé, le plus coriace.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_species_stats (
+        species_id INTEGER PRIMARY KEY,
+        spawns INTEGER DEFAULT 0,
+        catches INTEGER DEFAULT 0,
+        escapes INTEGER DEFAULT 0,
+        shiny_spawns INTEGER DEFAULT 0,
+        shiny_catches INTEGER DEFAULT 0,
+        throws_received INTEGER DEFAULT 0,
+        points_burned INTEGER DEFAULT 0,
+        max_throws_single_spawn INTEGER DEFAULT 0
+      )`,
+      (err) => {
+        if (err) handleException("Erreur lors de la création de la table pokemon_species_stats :", err);
+      }
+    );
+
+    // Moments notables de l'année : shinies, légendaires, spawns disputés.
+    // Une ligne par événement, pour raconter l'année plutôt que la résumer.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_highlights (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        type TEXT NOT NULL,
+        user_id TEXT,
+        species_id INTEGER,
+        is_shiny INTEGER DEFAULT 0,
+        value INTEGER,
+        detail TEXT,
+        created_at INTEGER NOT NULL
+      )`,
+      (err) => {
+        if (err) return handleException("Erreur lors de la création de la table pokemon_highlights :", err);
+        db.run(
+          "CREATE INDEX IF NOT EXISTS idx_pokemon_highlights_type ON pokemon_highlights(type, created_at)",
+          (err) => {
+            if (err) handleException("Erreur lors de la création de l'index pokemon_highlights :", err);
+          }
+        );
+      }
+    );
+
+    // Activité par jour : pour tracer la courbe de l'année.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_daily_stats (
+        date TEXT PRIMARY KEY,
+        spawns INTEGER DEFAULT 0,
+        throws INTEGER DEFAULT 0,
+        catches INTEGER DEFAULT 0,
+        points_burned INTEGER DEFAULT 0
+      )`,
+      (err) => {
+        if (err) handleException("Erreur lors de la création de la table pokemon_daily_stats :", err);
+      }
+    );
   }
 });
 

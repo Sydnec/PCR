@@ -602,5 +602,13 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "feature",
+      "name": "Capture de Pokémon",
+      "description": "Des Pokémon de 1re génération apparaissent dans un salon dédié au rythme de l'activité du serveur. Chaque lancer de ball coûte des points, réussi ou non : Poké Ball, Super Ball, Hyper Ball et Master Ball. Le premier jet réussi remporte le Pokémon. Ajout de /pokedex, /pokeclassement, /pokeinfo, /evolution, /echange et /pokespawn (admin, pour les événements).",
+      "author": "Sydnec",
+      "announce": true
+    }
+  ]
 }

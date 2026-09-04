@@ -1,6 +1,7 @@
 import { log, updateThreadList } from '../../modules/utils.js';
 import { checkAndAnnounceNewRelease } from '../../modules/changelog-notifier.js';
 import db from '../../modules/db.js';
+import { rehydratePokemon } from '../../modules/pokemon/spawn.js';
 
 const name = 'clientReady';
 const once = true;
@@ -33,6 +34,11 @@ async function execute(bot) {
 
     bot.handleUpdateRoleMessage();
     bot.handleCheckExpiredMessages(db);
+
+    // Répare l'état Pokémon après un arrêt brutal : verrou de spawn resté
+    // verrouillé, ou spawn ACTIVE sans message, qui bloquerait définitivement
+    // toutes les apparitions à cause de l'index unique partiel.
+    rehydratePokemon(bot);
 
     // Remplir la BDD avec les événements passés avant le 29/08/2025 à 00:28
     import('../../modules/db.js').then(mod => {

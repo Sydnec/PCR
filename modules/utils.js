@@ -66,8 +66,11 @@ function getRoleID(roleName, guild) {
 		return -1;
 	}
 }
-function handleException(e) {
-	error(e);
+function handleException(...args) {
+	// Variadique : une cinquantaine d'appels dans le projet passent un message
+	// de contexte suivi de l'erreur. Avec un seul paramètre, l'erreur était
+	// silencieusement perdue et les logs n'indiquaient pas la cause.
+	error(...args);
 }
 function log(...args) {
 	const messageWithDate = [`${formatDate()} -`, ...args];
