@@ -616,5 +616,13 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Améliorations Pokémon",
+      "description": "Le Pokédex répond désormais en privé. Un bouton « Je l'ai déjà ? » sur chaque apparition indique à chacun si le Pokémon manque à sa collection. À la capture comme à la fuite, l'embed affiche qui a perdu le plus de points plutôt qu'un simple total. Enfin, un nouveau Pokémon apparaît dès le message suivant une capture ou une fuite, au lieu d'attendre le seuil complet.",
+      "author": "Sydnec",
+      "announce": true
+    }
+  ]
 }

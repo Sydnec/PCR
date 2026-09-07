@@ -12,6 +12,7 @@ import {
   buildBallRow,
   buildCaughtEmbed,
   buildFledEmbed,
+  buildOwnedRow,
   buildSpawnEmbed,
 } from "./embeds.js";
 import { recordSpawn, recordSpawnEnd } from "./stats.js";
@@ -28,12 +29,24 @@ export function getSpawn(spawnId, cb) {
   db.get("SELECT * FROM pokemon_spawns WHERE id = ?", [spawnId], cb);
 }
 
-// Points définitivement perdus sur ce spawn : la mesure du puits.
-export function sumPointsBurned(spawnId, cb) {
-  db.get(
-    "SELECT COALESCE(SUM(cost), 0) AS burned FROM pokemon_throws WHERE spawn_id = ? AND result = 'MISS'",
+// Qui a perdu combien sur ce spawn, et le total. Ce sont les points brûlés :
+// les lancers ratés, jamais la capture gagnante ni les remboursements.
+export function spendingBreakdown(spawnId, cb) {
+  db.all(
+    `SELECT user_id, SUM(cost) AS burned
+       FROM pokemon_throws
+      WHERE spawn_id = ? AND result = 'MISS'
+      GROUP BY user_id
+      ORDER BY burned DESC`,
     [spawnId],
-    (err, row) => cb(err, row ? row.burned : 0)
+    (err, rows) => {
+      if (err) return cb(err, { total: 0, spenders: [] });
+      const spenders = rows || [];
+      cb(null, {
+        total: spenders.reduce((sum, row) => sum + row.burned, 0),
+        spenders,
+      });
+    }
   );
 }
 
@@ -79,14 +92,25 @@ export function registerMessageForSpawn(client) {
       const now = Date.now();
       const minDelayMs = config.spawn.minDelayMinutes * 60 * 1000;
 
+      // Deux cas, en une seule instruction gardée pour rester atomique :
+      //  - plus aucun Pokémon dans le salon (capturé ou enfui) : le prochain
+      //    message en fait apparaître un, éventuellement après un court délai
+      //    plancher réglable (0 par défaut) ;
+      //  - un Pokémon est encore là : le seuil de messages et le délai
+      //    minimum décident du moment où il s'enfuit, remplacé par le suivant.
+      const afterEndMs = config.spawn.minDelayAfterEndMinutes * 60 * 1000;
+
       db.run(
         `UPDATE pokemon_state
             SET message_count = 0, last_spawn_at = ?, spawning = 1
           WHERE id = 1
             AND spawning = 0
-            AND message_count >= ?
-            AND last_spawn_at <= ?`,
-        [now, config.spawn.messagesPerSpawn, now - minDelayMs],
+            AND (
+              ( NOT EXISTS (SELECT 1 FROM pokemon_spawns WHERE status = 'ACTIVE')
+                AND last_spawn_at <= ? )
+              OR ( message_count >= ? AND last_spawn_at <= ? )
+            )`,
+        [now, now - afterEndMs, config.spawn.messagesPerSpawn, now - minDelayMs],
         function (err) {
           if (err) return handleException("Revendication du spawn :", err);
           if (this.changes === 1) doSpawn(client);
@@ -204,7 +228,7 @@ function createSpawn(client, channel, species, isShiny, announcement, ping, prev
         const message = await channel.send({
           content,
           embeds: [buildSpawnEmbed(spawn, species, [], announcement)],
-          components: [buildBallRow(spawnId)],
+          components: [buildBallRow(spawnId), buildOwnedRow(spawnId)],
         });
 
         db.run(
@@ -250,14 +274,14 @@ async function markPreviousAsFled(client, previous) {
   const species = getSpecies(previous.species_id);
   if (!species) return;
 
-  sumPointsBurned(previous.id, async (err, burned) => {
-    if (err) handleException("Somme des points brûlés :", err);
+  spendingBreakdown(previous.id, async (err, spending) => {
+    if (err) handleException("Répartition des dépenses :", err);
     try {
       const channel = await client.channels.fetch(previous.channel_id);
       const message = await channel.messages.fetch(previous.message_id);
       await message.edit({
         content: null,
-        embeds: [buildFledEmbed(previous, species, burned || 0)],
+        embeds: [buildFledEmbed(previous, species, spending)],
         components: [],
       });
     } catch (error) {
@@ -316,14 +340,14 @@ export function finalizeCaughtSpawn(client, spawnId, winnerId, ballKey) {
     const species = getSpecies(spawn.species_id);
     if (!species) return;
 
-    sumPointsBurned(spawnId, async (err, burned) => {
-      if (err) handleException("Somme des points brûlés :", err);
+    spendingBreakdown(spawnId, async (err, spending) => {
+      if (err) handleException("Répartition des dépenses :", err);
       try {
         const channel = await client.channels.fetch(spawn.channel_id);
         const message = await channel.messages.fetch(spawn.message_id);
         await message.edit({
           content: null,
-          embeds: [buildCaughtEmbed(spawn, species, winnerId, ballKey, burned || 0)],
+          embeds: [buildCaughtEmbed(spawn, species, winnerId, ballKey, spending)],
           components: [],
         });
       } catch (error) {
