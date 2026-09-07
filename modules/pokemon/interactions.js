@@ -13,12 +13,14 @@ import { getBalance } from "../economy.js";
 import { handleException, log } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
 import { throwBall } from "./capture.js";
+import { getSpawn } from "./spawn.js";
 import { getSpecies } from "./data.js";
 import {
   acceptTrade,
   describeEvolution,
   evolve,
   getCollection,
+  getOwnedVariants,
   getTrade,
   resolveTradeAs,
 } from "./collection.js";
@@ -71,6 +73,59 @@ function askMasterBallConfirmation(interaction, spawnId) {
         flags: MessageFlags.Ephemeral,
       })
       .catch(() => {});
+  });
+}
+
+// ---------------------- « Je l'ai déjà ? » ----------------------
+
+// Répond en privé au cliqueur, ce qu'un embed public ne peut pas faire :
+// un message Discord est identique pour tous ses lecteurs.
+function answerAlreadyOwned(interaction, spawnId) {
+  getSpawn(spawnId, (err, spawn) => {
+    if (err) {
+      handleException(err);
+      return ephemeral(interaction, "❌ Erreur base de données.");
+    }
+    if (!spawn) return ephemeral(interaction, "❌ Ce Pokémon est introuvable.");
+
+    const species = getSpecies(spawn.species_id);
+    if (!species) return ephemeral(interaction, "❌ Espèce inconnue.");
+
+    getOwnedVariants(interaction.user.id, species.id, (err, owned) => {
+      if (err) {
+        handleException(err);
+        return ephemeral(interaction, "❌ Erreur base de données.");
+      }
+
+      const plural = (n) => (n > 1 ? ` (×${n})` : "");
+
+      if (spawn.is_shiny) {
+        if (owned.shiny > 0) {
+          return ephemeral(
+            interaction,
+            `✅ Tu as déjà **${species.name}** ✨ dans ton Pokédex${plural(owned.shiny)}.`
+          );
+        }
+        return ephemeral(
+          interaction,
+          `🆕 Tu n'as pas encore **${species.name}** en shiny !` +
+            (owned.normal > 0
+              ? ` (tu possèdes la version normale${plural(owned.normal)})`
+              : ` Et tu n'as même pas la version normale.`)
+        );
+      }
+
+      if (owned.normal > 0) {
+        return ephemeral(
+          interaction,
+          `✅ Tu as déjà **${species.name}** dans ton Pokédex${plural(owned.normal)}.`
+        );
+      }
+      return ephemeral(
+        interaction,
+        `🆕 **${species.name}** n'est pas encore dans ton Pokédex !`
+      );
+    });
   });
 }
 
@@ -235,6 +290,9 @@ export async function handlePokemonButton(interaction) {
       return interaction
         .update({ content: "Annulé, tes points sont intacts.", components: [] })
         .catch(() => {});
+
+    case "poke_owned":
+      return answerAlreadyOwned(interaction, args[0]);
 
     case "poke_dex":
       return showDexPage(interaction, args[0], Number(args[1]));

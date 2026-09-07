@@ -21,17 +21,24 @@ PCR est un bot Discord modulaire conçu pour animer et gérer la communauté. Il
 Système de capture qui sert de **puits à points** : chaque lancer de ball débite des points,
 que la capture réussisse ou non.
 
-- **Spawns automatiques** : un Pokémon de 1ʳᵉ génération apparaît dans un salon dédié au rythme de
-  l'activité du serveur (~40 messages, 1 h minimum entre deux). Le spawn précédent s'enfuit quand le
-  suivant arrive, donc un seul Pokémon est disponible à la fois.
+- **Spawns automatiques** : un Pokémon de 1ʳᵉ génération apparaît dans un salon dédié, un seul à la
+  fois. Dès que le salon est vide — le précédent ayant été capturé ou s'étant enfui — le **message
+  suivant** en fait apparaître un nouveau. Tant qu'un Pokémon est là, ce sont le seuil de messages et
+  le délai minimum (~40 messages et 1 h) qui décident du moment où il s'enfuit, remplacé par le
+  suivant. Un délai plancher après capture est disponible (`minDelayAfterEndMinutes`, à 0 par défaut)
+  si l'enchaînement devient trop rapide.
 - **Course à un vainqueur** : tout le monde peut lancer autant de balls qu'il veut, le premier jet
   réussi remporte le Pokémon. Les balls ratées sont définitivement perdues.
 - **4 balls** : Poké Ball (×1), Super Ball (×2), Hyper Ball (×4) et Master Ball (capture garantie,
   avec confirmation obligatoire). Les probabilités suivent la formule officielle de la génération 3,
   à partir du taux de capture réel de chaque espèce.
 - **Shiny** (~1/500) comptant comme une entrée de Pokédex distincte.
+- **Bouton « ❓ Je l'ai déjà ? »** sur chaque apparition : un message Discord étant identique pour
+  tous ses lecteurs, ce bouton répond à chacun en privé selon sa propre collection.
+- À la capture comme à la fuite, l'embed affiche le **classement des points perdus** par dresseur,
+  et le total part en pied de page.
 - **Commandes** :
-  - `/pokedex [membre]` : collection, doublons, shinies et progression.
+  - `/pokedex [membre]` : collection, doublons, shinies et progression. Réponse privée.
   - `/pokeclassement` : classement des dresseurs par espèces distinctes.
   - `/pokeinfo <pokemon>` : fiche, rareté et chances de capture par ball.
   - `/evolution <pokemon>` : fait évoluer un Pokémon en sacrifiant des doublons. Les lignées à

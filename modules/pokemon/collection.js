@@ -29,6 +29,25 @@ export function getOwned(userId, speciesId, isShiny, cb) {
   );
 }
 
+// Les deux variantes d'une espèce en une requête : un shiny est une entrée de
+// Pokédex distincte, donc « est-ce que je l'ai ? » a deux réponses possibles.
+export function getOwnedVariants(userId, speciesId, cb) {
+  db.all(
+    `SELECT is_shiny, count FROM pokemon_collection
+      WHERE user_id = ? AND species_id = ? AND count > 0`,
+    [userId, speciesId],
+    (err, rows) => {
+      if (err) return cb(err, { normal: 0, shiny: 0 });
+      const counts = { normal: 0, shiny: 0 };
+      for (const row of rows || []) {
+        if (row.is_shiny) counts.shiny = row.count;
+        else counts.normal = row.count;
+      }
+      cb(null, counts);
+    }
+  );
+}
+
 export function getLeaderboard(limit, cb) {
   db.all(
     `SELECT user_id,

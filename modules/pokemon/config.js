@@ -17,6 +17,9 @@ export const DEFAULTS = {
   spawn: {
     messagesPerSpawn: 40,
     minDelayMinutes: 60,
+    // Délai plancher avant qu'un nouveau Pokémon apparaisse une fois le
+    // précédent capturé ou enfui. À 0, il apparaît dès le message suivant.
+    minDelayAfterEndMinutes: 0,
     shinyOdds: 500,
     weightsByStage: { 1: 100, 2: 35, 3: 10 },
     legendaryWeight: 8,

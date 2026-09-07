@@ -113,9 +113,50 @@ export function buildBallRow(spawnId, { disabled = false } = {}) {
   return row;
 }
 
-export function buildCaughtEmbed(spawn, species, winnerId, ballKey, pointsBurned) {
+// Un message Discord est identique pour tous ses lecteurs : impossible d'y
+// afficher « tu l'as déjà » personnalisé. Ce bouton contourne la limite en
+// répondant à chacun en privé selon SA collection.
+export function buildOwnedRow(spawnId) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`poke_owned|${spawnId}`)
+      .setLabel("Je l'ai déjà ?")
+      .setEmoji("❓")
+      .setStyle(ButtonStyle.Secondary)
+  );
+}
+
+const formatPoints = (value) => value.toLocaleString("fr-FR");
+
+// Classement des points perdus sur un spawn. Le champ d'embed est plafonné à
+// 1024 caractères, d'où la coupe au top 5 avec un reliquat agrégé.
+const SPENDERS_SHOWN = 5;
+
+function spendersField(spending) {
+  const spenders = spending?.spenders ?? [];
+  if (!spenders.length) return "*Personne n'a perdu un seul point.*";
+
+  const lines = spenders
+    .slice(0, SPENDERS_SHOWN)
+    .map((row, index) => {
+      const medal = ["🥇", "🥈", "🥉"][index] ?? "▪️";
+      return `${medal} <@${row.user_id}> — ${formatPoints(row.burned)} pts`;
+    });
+
+  const rest = spenders.length - SPENDERS_SHOWN;
+  if (rest > 0) {
+    const restTotal = spenders
+      .slice(SPENDERS_SHOWN)
+      .reduce((sum, row) => sum + row.burned, 0);
+    lines.push(`*et ${rest} autre${rest > 1 ? "s" : ""} — ${formatPoints(restTotal)} pts*`);
+  }
+  return lines.join("\n");
+}
+
+export function buildCaughtEmbed(spawn, species, winnerId, ballKey, spending) {
   const isShiny = Boolean(spawn.is_shiny);
   const ball = getPokemonConfig().capture.balls[ballKey];
+  const total = spending?.total ?? 0;
 
   return new EmbedBuilder()
     .setTitle(`🎉 ${displayName(species, isShiny)} a été capturé !`)
@@ -126,18 +167,17 @@ export function buildCaughtEmbed(spawn, species, winnerId, ballKey, pointsBurned
     .setThumbnail(spriteUrl(species, isShiny))
     .addFields(
       { name: "Lancers", value: `${spawn.throw_count}`, inline: true },
-      {
-        // Matérialise le puits : c'est la raison d'être de la fonctionnalité.
-        name: "💸 Points partis en fumée",
-        value: `${pointsBurned}`,
-        inline: true,
-      }
+      { name: "💸 Ils ont payé pour rien", value: spendersField(spending), inline: false }
     )
-    .setFooter({ text: `Spawn #${spawn.id} · Pokédex n°${species.id}` });
+    .setFooter({
+      // Le total reste visible : c'est la mesure du puits, raison d'être du système.
+      text: `Spawn #${spawn.id} · Pokédex n°${species.id} · ${formatPoints(total)} pts partis en fumée`,
+    });
 }
 
-export function buildFledEmbed(spawn, species, pointsBurned) {
+export function buildFledEmbed(spawn, species, spending) {
   const isShiny = Boolean(spawn.is_shiny);
+  const total = spending?.total ?? 0;
 
   return new EmbedBuilder()
     .setTitle(`💨 ${displayName(species, isShiny)} s'est enfui...`)
@@ -146,9 +186,11 @@ export function buildFledEmbed(spawn, species, pointsBurned) {
     .setThumbnail(spriteUrl(species, isShiny))
     .addFields(
       { name: "Lancers", value: `${spawn.throw_count}`, inline: true },
-      { name: "💸 Points partis en fumée", value: `${pointsBurned}`, inline: true }
+      { name: "💸 Ils ont payé pour rien", value: spendersField(spending), inline: false }
     )
-    .setFooter({ text: `Spawn #${spawn.id} · Pokédex n°${species.id}` });
+    .setFooter({
+      text: `Spawn #${spawn.id} · Pokédex n°${species.id} · ${formatPoints(total)} pts partis en fumée`,
+    });
 }
 
 // ====================== POKÉDEX ======================

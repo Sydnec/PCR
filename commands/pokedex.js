@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from "discord.js";
+import { SlashCommandBuilder, MessageFlags } from "discord.js";
 import { handleException } from "../modules/utils.js";
 import { getCollection } from "../modules/pokemon/collection.js";
 import { buildDexEmbed, buildDexRow } from "../modules/pokemon/embeds.js";
@@ -17,7 +17,9 @@ export default {
   async execute(interaction) {
     try {
       const target = interaction.options.getUser("membre") || interaction.user;
-      await interaction.deferReply();
+      // Réponse privée : le Pokédex ne concerne que celui qui le consulte, et
+      // cela évite au passage que quelqu'un d'autre manipule la pagination.
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
       getCollection(target.id, async (err, rows) => {
         if (err) {
