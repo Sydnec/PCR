@@ -1,18 +1,18 @@
 {
     "messagePointsDistribution": {
-        "1": 100,
-        "2": 80,
-        "3": 50,
-        "4": 30,
-        "5": 20,
-        "6": 10,
-        "default": 5
+        "1": 500,
+        "2": 400,
+        "3": 350,
+        "4": 300,
+        "5": 250,
+        "6": 200,
+        "default": 100
     },
     "pokemon": {
         "enabled": true,
         "spawn": {
-            "messagesPerSpawn": 40,
-            "minDelayMinutes": 60,
+            "messagesPerSpawn": 20,
+            "minDelayMinutes": 1,
             "minDelayAfterEndMinutes": 0,
             "shinyOdds": 500,
             "weightsByStage": {
@@ -35,25 +35,25 @@
                 "poke": {
                     "label": "Poké Ball",
                     "emoji": "⚪",
-                    "price": 150,
+                    "price": 170,
                     "multiplier": 1
                 },
                 "super": {
                     "label": "Super Ball",
                     "emoji": "🔵",
-                    "price": 400,
+                    "price": 300,
                     "multiplier": 2
                 },
                 "hyper": {
                     "label": "Hyper Ball",
                     "emoji": "🟡",
-                    "price": 1000,
+                    "price": 500,
                     "multiplier": 4
                 },
                 "master": {
                     "label": "Master Ball",
                     "emoji": "🟣",
-                    "price": 50000,
+                    "price": 30000,
                     "multiplier": 255,
                     "guaranteed": true
                 }
