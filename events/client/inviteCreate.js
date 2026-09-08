@@ -1,18 +1,21 @@
-import { Collection } from 'discord.js';
+import { log } from '../../modules/utils.js';
 
 const name = 'inviteCreate';
 const once = false;
 
 async function execute(invite) {
-    const cachedInvites = invite.guild.invites.cache || new Collection();
-    
-    // Add the new invite to the cache
-    cachedInvites.set(invite.code, invite.uses);
-    
-    // Update the client's invite cache
-    invite.client.invites.set(invite.guild.id, cachedInvites);
+    // Le cache du client associe un code au NOMBRE d'utilisations. La version
+    // précédente y déversait le cache de discord.js, qui associe un code à un
+    // objet Invite : la comparaison faite dans guildMemberAdd devenait
+    // impossible et le suivi des invitations décrochait.
+    const guildInvites = invite.client.invites.get(invite.guild.id) ?? new Map();
+    guildInvites.set(invite.code, invite.uses ?? 0);
+    invite.client.invites.set(invite.guild.id, guildInvites);
 
-    console.log(`New invite created with code ${invite.code} by ${invite.inviter.tag}`);
+    log(
+        `Nouvelle invitation ${invite.code}` +
+            (invite.inviter ? ` créée par ${invite.inviter.tag}` : '')
+    );
 }
 
 export { name, once, execute };

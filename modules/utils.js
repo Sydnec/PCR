@@ -8,7 +8,10 @@ import { load } from 'cheerio';
 dotenv.config();
 
 function isAdmin(member) {
-	return member.permissions.has(PermissionsBitField.Flags.Administrator);
+	// member est null hors d'un serveur : refuser plutôt que lever.
+	return Boolean(
+		member?.permissions?.has(PermissionsBitField.Flags.Administrator)
+	);
 }
 const getCommand = (message = '') =>
 	message.replace(/\s+/, '\x01').split('\x01'); // Créer un tableau avec le séparateur ' '
@@ -55,6 +58,57 @@ async function registerCommands() {
 		handleException(e);
 	}
 }
+// Permissions qu'un rôle en libre-service ne doit jamais accorder. Le message
+// de rôles est public : tout le monde peut réagir avec n'importe quel emoji.
+const SELF_SERVICE_FORBIDDEN_PERMISSIONS = [
+	PermissionsBitField.Flags.Administrator,
+	PermissionsBitField.Flags.ManageGuild,
+	PermissionsBitField.Flags.ManageRoles,
+	PermissionsBitField.Flags.ManageChannels,
+	PermissionsBitField.Flags.ManageMessages,
+	PermissionsBitField.Flags.ManageWebhooks,
+	PermissionsBitField.Flags.ManageNicknames,
+	PermissionsBitField.Flags.ManageEmojisAndStickers,
+	PermissionsBitField.Flags.KickMembers,
+	PermissionsBitField.Flags.BanMembers,
+	PermissionsBitField.Flags.ModerateMembers,
+	PermissionsBitField.Flags.MentionEveryone,
+];
+
+// Rôles qu'une réaction sur le message de rôles peut réellement accorder.
+//
+// La règle DOIT être la même que celle qui construit ce message
+// (handleUpdateRoleMessage) : uniquement les rôles situés sous PING_ROLE_ID.
+// Sans ce filtre, réagir avec l'emoji d'un rôle non listé — un rôle de
+// modération dont le nom commence par un emoji, par exemple — suffisait à se
+// l'attribuer soi-même. Les rôles gérés par une intégration et ceux portant une
+// permission sensible sont exclus par sécurité.
+function selfServiceRoles(guild) {
+	if (!guild) return [];
+
+	const pingRole = guild.roles.cache.get(process.env.PING_ROLE_ID);
+	if (!pingRole) {
+		error('PING_ROLE_ID introuvable : aucun rôle-réaction ne sera attribué.');
+		return [];
+	}
+
+	return [...guild.roles.cache.values()].filter(
+		(role) =>
+			role.position < pingRole.position &&
+			!role.managed &&
+			!role.permissions.any(SELF_SERVICE_FORBIDDEN_PERMISSIONS)
+	);
+}
+
+// Rôles qu'une réaction donnée peut accorder : la même liste, restreinte aux
+// rôles dont le nom commence par l'emoji utilisé.
+function rolesForReactionEmoji(guild, emojiName) {
+	if (!emojiName) return [];
+	return selfServiceRoles(guild).filter((role) =>
+		role.name.startsWith(emojiName)
+	);
+}
+
 function environmentIsProd() {
 	return process.env.ENV === 'production';
 }
@@ -400,6 +454,8 @@ function splitEmbed(embed) {
 
 export {
 	isAdmin,
+	selfServiceRoles,
+	rolesForReactionEmoji,
 	registerCommands,
 	getCommand,
 	environmentIsProd,

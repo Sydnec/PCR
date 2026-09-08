@@ -91,22 +91,32 @@ async function execute(message) {
         }
 
         if (pointsToAdd > 0) {
-            pointsDb.serialize(() => {
-                // Update tracking et ajout points
-                pointsDb.run(
-                    `INSERT INTO points (user_id, balance, last_message_at, messages_today_count, last_reset_date) 
-                     VALUES (?, ?, ?, ?, ?)
-                     ON CONFLICT(user_id) DO UPDATE SET 
-                        balance = balance + ?,
-                        last_message_at = ?, 
-                        messages_today_count = ?, 
-                        last_reset_date = ?`,
-                    [userId, pointsToAdd, now, rank, today, pointsToAdd, now, rank, today],
-                    (err) => {
-                        if (err) handleException("Erreur update points message équilibrés", err);
-                    }
-                );
-            });
+            // Écriture gardée : le SELECT ci-dessus et cette écriture sont
+            // séparés par un aller-retour asynchrone. Deux messages envoyés
+            // coup sur coup lisaient tous les deux l'ancien last_message_at et
+            // encaissaient chacun la récompense du 1er message de la journée.
+            // La condition reproduit ici la règle appliquée plus haut : soit on
+            // a changé de jour, soit l'heure de carence est écoulée.
+            pointsDb.run(
+                `INSERT INTO points (user_id, balance, last_message_at, messages_today_count, last_reset_date)
+                 VALUES (?, ?, ?, ?, ?)
+                 ON CONFLICT(user_id) DO UPDATE SET
+                    balance = balance + ?,
+                    last_message_at = ?,
+                    messages_today_count = ?,
+                    last_reset_date = ?
+                 WHERE COALESCE(points.last_reset_date, '') != ?
+                    OR COALESCE(points.last_message_at, 0) = 0
+                    OR points.last_message_at <= ?`,
+                [
+                    userId, pointsToAdd, now, rank, today,
+                    pointsToAdd, now, rank, today,
+                    today, now - oneHour,
+                ],
+                function (err) {
+                    if (err) handleException("Erreur update points message équilibrés", err);
+                }
+            );
         }
     });
 

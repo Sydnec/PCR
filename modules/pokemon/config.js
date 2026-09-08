@@ -58,12 +58,19 @@ export const DEFAULTS = {
 const isPlainObject = (value) =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 
+// Clés qui, affectées sur un objet ordinaire, modifient sa chaîne de
+// prototypes au lieu d'ajouter un réglage. config.json est un fichier de
+// confiance, mais une fusion profonde qui les recopie est une pollution de
+// prototype en attente d'une mauvaise manipulation.
+const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
 // Fusion profonde : une clé absente ou en trop dans config.json retombe
 // silencieusement sur la valeur par défaut plutôt que de casser le jeu.
 function merge(defaults, override) {
   if (!isPlainObject(override)) return defaults;
   const result = { ...defaults };
   for (const [key, value] of Object.entries(override)) {
+    if (FORBIDDEN_KEYS.has(key)) continue;
     result[key] = isPlainObject(defaults[key]) ? merge(defaults[key], value) : value;
   }
   return result;
@@ -81,7 +88,12 @@ export function getPokemonConfig() {
 
 // Renvoie la définition d'une ball, ou null si la clé est inconnue.
 export function getBall(key) {
-  const ball = getPokemonConfig().capture.balls[key];
+  const balls = getPokemonConfig().capture.balls;
+  // hasOwnProperty : sans lui, une clé héritée (« constructor », par exemple)
+  // renvoyait un objet tronqué au lieu de null, et le lancer partait avec un
+  // prix indéfini.
+  if (!Object.prototype.hasOwnProperty.call(balls, key)) return null;
+  const ball = balls[key];
   return ball ? { key, ...ball } : null;
 }
 

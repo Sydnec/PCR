@@ -1,7 +1,56 @@
 {
-  "version": "1.10.2",
-  "lastUpdated": "2026-09-08T09:31:06.778Z",
+  "version": "1.10.3",
+  "lastUpdated": "2026-09-08T09:49:58.037Z",
   "releases": [
+    {
+      "version": "1.10.3",
+      "date": "2026-09-08",
+      "title": "Release 1.10.3 — Audit de sécurité",
+      "features": [
+        {
+          "type": "fix",
+          "name": "Économie de points sécurisée",
+          "description": "Les mises de /bet et /estimate sont débitées de façon atomique (plus moyen de miser deux fois le même solde ni de passer sous zéro), la clôture d'un pari ne paie plus qu'une seule fois, et un pari clos n'accepte plus de mise. Deux messages coup sur coup ne rapportent plus deux fois les points du jour.",
+          "author": "Sydnec",
+          "announce": true
+        },
+        {
+          "type": "fix",
+          "name": "Rôles-réaction restreints",
+          "description": "Réagir au message des rôles n'accorde plus que les rôles réellement listés : les rôles d'intégration et ceux portant une permission sensible ne peuvent plus être pris en libre-service.",
+          "author": "Sydnec",
+          "announce": true
+        },
+        {
+          "type": "fix",
+          "name": "Plus de @everyone via le bot",
+          "description": "Le bot ne relaie plus @everyone ni @here glissés dans un texte qu'il republie (/safe-place, /poll, /week, /edit, liens twitter et instagram).",
+          "author": "Sydnec",
+          "announce": true
+        },
+        {
+          "type": "fix",
+          "name": "Commandes plus sûres",
+          "description": "/purge s'arrête à la borne demandée au lieu de vider le salon sur un lien erroné, /color exige un vrai code hexadécimal, /edit est réservé à l'auteur du sondage et /week se limite à 31 jours.",
+          "author": "Sydnec",
+          "announce": true
+        },
+        {
+          "type": "fix",
+          "name": "Arrivées, rôle par défaut et minuteries",
+          "description": "Le suivi des invitations enregistrait des objets au lieu du nombre d'utilisations : un nouveau membre pouvait repartir sans aucun rôle. Le rôle par défaut est désormais attribué même quand l'invitation n'a pas pu être identifiée. Les tâches planifiées sont enregistrées une par une : une variable cron absente ne prive plus le bot des minuteries suivantes, rappels et fuite des Pokémon compris. /autodel écrit enfin dans la base partagée, si bien que les suppressions programmées survivent à un redémarrage.",
+          "author": "Sydnec",
+          "announce": false
+        },
+        {
+          "type": "chore",
+          "name": "Dépendances et durcissement interne",
+          "description": "Mise à jour des dépendances vulnérables (axios, ws, discord.js, form-data, lodash, qs, minimatch, brace-expansion) : 21 vulnérabilités connues ramenées à 10, les restantes nécessitant une montée majeure de sqlite3 et node-cron. Le script pcr ne construit plus son script node par interpolation des saisies, .gitignore ignore de nouveau .env.dev et .env.prod, et la configuration Pokémon est protégée contre la pollution de prototype.",
+          "author": "Sydnec",
+          "announce": false
+        }
+      ]
+    },
     {
       "version": "1.10.2",
       "date": "2026-09-08",
