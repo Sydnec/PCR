@@ -630,5 +630,13 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Fuite autonome des Pokémon",
+      "description": "Chaque Pokémon reçoit une durée de vie tirée au hasard entre 3 et 6 heures. Passé ce délai, s'il n'a été capturé par personne, il s'enfuit de lui-même sans dépendre de l'activité du serveur : un salon calme ne reste plus bloqué indéfiniment sur le même Pokémon.",
+      "author": "Sydnec",
+      "announce": true
+    }
+  ]
 }

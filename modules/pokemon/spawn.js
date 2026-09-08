@@ -107,7 +107,7 @@ export function registerMessageForSpawn(client) {
             AND spawning = 0
             AND (
               ( NOT EXISTS (SELECT 1 FROM pokemon_spawns WHERE status = 'ACTIVE')
-                AND last_spawn_at <= ? )
+                AND COALESCE((SELECT MAX(ended_at) FROM pokemon_spawns), 0) <= ? )
               OR ( message_count >= ? AND last_spawn_at <= ? )
             )`,
         [now, now - afterEndMs, config.spawn.messagesPerSpawn, now - minDelayMs],
@@ -177,13 +177,10 @@ export async function doSpawn(client, options = {}) {
             handleException("Fuite du spawn précédent :", err);
             return releaseSpawnSlot();
           }
-          // La statistique suit l'événement de jeu, pas l'affichage : le message
-          // de l'ancien spawn a pu être supprimé, la fuite compte quand même.
-          // La garde sur le statut évite de compter deux fois.
-          if (this.changes === 1) {
-            const previousSpecies = getSpecies(previous.species_id);
-            if (previousSpecies) recordSpawnEnd(previous, previousSpecies);
-          }
+          // La fuite n'est conclue que si ce spawn était bien encore actif :
+          // la garde évite de la comptabiliser deux fois. L'affichage suit dans
+          // createSpawn, une fois le nouveau message posté.
+          if (this.changes !== 1) previous = null;
           insertNew();
         }
       );
@@ -194,14 +191,24 @@ export async function doSpawn(client, options = {}) {
   }
 }
 
+// Durée de vie tirée au sort, figée à la création : elle survit aux
+// redémarrages et n'est jamais recalculée à la lecture.
+export function rollFleeDeadline(spawnedAt, spawnConfig) {
+  const { min, max } = spawnConfig.fleeAfterMinutes;
+  const low = Math.min(min, max);
+  const span = Math.abs(max - min);
+  return spawnedAt + (low + Math.random() * span) * 60 * 1000;
+}
+
 function createSpawn(client, channel, species, isShiny, announcement, ping, previous) {
   const now = Date.now();
   const rarity = rarityOf(species);
+  const fleesAt = Math.round(rollFleeDeadline(now, getPokemonConfig().spawn));
 
   db.run(
-    `INSERT INTO pokemon_spawns (species_id, is_shiny, catch_rate, rarity, channel_id, spawned_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [species.id, isShiny ? 1 : 0, species.catchRate, rarity, channel.id, now],
+    `INSERT INTO pokemon_spawns (species_id, is_shiny, catch_rate, rarity, channel_id, spawned_at, flees_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [species.id, isShiny ? 1 : 0, species.catchRate, rarity, channel.id, now, fleesAt],
     async function (err) {
       if (err) {
         handleException("Insertion du spawn :", err);
@@ -252,7 +259,7 @@ function createSpawn(client, channel, species, isShiny, announcement, ping, prev
           `Spawn #${spawnId} : ${species.name}${isShiny ? " ✨" : ""} (${rarity}, rate ${species.catchRate})`
         );
 
-        if (previous) await markPreviousAsFled(client, previous);
+        if (previous) endSpawnAsFled(client, previous);
       } catch (error) {
         // Envoi impossible : on annule le spawn plutôt que de laisser une ligne
         // ACTIVE sans message, qui bloquerait tous les spawns suivants.
@@ -267,25 +274,34 @@ function createSpawn(client, channel, species, isShiny, announcement, ping, prev
   );
 }
 
-// Édite l'ancien message pour montrer la fuite. Best-effort : le message a pu
-// être supprimé entre-temps.
-async function markPreviousAsFled(client, previous) {
-  if (!previous.channel_id || !previous.message_id) return;
-  const species = getSpecies(previous.species_id);
+// Conclut un spawn en fuite : statistiques puis édition du message.
+//
+// Chemin unique partagé par les deux causes de fuite — le remplacement par un
+// nouveau spawn, et l'expiration de la durée de vie — pour qu'il n'existe
+// qu'une seule façon de terminer un Pokémon.
+//
+// L'affichage est best-effort : le message a pu être supprimé entre-temps, ce
+// qui ne doit pas empêcher la fuite d'être comptabilisée.
+export function endSpawnAsFled(client, spawn) {
+  const species = getSpecies(spawn.species_id);
   if (!species) return;
 
-  spendingBreakdown(previous.id, async (err, spending) => {
+  recordSpawnEnd(spawn, species);
+
+  if (!spawn.channel_id || !spawn.message_id) return;
+
+  spendingBreakdown(spawn.id, async (err, spending) => {
     if (err) handleException("Répartition des dépenses :", err);
     try {
-      const channel = await client.channels.fetch(previous.channel_id);
-      const message = await channel.messages.fetch(previous.message_id);
+      const channel = await client.channels.fetch(spawn.channel_id);
+      const message = await channel.messages.fetch(spawn.message_id);
       await message.edit({
         content: null,
-        embeds: [buildFledEmbed(previous, species, spending)],
+        embeds: [buildFledEmbed(spawn, species, spending)],
         components: [],
       });
     } catch (error) {
-      log(`Message du spawn #${previous.id} introuvable, fuite non affichée`);
+      log(`Message du spawn #${spawn.id} introuvable, fuite non affichée`);
     }
   });
 }
@@ -375,6 +391,17 @@ export function rehydratePokemon(client) {
     function (err) {
       if (err) return handleException("Nettoyage des spawns incomplets :", err);
       if (this.changes) log(`${this.changes} spawn(s) incomplet(s) nettoyé(s)`);
+    }
+  );
+
+  // Un spawn antérieur à l'ajout de flees_at n'a pas d'échéance. On lui en
+  // donne une à partir de maintenant : ni immortel, ni tué au premier tick.
+  db.run(
+    "UPDATE pokemon_spawns SET flees_at = ? WHERE status = 'ACTIVE' AND flees_at IS NULL",
+    [Math.round(rollFleeDeadline(Date.now(), getPokemonConfig().spawn))],
+    function (err) {
+      if (err) return handleException("Attribution d'une échéance de fuite :", err);
+      if (this.changes) log("Échéance de fuite attribuée au spawn en cours");
     }
   );
 
