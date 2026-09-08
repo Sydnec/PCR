@@ -154,11 +154,36 @@ export default {
       }
     }
 
+    // Validation : dates réellement analysables. `new Date(2026, NaN, NaN)`
+    // produit une date invalide qui traversait silencieusement la suite et
+    // donnait un sondage vide.
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+      await interaction.editReply({
+        content: "❌ Date invalide. Utilisez JJ/MM ou JJ/MM/AAAA",
+      });
+      return;
+    }
+
     // Validation : la date de début doit être avant ou égale à la date de fin
     if (startDate > endDate) {
       await interaction.editReply({
         content:
           "❌ La date de début doit être avant ou égale à la date de fin !",
+      });
+      return;
+    }
+
+    // Période bornée : la boucle de génération ci-dessous parcourt chaque jour
+    // de l'intervalle. Une plage de plusieurs siècles bloquait la boucle
+    // d'événements du bot — donc tout le serveur — le temps de construire une
+    // chaîne de plusieurs mégaoctets, pour un message que Discord aurait de
+    // toute façon refusé (2000 caractères maximum).
+    const MAX_DAYS = 31;
+    const spanDays =
+      Math.floor((endDate - startDate) / (24 * 60 * 60 * 1000)) + 1;
+    if (spanDays > MAX_DAYS) {
+      await interaction.editReply({
+        content: `❌ La période demandée fait ${spanDays} jours : ${MAX_DAYS} au maximum.`,
       });
       return;
     }
@@ -185,12 +210,19 @@ export default {
       currentDate.setDate(currentDate.getDate() + 1);
     }
 
-    let pollMessage = await interaction.channel.send(
-      `# ${input} :\n${daysOfTheWeek}`
-    );
-    await autoAddEmojis(pollMessage);
-    await interaction.editReply({
-      content: "Sondage créé ✅",
-    });
+    try {
+      const pollMessage = await interaction.channel.send(
+        `# ${input} :\n${daysOfTheWeek}`
+      );
+      await autoAddEmojis(pollMessage);
+      await interaction.editReply({
+        content: "Sondage créé ✅",
+      });
+    } catch (error) {
+      handleException(error);
+      await interaction
+        .editReply({ content: "❌ Impossible de créer le sondage." })
+        .catch(() => {});
+    }
   },
 };

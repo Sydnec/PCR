@@ -1,4 +1,4 @@
-import { handleException } from '../../modules/utils.js';
+import { handleException, rolesForReactionEmoji } from '../../modules/utils.js';
 import db from '../../modules/db.js';
 import dotenv from 'dotenv';
 dotenv.config();
@@ -45,14 +45,16 @@ async function execute(reaction, user) {
 
         // Gestion rôles (logique existante)
         if (reaction.message.id === process.env.ROLE_MESSAGE_ID) {
-            const guildMember = await reaction.message.guild.members.cache.get(
-                user.id
-            );
-            const matchingRoles =
-                await reaction.message.guild.roles.cache.filter((role) =>
-                    role.name.startsWith(reaction.emoji.name)
-                );
-            await guildMember.roles.remove(matchingRoles);
+            const guild = reaction.message.guild;
+            // fetch plutôt que cache : un membre absent du cache faisait lever
+            // le handler au lieu d'attribuer le rôle.
+            const guildMember = await guild.members.fetch(user.id).catch(() => null);
+            // Seuls les rôles réellement proposés par le message sont
+            // retirables : voir rolesForReactionEmoji().
+            const matchingRoles = rolesForReactionEmoji(guild, reaction.emoji.name);
+            if (guildMember && matchingRoles.length) {
+                await guildMember.roles.remove(matchingRoles);
+            }
         }
     } catch (err) {
         handleException(err);

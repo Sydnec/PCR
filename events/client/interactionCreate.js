@@ -1,15 +1,49 @@
 import { handleException, log } from '../../modules/utils.js';
 import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, MessageFlags, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import pointsDb from '../../modules/points-db.js';
+import { addPoints, getBalance, spendPoints } from '../../modules/economy.js';
 import { handlePokemonButton } from '../../modules/pokemon/interactions.js';
 
 const name = 'interactionCreate';
 const once = false;
+
+// Réponse d'erreur sûre. Selon l'endroit où l'échec survient, l'interaction
+// peut déjà être différée ou répondue : reply() lèverait alors à son tour et
+// masquerait l'erreur d'origine derrière un rejet non capturé.
+async function safeReply(interaction, content) {
+    const payload = { content, flags: MessageFlags.Ephemeral };
+    try {
+        if (interaction.deferred || interaction.replied) {
+            await interaction.followUp(payload);
+        } else {
+            await interaction.reply(payload);
+        }
+    } catch {
+        // Interaction expirée ou déjà consommée : il n'y a plus rien à dire.
+    }
+}
+
+// Revendication atomique de la clôture d'un pari.
+//
+// Sans cette garde, deux clics rapides sur « Déclarer le résultat » lisaient
+// tous les deux un pari encore OPEN et créditaient les gagnants deux fois :
+// le créateur pouvait fabriquer des points à volonté. Un seul appelant obtient
+// désormais changes === 1, et lui seul paie.
+function claimBetResolution(betId, status, winningIndex, cb) {
+    pointsDb.run(
+        `UPDATE bets SET status = ?, winning_option_index = ?
+          WHERE id = ? AND status IN ('OPEN', 'LOCKED')`,
+        [status, winningIndex, betId],
+        function (err) {
+            cb(err, this ? this.changes === 1 : false);
+        }
+    );
+}
 async function execute(interaction, bot) {
     if (interaction.isChatInputCommand()) {
         if (interaction.commandName != 'safe-place')
             log(
-                `/${interaction.commandName} par ${interaction.member.displayName}`
+                `/${interaction.commandName} par ${interaction.member?.displayName ?? interaction.user.username}`
             );
         // --- Statistiques commandes les plus utilisées ---
         try {
@@ -33,10 +67,10 @@ async function execute(interaction, bot) {
             await command.execute(interaction, bot);
         } catch (err) {
             handleException(err);
-            await interaction.reply({
-                content: `Erreur lors de l'execution de la commande.`,
-                flags: MessageFlags.Ephemeral,
-            });
+            await safeReply(
+                interaction,
+                `Erreur lors de l'execution de la commande.`
+            );
         }
     }
     // Autocomplétion : branche générique, utilisable par n'importe quelle
@@ -69,8 +103,11 @@ async function execute(interaction, bot) {
             const [, betId] = customId.split('|');
             const userId = interaction.user.id;
 
-            pointsDb.get("SELECT creator_id FROM bets WHERE id = ?", [betId], (err, bet) => {
+            pointsDb.get("SELECT creator_id, status FROM bets WHERE id = ?", [betId], (err, bet) => {
                 if (err || !bet) return interaction.reply({ content: "Pari introuvable.", flags: MessageFlags.Ephemeral });
+                if (bet.status !== "OPEN") {
+                    return interaction.reply({ content: "❌ Ce pari est clos, les estimations ne sont plus acceptées.", flags: MessageFlags.Ephemeral });
+                }
                 if (bet.creator_id === userId) {
                     return interaction.reply({ content: "❌ Vous ne pouvez pas parier sur votre propre estimation !", flags: MessageFlags.Ephemeral });
                 }
@@ -117,8 +154,11 @@ async function execute(interaction, bot) {
             const userId = interaction.user.id;
             
             // Check if user is creator
-            pointsDb.get("SELECT creator_id FROM bets WHERE id = ?", [betId], (err, bet) => {
+            pointsDb.get("SELECT creator_id, status FROM bets WHERE id = ?", [betId], (err, bet) => {
                 if (err || !bet) return interaction.reply({ content: "Pari introuvable.", flags: MessageFlags.Ephemeral });
+                if (bet.status !== "OPEN") {
+                    return interaction.reply({ content: "❌ Ce pari est fermé, les mises ne sont plus acceptées.", flags: MessageFlags.Ephemeral });
+                }
                 if (bet.creator_id === userId) {
                     return interaction.reply({ content: "❌ Vous ne pouvez pas parier sur votre propre pari !", flags: MessageFlags.Ephemeral });
                 }
@@ -330,7 +370,10 @@ async function execute(interaction, bot) {
                 if (bet.status !== "OPEN" && bet.status !== "LOCKED") return interaction.reply({ content: "Ce pari est déjà terminé.", flags: MessageFlags.Ephemeral });
 
                 if (selectedValue === 'lock') {
-                    pointsDb.run("UPDATE bets SET status = 'LOCKED' WHERE id = ?", [betId]);
+                    // Garde sur OPEN : sans elle, un verrouillage arrivant après
+                    // une résolution rouvrait un pari déjà payé, qui pouvait
+                    // alors être résolu — et payé — une seconde fois.
+                    pointsDb.run("UPDATE bets SET status = 'LOCKED' WHERE id = ? AND status = 'OPEN'", [betId]);
                     interaction.update({ content: "Les paris sont désormais clos.", components: [] });
                     
                     if (messageId) {
@@ -363,17 +406,26 @@ async function execute(interaction, bot) {
                 }
 
                 if (selectedValue === 'cancel') {
-                    pointsDb.all("SELECT user_id, amount FROM bet_participations WHERE bet_id = ?", [betId], (err, parts) => {
+                    // Revendication d'abord : deux menus de résolution ouverts
+                    // en parallèle remboursaient sinon les mises deux fois.
+                    claimBetResolution(betId, 'CANCELLED', null, (err, claimed) => {
+                        if (err) {
+                            handleException(err);
+                            return interaction.reply({ content: "Erreur lors de l'annulation du pari.", flags: MessageFlags.Ephemeral });
+                        }
+                        if (!claimed) {
+                            return interaction.reply({ content: "Ce pari vient d'être terminé.", flags: MessageFlags.Ephemeral });
+                        }
+
+                        pointsDb.all("SELECT user_id, amount FROM bet_participations WHERE bet_id = ?", [betId], (err, parts) => {
                         if (err) {
                             handleException(err);
                             return interaction.reply({ content: "Erreur lors de la récupération des participations.", flags: MessageFlags.Ephemeral });
                         }
 
                         pointsDb.serialize(async () => {
-                            pointsDb.run("UPDATE bets SET status = 'CANCELLED' WHERE id = ?", [betId]);
-                            
                             parts.forEach(p => {
-                                pointsDb.run("UPDATE points SET balance = balance + ? WHERE user_id = ?", [p.amount, p.user_id]);
+                                addPoints(p.user_id, p.amount);
                             });
 
                             interaction.update({ content: "Le pari a été annulé et les mises remboursées.", components: [] });
@@ -396,6 +448,7 @@ async function execute(interaction, bot) {
                                 }
                             }
                         });
+                        });
                     });
                     return;
                 }
@@ -404,6 +457,17 @@ async function execute(interaction, bot) {
 
                 pointsDb.get("SELECT label FROM bet_options WHERE bet_id = ? AND option_index = ?", [betId, winnerIndex], (err, winningOption) => {
                     if (err || !winningOption) return interaction.reply({ content: "Option gagnante invalide.", flags: MessageFlags.Ephemeral });
+
+                    // Revendication d'abord : sans elle, deux résolutions
+                    // lancées coup sur coup payaient les gagnants deux fois.
+                    claimBetResolution(betId, 'CLOSED', winnerIndex, (err, claimed) => {
+                    if (err) {
+                        handleException(err);
+                        return interaction.reply({ content: "Erreur lors de la clôture du pari.", flags: MessageFlags.Ephemeral });
+                    }
+                    if (!claimed) {
+                        return interaction.reply({ content: "Ce pari vient d'être terminé.", flags: MessageFlags.Ephemeral });
+                    }
 
                     // Calculate results
                     pointsDb.all("SELECT user_id, option_index, amount FROM bet_participations WHERE bet_id = ?", [betId], (err, parts) => {
@@ -417,8 +481,6 @@ async function execute(interaction, bot) {
                         const totalWinningAmount = winners.reduce((acc, p) => acc + p.amount, 0);
 
                         pointsDb.serialize(async() => {
-                            pointsDb.run("UPDATE bets SET status = 'CLOSED', winning_option_index = ? WHERE id = ?", [winnerIndex, betId]);
-
                             // Import stats DB
                             const statsDb = (await import('../../modules/db.js')).default;
 
@@ -472,7 +534,7 @@ async function execute(interaction, bot) {
                                     winners.forEach(winner => {
                                         const share = winner.amount / totalWinningAmount;
                                         const winnings = Math.floor(share * totalPool);
-                                        pointsDb.run("UPDATE points SET balance = balance + ? WHERE user_id = ?", [winnings, winner.user_id]);
+                                        addPoints(winner.user_id, winnings);
                                         
                                         // Update MAX WIN stats
                                         statsDb.run(
@@ -514,6 +576,7 @@ async function execute(interaction, bot) {
                             });
                         });
                     });
+                    });
                 });
             });
         }
@@ -529,8 +592,16 @@ async function execute(interaction, bot) {
                 return interaction.reply({ content: "La réponse doit être un nombre entier.", flags: MessageFlags.Ephemeral });
             }
 
-            pointsDb.get("SELECT title FROM bets WHERE id = ?", [betId], (err, bet) => {
+            pointsDb.get("SELECT title, creator_id, status FROM bets WHERE id = ?", [betId], (err, bet) => {
                  if (err || !bet) return interaction.reply({ content: "Pari introuvable.", flags: MessageFlags.Ephemeral });
+                 // La modale a pu être ouverte avant une autre résolution : on
+                 // revérifie l'auteur et le statut au moment de l'envoi.
+                 if (bet.creator_id !== interaction.user.id) {
+                     return interaction.reply({ content: "Seul le créateur peut terminer le pari.", flags: MessageFlags.Ephemeral });
+                 }
+                 if (bet.status !== "OPEN" && bet.status !== "LOCKED") {
+                     return interaction.reply({ content: "Ce pari est déjà terminé.", flags: MessageFlags.Ephemeral });
+                 }
 
                  pointsDb.all("SELECT user_id, amount, prediction_value FROM bet_participations WHERE bet_id = ?", [betId], (err, parts) => {
                     if (err) {
@@ -558,9 +629,18 @@ async function execute(interaction, bot) {
                     const winners = diffs.filter(d => d.diff === minDiff);
                     const totalWinningAmount = winners.reduce((acc, w) => acc + w.amount, 0);
 
-                    pointsDb.serialize(async () => {
-                         pointsDb.run("UPDATE bets SET status = 'CLOSED', winning_option_index = ? WHERE id = ?", [resultValue, betId]);
+                    // Revendication atomique : un double envoi de la modale
+                    // payait sinon les gagnants deux fois.
+                    claimBetResolution(betId, 'CLOSED', resultValue, (err, claimed) => {
+                     if (err) {
+                         handleException(err);
+                         return interaction.reply({ content: "Erreur lors de la clôture du pari.", flags: MessageFlags.Ephemeral });
+                     }
+                     if (!claimed) {
+                         return interaction.reply({ content: "Ce pari vient d'être terminé.", flags: MessageFlags.Ephemeral });
+                     }
 
+                     pointsDb.serialize(async () => {
                          // import DB for stats
                          const statsDb = (await import('../../modules/db.js')).default;
 
@@ -576,7 +656,7 @@ async function execute(interaction, bot) {
                          winners.forEach(winner => {
                              const share = winner.amount / totalWinningAmount;
                              const winnings = Math.floor(share * totalPool);
-                             pointsDb.run("UPDATE points SET balance = balance + ? WHERE user_id = ?", [winnings, winner.user_id]);
+                             addPoints(winner.user_id, winnings);
                              resultText += `<@${winner.user_id}> gagne **${winnings}** points (Estimé: ${winner.prediction_value}, Diff: ${winner.diff})\n`;
                              
                              // Update MAX WIN stats
@@ -606,6 +686,7 @@ async function execute(interaction, bot) {
                             } catch (e) {}
                          }
                     });
+                    });
                  });
             });
             return;
@@ -623,41 +704,79 @@ async function execute(interaction, bot) {
             if (isNaN(prediction)) return interaction.reply({ content: "L'estimation doit être un nombre entier.", flags: MessageFlags.Ephemeral });
             if (isNaN(amount) || amount <= 0) return interaction.reply({ content: "La mise doit être un nombre positif.", flags: MessageFlags.Ephemeral });
 
-            pointsDb.get("SELECT balance FROM points WHERE user_id = ?", [userId], (err, row) => {
-                if (err) return interaction.reply({ content: "Erreur BD.", flags: MessageFlags.Ephemeral });
-                const balance = row ? row.balance : 0;
-                
-                // Check if updating
-                pointsDb.get("SELECT amount FROM bet_participations WHERE bet_id = ? AND user_id = ?", [betId, userId], (err, existing) => {
-                     const previousAmount = existing ? existing.amount : 0;
-                     const cost = amount - previousAmount; // Can be negative if reducing bet, but we usually only allow adding? The prompt said "participants by providing a value".
-                     // If I allow changing prediction, I must account for amount differences.
-                     // The user can change amount. If amount > previousAmount, they pay more.
-                     // If amount < previousAmount, they get refund? Let's check logic.
-                     
-                     if (balance < cost) {
-                         return interaction.reply({ content: `Solde insuffisant. Manque ${cost - balance} points.`, flags: MessageFlags.Ephemeral });
-                     }
+            // Le pari doit encore être ouvert : une modale laissée ouverte
+            // permettait sinon d'estimer après l'annonce du résultat.
+            pointsDb.get("SELECT status FROM bets WHERE id = ?", [betId], (err, bet) => {
+                if (err) {
+                    handleException(err);
+                    return interaction.reply({ content: "Erreur BD.", flags: MessageFlags.Ephemeral });
+                }
+                if (!bet) return interaction.reply({ content: "Pari introuvable.", flags: MessageFlags.Ephemeral });
+                if (bet.status !== "OPEN") {
+                    return interaction.reply({ content: "❌ Ce pari est clos, ton estimation n'a pas été enregistrée.", flags: MessageFlags.Ephemeral });
+                }
 
-                     pointsDb.serialize(async () => {
-                         // Update balance
-                         pointsDb.run("UPDATE points SET balance = balance - ? WHERE user_id = ?", [cost, userId]);
-                         
-                         // Import stats DB
-                         // const statsDb = (await import('../../modules/db.js')).default; // REMOVED: Stats updated mostly on resolve
-                     
-                         if (existing) {
-                             pointsDb.run("UPDATE bet_participations SET amount = ?, prediction_value = ? WHERE bet_id = ? AND user_id = ?", [amount, prediction, betId, userId]);
-                             interaction.reply({ content: `Estimation mise à jour: **${prediction}** avec **${amount}** points.`, flags: MessageFlags.Ephemeral });
-                         } else {
-                             pointsDb.run("INSERT INTO bet_participations (bet_id, user_id, option_index, amount, prediction_value) VALUES (?, ?, 0, ?, ?)", [betId, userId, amount, prediction]);
-                             interaction.reply({ content: `Estimation enregistrée: **${prediction}** avec **${amount}** points.`, flags: MessageFlags.Ephemeral });
-                         }
-                         
-                         // Update TOTAL WAGERED stats moved to resolution to avoid inflation on edit/cancel
-                         
-                         updateEstimateEmbed(interaction, betId);
-                     });
+                pointsDb.get("SELECT amount FROM bet_participations WHERE bet_id = ? AND user_id = ?", [betId, userId], (err, existing) => {
+                    if (err) {
+                        handleException(err);
+                        return interaction.reply({ content: "Erreur BD.", flags: MessageFlags.Ephemeral });
+                    }
+
+                    const previousAmount = existing ? existing.amount : 0;
+                    // Négatif quand la mise est revue à la baisse : c'est alors
+                    // un remboursement de la différence.
+                    const cost = amount - previousAmount;
+
+                    // Débit atomique. Le SELECT puis UPDATE d'origine laissait
+                    // deux modales envoyées en même temps miser deux fois le
+                    // même solde et le faire passer sous zéro.
+                    const applyCost = (next) => {
+                        if (cost > 0) {
+                            return spendPoints(userId, cost, (err, debited) => {
+                                if (err) {
+                                    handleException(err);
+                                    return interaction.reply({ content: "Erreur BD.", flags: MessageFlags.Ephemeral });
+                                }
+                                if (!debited) {
+                                    return getBalance(userId, (err, balance) => {
+                                        interaction.reply({ content: `Solde insuffisant. Manque ${cost - balance} points.`, flags: MessageFlags.Ephemeral });
+                                    });
+                                }
+                                next();
+                            });
+                        }
+                        if (cost < 0) return addPoints(userId, -cost, () => next());
+                        return next();
+                    };
+
+                    applyCost(() => {
+                        const done = (err) => {
+                            if (err) {
+                                handleException(err);
+                                // Compensation : la mise n'a pas été enregistrée,
+                                // le débit ne doit pas rester acquis.
+                                if (cost > 0) addPoints(userId, cost);
+                                else if (cost < 0) spendPoints(userId, -cost, () => {});
+                                return interaction.reply({ content: "Erreur lors de l'enregistrement de votre estimation.", flags: MessageFlags.Ephemeral });
+                            }
+
+                            interaction.reply({
+                                content: existing
+                                    ? `Estimation mise à jour: **${prediction}** avec **${amount}** points.`
+                                    : `Estimation enregistrée: **${prediction}** avec **${amount}** points.`,
+                                flags: MessageFlags.Ephemeral,
+                            });
+                            // Les statistiques « total misé » sont alimentées à la
+                            // résolution, pour ne pas gonfler à chaque édition.
+                            updateEstimateEmbed(interaction, betId);
+                        };
+
+                        if (existing) {
+                            pointsDb.run("UPDATE bet_participations SET amount = ?, prediction_value = ? WHERE bet_id = ? AND user_id = ?", [amount, prediction, betId, userId], done);
+                        } else {
+                            pointsDb.run("INSERT INTO bet_participations (bet_id, user_id, option_index, amount, prediction_value) VALUES (?, ?, 0, ?, ?)", [betId, userId, amount, prediction], done);
+                        }
+                    });
                 });
             });
             return;
@@ -672,73 +791,77 @@ async function execute(interaction, bot) {
                 return interaction.reply({ content: "La mise doit être un nombre positif.", flags: MessageFlags.Ephemeral });
             }
 
-            // Check balance
-            pointsDb.get("SELECT balance FROM points WHERE user_id = ?", [userId], (err, row) => {
-                if (err) {
-                    handleException(err);
-                    return interaction.reply({ content: "Erreur base de données.", flags: MessageFlags.Ephemeral });
-                }
-                const balance = row ? row.balance : 0;
+            // Statut du pari et validité de l'option d'abord : rien n'est
+            // débité tant que la mise ne peut pas aboutir.
+            pointsDb.get("SELECT status FROM bets WHERE id = ?", [betId], (err, bet) => {
+                if (err || !bet) return interaction.reply({ content: "Pari introuvable.", flags: MessageFlags.Ephemeral });
+                if (bet.status !== "OPEN") return interaction.reply({ content: "Ce pari est fermé.", flags: MessageFlags.Ephemeral });
 
-                if (balance < amount) {
-                    return interaction.reply({
-                        content: `Vous n'avez pas assez de points. Solde: ${balance}`,
-                        flags: MessageFlags.Ephemeral,
-                    });
-                }
+                pointsDb.get("SELECT id FROM bet_options WHERE bet_id = ? AND option_index = ?", [betId, optionIndex], (err, opt) => {
+                    if (err || !opt) return interaction.reply({ content: "Option invalide.", flags: MessageFlags.Ephemeral });
 
-                // Check bet status and option validity
-                pointsDb.get("SELECT status FROM bets WHERE id = ?", [betId], (err, bet) => {
-                    if (err || !bet) return interaction.reply({ content: "Pari introuvable.", flags: MessageFlags.Ephemeral });
-                    if (bet.status !== "OPEN") return interaction.reply({ content: "Ce pari est fermé.", flags: MessageFlags.Ephemeral });
-
-                    pointsDb.get("SELECT id FROM bet_options WHERE bet_id = ? AND option_index = ?", [betId, optionIndex], (err, opt) => {
-                        if (err || !opt) return interaction.reply({ content: "Option invalide.", flags: MessageFlags.Ephemeral });
-
-                        // Deduct points and add participation
-                        pointsDb.serialize(async () => {
-                            pointsDb.run("UPDATE points SET balance = balance - ? WHERE user_id = ?", [amount, userId]);
-                            
-                            // Check if user already participated to update or insert
-                            pointsDb.get("SELECT amount FROM bet_participations WHERE bet_id = ? AND user_id = ?", [betId, userId], (err, existing) => {
-                                if (existing) {
-                                    // Update existing participation
-                                    pointsDb.run(
-                                        "UPDATE bet_participations SET amount = amount + ? WHERE bet_id = ? AND user_id = ?",
-                                        [amount, betId, userId],
-                                        (err) => {
-                                            if (err) {
-                                                // Refund if update fails
-                                                pointsDb.run("UPDATE points SET balance = balance + ? WHERE user_id = ?", [amount, userId]);
-                                                return interaction.reply({ content: "Erreur lors de la mise à jour de votre pari.", flags: MessageFlags.Ephemeral });
-                                            }
-                                            
-                                            // Stats update moved to resolution
-                                            
-                                            interaction.reply({ content: `Vous avez ajouté **${amount}** points à votre mise sur l'option **${optionIndex}** du pari #${betId}. Total misé: **${existing.amount + amount}**.`, flags: MessageFlags.Ephemeral });
-                                            updateBetEmbed(interaction, betId);
-                                        }
-                                    );
-                                } else {
-                                    // Insert new participation
-                                    pointsDb.run(
-                                        "INSERT INTO bet_participations (bet_id, user_id, option_index, amount) VALUES (?, ?, ?, ?)",
-                                        [betId, userId, optionIndex, amount],
-                                        (err) => {
-                                            if (err) {
-                                                // Refund if insert fails
-                                                pointsDb.run("UPDATE points SET balance = balance + ? WHERE user_id = ?", [amount, userId]);
-                                                return interaction.reply({ content: "Erreur lors de l'enregistrement de votre pari.", flags: MessageFlags.Ephemeral });
-                                            }
-                                            
-                                            // Stats update moved to resolution
-
-                                            interaction.reply({ content: `Vous avez misé **${amount}** points sur l'option **${optionIndex}** du pari #${betId}.`, flags: MessageFlags.Ephemeral });
-                                            updateBetEmbed(interaction, betId);
-                                        }
-                                    );
-                                }
+                    // Débit atomique : le SELECT du solde suivi d'un UPDATE non
+                    // gardé permettait de miser plusieurs fois le même solde en
+                    // envoyant deux modales simultanément, et de finir négatif.
+                    spendPoints(userId, amount, (err, debited) => {
+                        if (err) {
+                            handleException(err);
+                            return interaction.reply({ content: "Erreur base de données.", flags: MessageFlags.Ephemeral });
+                        }
+                        if (!debited) {
+                            return getBalance(userId, (err, balance) => {
+                                interaction.reply({
+                                    content: `Vous n'avez pas assez de points. Solde: ${balance}`,
+                                    flags: MessageFlags.Ephemeral,
+                                });
                             });
+                        }
+
+                        // Check if user already participated to update or insert
+                        pointsDb.get("SELECT amount FROM bet_participations WHERE bet_id = ? AND user_id = ?", [betId, userId], (err, existing) => {
+                            if (err) {
+                                handleException(err);
+                                addPoints(userId, amount);
+                                return interaction.reply({ content: "Erreur lors de l'enregistrement de votre pari.", flags: MessageFlags.Ephemeral });
+                            }
+
+                            if (existing) {
+                                // Update existing participation
+                                pointsDb.run(
+                                    "UPDATE bet_participations SET amount = amount + ? WHERE bet_id = ? AND user_id = ?",
+                                    [amount, betId, userId],
+                                    (err) => {
+                                        if (err) {
+                                            // Refund if update fails
+                                            addPoints(userId, amount);
+                                            return interaction.reply({ content: "Erreur lors de la mise à jour de votre pari.", flags: MessageFlags.Ephemeral });
+                                        }
+
+                                        // Stats update moved to resolution
+
+                                        interaction.reply({ content: `Vous avez ajouté **${amount}** points à votre mise sur l'option **${optionIndex}** du pari #${betId}. Total misé: **${existing.amount + amount}**.`, flags: MessageFlags.Ephemeral });
+                                        updateBetEmbed(interaction, betId);
+                                    }
+                                );
+                            } else {
+                                // Insert new participation
+                                pointsDb.run(
+                                    "INSERT INTO bet_participations (bet_id, user_id, option_index, amount) VALUES (?, ?, ?, ?)",
+                                    [betId, userId, optionIndex, amount],
+                                    (err) => {
+                                        if (err) {
+                                            // Refund if insert fails
+                                            addPoints(userId, amount);
+                                            return interaction.reply({ content: "Erreur lors de l'enregistrement de votre pari.", flags: MessageFlags.Ephemeral });
+                                        }
+
+                                        // Stats update moved to resolution
+
+                                        interaction.reply({ content: `Vous avez misé **${amount}** points sur l'option **${optionIndex}** du pari #${betId}.`, flags: MessageFlags.Ephemeral });
+                                        updateBetEmbed(interaction, betId);
+                                    }
+                                );
+                            }
                         });
                     });
                 });
