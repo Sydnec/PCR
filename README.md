@@ -27,6 +27,10 @@ que la capture réussisse ou non.
   le délai minimum (~40 messages et 1 h) qui décident du moment où il s'enfuit, remplacé par le
   suivant. Un délai plancher après capture est disponible (`minDelayAfterEndMinutes`, à 0 par défaut)
   si l'enchaînement devient trop rapide.
+- **Fuite autonome** : chaque apparition reçoit une durée de vie tirée au hasard entre 3 et 6 heures
+  (`fleeAfterMinutes`). Passé ce délai, un Pokémon que personne n'a capturé s'enfuit de lui-même,
+  sans dépendre de l'activité du serveur — un salon silencieux ne reste donc jamais figé sur le même
+  Pokémon. La durée de vie n'est jamais affichée.
 - **Course à un vainqueur** : tout le monde peut lancer autant de balls qu'il veut, le premier jet
   réussi remporte le Pokémon. Les balls ratées sont définitivement perdues.
 - **4 balls** : Poké Ball (×1), Super Ball (×2), Hyper Ball (×4) et Master Ball (capture garantie,

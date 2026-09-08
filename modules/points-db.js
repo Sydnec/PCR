@@ -142,6 +142,23 @@ const db = new sqlite3.Database(dbPath, (err) => {
             if (err) handleException("Erreur création index pokemon_spawn_active :", err);
           }
         );
+        // Échéance de fuite autonome, tirée au sort à la création du spawn.
+        // Migration pour les bases antérieures : l'erreur « duplicate column »
+        // signifie simplement que la colonne est déjà là.
+        // L'index doit être créé DANS le callback de l'ALTER : sqlite3
+        // n'ordonne pas deux db.run successifs, et l'index référencerait une
+        // colonne qui n'existe pas encore.
+        db.run("ALTER TABLE pokemon_spawns ADD COLUMN flees_at INTEGER", (err) => {
+          if (err && !err.message.includes("duplicate column")) {
+            handleException("Erreur lors de l'ajout de flees_at :", err);
+          }
+          db.run(
+            "CREATE INDEX IF NOT EXISTS idx_pokemon_spawns_flees ON pokemon_spawns(status, flees_at)",
+            (err) => {
+              if (err) handleException("Erreur création index pokemon_spawns_flees :", err);
+            }
+          );
+        });
       }
     );
 

@@ -14,6 +14,10 @@
             "messagesPerSpawn": 20,
             "minDelayMinutes": 1,
             "minDelayAfterEndMinutes": 0,
+            "fleeAfterMinutes": {
+                "min": 180,
+                "max": 360
+            },
             "shinyOdds": 500,
             "weightsByStage": {
                 "1": 100,

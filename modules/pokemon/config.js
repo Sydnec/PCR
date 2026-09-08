@@ -20,6 +20,9 @@ export const DEFAULTS = {
     // Délai plancher avant qu'un nouveau Pokémon apparaisse une fois le
     // précédent capturé ou enfui. À 0, il apparaît dès le message suivant.
     minDelayAfterEndMinutes: 0,
+    // Durée de vie d'un Pokémon non capturé : il s'enfuit de lui-même après un
+    // délai tiré au hasard dans cet intervalle, sans dépendre de l'activité.
+    fleeAfterMinutes: { min: 180, max: 360 },
     shinyOdds: 500,
     weightsByStage: { 1: 100, 2: 35, 3: 10 },
     legendaryWeight: 8,

@@ -75,6 +75,12 @@ try {
     bot.handleRemindersOnTimer();
   });
 
+  // Faire fuir les Pokémon dont la durée de vie est écoulée. Indépendant de
+  // l'activité du serveur, sinon un salon silencieux ne les délogerait jamais.
+  cron.schedule("* * * * *", () => {
+    bot.handlePokemonFleeOnTimer();
+  });
+
   bot.on("error", (e) => {
     handleException(e);
   });
