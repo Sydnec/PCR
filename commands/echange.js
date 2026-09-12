@@ -5,10 +5,20 @@ import { getSpecies } from "../modules/pokemon/data.js";
 import { buildTradeEmbed, buildTradeRow } from "../modules/pokemon/embeds.js";
 import { decode } from "./evolution.js";
 
+// Discord n'autorise pas de liste vide accompagnée d'un message : une
+// proposition inerte est le seul moyen d'expliquer pourquoi il n'y a rien à
+// choisir. Sa valeur ne correspond à aucune espèce, donc execute() la refuse.
+const HINT_VALUE = "0:0";
+const hint = (interaction, name) =>
+  interaction.respond([{ name, value: HINT_VALUE }]).catch(() => {});
+
 // Propose les Pokémon réellement possédés par `userId`.
-function respondWithOwned(interaction, userId, query) {
+function respondWithOwned(interaction, userId, query, emptyLabel) {
   getCollection(userId, async (err, rows) => {
-    if (err) return interaction.respond([]).catch(() => {});
+    if (err) {
+      handleException("Autocomplétion d'échange :", err);
+      return interaction.respond([]).catch(() => {});
+    }
     const needle = query.toLowerCase();
     const choices = (rows || [])
       .map((row) => {
@@ -21,6 +31,10 @@ function respondWithOwned(interaction, userId, query) {
       })
       .filter((choice) => choice && choice.name.toLowerCase().includes(needle))
       .slice(0, 25);
+
+    // Une liste vide est indiscernable d'une commande cassée : on dit
+    // explicitement que le dresseur n'a rien à échanger.
+    if (choices.length === 0 && emptyLabel) return hint(interaction, emptyLabel);
     await interaction.respond(choices).catch(() => {});
   });
 }
@@ -55,11 +69,32 @@ export default {
     // Les autres options sont déjà lisibles pendant l'autocomplétion : on peut
     // donc proposer la collection du destinataire pour « je_recois ».
     if (focused.name === "je_recois") {
-      const target = interaction.options.getUser("membre");
-      if (!target) return interaction.respond([]).catch(() => {});
-      return respondWithOwned(interaction, target.id, focused.value);
+      // getUser() renvoie TOUJOURS null ici : Discord n'envoie pas le bloc
+      // `resolved` avec une interaction d'autocomplétion, et discord.js
+      // construit donc les options sans objet utilisateur (voir
+      // AutocompleteInteraction, qui passe les options brutes au resolver).
+      // Seule la valeur brute de l'option — l'identifiant du membre — est
+      // disponible. Avec getUser(), la liste était systématiquement vide.
+      const targetId = interaction.options.get("membre")?.value;
+      if (!targetId) {
+        return hint(
+          interaction,
+          "⚠️ Choisis d'abord le dresseur dans l'option « membre »"
+        );
+      }
+      return respondWithOwned(
+        interaction,
+        String(targetId),
+        focused.value,
+        "Ce dresseur n'a aucun Pokémon à échanger"
+      );
     }
-    return respondWithOwned(interaction, interaction.user.id, focused.value);
+    return respondWithOwned(
+      interaction,
+      interaction.user.id,
+      focused.value,
+      "Tu n'as aucun Pokémon à échanger"
+    );
   },
 
   async execute(interaction) {
@@ -82,7 +117,8 @@ export default {
       }
       if (!getSpecies(offer.speciesId) || !getSpecies(request.speciesId)) {
         return interaction.reply({
-          content: "❌ Pokémon inconnu.",
+          content:
+            "❌ Pokémon inconnu : choisis une proposition dans la liste d'autocomplétion.",
           flags: MessageFlags.Ephemeral,
         });
       }
