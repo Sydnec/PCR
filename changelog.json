@@ -1,6 +1,6 @@
 {
   "version": "1.10.3",
-  "lastUpdated": "2026-09-08T09:49:58.037Z",
+  "lastUpdated": "2026-09-12T12:13:49.265Z",
   "releases": [
     {
       "version": "1.10.3",
@@ -693,5 +693,26 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Évolutions rééquilibrées",
+      "description": "Une évolution coûte désormais 3 doublons quel que soit le stade (4 exemplaires à posséder, un est toujours conservé). Côté points : 2000 pour passer au stade 2, 5000 pour le stade 3, et 5000 pour choisir soi-même l'évolution d'un Évoli au lieu de la tirer au sort.",
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-12T12:13:49.265Z",
+      "branch": "claude/security-audit-bug-1-10-3-ic11df",
+      "announce": true
+    },
+    {
+      "type": "fix",
+      "name": "Échanges à nouveau fonctionnels",
+      "description": "La liste « je_recois » de /echange restait désespérément vide : Discord ne transmet pas les données du membre choisi pendant l'autocomplétion. La collection du destinataire s'affiche de nouveau, et un message explicite remplace la liste vide quand le dresseur n'a rien à échanger.",
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-12T12:13:49.265Z",
+      "branch": "claude/security-audit-bug-1-10-3-ic11df",
+      "announce": true
+    }
+  ]
 }

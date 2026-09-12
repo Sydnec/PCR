@@ -65,14 +65,14 @@
         },
         "evolution": {
             "2": {
-                "duplicates": 5,
-                "points": 500
-            },
-            "3": {
-                "duplicates": 10,
+                "duplicates": 3,
                 "points": 2000
             },
-            "branchChoicePoints": 1000
+            "3": {
+                "duplicates": 3,
+                "points": 5000
+            },
+            "branchChoicePoints": 5000
         },
         "trade": {
             "expiryHours": 24
