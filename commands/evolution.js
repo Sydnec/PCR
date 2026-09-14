@@ -19,19 +19,29 @@ export const decode = (value) => {
   return { speciesId: Number(speciesId), isShiny: shiny === "1" };
 };
 
-// Espèces que ce dresseur possède en assez grand nombre pour évoluer.
+// Discord n'autorise pas de liste vide accompagnée d'un message : une
+// proposition inerte est le seul moyen d'expliquer pourquoi il n'y a rien à
+// choisir. Sa valeur ne correspond à aucune espèce, donc execute() la refuse.
+const HINT_VALUE = "0:0";
+
+// Espèces que ce dresseur possède : celles qu'il peut faire évoluer, et celles
+// qui pourraient évoluer mais dont il manque des exemplaires. Le second groupe
+// sert à expliquer une liste vide au lieu de la laisser muette — c'est
+// exactement ce qui faisait croire à une commande cassée.
 function listEvolvable(userId, cb) {
   getCollection(userId, (err, rows) => {
-    if (err) return cb(err, []);
+    if (err) return cb(err, [], []);
     const evolvable = [];
+    const incomplete = [];
     for (const row of rows || []) {
       const plan = describeEvolution(row.species_id);
       if (plan.error) continue;
-      if (row.count >= plan.required) {
-        evolvable.push({ ...row, plan });
-      }
+      if (row.count >= plan.required) evolvable.push({ ...row, plan });
+      else incomplete.push({ ...row, plan });
     }
-    cb(null, evolvable);
+    // Les plus proches du seuil d'abord : ce sont les plus utiles à afficher.
+    incomplete.sort((a, b) => b.count - a.count);
+    cb(null, evolvable, incomplete);
   });
 }
 
@@ -49,25 +59,60 @@ export default {
 
   async autocomplete(interaction) {
     const query = interaction.options.getFocused().toLowerCase();
-    listEvolvable(interaction.user.id, async (err, entries) => {
-      if (err) return interaction.respond([]).catch(() => {});
+    listEvolvable(interaction.user.id, async (err, entries, incomplete) => {
+      if (err) {
+        handleException("Autocomplétion d'évolution :", err);
+        return interaction.respond([]).catch(() => {});
+      }
+      const label = (entry) =>
+        `${entry.is_shiny ? "✨ " : ""}${getSpecies(entry.species_id).name}`;
+
       const choices = entries
-        .map((entry) => {
-          const species = getSpecies(entry.species_id);
-          return {
-            name: `${entry.is_shiny ? "✨ " : ""}${species.name} (×${entry.count})`,
-            value: encode(entry.species_id, entry.is_shiny),
-          };
-        })
+        .map((entry) => ({
+          name: `${label(entry)} (×${entry.count})`,
+          value: encode(entry.species_id, entry.is_shiny),
+        }))
         .filter((choice) => choice.name.toLowerCase().includes(query))
         .slice(0, 25);
-      await interaction.respond(choices).catch(() => {});
+
+      if (choices.length > 0) {
+        return interaction.respond(choices).catch(() => {});
+      }
+
+      // Rien à proposer : on dit ce qui manque, espèce par espèce.
+      const hints = incomplete
+        .map((entry) => ({
+          name: `⚠️ ${label(entry)} : ${entry.plan.required} exemplaires requis, tu en as ${entry.count}`,
+          value: HINT_VALUE,
+        }))
+        .filter((choice) => choice.name.toLowerCase().includes(query))
+        .slice(0, 25);
+
+      await interaction
+        .respond(
+          hints.length
+            ? hints
+            : [
+                {
+                  name: "Aucun Pokémon de ta collection ne peut évoluer",
+                  value: HINT_VALUE,
+                },
+              ]
+        )
+        .catch(() => {});
     });
   },
 
   async execute(interaction) {
     try {
       const { speciesId, isShiny } = decode(interaction.options.getString("pokemon"));
+      if (!getSpecies(speciesId)) {
+        return interaction.reply({
+          content:
+            "❌ Choisis une proposition dans la liste d'autocomplétion.",
+          flags: MessageFlags.Ephemeral,
+        });
+      }
       const plan = describeEvolution(speciesId);
       if (plan.error) {
         return interaction.reply({

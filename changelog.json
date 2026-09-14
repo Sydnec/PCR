@@ -1,6 +1,6 @@
 {
   "version": "1.10.4",
-  "lastUpdated": "2026-09-12T12:16:10.001Z",
+  "lastUpdated": "2026-09-14T22:41:09.691Z",
   "releases": [
     {
       "version": "1.10.4",
@@ -720,5 +720,26 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "fix",
+      "name": "Évolutions : 3 exemplaires suffisent",
+      "description": "Le seuil demandait 4 exemplaires là où 3 étaient annoncés. Une évolution coûte désormais 3 exemplaires, dont 2 consommés : avec 3 Abra tu obtiens un Kadabra et il te reste un Abra, l'entrée du Pokédex n'est jamais perdue.",
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-14T22:41:09.690Z",
+      "branch": "claude/security-audit-bug-1-10-3-ic11df",
+      "announce": true
+    },
+    {
+      "type": "enhancement",
+      "name": "/evolution dit ce qui manque",
+      "description": "Quand aucune évolution n'est possible, la commande ne renvoie plus une liste vide : elle indique espèce par espèce combien d'exemplaires il te manque, les plus proches du seuil en premier.",
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-14T22:41:09.691Z",
+      "branch": "claude/security-audit-bug-1-10-3-ic11df",
+      "announce": true
+    }
+  ]
 }
