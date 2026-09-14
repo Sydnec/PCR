@@ -65,11 +65,11 @@
         },
         "evolution": {
             "2": {
-                "duplicates": 3,
+                "duplicates": 2,
                 "points": 2000
             },
             "3": {
-                "duplicates": 3,
+                "duplicates": 2,
                 "points": 5000
             },
             "branchChoicePoints": 5000
