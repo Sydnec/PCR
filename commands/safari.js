@@ -64,7 +64,7 @@ export default {
               content:
                 `🏕️ Tu paies **${config.entryPrice}** points et franchis les grilles du parc safari. ` +
                 `**${config.actionsPerSession} actions**, et plus rien à débourser.`,
-              ...buildSafariView(result.session),
+              ...buildSafariView(result.session, { owned: result.owned }),
             })
             .catch(() => {});
         });

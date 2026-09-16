@@ -450,7 +450,24 @@ function safariOutcomeLine(result, config) {
   }
 }
 
-function buildEncounterEmbed(session, species, config, { intro = null } = {}) {
+// Mêmes règles que le bouton « Je l'ai déjà ? » des spawns publics : un shiny
+// est une entrée de Pokédex distincte, donc on compare la variante rencontrée.
+// Formulations courtes : le champ est affiché en colonne, à un tiers de largeur.
+function ownedLine(owned, isShiny) {
+  if (!owned) return null;
+  const mine = isShiny ? owned.shiny : owned.normal;
+  const times = mine > 1 ? ` (\u00D7${mine})` : "";
+
+  if (mine > 0) {
+    return isShiny ? `\u2705 Déjà en shiny${times}` : `\u2705 Déjà capturé${times}`;
+  }
+  if (!isShiny) return "\u{1F195} Il te manque !";
+  return owned.normal > 0
+    ? "\u{1F195} Shiny inédit ! (tu as la normale)"
+    : "\u{1F195} Shiny inédit, et pas la normale !";
+}
+
+function buildEncounterEmbed(session, species, config, { intro = null, owned = null } = {}) {
   const isShiny = Boolean(session.encounter_is_shiny);
   const rarity = RARITIES[rarityOf(species)];
   const probability = safariCatchProbability(
@@ -462,6 +479,11 @@ function buildEncounterEmbed(session, species, config, { intro = null } = {}) {
   const baitNote = session.encounter_bait
     ? ` \u{1F34E} \u00D7${baitFactor} (${session.encounter_bait} appât${session.encounter_bait > 1 ? "s" : ""})`
     : "";
+
+  // Collection illisible : on préfère une rencontre sans pastille à un champ
+  // vide, que l'API refuserait. Trois champs par rangée, d'où la grille
+  // « Rareté | Type | Chances » puis « Ton Pokédex | Actions restantes ».
+  const ownership = ownedLine(owned, isShiny);
 
   const embed = new EmbedBuilder()
     .setTitle(
@@ -479,10 +501,11 @@ function buildEncounterEmbed(session, species, config, { intro = null } = {}) {
         value: `${formatPercent(probability)}${baitNote}`,
         inline: true,
       },
+      ...(ownership ? [{ name: "Ton Pokédex", value: ownership, inline: true }] : []),
       {
         name: "Actions restantes",
         value: `**${session.actions_left}** / ${config.actionsPerSession}`,
-        inline: false,
+        inline: true,
       }
     )
     .setFooter({
@@ -524,7 +547,7 @@ function buildSafariRow(session, config) {
 // le bilan une fois les actions épuisées. Un seul point d'entrée, pour que la
 // commande, le bouton d'entrée et les trois actions rendent rigoureusement la
 // même chose — et qu'ajouter un champ ne demande qu'une seule retouche.
-export function buildSafariView(session, { result = null, catches = [] } = {}) {
+export function buildSafariView(session, { result = null, catches = [], owned = null } = {}) {
   const config = getSafariConfig();
   const intro = result ? safariOutcomeLine(result, config) : null;
   const species =
@@ -539,7 +562,7 @@ export function buildSafariView(session, { result = null, catches = [] } = {}) {
     };
   }
   return {
-    embeds: [buildEncounterEmbed(session, species, config, { intro })],
+    embeds: [buildEncounterEmbed(session, species, config, { intro, owned })],
     components: [buildSafariRow(session, config)],
   };
 }

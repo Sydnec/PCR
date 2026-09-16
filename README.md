@@ -61,7 +61,7 @@ Contrepoids du puits à points : le pool naturel étrangle volontairement les é
 légendaires (poids 100/35/10 par stade, 8 pour un légendaire), et le parc **compense ce malus** le
 temps d'une visite. C'est le seul contenu Pokémon où les actions ne coûtent rien.
 
-- **Ouverture aléatoire** : un tirage horaire (1,5 % par heure, soit environ un parc tous les trois
+- **Ouverture aléatoire** : un tirage horaire (1 % par heure, soit environ un parc tous les quatre
   jours) annonce le parc dans le salon des apparitions, rôle Dresseur mentionné. Un délai minimum
   de 48 h sépare deux parcs. Le bouton reste cliquable **24 h**, mais les **apparitions ne sont
   suspendues que 6 h** — le temps que l'événement respire sans figer le salon pour la journée.
@@ -73,10 +73,13 @@ temps d'une visite. C'est le seul contenu Pokémon où les actions ne coûtent r
   - 🍎 **Appâter** — ×2 sur les chances de capture, cumulable jusqu'à ×4 : deux appâts atteignent le
     plafond, le bouton se ferme ensuite plutôt que de laisser gaspiller une action.
   - 🏃 **Essayer de fuir** — passer au Pokémon suivant, avec 10 % de chances d'échouer.
+- **« Il te manque ? »** : chaque rencontre affiche si le dresseur possède déjà l'espèce — et la
+  variante shiny compte à part. Le message étant privé, l'information tient dans l'embed, là où les
+  apparitions publiques ont besoin d'un bouton pour répondre à chacun séparément.
 - **Raretés compensées** : stade 2 ×2, stade 3 (les *rares*) ×4, légendaires ×3, shiny 1/250 au lieu
   de 1/500. Les rares passent de 1,3 % à 4 % du pool et les légendaires de 0,4 % à 1 %. Les
   évolutions par échange restent hors pool, comme à l'état sauvage.
-- **Entrée payante** : `/safari` ouvre une visite hors événement pour **4 000 points**, avec un
+- **Entrée payante** : `/safari` ouvre une visite hors événement pour **5 000 points**, avec un
   cooldown de 24 h. Si un parc gratuit attend le dresseur, la commande le lui dit au lieu de
   débiter. Une visite entamée expire au bout d'une heure.
 - Tout l'état vit en base : les boutons répondent encore après un redémarrage du bot, et un
