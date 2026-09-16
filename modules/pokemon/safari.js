@@ -495,12 +495,13 @@ function claimPark({ openedBy = null, reservedFor = null, ignoreCooldown = false
 // cours. `clear` est l'exception explicite — un administrateur qui passe
 // `pause:false` veut rendre le salon aux apparitions, y compris si un parc
 // précédent l'avait gelé.
-function setSpawnPause(until, { clear = false } = {}) {
+function setSpawnPause(until, { clear = false } = {}, cb = () => {}) {
   const sql = clear
     ? "UPDATE pokemon_state SET spawn_paused_until = 0 WHERE id = 1"
     : "UPDATE pokemon_state SET spawn_paused_until = MAX(spawn_paused_until, ?) WHERE id = 1";
   db.run(sql, clear ? [] : [Math.round(until)], (err) => {
     if (err) handleException("Pause des apparitions pendant le parc safari :", err);
+    cb();
   });
 }
 
@@ -575,10 +576,16 @@ export async function openPark(
       // La pause n'est posée qu'une fois le parc réellement annoncé : un envoi
       // raté referme le parc, et il ne doit pas laisser le salon gelé six heures
       // pour un événement que personne n'a vu.
+      //
+      // On attend l'écriture avant de rendre la main : openPark annonce l'état de
+      // la pause dans son résultat, et le premier message posté juste après doit
+      // déjà la voir, sans quoi un Pokémon pourrait apparaître en plein parc.
       if (shouldPause) {
-        setSpawnPause(Date.now() + config.spawnPauseHours * HOUR);
+        await new Promise((resolve) =>
+          setSpawnPause(Date.now() + config.spawnPauseHours * HOUR, {}, resolve)
+        );
       } else if (pauseSpawns === false) {
-        setSpawnPause(0, { clear: true });
+        await new Promise((resolve) => setSpawnPause(0, { clear: true }, resolve));
       }
 
       log(
