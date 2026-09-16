@@ -1,84 +1,35 @@
 {
-    "messagePointsDistribution": {
-        "1": 500,
-        "2": 400,
-        "3": 350,
-        "4": 300,
-        "5": 250,
-        "6": 200,
-        "default": 100
-    },
-    "pokemon": {
-        "enabled": true,
-        "spawn": {
-            "messagesPerSpawn": 20,
-            "minDelayMinutes": 1,
-            "minDelayAfterEndMinutes": 0,
-            "fleeAfterMinutes": {
-                "min": 180,
-                "max": 360
-            },
-            "shinyOdds": 500,
-            "weightsByStage": {
-                "1": 100,
-                "2": 35,
-                "3": 10
-            },
-            "legendaryWeight": 8,
-            "pingRarities": [
-                "RARE",
-                "LEGENDAIRE"
-            ],
-            "throwLogSize": 8,
-            "embedRefreshMs": 2000
-        },
-        "capture": {
-            "globalMultiplier": 1,
-            "throwCooldownSeconds": 5,
-            "balls": {
-                "poke": {
-                    "label": "Poké Ball",
-                    "emoji": "⚪",
-                    "price": 170,
-                    "multiplier": 1
-                },
-                "super": {
-                    "label": "Super Ball",
-                    "emoji": "🔵",
-                    "price": 300,
-                    "multiplier": 2
-                },
-                "hyper": {
-                    "label": "Hyper Ball",
-                    "emoji": "🟡",
-                    "price": 500,
-                    "multiplier": 4
-                },
-                "master": {
-                    "label": "Master Ball",
-                    "emoji": "🟣",
-                    "price": 30000,
-                    "multiplier": 255,
-                    "guaranteed": true
-                }
-            }
-        },
-        "evolution": {
-            "2": {
-                "duplicates": 2,
-                "points": 2000
-            },
-            "3": {
-                "duplicates": 2,
-                "points": 5000
-            },
-            "branchChoicePoints": 5000
-        },
-        "trade": {
-            "expiryHours": 24
-        },
-        "pokedex": {
-            "pageSize": 30
-        }
-    }
+	"messagePointsDistribution":
+		{"1":750,"2":600,"3":500,"4":400,"5":350,"6":300,"default":300},
+	"pokemon":{
+		"enabled":true,"spawn":{
+			"messagesPerSpawn":20,
+			"minDelayMinutes":1,
+			"minDelayAfterEndMinutes":0,
+			"fleeAfterMinutes":{"min":180,"max":360},
+			"shinyOdds":500,
+			"weightsByStage":{"1":100,"2":35,"3":10},
+			"legendaryWeight":8,
+			"pingRarities":["RARE","LEGENDAIRE"],
+			"throwLogSize":8,
+			"embedRefreshMs":2000
+		},
+		"capture":{
+			"globalMultiplier":1,
+			"throwCooldownSeconds":5,
+			"balls":{
+				"poke":{"label":"Poké Ball","emoji":"⚪","price":120,"multiplier":1},
+				"super":{"label":"Super Ball","emoji":"🔵","price":210,"multiplier":2},
+				"hyper":{"label":"Hyper Ball","emoji":"🟡","price":400,"multiplier":4},
+				"master":{"label":"Master Ball","emoji":"🟣","price":22500,"multiplier":255,"guaranteed":true}
+			}
+		},
+		"evolution":{
+			"2":{"duplicates":2,"points":2000},
+			"3":{"duplicates":2,"points":5000},
+			"branchChoicePoints":5000
+		},
+		"trade":{"expiryHours":24},
+		"pokedex":{"pageSize":30}
+	}
 }
