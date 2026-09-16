@@ -66,7 +66,7 @@ function releaseSpawnSlot() {
   });
 }
 
-function resolveChannel(client) {
+export function resolveChannel(client) {
   const channelId = process.env.POKEMON_CHANNEL_ID;
   if (!channelId) {
     log("⚠️ POKEMON_CHANNEL_ID non configuré, spawns Pokémon désactivés");
@@ -100,17 +100,22 @@ export function registerMessageForSpawn(client) {
       //    minimum décident du moment où il s'enfuit, remplacé par le suivant.
       const afterEndMs = config.spawn.minDelayAfterEndMinutes * 60 * 1000;
 
+      // spawn_paused_until suspend les apparitions pendant un parc safari : le
+      // salon lui appartient le temps de l'événement. Le compteur de messages,
+      // lui, continue de monter — à la réouverture, le message suivant fait donc
+      // apparaître un Pokémon sans attendre à nouveau le seuil.
       db.run(
         `UPDATE pokemon_state
             SET message_count = 0, last_spawn_at = ?, spawning = 1
           WHERE id = 1
             AND spawning = 0
+            AND spawn_paused_until <= ?
             AND (
               ( NOT EXISTS (SELECT 1 FROM pokemon_spawns WHERE status = 'ACTIVE')
                 AND COALESCE((SELECT MAX(ended_at) FROM pokemon_spawns), 0) <= ? )
               OR ( message_count >= ? AND last_spawn_at <= ? )
             )`,
-        [now, now - afterEndMs, config.spawn.messagesPerSpawn, now - minDelayMs],
+        [now, now, now - afterEndMs, config.spawn.messagesPerSpawn, now - minDelayMs],
         function (err) {
           if (err) return handleException("Revendication du spawn :", err);
           if (this.changes === 1) doSpawn(client);
@@ -125,6 +130,8 @@ export function registerMessageForSpawn(client) {
 // Revendique le créneau sans condition de seuil : utilisé par /pokespawn.
 // Remet aussi le compteur et l'horloge à zéro, sinon un spawn automatique
 // pourrait tomber juste après un événement et faire fuir le Pokémon annoncé.
+// La pause d'un parc safari est délibérément ignorée : un administrateur doit
+// pouvoir faire apparaître un Pokémon quoi qu'il arrive.
 export function claimForcedSpawn(cb) {
   db.run(
     `UPDATE pokemon_state

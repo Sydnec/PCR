@@ -108,6 +108,11 @@ try {
     bot.handlePokemonFleeOnTimer();
   });
 
+  // Tirage horaire d'ouverture du parc safari, et fermeture de ce qui a expiré.
+  cron.schedule("0 * * * *", () => {
+    bot.handleSafariParkOnTimer();
+  });
+
   bot.on("error", (e) => {
     handleException(e);
   });

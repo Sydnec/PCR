@@ -35,6 +35,9 @@ const COUNTERS = [
   "duplicates_spent",
   "fusion_points",
   "trades",
+  "safari_sessions",
+  "safari_catches",
+  "safari_points_spent",
 ];
 
 function run(sql, params, label) {
@@ -306,5 +309,58 @@ export function recordTrade({ fromUserId, toUserId }) {
     bumpStats(GLOBAL, { trades: 1 }, { global: false });
   } catch (error) {
     handleException(error, "recordTrade");
+  }
+}
+
+// ====================== PARC SAFARI ======================
+
+// Une entrée dans le parc. Seule l'entrée payante alimente points_spent : les
+// 25 actions du parc sont gratuites, et les compter comme des points brûlés
+// fausserait la mesure du puits, qui est la raison d'être du jeu de base.
+export function recordSafariEntry({ userId, cost = 0 }) {
+  try {
+    bumpStats(userId, {
+      safari_sessions: 1,
+      safari_points_spent: cost,
+      points_spent: cost,
+      points_burned: cost,
+    });
+  } catch (error) {
+    handleException(error, "recordSafariEntry");
+  }
+}
+
+// Une capture dans le parc. Volontairement absente de pokemon_species_stats :
+// sans spawn associé, elle gonflerait les captures d'une espèce sans gonfler
+// ses apparitions, et le ratio spawns/escapes de l'année ne voudrait plus rien
+// dire. Le Pokédex du dresseur, lui, ne fait pas la différence.
+export function recordSafariCatch({ userId, species, isShiny }) {
+  try {
+    bumpStats(userId, {
+      catches: 1,
+      safari_catches: 1,
+      shiny_catches: isShiny ? 1 : 0,
+      legendary_catches: isLegendary(species) ? 1 : 0,
+    });
+    bumpDaily({ catches: 1 });
+
+    if (isShiny) {
+      addHighlight("SHINY", {
+        userId,
+        speciesId: species.id,
+        isShiny: 1,
+        detail: `${species.name} shiny capturé au parc safari`,
+      });
+    }
+    if (isLegendary(species)) {
+      addHighlight("LEGENDAIRE", {
+        userId,
+        speciesId: species.id,
+        isShiny: isShiny ? 1 : 0,
+        detail: `${species.name} capturé au parc safari`,
+      });
+    }
+  } catch (error) {
+    handleException(error, "recordSafariCatch");
   }
 }

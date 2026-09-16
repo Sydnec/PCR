@@ -14,6 +14,7 @@ import { handleException, log } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
 import { throwBall } from "./capture.js";
 import { getSpawn } from "./spawn.js";
+import { enterPark, playAction, refreshParkMessage } from "./safari.js";
 import { getSpecies } from "./data.js";
 import {
   acceptTrade,
@@ -27,6 +28,7 @@ import {
 import {
   buildDexEmbed,
   buildDexRow,
+  buildSafariView,
   buildTradeEmbed,
   buildTradeRow,
   displayName,
@@ -271,6 +273,43 @@ function handleTradeButton(interaction, action, tradeId) {
   });
 }
 
+// ---------------------- Parc safari ----------------------
+
+// Le parc vit dans un message éphémère réécrit à chaque clic : chaque bouton est
+// une nouvelle interaction, donc un nouveau token, et la visite survit largement
+// aux 15 minutes de validité d'un token d'interaction.
+
+function handleSafariEnter(interaction, parkId) {
+  enterPark(interaction.user.id, Number(parkId), (err, result) => {
+    if (err) {
+      handleException(err);
+      return ephemeral(interaction, "❌ Erreur base de données.");
+    }
+    if (!result.ok) return ephemeral(interaction, `❌ ${result.reason}`);
+
+    refreshParkMessage(interaction.client, Number(parkId));
+    interaction
+      .reply({ ...buildSafariView(result.session), flags: MessageFlags.Ephemeral })
+      .catch(() => {});
+  });
+}
+
+function handleSafariAction(interaction, action, sessionId, token) {
+  playAction(interaction.user.id, Number(sessionId), token, action, (err, result) => {
+    if (err) {
+      handleException(err);
+      return ephemeral(interaction, "❌ Erreur base de données.");
+    }
+    // Une action refusée ne touche pas au plateau : le message en place reste
+    // valide, on se contente d'expliquer à part pourquoi le clic n'a rien fait.
+    if (!result.ok) return ephemeral(interaction, `❌ ${result.reason}`);
+
+    interaction
+      .update(buildSafariView(result.session, { result, catches: result.catches ?? [] }))
+      .catch(() => {});
+  });
+}
+
 // ---------------------- Routeur ----------------------
 
 export async function handlePokemonButton(interaction) {
@@ -309,6 +348,16 @@ export async function handlePokemonButton(interaction) {
       const [speciesId, shiny, targetId] = args;
       return runEvolution(interaction, Number(speciesId), shiny === "1", Number(targetId));
     }
+
+    case "poke_safari_enter":
+      return handleSafariEnter(interaction, args[0]);
+
+    case "poke_safari_ball":
+      return handleSafariAction(interaction, "BALL", args[0], args[1]);
+    case "poke_safari_bait":
+      return handleSafariAction(interaction, "BAIT", args[0], args[1]);
+    case "poke_safari_flee":
+      return handleSafariAction(interaction, "FLEE", args[0], args[1]);
 
     case "poke_trade_accept":
       return handleTradeButton(interaction, "accept", args[0]);

@@ -5,7 +5,7 @@ import {
   ButtonStyle,
   EmbedBuilder,
 } from "discord.js";
-import { getPokemonConfig } from "./config.js";
+import { getPokemonConfig, getSafariConfig } from "./config.js";
 import {
   RARITIES,
   allSpecies,
@@ -15,6 +15,9 @@ import {
   getSpecies,
   probabilitiesByBall,
   rarityOf,
+  safariBaitCapped,
+  safariBaitFactor,
+  safariCatchProbability,
   spriteUrl,
 } from "./data.js";
 
@@ -345,4 +348,236 @@ export function buildTradeRow(tradeId, { disabled = false } = {}) {
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(disabled)
   );
+}
+
+// ====================== PARC SAFARI ======================
+
+const SAFARI_COLOR = 0x2ecc71;
+const timestamp = (ms) => `<t:${Math.floor(ms / 1000)}:R>`;
+
+export function buildParkEmbed(park, { closed = false } = {}) {
+  const config = getSafariConfig();
+  const reserved = Boolean(park.reserved_for);
+
+  if (closed) {
+    return new EmbedBuilder()
+      .setTitle("\u{1F3D5}\uFE0F Le parc safari a fermé ses portes")
+      .setColor(0x4f545c)
+      .setDescription(
+        park.entries > 0
+          ? `**${park.entries}** dresseur${park.entries > 1 ? "s l'ont" : " l'a"} visité.`
+          : "Personne n'est venu. Les Pokémon rares peuvent souffler."
+      )
+      .setFooter({ text: `Parc #${park.id}` });
+  }
+
+  const embed = new EmbedBuilder()
+    .setTitle(
+      reserved
+        ? "\u{1F3D5}\uFE0F Un parc safari privé vient d'ouvrir"
+        : "\u{1F3D5}\uFE0F Le Parc Safari ouvre ses portes !"
+    )
+    .setColor(SAFARI_COLOR)
+    .setDescription(
+      reserved
+        ? `Ce parc est réservé à <@${park.reserved_for}>.`
+        : "Les grilles sont ouvertes à **tout le monde**, et l'entrée est offerte."
+    )
+    .addFields(
+      {
+        name: "Ce qui t'attend",
+        value:
+          `**${config.actionsPerSession} actions**, et pas un point dépensé.\n` +
+          "Les évolutions, les Pokémon rares et les légendaires y sont bien plus " +
+          `fréquents qu'à l'état sauvage, et les shinies deux fois plus (1/${config.shinyOdds}).`,
+        inline: false,
+      },
+      {
+        name: "Trois façons de jouer",
+        value:
+          `${config.ball.emoji} **${config.ball.label}** — tenter la capture\n` +
+          "\u{1F34E} **Appâter** — il baisse sa garde, tes chances montent\n" +
+          "\u{1F3C3} **Essayer de fuir** — passer au Pokémon suivant",
+        inline: false,
+      },
+      { name: "Fermeture", value: timestamp(park.expires_at), inline: true },
+      {
+        name: "Dresseurs entrés",
+        value: `${park.entries}`,
+        inline: true,
+      }
+    )
+    .setFooter({
+      text: reserved
+        ? `Parc #${park.id} · une seule visite`
+        : `Parc #${park.id} · une seule visite par dresseur`,
+    });
+
+  return embed;
+}
+
+export function buildParkRow(parkId, { disabled = false } = {}) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`poke_safari_enter|${parkId}`)
+      .setLabel("Entrer dans le parc")
+      .setEmoji("\u{1F3D5}\uFE0F")
+      .setStyle(ButtonStyle.Success)
+      .setDisabled(disabled)
+  );
+}
+
+// Le récit de la dernière action, en tête de l'embed de rencontre. C'est la
+// seule trace qu'en garde le joueur : le message est unique et réécrit à chaque
+// clic, il n'y a pas de fil de discussion où relire ce qui s'est passé.
+function safariOutcomeLine(result, config) {
+  const name = displayName(result.species, result.isShiny);
+  switch (result.outcome) {
+    case "CATCH":
+      return `\u{1F389} **${name}** est capturé ! Il rejoint ton Pokédex.`;
+    case "MISS":
+      return `\u274C Raté ! **${name}** s'est dégagé de ta ${config.ball.label}.`;
+    case "MISS_FLED":
+      return `\u274C Raté — et **${name}** en a profité pour détaler !`;
+    case "BAIT":
+      return `\u{1F34E} Tu jettes de l'appât. **${name}** se régale et baisse sa garde.`;
+    case "FLED":
+      return "\u{1F3C3} Tu t'éclipses sans demander ton reste.";
+    case "FLEE_FAILED":
+      return `\u{1F3C3} Tu tentes de filer... mais **${name}** te barre la route !`;
+    default:
+      return null;
+  }
+}
+
+function buildEncounterEmbed(session, species, config, { intro = null } = {}) {
+  const isShiny = Boolean(session.encounter_is_shiny);
+  const rarity = RARITIES[rarityOf(species)];
+  const probability = safariCatchProbability(
+    session.encounter_catch_rate,
+    session.encounter_bait,
+    config
+  );
+  const baitFactor = safariBaitFactor(session.encounter_bait, config);
+  const baitNote = session.encounter_bait
+    ? ` \u{1F34E} \u00D7${baitFactor} (${session.encounter_bait} appât${session.encounter_bait > 1 ? "s" : ""})`
+    : "";
+
+  const embed = new EmbedBuilder()
+    .setTitle(
+      isShiny
+        ? `\u2728 Un ${species.name} SHINY vous observe ! \u2728`
+        : `Un ${species.name} sauvage vous observe...`
+    )
+    .setColor(embedColor(species, isShiny))
+    .setImage(spriteUrl(species, isShiny))
+    .addFields(
+      { name: "Rareté", value: `${rarity.icon} ${rarity.label}`, inline: true },
+      { name: "Type", value: species.types.join(" / "), inline: true },
+      {
+        name: "Chances de capture",
+        value: `${formatPercent(probability)}${baitNote}`,
+        inline: true,
+      },
+      {
+        name: "Actions restantes",
+        value: `**${session.actions_left}** / ${config.actionsPerSession}`,
+        inline: false,
+      }
+    )
+    .setFooter({
+      text: `Parc safari · Pokédex n°${species.id} · rencontre n°${session.encounter_no}`,
+    });
+
+  if (intro) embed.setDescription(intro);
+  return embed;
+}
+
+function buildSafariRow(session, config) {
+  // actions_left sert de jeton anti-double-clic : il décroît strictement, donc
+  // il identifie l'action de façon unique et un second clic sur le même bouton
+  // n'a plus de correspondance en base.
+  const token = `${session.id}|${session.actions_left}`;
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`poke_safari_ball|${token}`)
+      .setLabel(config.ball.label)
+      .setEmoji(config.ball.emoji)
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
+      .setCustomId(`poke_safari_bait|${token}`)
+      .setLabel("Appâter")
+      .setEmoji("\u{1F34E}")
+      .setStyle(ButtonStyle.Secondary)
+      // Au plafond, un appât de plus ne change rien : mieux vaut fermer le
+      // bouton que de laisser brûler une action pour rien.
+      .setDisabled(safariBaitCapped(session.encounter_bait, config)),
+    new ButtonBuilder()
+      .setCustomId(`poke_safari_flee|${token}`)
+      .setLabel("Essayer de fuir")
+      .setEmoji("\u{1F3C3}")
+      .setStyle(ButtonStyle.Secondary)
+  );
+}
+
+// Une visite du parc ne s'affiche que de deux façons : la rencontre en cours, ou
+// le bilan une fois les actions épuisées. Un seul point d'entrée, pour que la
+// commande, le bouton d'entrée et les trois actions rendent rigoureusement la
+// même chose — et qu'ajouter un champ ne demande qu'une seule retouche.
+export function buildSafariView(session, { result = null, catches = [] } = {}) {
+  const config = getSafariConfig();
+  const intro = result ? safariOutcomeLine(result, config) : null;
+  const species =
+    session.status === "ACTIVE" && session.actions_left > 0
+      ? getSpecies(session.encounter_species_id)
+      : null;
+
+  if (!species) {
+    return {
+      embeds: [buildSafariRecapEmbed(session, catches, config, { intro })],
+      components: [],
+    };
+  }
+  return {
+    embeds: [buildEncounterEmbed(session, species, config, { intro })],
+    components: [buildSafariRow(session, config)],
+  };
+}
+
+function buildSafariRecapEmbed(session, catches, config, { intro = null } = {}) {
+  const lines = catches.map((row) => {
+    const species = getSpecies(row.species_id);
+    if (!species) return null;
+    const rarity = RARITIES[rarityOf(species)];
+    return `${rarity.icon} ${displayName(species, row.is_shiny)}`;
+  });
+  const caught = lines.filter(Boolean);
+
+  const embed = new EmbedBuilder()
+    .setTitle("\u{1F3D5}\uFE0F Fin de la visite")
+    .setColor(caught.length ? SAFARI_COLOR : 0x4f545c)
+    .setDescription(
+      (intro ? `${intro}\n\n` : "") +
+        (caught.length
+          ? `Tu ressors du parc avec **${caught.length}** Pokémon.`
+          : "Tu ressors du parc les mains vides. Ça arrive.")
+    )
+    .addFields(
+      {
+        name: "Tes prises",
+        value: caught.length ? caught.join("\n") : "*Rien du tout.*",
+        inline: false,
+      },
+      {
+        name: `${config.actionsPerSession} actions`,
+        value:
+          `${config.ball.emoji} ${session.balls_thrown} lancer${session.balls_thrown > 1 ? "s" : ""} · ` +
+          `\u{1F34E} ${session.baits_used} appât${session.baits_used > 1 ? "s" : ""} · ` +
+          `\u{1F3C3} ${session.flees} fuite${session.flees > 1 ? "s" : ""}`,
+        inline: false,
+      }
+    )
+    .setFooter({ text: `Session #${session.id}` });
+
+  return embed;
 }

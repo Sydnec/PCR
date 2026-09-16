@@ -190,10 +190,24 @@ const db = new sqlite3.Database(dbPath, (err) => {
         fusions INTEGER DEFAULT 0,
         duplicates_spent INTEGER DEFAULT 0,
         fusion_points INTEGER DEFAULT 0,
-        trades INTEGER DEFAULT 0
+        trades INTEGER DEFAULT 0,
+        safari_sessions INTEGER DEFAULT 0,
+        safari_catches INTEGER DEFAULT 0,
+        safari_points_spent INTEGER DEFAULT 0
       )`,
       (err) => {
-        if (err) handleException("Erreur lors de la création de la table pokemon_stats :", err);
+        if (err) {
+          return handleException("Erreur lors de la création de la table pokemon_stats :", err);
+        }
+        // La base de l'année est déjà créée : CREATE TABLE IF NOT EXISTS ne
+        // suffit pas à faire apparaître les colonnes du parc safari.
+        for (const column of ["safari_sessions", "safari_catches", "safari_points_spent"]) {
+          db.run(`ALTER TABLE pokemon_stats ADD COLUMN ${column} INTEGER DEFAULT 0`, (err) => {
+            if (err && !err.message.includes("duplicate column")) {
+              handleException(`Erreur lors de l'ajout de ${column} :`, err);
+            }
+          });
+        }
       }
     );
 

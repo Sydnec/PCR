@@ -30,6 +30,25 @@
 			"branchChoicePoints":5000
 		},
 		"trade":{"expiryHours":24},
-		"pokedex":{"pageSize":30}
+		"pokedex":{"pageSize":30},
+		"safari":{
+			"enabled":true,
+			"randomChancePerHour":0.015,
+			"minHoursBetweenParks":48,
+			"parkDurationHours":24,
+			"spawnPauseHours":6,
+			"sessionDurationMinutes":60,
+			"actionsPerSession":25,
+			"entryPrice":4000,
+			"entryCooldownHours":24,
+			"ball":{"label":"Safari Ball","emoji":"🟢","multiplier":1.5},
+			"baitMultiplier":2,
+			"baitMaxMultiplier":4,
+			"fleeFailChance":0.1,
+			"wildFleeChance":0.05,
+			"shinyOdds":250,
+			"weightsByStage":{"1":100,"2":70,"3":40},
+			"legendaryWeight":24
+		}
 	}
 }

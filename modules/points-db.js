@@ -103,13 +103,25 @@ const db = new sqlite3.Database(dbPath, (err) => {
         message_count INTEGER NOT NULL DEFAULT 0,
         last_spawn_at INTEGER NOT NULL DEFAULT 0,
         spawning INTEGER NOT NULL DEFAULT 0,
-        total_spawns INTEGER NOT NULL DEFAULT 0
+        total_spawns INTEGER NOT NULL DEFAULT 0,
+        spawn_paused_until INTEGER NOT NULL DEFAULT 0
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_state :", err);
-        db.run("INSERT OR IGNORE INTO pokemon_state (id) VALUES (1)", (err) => {
-          if (err) handleException("Erreur initialisation pokemon_state :", err);
-        });
+        // Pause des apparitions pendant un parc safari. Vit ici plutôt que dans
+        // pokemon_safari_parks pour tenir dans l'UPDATE gardé qui revendique un
+        // spawn : une garde de plus, aucune requête supplémentaire, aucune course.
+        db.run(
+          "ALTER TABLE pokemon_state ADD COLUMN spawn_paused_until INTEGER NOT NULL DEFAULT 0",
+          (err) => {
+            if (err && !err.message.includes("duplicate column")) {
+              handleException("Erreur lors de l'ajout de spawn_paused_until :", err);
+            }
+            db.run("INSERT OR IGNORE INTO pokemon_state (id) VALUES (1)", (err) => {
+              if (err) handleException("Erreur initialisation pokemon_state :", err);
+            });
+          }
+        );
       }
     );
 
@@ -248,6 +260,114 @@ const db = new sqlite3.Database(dbPath, (err) => {
       )`,
       (err) => {
         if (err) handleException("Erreur création table pokemon_fusions :", err);
+      }
+    );
+
+    // ================== PARC SAFARI ==================
+
+    // Un parc est l'événement public : le message à bouton, sa fenêtre
+    // d'ouverture, et la pause de spawn qu'il déclenche. Une entrée payante
+    // (/safari) n'en crée pas : elle ouvre directement une session.
+    // reserved_for porte les parcs offerts à un dresseur précis par un
+    // administrateur : même message, même bouton, mais un seul ayant droit.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_safari_parks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        status TEXT NOT NULL DEFAULT 'OPEN',
+        opened_at INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL,
+        opened_by TEXT,
+        reserved_for TEXT,
+        channel_id TEXT,
+        message_id TEXT,
+        entries INTEGER NOT NULL DEFAULT 0,
+        closed_at INTEGER
+      )`,
+      (err) => {
+        if (err) return handleException("Erreur création table pokemon_safari_parks :", err);
+        // Jamais deux parcs PUBLICS ouverts à la fois, comme pour les spawns. Les
+        // parcs réservés échappent à l'index : ils ne se marchent pas dessus,
+        // chacun n'ayant qu'un seul ayant droit.
+        db.run(
+          `CREATE UNIQUE INDEX IF NOT EXISTS idx_pokemon_safari_park_open
+             ON pokemon_safari_parks(status) WHERE status = 'OPEN' AND reserved_for IS NULL`,
+          (err) => {
+            if (err) handleException("Erreur création index pokemon_safari_park_open :", err);
+          }
+        );
+      }
+    );
+
+    // Sessions de chasse. La rencontre en cours vit dans la ligne : rien en
+    // mémoire, donc les boutons répondent encore après un redémarrage.
+    // encounter_catch_rate est figé à la rencontre, pour la même raison que sur
+    // pokemon_spawns — régénérer le dataset ne doit pas changer une partie en cours.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_safari_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        park_id INTEGER,
+        user_id TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'ACTIVE',
+        actions_left INTEGER NOT NULL,
+        entry_cost INTEGER NOT NULL DEFAULT 0,
+        started_at INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL,
+        ended_at INTEGER,
+        balls_thrown INTEGER NOT NULL DEFAULT 0,
+        baits_used INTEGER NOT NULL DEFAULT 0,
+        flees INTEGER NOT NULL DEFAULT 0,
+        catches INTEGER NOT NULL DEFAULT 0,
+        encounter_no INTEGER NOT NULL DEFAULT 0,
+        encounter_species_id INTEGER,
+        encounter_is_shiny INTEGER NOT NULL DEFAULT 0,
+        encounter_catch_rate INTEGER,
+        encounter_bait INTEGER NOT NULL DEFAULT 0
+      )`,
+      (err) => {
+        if (err) return handleException("Erreur création table pokemon_safari_sessions :", err);
+        // Une seule session à la fois par dresseur, garanti en base.
+        db.run(
+          `CREATE UNIQUE INDEX IF NOT EXISTS idx_pokemon_safari_session_active
+             ON pokemon_safari_sessions(user_id) WHERE status = 'ACTIVE'`,
+          (err) => {
+            if (err) {
+              return handleException("Erreur création index pokemon_safari_session_active :", err);
+            }
+            // Une entrée gratuite par dresseur et par parc. park_id NULL (entrée
+            // payante) échappe à l'index : SQLite traite chaque NULL comme distinct,
+            // donc les /safari successifs restent possibles.
+            db.run(
+              `CREATE UNIQUE INDEX IF NOT EXISTS idx_pokemon_safari_session_park
+                 ON pokemon_safari_sessions(park_id, user_id) WHERE park_id IS NOT NULL`,
+              (err) => {
+                if (err) {
+                  handleException("Erreur création index pokemon_safari_session_park :", err);
+                }
+              }
+            );
+          }
+        );
+      }
+    );
+
+    // Captures du parc : alimente le bilan de fin de session.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_safari_catches (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id INTEGER NOT NULL,
+        species_id INTEGER NOT NULL,
+        is_shiny INTEGER NOT NULL DEFAULT 0,
+        caught_at INTEGER NOT NULL
+      )`,
+      (err) => {
+        if (err) return handleException("Erreur création table pokemon_safari_catches :", err);
+        db.run(
+          `CREATE INDEX IF NOT EXISTS idx_pokemon_safari_catches_session
+             ON pokemon_safari_catches(session_id, id)`,
+          (err) => {
+            if (err) handleException("Erreur création index pokemon_safari_catches_session :", err);
+          }
+        );
       }
     );
   }
