@@ -1,24 +1,7 @@
 {
-  "version": "1.11.0",
-  "lastUpdated": "2026-09-16T22:16:56.695Z",
+  "version": "1.10.5",
+  "lastUpdated": "2026-09-14T22:41:18.316Z",
   "releases": [
-    {
-      "version": "1.11.0",
-      "date": "2026-09-16",
-      "title": "Release 1.11.0",
-      "features": [
-        {
-          "type": "feature",
-          "name": "Parc Safari",
-          "description": "Un parc safari ouvre au hasard dans le salon des Pokémon, environ tous les trois jours, et l'entrée est offerte à tout le monde. Chacun y dispose de 25 actions gratuites — lancer une Safari Ball, appâter pour faire grimper ses chances, ou filer vers le Pokémon suivant — dans un pool où les évolutions, les rares et les légendaires sont bien plus fréquents, et les shinies deux fois plus (1/250). Les apparitions normales s'arrêtent 6 h le temps de l'événement, le bouton reste ouvert 24 h, et /safari permet de s'offrir une visite entre deux parcs pour 4 000 points.",
-          "announce": true,
-          "author": "Sydnec",
-          "commit": "pending",
-          "timestamp": "2026-09-16T22:12:04.308Z",
-          "branch": "claude/practical-ptolemy-qb5aha"
-        }
-      ]
-    },
     {
       "version": "1.10.5",
       "date": "2026-09-14",
@@ -764,5 +747,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "feature",
+      "name": "Parc Safari",
+      "description": "Un parc safari ouvre au hasard dans le salon des Pokémon, environ tous les trois jours, et l'entrée est offerte à tout le monde. Chacun y dispose de 25 actions gratuites — lancer une Safari Ball, appâter pour faire grimper ses chances, ou filer vers le Pokémon suivant — dans un pool où les évolutions, les rares et les légendaires sont bien plus fréquents, et les shinies deux fois plus (1/250). Les apparitions normales s'arrêtent 6 h le temps de l'événement, le bouton reste ouvert 24 h, et /safari permet de s'offrir une visite entre deux parcs pour 4 000 points.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-16T22:12:04.308Z",
+      "branch": "claude/practical-ptolemy-qb5aha"
+    }
+  ]
 }
