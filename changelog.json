@@ -764,5 +764,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Parc safari : « il te manque ? » sur chaque rencontre",
+      "description": "Chaque rencontre du parc safari indique désormais si le Pokémon en face de toi manque à ton Pokédex — la version shiny comptant à part — pour que tu saches sur quoi dépenser tes 25 actions. Pas besoin de bouton comme sur les apparitions publiques : le parc est déjà un message privé. Au passage, le parc s'ouvre un peu plus rarement (environ tous les quatre jours au lieu de trois) et l'entrée payante de /safari passe de 4 000 à 5 000 points.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-16T22:55:36.073Z",
+      "branch": "claude/practical-ptolemy-qb5aha"
+    }
+  ]
 }

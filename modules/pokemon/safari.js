@@ -21,7 +21,7 @@ import {
   safariBaitCapped,
   safariCatchProbability,
 } from "./data.js";
-import { creditSpecies } from "./collection.js";
+import { creditSpecies, getOwnedVariants } from "./collection.js";
 import { resolveChannel } from "./spawn.js";
 import { recordSafariCatch, recordSafariEntry } from "./stats.js";
 import { buildParkEmbed, buildParkRow } from "./embeds.js";
@@ -115,6 +115,25 @@ function rollNextEncounter(sessionId, config, cb) {
   );
 }
 
+// Joint au résultat l'état de la collection du dresseur pour l'espèce en face de
+// lui. Sur un spawn public, cette question passe par le bouton « Je l'ai déjà ? »
+// parce qu'un message Discord est identique pour tous ses lecteurs ; ici la
+// rencontre est éphémère et n'appartient qu'à un joueur, donc la réponse tient
+// directement dans l'embed.
+function withOwned(payload, cb) {
+  const session = payload.session;
+  // Une visite terminée affiche son bilan, pas une rencontre : rien à lire.
+  if (!session || session.status !== "ACTIVE" || session.actions_left <= 0) {
+    return cb(null, payload);
+  }
+  getOwnedVariants(session.user_id, session.encounter_species_id, (err, owned) => {
+    // Une collection illisible ne doit jamais faire échouer une action déjà
+    // jouée et déjà décomptée : on affiche la rencontre sans la pastille.
+    if (err) handleException("Lecture de la collection au parc safari :", err);
+    cb(null, { ...payload, owned: err ? null : owned });
+  });
+}
+
 // ====================== SESSIONS ======================
 
 // Une session expirée reste ACTIVE tant que personne ne l'a close, et occupe
@@ -198,7 +217,7 @@ function startSession(userId, { parkId = null, entryCost = 0 }, cb) {
           log(
             `Parc safari : ${userId} entre (session #${session.id}, parc ${parkId ?? "—"}, ${entryCost} pts)`
           );
-          cb(null, { ok: true, session });
+          withOwned({ ok: true, session }, cb);
         });
       }
     );
@@ -435,7 +454,7 @@ function finishOrContinue(sessionId, result, cb) {
     if (err) return cb(err);
     if (!session) return cb(new Error(`Session de parc introuvable : ${sessionId}`));
     if (session.actions_left > 0) {
-      return cb(null, { ok: true, ...result, session, finished: false });
+      return withOwned({ ok: true, ...result, session, finished: false }, cb);
     }
 
     db.run(

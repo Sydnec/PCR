@@ -289,7 +289,10 @@ function handleSafariEnter(interaction, parkId) {
 
     refreshParkMessage(interaction.client, Number(parkId));
     interaction
-      .reply({ ...buildSafariView(result.session), flags: MessageFlags.Ephemeral })
+      .reply({
+        ...buildSafariView(result.session, { owned: result.owned }),
+        flags: MessageFlags.Ephemeral,
+      })
       .catch(() => {});
   });
 }
@@ -305,7 +308,13 @@ function handleSafariAction(interaction, action, sessionId, token) {
     if (!result.ok) return ephemeral(interaction, `❌ ${result.reason}`);
 
     interaction
-      .update(buildSafariView(result.session, { result, catches: result.catches ?? [] }))
+      .update(
+        buildSafariView(result.session, {
+          result,
+          catches: result.catches ?? [],
+          owned: result.owned,
+        })
+      )
       .catch(() => {});
   });
 }

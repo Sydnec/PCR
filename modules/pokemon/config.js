@@ -60,13 +60,13 @@ export const DEFAULTS = {
   // elle apparaîtrait sur les spawns publics et dans /pokeinfo.
   safari: {
     enabled: true,
-    randomChancePerHour: 0.015,
+    randomChancePerHour: 0.01,
     minHoursBetweenParks: 48,
     parkDurationHours: 24,
     spawnPauseHours: 6,
     sessionDurationMinutes: 60,
     actionsPerSession: 25,
-    entryPrice: 4000,
+    entryPrice: 5000,
     entryCooldownHours: 24,
     ball: { label: "Safari Ball", emoji: "\u{1F7E2}", multiplier: 1.5 },
     // Multiplicatif et cumulable, mais plafonné : deux appâts atteignent le
