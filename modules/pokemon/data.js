@@ -112,6 +112,48 @@ export function probabilitiesByBall(catchRate) {
   }));
 }
 
+// ====================== PARC SAFARI ======================
+
+// L'appât est multiplicatif et cumulable, mais plafonné : avec les réglages par
+// défaut (x2, plafond x4) deux appâts suffisent à l'atteindre et un troisième ne
+// serait qu'une action perdue. C'est ce plafond qui fait le choix tactique entre
+// appâter et lancer.
+export function safariBaitFactor(baitStacks, safariConfig) {
+  const stacks = Math.max(0, Number(baitStacks) || 0);
+  return Math.min(
+    safariConfig.baitMaxMultiplier,
+    Math.pow(safariConfig.baitMultiplier, stacks)
+  );
+}
+
+export const safariBaitCapped = (baitStacks, safariConfig) =>
+  safariBaitFactor(baitStacks, safariConfig) >= safariConfig.baitMaxMultiplier;
+
+// Une rencontre du parc. pickWeightedSpecies lit exactement weightsByStage et
+// legendaryWeight : le bloc safari lui est passé tel quel, il n'y a pas de
+// second tirage à maintenir. Les évolutions par échange restent hors pool,
+// spawnWeight leur donne déjà un poids nul.
+export function rollSafariEncounter(safariConfig) {
+  const species = pickWeightedSpecies(safariConfig);
+  if (!species) return null;
+  return {
+    species,
+    isShiny: Math.floor(Math.random() * safariConfig.shinyOdds) === 0,
+    catchRate: species.catchRate,
+  };
+}
+
+// Même formule que les captures sauvages : le parc ne change que le
+// multiplicateur, jamais la courbe. Le curseur global reste donc pleinement
+// opérant sur le parc aussi.
+export function safariCatchProbability(catchRate, baitStacks, safariConfig) {
+  return catchProbability(
+    catchRate,
+    safariConfig.ball.multiplier * safariBaitFactor(baitStacks, safariConfig),
+    getPokemonConfig().capture.globalMultiplier
+  );
+}
+
 export function difficultyLabel(catchRate) {
   if (catchRate >= 190) return "Très facile";
   if (catchRate >= 120) return "Facile";

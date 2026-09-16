@@ -64,7 +64,10 @@ export function getLeaderboard(limit, cb) {
   );
 }
 
-function creditSpecies(userId, speciesId, isShiny, cb) {
+// Chemin unique de crédit de la collection : capture sauvage, parc safari et
+// évolution passent tous par ici, sinon la règle « un shiny est une entrée
+// distincte » finit par diverger entre les copies.
+export function creditSpecies(userId, speciesId, isShiny, cb) {
   const now = Date.now();
   db.run(
     `INSERT INTO pokemon_collection (user_id, species_id, is_shiny, count, first_caught_at, last_caught_at)

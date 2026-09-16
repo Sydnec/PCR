@@ -14,6 +14,7 @@ import db from "../points-db.js";
 import { addPoints, getBalance, spendPoints } from "../economy.js";
 import { handleException, log } from "../utils.js";
 import { getBall, getPokemonConfig } from "./config.js";
+import { creditSpecies } from "./collection.js";
 import { catchProbability, getSpecies } from "./data.js";
 import { displayName } from "./embeds.js";
 import { finalizeCaughtSpawn, refreshSpawnEmbed } from "./spawn.js";
@@ -43,23 +44,6 @@ function logThrow(spawnId, userId, ballKey, cost, probability, result) {
     [spawnId, userId, ballKey, cost, probability, result, Date.now()],
     (err) => {
       if (err) handleException("Enregistrement du lancer :", err);
-    }
-  );
-}
-
-function creditCollection(userId, speciesId, isShiny, cb = () => {}) {
-  const now = Date.now();
-  db.run(
-    `INSERT INTO pokemon_collection (user_id, species_id, is_shiny, count, first_caught_at, last_caught_at)
-     VALUES (?, ?, ?, 1, ?, ?)
-     ON CONFLICT(user_id, species_id, is_shiny) DO UPDATE SET
-       count = count + 1,
-       first_caught_at = COALESCE(first_caught_at, excluded.first_caught_at),
-       last_caught_at = excluded.last_caught_at`,
-    [userId, speciesId, isShiny ? 1 : 0, now, now],
-    (err) => {
-      if (err) handleException("Crédit de la collection :", err);
-      cb(err);
     }
   );
 }
@@ -214,7 +198,8 @@ export async function throwBall(interaction, spawnId, ballKey) {
             ball: ball.label,
             probability,
           });
-          creditCollection(userId, spawn.species_id, spawn.is_shiny, () => {
+          creditSpecies(userId, spawn.species_id, spawn.is_shiny, (err) => {
+            if (err) handleException("Crédit de la collection :", err);
             finalizeCaughtSpawn(interaction.client, spawnId, userId, ball.key);
             log(
               `Capture : ${userId} attrape ${species.name}${spawn.is_shiny ? " ✨" : ""} (spawn #${spawnId}, ${ball.key})`

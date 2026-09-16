@@ -53,6 +53,32 @@ export const DEFAULTS = {
   },
   trade: { expiryHours: 24 },
   pokedex: { pageSize: 30 },
+  // Parc safari. Les poids d'apparition y compensent partiellement le malus
+  // infligé aux évolutions dans le pool naturel : c'est toute la raison d'être
+  // du parc, et la seule façon de croiser un stade 3 ou un légendaire sans y
+  // passer la semaine. La Safari Ball vit ici et non dans capture.balls, sinon
+  // elle apparaîtrait sur les spawns publics et dans /pokeinfo.
+  safari: {
+    enabled: true,
+    randomChancePerHour: 0.015,
+    minHoursBetweenParks: 48,
+    parkDurationHours: 24,
+    spawnPauseHours: 6,
+    sessionDurationMinutes: 60,
+    actionsPerSession: 25,
+    entryPrice: 4000,
+    entryCooldownHours: 24,
+    ball: { label: "Safari Ball", emoji: "\u{1F7E2}", multiplier: 1.5 },
+    // Multiplicatif et cumulable, mais plafonné : deux appâts atteignent le
+    // plafond, le troisième est une action gaspillée. C'est là qu'est le choix.
+    baitMultiplier: 2,
+    baitMaxMultiplier: 4,
+    fleeFailChance: 0.1,
+    wildFleeChance: 0.05,
+    shinyOdds: 250,
+    weightsByStage: { 1: 100, 2: 70, 3: 40 },
+    legendaryWeight: 24,
+  },
 };
 
 const isPlainObject = (value) =>
@@ -100,4 +126,12 @@ export function getBall(key) {
 export function getBalls() {
   const balls = getPokemonConfig().capture.balls;
   return Object.entries(balls).map(([key, ball]) => ({ key, ...ball }));
+}
+
+// Réglages du parc safari, avec la Safari Ball déjà mise en forme comme les
+// balls de capture (clé comprise) pour que les embeds n'aient pas à distinguer
+// les deux familles.
+export function getSafariConfig() {
+  const safari = getPokemonConfig().safari;
+  return { ...safari, ball: { key: "safari", ...safari.ball } };
 }

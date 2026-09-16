@@ -2,6 +2,7 @@ import { log, updateThreadList } from '../../modules/utils.js';
 import { checkAndAnnounceNewRelease } from '../../modules/changelog-notifier.js';
 import db from '../../modules/db.js';
 import { rehydratePokemon } from '../../modules/pokemon/spawn.js';
+import { sweepSafari } from '../../modules/pokemon/safari.js';
 
 const name = 'clientReady';
 const once = true;
@@ -39,6 +40,10 @@ async function execute(bot) {
     // verrouillé, ou spawn ACTIVE sans message, qui bloquerait définitivement
     // toutes les apparitions à cause de l'index unique partiel.
     rehydratePokemon(bot);
+
+    // Même chose côté parc safari : une session ou un parc laissés ouverts par
+    // un arrêt brutal bloqueraient leurs index uniques respectifs.
+    sweepSafari(bot);
 
     // Remplir la BDD avec les événements passés avant le 29/08/2025 à 00:28
     import('../../modules/db.js').then(mod => {

@@ -48,13 +48,44 @@ que la capture réussisse ou non.
   - `/evolution <pokemon>` : fait évoluer un Pokémon en sacrifiant des doublons. Les lignées à
     embranchement (Évoli) peuvent évoluer au hasard, ou vers une cible choisie pour plus cher.
   - `/echange <membre> <je_donne> <je_recois>` : échange entre dresseurs.
+  - `/safari` : paie l'entrée du parc safari (voir ci-dessous). Réponse privée.
   - `/pokespawn` *(Admin)* : déclenche une apparition pour organiser un événement. Donne accès aux
     espèces hors pool naturel (légendaires et évolutions par échange), avec forçage du shiny, texte
     d'annonce et mention de rôle.
+  - `/safarispawn` *(Admin)* : ouvre un parc safari à la demande, pour un événement ou pour offrir
+    une visite à un dresseur en particulier.
+
+### 🏕️ Parc Safari
+
+Contrepoids du puits à points : le pool naturel étrangle volontairement les évolutions et les
+légendaires (poids 100/35/10 par stade, 8 pour un légendaire), et le parc **compense ce malus** le
+temps d'une visite. C'est le seul contenu Pokémon où les actions ne coûtent rien.
+
+- **Ouverture aléatoire** : un tirage horaire (1,5 % par heure, soit environ un parc tous les trois
+  jours) annonce le parc dans le salon des apparitions, rôle Dresseur mentionné. Un délai minimum
+  de 48 h sépare deux parcs. Le bouton reste cliquable **24 h**, mais les **apparitions ne sont
+  suspendues que 6 h** — le temps que l'événement respire sans figer le salon pour la journée.
+- **Une visite par dresseur**, et tout se passe en message privé : le bouton est public, la partie
+  ne l'est pas.
+- **25 actions**, gratuites, à répartir entre trois gestes :
+  - 🟢 **Safari Ball** (×1,5) — tenter la capture. Un raté laisse 5 % de chances au Pokémon de
+    détaler.
+  - 🍎 **Appâter** — ×2 sur les chances de capture, cumulable jusqu'à ×4 : deux appâts atteignent le
+    plafond, le bouton se ferme ensuite plutôt que de laisser gaspiller une action.
+  - 🏃 **Essayer de fuir** — passer au Pokémon suivant, avec 10 % de chances d'échouer.
+- **Raretés compensées** : stade 2 ×2, stade 3 (les *rares*) ×4, légendaires ×3, shiny 1/250 au lieu
+  de 1/500. Les rares passent de 1,3 % à 4 % du pool et les légendaires de 0,4 % à 1 %. Les
+  évolutions par échange restent hors pool, comme à l'état sauvage.
+- **Entrée payante** : `/safari` ouvre une visite hors événement pour **4 000 points**, avec un
+  cooldown de 24 h. Si un parc gratuit attend le dresseur, la commande le lui dit au lieu de
+  débiter. Une visite entamée expire au bout d'une heure.
+- Tout l'état vit en base : les boutons répondent encore après un redémarrage du bot, et un
+  double-clic ne peut pas jouer deux fois la même action.
 
 **Réglages** : tous les nombres (prix, multiplicateurs, taux de shiny, cadence, poids de rareté,
-coûts de fusion) vivent dans le bloc `pokemon` de `config.json`, relu à l'exécution — ils sont donc
-modifiables **sans redémarrer le bot**. Le curseur `capture.globalMultiplier` rend l'ensemble du jeu
+coûts de fusion, et l'intégralité du parc safari dans `pokemon.safari`) vivent dans le bloc
+`pokemon` de `config.json`, relu à l'exécution — ils sont donc modifiables **sans redémarrer le
+bot**. Le curseur `capture.globalMultiplier` rend l'ensemble du jeu
 plus ou moins difficile tout en préservant la hiérarchie entre espèces.
 
 **Données** : `modules/pokemon-gen1.json` est généré une fois par `npm run gen:pokemon` depuis le
