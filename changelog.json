@@ -1,7 +1,24 @@
 {
-  "version": "1.11.4",
-  "lastUpdated": "2026-09-17T20:52:22.069Z",
+  "version": "1.11.5",
+  "lastUpdated": "2026-09-17T21:01:22.337Z",
   "releases": [
+    {
+      "version": "1.11.5",
+      "date": "2026-09-17",
+      "title": "Release 1.11.5",
+      "features": [
+        {
+          "type": "fix",
+          "name": "Le message d'attente n'ouvre plus de nouveau message",
+          "description": "Le message « attends un peu avant de relancer » ouvrait un nouveau message au lieu de modifier ton panneau de lancer. Il l'édite désormais sur place : un seul message, toujours.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-17T20:59:16.363Z",
+          "branch": "claude/practical-ptolemy-qb5aha"
+        }
+      ]
+    },
     {
       "version": "1.11.4",
       "date": "2026-09-17",
@@ -821,16 +838,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "fix",
-      "name": "Le message d'attente n'ouvre plus de nouveau message",
-      "description": "Le message « attends un peu avant de relancer » ouvrait un nouveau message au lieu de modifier ton panneau de lancer. Il l'édite désormais sur place : un seul message, toujours.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-17T20:59:16.363Z",
-      "branch": "claude/practical-ptolemy-qb5aha"
-    }
-  ]
+  "pending": []
 }
