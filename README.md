@@ -33,6 +33,11 @@ que la capture réussisse ou non.
   Pokémon. La durée de vie n'est jamais affichée.
 - **Course à un vainqueur** : tout le monde peut lancer autant de balls qu'il veut, le premier jet
   réussi remporte le Pokémon. Les balls ratées sont définitivement perdues.
+- **Panneau de relance** : la réponse privée à un lancer porte elle-même les quatre balls et se
+  **réécrit** à chaque jet, au lieu d'empiler un message par lancer. Plus besoin de remonter à
+  l'annonce pour relancer. Dès que le Pokémon n'est plus là, le panneau te le dit et retire ses
+  boutons — au clic suivant : Discord ne permet pas de modifier un message privé sans que son
+  destinataire n'agisse.
 - **4 balls** : Poké Ball (×1), Super Ball (×2), Hyper Ball (×4) et Master Ball (capture garantie,
   avec confirmation obligatoire). Les probabilités suivent la formule officielle de la génération 3,
   à partir du taux de capture réel de chaque espèce.

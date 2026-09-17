@@ -97,14 +97,18 @@ export function buildSpawnEmbed(spawn, species, throws = [], announcement = null
   return embed;
 }
 
-export function buildBallRow(spawnId, { disabled = false } = {}) {
+// La même rangée sert l'annonce publique et le panneau éphémère qui répond aux
+// lancers. Seul le préfixe change : `poke_throw` ouvre un éphémère, `poke_rethrow`
+// réécrit celui d'où vient le clic. Le nom de la route dit donc ce qu'elle fait,
+// plutôt qu'un drapeau à déchiffrer côté routeur.
+export function buildBallRow(spawnId, { disabled = false, panel = false } = {}) {
   const row = new ActionRowBuilder();
   for (const [key, ball] of Object.entries(getPokemonConfig().capture.balls)) {
-    // La Master Ball passe par une confirmation : à 50 000 points, un mésclic
+    // La Master Ball passe par une confirmation : à 22 500 points, un mésclic
     // n'est pas rattrapable.
     const customId = ball.guaranteed
-      ? `poke_master|${spawnId}`
-      : `poke_throw|${spawnId}|${key}`;
+      ? `${panel ? "poke_remaster" : "poke_master"}|${spawnId}`
+      : `${panel ? "poke_rethrow" : "poke_throw"}|${spawnId}|${key}`;
     row.addComponents(
       new ButtonBuilder()
         .setCustomId(customId)
