@@ -16,7 +16,7 @@ import { handleException, log } from "../utils.js";
 import { getBall, getPokemonConfig } from "./config.js";
 import { creditSpecies } from "./collection.js";
 import { catchProbability, getSpecies } from "./data.js";
-import { displayName } from "./embeds.js";
+import { buildBallRow, displayName } from "./embeds.js";
 import { finalizeCaughtSpawn, refreshSpawnEmbed } from "./spawn.js";
 import { recordSpawnEnd, recordThrow } from "./stats.js";
 
@@ -50,57 +50,78 @@ function logThrow(spawnId, userId, ballKey, cost, probability, result) {
 
 // Chemin de remboursement unique et journalisé. Le crédit est inconditionnel et
 // sûr : on ne rembourse qu'après un débit réussi, donc la ligne existe.
-function refundThrow(interaction, spawnId, ball, probability) {
+function refundThrow(interaction, spawnId, ball, probability, view) {
   const userId = interaction.user.id;
   addPoints(userId, ball.price, (err) => {
     if (err) handleException("Remboursement impossible :", err);
     logThrow(spawnId, userId, ball.key, ball.price, probability, "VOID");
     log(`Remboursement de ${ball.price} pts à ${userId} (spawn #${spawnId} déjà résolu)`);
     interaction
-      .editReply({
-        content: `💨 Trop tard, quelqu'un a été plus rapide ! Tes **${ball.price}** points ont été remboursés.`,
-      })
+      .editReply(
+        view(
+          `💨 Trop tard, quelqu'un a été plus rapide ! Tes **${ball.price}** points ont été remboursés.`,
+          { done: true }
+        )
+      )
       .catch(() => {});
   });
 }
 
-export async function throwBall(interaction, spawnId, ballKey) {
+// `panel` distingue les deux origines d'un clic : l'annonce publique, où l'on
+// ouvre un éphémère, et le panneau de relance, où l'on réécrit celui d'où vient
+// le clic. Sans ça, dix lancers laissaient dix messages empilés.
+export async function throwBall(interaction, spawnId, ballKey, { panel = false } = {}) {
   const config = getPokemonConfig();
   const ball = getBall(ballKey);
   const userId = interaction.user.id;
 
-  if (!ball) {
-    return interaction.reply({
-      content: "❌ Ball inconnue.",
-      flags: MessageFlags.Ephemeral,
-    });
-  }
+  // Un lancer a dix issues ; ce point de sortie unique décide une fois pour
+  // toutes de la forme de la réponse, aucune branche n'a à s'en soucier.
+  // `done` retire les boutons quand il n'y a plus rien à relancer.
+  const view = (content, { done = false } = {}) => ({
+    content,
+    components: done ? [] : [buildBallRow(spawnId, { panel: true })],
+  });
+
+  // Les deux sorties qui précèdent le defer ne doivent surtout PAS réécrire le
+  // panneau : elles sont concurrentes de la réponse au lancer précédent, et rien
+  // n'ordonne les deux interactions entre elles. Un « attends 5s » arrivant après
+  // un « Bravo » effacerait la capture et ferait réapparaître les boutons — et
+  // depuis la confirmation Master Ball, il l'écraserait purement et simplement.
+  // On accuse donc réception sans toucher au message, et la remarque part à côté.
+  const answerAside = async (content) => {
+    if (!panel) {
+      return interaction.reply({ content, flags: MessageFlags.Ephemeral }).catch(() => {});
+    }
+    await interaction.deferUpdate().catch(() => {});
+    return interaction.followUp({ content, flags: MessageFlags.Ephemeral }).catch(() => {});
+  };
+
+  if (!ball) return answerAside("❌ Ball inconnue.");
 
   const remaining = tryConsumeCooldown(userId, config.capture.throwCooldownSeconds * 1000);
   if (remaining > 0) {
-    return interaction.reply({
-      content: `⏳ Doucement ! Attends encore **${remaining}s** avant de relancer.`,
-      flags: MessageFlags.Ephemeral,
-    });
+    return answerAside(`⏳ Doucement ! Attends encore **${remaining}s** avant de relancer.`);
   }
 
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  if (panel) await interaction.deferUpdate();
+  else await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   db.get("SELECT * FROM pokemon_spawns WHERE id = ?", [spawnId], (err, spawn) => {
     if (err) {
       handleException("Lecture du spawn :", err);
-      return interaction.editReply({ content: "❌ Erreur base de données." }).catch(() => {});
+      return interaction.editReply(view("❌ Erreur base de données.")).catch(() => {});
     }
     // Sortie anticipée AVANT tout débit : un Pokémon déjà parti ne coûte rien.
     if (!spawn || spawn.status !== "ACTIVE") {
       return interaction
-        .editReply({ content: "💨 Ce Pokémon n'est plus là !" })
+        .editReply(view("💨 Ce Pokémon n'est plus là !", { done: true }))
         .catch(() => {});
     }
 
     const species = getSpecies(spawn.species_id);
     if (!species) {
-      return interaction.editReply({ content: "❌ Espèce inconnue." }).catch(() => {});
+      return interaction.editReply(view("❌ Espèce inconnue.", { done: true })).catch(() => {});
     }
 
     const probability = ball.guaranteed
@@ -115,15 +136,17 @@ export async function throwBall(interaction, spawnId, ballKey) {
     spendPoints(userId, ball.price, (err, debited) => {
       if (err) {
         handleException("Débit du lancer :", err);
-        return interaction.editReply({ content: "❌ Erreur base de données." }).catch(() => {});
+        return interaction.editReply(view("❌ Erreur base de données.")).catch(() => {});
       }
 
       if (!debited) {
         return getBalance(userId, (err, balance) => {
           interaction
-            .editReply({
-              content: `❌ Solde insuffisant : une **${ball.label}** coûte **${ball.price}** points, tu en as **${balance}**.`,
-            })
+            .editReply(
+              view(
+                `❌ Solde insuffisant : une **${ball.label}** coûte **${ball.price}** points, tu en as **${balance}**.`
+              )
+            )
             .catch(() => {});
         });
       }
@@ -141,10 +164,10 @@ export async function throwBall(interaction, spawnId, ballKey) {
           function (err) {
             if (err) {
               handleException("Comptabilisation du raté :", err);
-              return refundThrow(interaction, spawnId, ball, probability);
+              return refundThrow(interaction, spawnId, ball, probability, view);
             }
             if (this.changes === 0) {
-              return refundThrow(interaction, spawnId, ball, probability);
+              return refundThrow(interaction, spawnId, ball, probability, view);
             }
 
             logThrow(spawnId, userId, ball.key, ball.price, probability, "MISS");
@@ -158,9 +181,11 @@ export async function throwBall(interaction, spawnId, ballKey) {
             });
             refreshSpawnEmbed(interaction.client, spawnId);
             interaction
-              .editReply({
-                content: `❌ Raté ! **${displayName(species, spawn.is_shiny)}** s'est dégagé de ta ${ball.label}. (**-${ball.price}** points, ${(probability * 100).toFixed(1)} % de réussite)`,
-              })
+              .editReply(
+                view(
+                  `❌ Raté ! **${displayName(species, spawn.is_shiny)}** s'est dégagé de ta ${ball.label}. (**-${ball.price}** points, ${(probability * 100).toFixed(1)} % de réussite)`
+                )
+              )
               .catch(() => {});
           }
         );
@@ -177,11 +202,11 @@ export async function throwBall(interaction, spawnId, ballKey) {
         function (err) {
           if (err) {
             handleException("Réclamation du spawn :", err);
-            return refundThrow(interaction, spawnId, ball, probability);
+            return refundThrow(interaction, spawnId, ball, probability, view);
           }
           if (this.changes === 0) {
             // Battu à la milliseconde près.
-            return refundThrow(interaction, spawnId, ball, probability);
+            return refundThrow(interaction, spawnId, ball, probability, view);
           }
 
           logThrow(spawnId, userId, ball.key, ball.price, probability, "CATCH");
@@ -205,9 +230,12 @@ export async function throwBall(interaction, spawnId, ballKey) {
               `Capture : ${userId} attrape ${species.name}${spawn.is_shiny ? " ✨" : ""} (spawn #${spawnId}, ${ball.key})`
             );
             interaction
-              .editReply({
-                content: `🎉 Bravo ! **${displayName(species, spawn.is_shiny)}** rejoint ton Pokédex ! (**-${ball.price}** points)`,
-              })
+              .editReply(
+                view(
+                  `🎉 Bravo ! **${displayName(species, spawn.is_shiny)}** rejoint ton Pokédex ! (**-${ball.price}** points)`,
+                  { done: true }
+                )
+              )
               .catch(() => {});
           });
         }

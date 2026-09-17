@@ -26,6 +26,7 @@ import {
   resolveTradeAs,
 } from "./collection.js";
 import {
+  buildBallRow,
   buildDexEmbed,
   buildDexRow,
   buildSafariView,
@@ -39,16 +40,27 @@ const ephemeral = (interaction, content) =>
 
 // ---------------------- Master Ball ----------------------
 
-function askMasterBallConfirmation(interaction, spawnId) {
+// Depuis le panneau de relance, la confirmation le TRANSFORME au lieu d'ouvrir
+// un éphémère de plus : c'est tout l'intérêt du panneau.
+function askMasterBallConfirmation(interaction, spawnId, { panel = false } = {}) {
   const ball = getPokemonConfig().capture.balls.master;
+
+  // Un refus depuis le panneau le réécrit — sinon on empilerait un message de
+  // plus sur celui que le joueur a justement sous les yeux.
+  const refuse = (content) =>
+    panel
+      ? interaction
+          .update({ content, components: [buildBallRow(spawnId, { panel: true })] })
+          .catch(() => {})
+      : ephemeral(interaction, content);
+
   getBalance(interaction.user.id, (err, balance) => {
     if (err) {
       handleException(err);
-      return ephemeral(interaction, "❌ Erreur base de données.");
+      return refuse("❌ Erreur base de données.");
     }
     if (balance < ball.price) {
-      return ephemeral(
-        interaction,
+      return refuse(
         `❌ Une **${ball.label}** coûte **${ball.price}** points, tu en as **${balance}**.`
       );
     }
@@ -60,21 +72,25 @@ function askMasterBallConfirmation(interaction, spawnId) {
         .setEmoji(ball.emoji)
         .setStyle(ButtonStyle.Danger),
       new ButtonBuilder()
-        .setCustomId("poke_master_cancel")
+        // Le spawnId permet de restaurer le panneau à l'annulation plutôt que
+        // de laisser un message sans boutons.
+        .setCustomId(`poke_master_cancel|${spawnId}`)
         .setLabel("Annuler")
         .setStyle(ButtonStyle.Secondary)
     );
 
-    interaction
-      .reply({
-        content:
-          `⚠️ La **${ball.label}** garantit la capture mais coûte **${ball.price}** points, ` +
-          `et ils sont perdus si quelqu'un t'attrape le Pokémon avant.\n` +
-          `Ton solde : **${balance}** points.`,
-        components: [row],
-        flags: MessageFlags.Ephemeral,
-      })
-      .catch(() => {});
+    const payload = {
+      content:
+        `⚠️ La **${ball.label}** garantit la capture mais coûte **${ball.price}** points, ` +
+        `et ils sont perdus si quelqu'un t'attrape le Pokémon avant.\n` +
+        `Ton solde : **${balance}** points.`,
+      components: [row],
+    };
+
+    (panel
+      ? interaction.update(payload)
+      : interaction.reply({ ...payload, flags: MessageFlags.Ephemeral })
+    ).catch(() => {});
   });
 }
 
@@ -325,18 +341,31 @@ export async function handlePokemonButton(interaction) {
   const [action, ...args] = interaction.customId.split("|");
 
   switch (action) {
+    // Depuis l'annonce publique : on ouvre le panneau de relance.
     case "poke_throw":
       return throwBall(interaction, args[0], args[1]);
 
     case "poke_master":
       return askMasterBallConfirmation(interaction, args[0]);
 
+    // Depuis le panneau : on le réécrit, au lieu d'empiler un message par jet.
+    case "poke_rethrow":
+      return throwBall(interaction, args[0], args[1], { panel: true });
+
+    case "poke_remaster":
+      return askMasterBallConfirmation(interaction, args[0], { panel: true });
+
+    // Toujours cliqué depuis un éphémère (la confirmation), donc toujours une
+    // réécriture.
     case "poke_master_ok":
-      return throwBall(interaction, args[0], "master");
+      return throwBall(interaction, args[0], "master", { panel: true });
 
     case "poke_master_cancel":
       return interaction
-        .update({ content: "Annulé, tes points sont intacts.", components: [] })
+        .update({
+          content: "Annulé, tes points sont intacts.",
+          components: args[0] ? [buildBallRow(args[0], { panel: true })] : [],
+        })
         .catch(() => {});
 
     case "poke_owned":

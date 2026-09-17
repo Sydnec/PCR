@@ -804,5 +804,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Un seul message pour tous tes lancers",
+      "description": "Lancer dix balls sur un Pokémon coriace ne remplit plus ton écran de dix messages : la réponse à un lancer porte désormais les quatre balls et se réécrit à chaque jet. Tu relances directement depuis elle, sans remonter à l'annonce. Si le Pokémon a été capturé ou s'est enfui entre-temps, ton prochain clic te le dit et retire les boutons. La Master Ball garde sa confirmation.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-17T20:30:29.600Z",
+      "branch": "claude/practical-ptolemy-qb5aha"
+    }
+  ]
 }
