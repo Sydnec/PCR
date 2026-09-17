@@ -18,6 +18,7 @@ import {
   safariBaitCapped,
   safariBaitFactor,
   safariCatchProbability,
+  safariFleeChance,
   spriteUrl,
 } from "./data.js";
 
@@ -441,6 +442,8 @@ function safariOutcomeLine(result, config) {
       return `\u274C Raté — et **${name}** en a profité pour détaler !`;
     case "BAIT":
       return `\u{1F34E} Tu jettes de l'appât. **${name}** se régale et baisse sa garde.`;
+    case "BAIT_FLED":
+      return `\u{1F34E} **${name}** engloutit la baie... et détale aussitôt !`;
     case "FLED":
       return "\u{1F3C3} Tu t'éclipses sans demander ton reste.";
     case "FLEE_FAILED":
@@ -479,6 +482,9 @@ function buildEncounterEmbed(session, species, config, { intro = null, owned = n
   const baitNote = session.encounter_bait
     ? ` \u{1F34E} \u00D7${baitFactor} (${session.encounter_bait} appât${session.encounter_bait > 1 ? "s" : ""})`
     : "";
+  // Sans ce chiffre, la nervosité gagnée en appâtant serait invisible et le
+  // joueur ne pourrait pas arbitrer entre lancer et appâter.
+  const fleeRisk = safariFleeChance(session.encounter_bait, config);
 
   // Collection illisible : on préfère une rencontre sans pastille à un champ
   // vide, que l'API refuserait. Trois champs par rangée, d'où la grille
@@ -498,7 +504,12 @@ function buildEncounterEmbed(session, species, config, { intro = null, owned = n
       { name: "Type", value: species.types.join(" / "), inline: true },
       {
         name: "Chances de capture",
-        value: `${formatPercent(probability)}${baitNote}`,
+        value:
+          `${formatPercent(probability)}${baitNote}\n` +
+          // Arrondi à l'entier plutôt que via formatPercent : c'est un cran de
+          // réglage grossier, pas une probabilité dérivée, et « 5.0 % » à côté
+          // de « 11 % » se lit mal.
+          `\u{1F4A8} ${Math.round(fleeRisk * 100)} % qu'il détale`,
         inline: true,
       },
       ...(ownership ? [{ name: "Ton Pokédex", value: ownership, inline: true }] : []),

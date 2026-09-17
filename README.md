@@ -68,10 +68,13 @@ temps d'une visite. C'est le seul contenu Pokémon où les actions ne coûtent r
 - **Une visite par dresseur**, et tout se passe en message privé : le bouton est public, la partie
   ne l'est pas.
 - **25 actions**, gratuites, à répartir entre trois gestes :
-  - 🟢 **Safari Ball** (×1,5) — tenter la capture. Un raté laisse 5 % de chances au Pokémon de
-    détaler.
+  - 🟢 **Safari Ball** (×1,5) — tenter la capture. Un raté peut faire détaler le Pokémon.
   - 🍎 **Appâter** — ×2 sur les chances de capture, cumulable jusqu'à ×4 : deux appâts atteignent le
-    plafond, le bouton se ferme ensuite plutôt que de laisser gaspiller une action.
+    plafond, le bouton se ferme ensuite plutôt que de laisser gaspiller une action. **Mais la baie
+    le met sur ses gardes** : sa chance de détaler passe de 5 % à 8 % puis 11 %, et elle est tirée
+    aussi bien après un lancer raté qu'au moment où il avale la baie. Appâter reste nettement
+    rentable — deux appâts font passer un stade 3 de 2,2 à 3,9 captures pour 25 actions — mais ce
+    n'est plus gratuit.
   - 🏃 **Essayer de fuir** — passer au Pokémon suivant, avec 10 % de chances d'échouer.
 - **« Il te manque ? »** : chaque rencontre affiche si le dresseur possède déjà l'espèce — et la
   variante shiny compte à part. Le message étant privé, l'information tient dans l'embed, là où les

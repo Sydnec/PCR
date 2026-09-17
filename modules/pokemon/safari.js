@@ -20,6 +20,7 @@ import {
   rollSafariEncounter,
   safariBaitCapped,
   safariCatchProbability,
+  safariFleeChance,
 } from "./data.js";
 import { creditSpecies, getOwnedVariants } from "./collection.js";
 import { resolveChannel } from "./spawn.js";
@@ -394,10 +395,18 @@ function resolveAction({ session, species, action, config }, cb) {
       (err) => {
         if (err) return cb(err);
         const stacks = session.encounter_bait + 1;
-        done("BAIT", {
+        const extra = {
           baitStacks: stacks,
           probability: safariCatchProbability(session.encounter_catch_rate, stacks, config),
-        });
+        };
+        // Le tirage se fait à la nervosité d'APRÈS la baie : c'est le fait de
+        // manger qui met le Pokémon sur ses gardes.
+        if (Math.random() < safariFleeChance(stacks, config)) {
+          return rollNextEncounter(session.id, config, (err) =>
+            err ? cb(err) : done("BAIT_FLED", extra)
+          );
+        }
+        done("BAIT", extra);
       }
     );
   }
@@ -410,9 +419,10 @@ function resolveAction({ session, species, action, config }, cb) {
   }
 
   if (Math.random() >= probability) {
-    // Raté. Le Pokémon peut en profiter pour détaler — jamais après un appât,
-    // sinon appâter serait un piège et l'action n'aurait aucun intérêt.
-    if (Math.random() < config.wildFleeChance) {
+    // Raté. Le Pokémon peut en profiter pour détaler, d'autant plus volontiers
+    // qu'il a mangé : c'est le prix de l'appât, et ce qui empêche « appâter deux
+    // fois » d'être le seul coup à jouer.
+    if (Math.random() < safariFleeChance(session.encounter_bait, config)) {
       return rollNextEncounter(session.id, config, (err) =>
         err ? cb(err) : done("MISS_FLED")
       );

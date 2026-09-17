@@ -781,5 +781,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Parc safari : appâter a un prix",
+      "description": "Les baies du parc safari ne sont plus gratuites : elles attirent le Pokémon mais le mettent sur ses gardes. Sa chance de détaler passe de 5 % à 8 % puis 11 % selon le nombre d'appâts, et elle est tirée aussi bien après un lancer raté qu'au moment où il avale la baie. Appâter reste largement le bon coup — sur un Pokémon rare tu passes de 2,2 à 3,9 captures pour 25 actions — mais il y a désormais un vrai arbitrage entre lancer tout de suite et prendre le temps d'appâter. L'embed affiche la chance de fuite en direct.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-17T09:43:18.498Z",
+      "branch": "claude/practical-ptolemy-qb5aha"
+    }
+  ]
 }

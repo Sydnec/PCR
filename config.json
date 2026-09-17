@@ -46,6 +46,7 @@
 			"baitMaxMultiplier":4,
 			"fleeFailChance":0.1,
 			"wildFleeChance":0.05,
+			"wildFleeChancePerBait":0.03,
 			"shinyOdds":250,
 			"weightsByStage":{"1":100,"2":70,"3":40},
 			"legendaryWeight":24
