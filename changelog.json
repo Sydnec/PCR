@@ -865,6 +865,16 @@
       "commit": "pending",
       "timestamp": "2026-09-17T22:47:13.466Z",
       "branch": "claude/practical-ptolemy-qb5aha"
+    },
+    {
+      "type": "fix",
+      "name": "Refus de la Master Ball : plus de cul-de-sac",
+      "description": "Cliquer la Master Ball depuis l'annonce avec un solde insuffisant ouvrait un message sans aucun bouton, sans remplacer ton panneau. Il suit maintenant la même règle que les autres refus : le message porte les quatre balls et remplace le panneau précédent.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-17T23:15:53.354Z",
+      "branch": "claude/practical-ptolemy-qb5aha"
     }
   ]
 }

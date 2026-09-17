@@ -12,7 +12,7 @@ import {
 import { getBalance } from "../economy.js";
 import { handleException, log } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
-import { throwBall, trackPanel } from "./capture.js";
+import { answerThrow, throwBall, trackPanel } from "./capture.js";
 import { getSpawn } from "./spawn.js";
 import { enterPark, playAction, refreshParkMessage } from "./safari.js";
 import { getSpecies } from "./data.js";
@@ -45,14 +45,8 @@ const ephemeral = (interaction, content) =>
 function askMasterBallConfirmation(interaction, spawnId, { panel = false } = {}) {
   const ball = getPokemonConfig().capture.balls.master;
 
-  // Un refus depuis le panneau le réécrit — sinon on empilerait un message de
-  // plus sur celui que le joueur a justement sous les yeux. `components` n'est
-  // pas transmis : le panneau porte déjà la bonne rangée, et la réaffirmer
-  // pourrait la faire réapparaître sur un Pokémon entre-temps capturé.
-  const refuse = (content) =>
-    panel
-      ? interaction.update({ content }).catch(() => {})
-      : ephemeral(interaction, content);
+  // Un refus répond exactement comme un cooldown : même règle, même fonction.
+  const refuse = (content) => answerThrow(interaction, spawnId, content, { panel });
 
   getBalance(interaction.user.id, (err, balance) => {
     if (err) {

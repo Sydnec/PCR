@@ -60,6 +60,35 @@ export function trackPanel(interaction, spawnId, { replacing = false } = {}) {
   previous.webhook?.deleteMessage("@original").catch(() => {});
 }
 
+// Réponse à un clic de lancer qui n'ira pas jusqu'au tirage : cooldown, ball
+// inconnue, refus de la Master Ball. Les deux origines demandent l'inverse l'une
+// de l'autre, et ceci en est la SEULE définition — la confirmation Master Ball,
+// dans interactions.js, répond exactement de la même façon et s'en sert aussi.
+//
+// Depuis le PANNEAU : on réécrit son texte sans transmettre `components`. La clé
+// absente est exclue du corps JSON, donc Discord laisse les boutons tels quels —
+// indispensable, car ces réponses sont concurrentes de celle du lancer précédent
+// et rien n'ordonne les deux interactions : sinon un « attends 5s » arrivant
+// après un « Bravo » ressusciterait les boutons d'un Pokémon déjà capturé.
+//
+// Depuis l'ANNONCE : message neuf, aucun état à préserver. Il porte la rangée de
+// balls — sans quoi le joueur fait face à un cul-de-sac — et devient son
+// panneau, ce qui fait disparaître le précédent.
+export function answerThrow(interaction, spawnId, content, { panel = false } = {}) {
+  return (panel
+    ? interaction.update({ content })
+    : interaction.reply({
+        content,
+        components: [buildBallRow(spawnId, { panel: true })],
+        flags: MessageFlags.Ephemeral,
+      })
+  )
+    // Uniquement en cas de succès : si la réponse échoue, supprimer le panneau
+    // précédent laisserait le dresseur sans rien du tout.
+    .then(() => trackPanel(interaction, spawnId, { replacing: !panel }))
+    .catch(() => {});
+}
+
 function tryConsumeCooldown(userId, cooldownMs) {
   if (cooldownMs <= 0) return 0;
   const now = Date.now();
@@ -117,35 +146,16 @@ export async function throwBall(interaction, spawnId, ballKey, { panel = false }
     components: done ? [] : [buildBallRow(spawnId, { panel: true })],
   });
 
-  // Sorties qui précèdent le defer (cooldown, ball inconnue). Les deux origines
-  // demandent un traitement opposé.
-  //
-  // Depuis le PANNEAU : on réécrit son texte sans transmettre `components`. La
-  // clé absente est exclue du corps JSON, donc Discord laisse les boutons tels
-  // quels — indispensable, car ces sorties sont concurrentes de la réponse au
-  // lancer précédent et rien n'ordonne les deux interactions : sinon un
-  // « attends 5s » arrivant après un « Bravo » ressusciterait les boutons d'un
-  // Pokémon déjà capturé.
-  //
-  // Depuis l'ANNONCE : c'est un message neuf, il n'y a donc aucun état à
-  // préserver. Il porte la rangée de balls — sans quoi le joueur se retrouve
-  // devant un cul-de-sac sans rien à cliquer — et devient son panneau, ce qui
-  // fait disparaître le précédent.
-  const answerInPlace = (content) =>
-    (panel
-      ? interaction.update({ content })
-      : interaction.reply({ ...view(content), flags: MessageFlags.Ephemeral })
-    )
-      // Uniquement en cas de succès : si la réponse échoue, supprimer le panneau
-      // précédent laisserait le dresseur sans rien du tout.
-      .then(() => trackPanel(interaction, spawnId, { replacing: !panel }))
-      .catch(() => {});
-
-  if (!ball) return answerInPlace("❌ Ball inconnue.");
+  if (!ball) return answerThrow(interaction, spawnId, "❌ Ball inconnue.", { panel });
 
   const remaining = tryConsumeCooldown(userId, config.capture.throwCooldownSeconds * 1000);
   if (remaining > 0) {
-    return answerInPlace(`⏳ Doucement ! Attends encore **${remaining}s** avant de relancer.`);
+    return answerThrow(
+      interaction,
+      spawnId,
+      `⏳ Doucement ! Attends encore **${remaining}s** avant de relancer.`,
+      { panel }
+    );
   }
 
   if (panel) await interaction.deferUpdate();

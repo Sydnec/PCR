@@ -534,6 +534,20 @@ function setSpawnPause(until, { clear = false } = {}, cb = () => {}) {
   });
 }
 
+// Fermeture d'un parc, toujours gardée sur 'OPEN' : deux balayages concurrents
+// ne peuvent pas la compter deux fois. `cb` reçoit true si c'est bien cet appel
+// qui l'a fermé.
+function closePark(parkId, cb = () => {}) {
+  db.run(
+    `UPDATE pokemon_safari_parks SET status = 'CLOSED', closed_at = ?
+      WHERE id = ? AND status = 'OPEN'`,
+    [Date.now(), parkId],
+    function (err) {
+      cb(err, this ? this.changes === 1 : false);
+    }
+  );
+}
+
 function bumpParkEntries(parkId) {
   db.run(
     "UPDATE pokemon_safari_parks SET entries = entries + 1 WHERE id = ?",
@@ -626,10 +640,7 @@ export async function openPark(
       // Envoi impossible : on referme le parc plutôt que de laisser une ligne
       // OPEN sans message, qui bloquerait tous les parcs suivants.
       handleException("Envoi du message de parc safari :", error);
-      db.run(
-        "UPDATE pokemon_safari_parks SET status = 'CLOSED', closed_at = ? WHERE id = ?",
-        [Date.now(), parkId]
-      );
+      closePark(parkId);
       return { ok: false, reason: "Impossible de poster le message du parc safari." };
     }
   } catch (error) {
@@ -664,23 +675,18 @@ function closeExpiredParks(client, cb = () => {}) {
       if (!remaining) return cb();
 
       for (const park of rows) {
-        db.run(
-          `UPDATE pokemon_safari_parks SET status = 'CLOSED', closed_at = ?
-            WHERE id = ? AND status = 'OPEN'`,
-          [Date.now(), park.id],
-          function (err) {
-            const finish = () => {
-              if (--remaining === 0) cb();
-            };
-            if (err) {
-              handleException("Fermeture d'un parc safari :", err);
-              return finish();
-            }
-            if (this.changes !== 1) return finish();
-            log(`Parc safari #${park.id} fermé (${park.entries} entrée(s))`);
-            closeParkMessage(client, park).finally(finish);
+        closePark(park.id, (err, closed) => {
+          const finish = () => {
+            if (--remaining === 0) cb();
+          };
+          if (err) {
+            handleException("Fermeture d'un parc safari :", err);
+            return finish();
           }
-        );
+          if (!closed) return finish();
+          log(`Parc safari #${park.id} fermé (${park.entries} entrée(s))`);
+          closeParkMessage(client, park).finally(finish);
+        });
       }
     }
   );
