@@ -143,6 +143,17 @@ export function rollSafariEncounter(safariConfig) {
   };
 }
 
+// La nervosité du Pokémon, tirée après un lancer raté comme après un appât. La
+// baie l'attire mais le met sur ses gardes : c'est ce qui empêche « appâter deux
+// fois » d'être le seul coup à jouer. Une seule valeur par rencontre, donc un
+// seul concept à expliquer au joueur et un seul réglage à tourner.
+export function safariFleeChance(baitStacks, safariConfig) {
+  const stacks = Math.max(0, Number(baitStacks) || 0);
+  const perBait = safariConfig.wildFleeChancePerBait ?? 0;
+  const chance = safariConfig.wildFleeChance + stacks * perBait;
+  return Math.min(1, Math.max(0, chance));
+}
+
 // Même formule que les captures sauvages : le parc ne change que le
 // multiplicateur, jamais la courbe. Le curseur global reste donc pleinement
 // opérant sur le parc aussi.

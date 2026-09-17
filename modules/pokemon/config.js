@@ -74,7 +74,10 @@ export const DEFAULTS = {
     baitMultiplier: 2,
     baitMaxMultiplier: 4,
     fleeFailChance: 0.1,
+    // La fuite part de wildFleeChance et monte de wildFleeChancePerBait par
+    // baie avalée : 5 % à jeun, 11 % après deux appâts.
     wildFleeChance: 0.05,
+    wildFleeChancePerBait: 0.03,
     shinyOdds: 250,
     weightsByStage: { 1: 100, 2: 70, 3: 40 },
     legendaryWeight: 24,
