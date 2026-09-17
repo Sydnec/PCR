@@ -12,7 +12,7 @@ import {
 import { getBalance } from "../economy.js";
 import { handleException, log } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
-import { throwBall } from "./capture.js";
+import { throwBall, trackPanel } from "./capture.js";
 import { getSpawn } from "./spawn.js";
 import { enterPark, playAction, refreshParkMessage } from "./safari.js";
 import { getSpecies } from "./data.js";
@@ -90,7 +90,12 @@ function askMasterBallConfirmation(interaction, spawnId, { panel = false } = {})
     (panel
       ? interaction.update(payload)
       : interaction.reply({ ...payload, flags: MessageFlags.Ephemeral })
-    ).catch(() => {});
+    )
+      // Depuis l'annonce, la confirmation est elle aussi un nouvel éphémère :
+      // elle remplace le panneau ouvert plutôt que de le laisser derrière elle.
+      // Le poke_master_ok qui suit réécrit ce message, la trace reste valide.
+      .then(() => trackPanel(interaction, spawnId, { replacing: !panel }))
+      .catch(() => {});
   });
 }
 

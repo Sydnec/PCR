@@ -838,5 +838,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Un seul panneau de lancer, où que tu cliques",
+      "description": "Le panneau de lancer était déjà unique tant que tu relançais depuis lui, mais recliquer sur l'annonce publique en rouvrait un à chaque fois. Désormais le nouveau remplace l'ancien : tu n'as jamais qu'un seul panneau ouvert, où que tu cliques. Un panneau resté ouvert sur un Pokémon précédent disparaît aussi tout seul.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-17T22:30:36.437Z",
+      "branch": "claude/practical-ptolemy-qb5aha"
+    }
+  ]
 }

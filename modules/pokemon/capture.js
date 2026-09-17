@@ -26,6 +26,40 @@ import { recordSpawnEnd, recordThrow } from "./stats.js";
 // correction, le débit et la réclamation restant gardés.
 const lastThrowAt = new Map();
 
+// Le panneau de lancer ouvert par chaque dresseur. Un joueur n'en a qu'un à la
+// fois, donc une entrée par dresseur suffit — et cette clé borne la table à
+// l'effectif du serveur, comme lastThrowAt juste au-dessus. Perdue au
+// redémarrage : au pire un panneau de trop survit une fois, ce qui est le
+// comportement d'avant.
+const openPanels = new Map();
+
+// Discord n'autorise à toucher un éphémère que par le token de l'interaction qui
+// l'a créé, d'où la conservation du webhook (id d'application + token) plutôt que
+// de l'interaction entière.
+//
+// `replacing` distingue les deux origines d'un clic : depuis l'annonce publique,
+// il vient d'ouvrir un NOUVEL éphémère et l'ancien doit disparaître ; depuis le
+// panneau, c'est le même message qu'on réécrit, on se contente de rafraîchir le
+// token — ce qui fait glisser sa fenêtre de 15 minutes tant que le joueur joue.
+export function trackPanel(interaction, spawnId, { replacing = false } = {}) {
+  const userId = interaction.user.id;
+  const previous = openPanels.get(userId);
+  const key = String(spawnId);
+
+  // Clic sur un VIEUX panneau alors que le joueur en a un plus récent ailleurs :
+  // celui-ci n'est plus sa référence. On n'y touche pas, et surtout on ne
+  // supprime pas le plus récent — il se contentera d'annoncer que le Pokémon
+  // n'est plus là et de retirer ses boutons.
+  if (!replacing && previous && previous.spawnId !== key) return;
+
+  openPanels.set(userId, { webhook: interaction.webhook, spawnId: key });
+  if (!replacing || !previous) return;
+
+  // Best-effort : token expiré ou éphémère déjà fermé par le joueur, on retombe
+  // simplement sur deux messages — le comportement d'avant, jamais pire.
+  previous.webhook?.deleteMessage("@original").catch(() => {});
+}
+
 function tryConsumeCooldown(userId, cooldownMs) {
   if (cooldownMs <= 0) return 0;
   const now = Date.now();
@@ -104,6 +138,10 @@ export async function throwBall(interaction, spawnId, ballKey, { panel = false }
 
   if (panel) await interaction.deferUpdate();
   else await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+  // Le nouveau panneau existe déjà (le defer l'a rendu visible) : on peut retirer
+  // le précédent sans jamais laisser le joueur sans rien sous les yeux.
+  trackPanel(interaction, spawnId, { replacing: !panel });
 
   db.get("SELECT * FROM pokemon_spawns WHERE id = ?", [spawnId], (err, spawn) => {
     if (err) {
