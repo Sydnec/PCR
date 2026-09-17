@@ -1,7 +1,34 @@
 {
-  "version": "1.11.6",
-  "lastUpdated": "2026-09-17T22:33:03.880Z",
+  "version": "1.11.7",
+  "lastUpdated": "2026-09-17T23:19:39.808Z",
   "releases": [
+    {
+      "version": "1.11.7",
+      "date": "2026-09-17",
+      "title": "Release 1.11.7",
+      "features": [
+        {
+          "type": "fix",
+          "name": "Le message d'attente respecte le panneau unique",
+          "description": "Le message « attends un peu avant de relancer » échappait encore au panneau unique quand tu cliquais depuis l'annonce : il ouvrait un éphémère de plus, et sans aucun bouton pour relancer. Il remplace désormais ton panneau comme n'importe quel autre lancer, et porte bien les quatre balls.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-17T22:47:13.466Z",
+          "branch": "claude/practical-ptolemy-qb5aha"
+        },
+        {
+          "type": "fix",
+          "name": "Refus de la Master Ball : plus de cul-de-sac",
+          "description": "Cliquer la Master Ball depuis l'annonce avec un solde insuffisant ouvrait un message sans aucun bouton, sans remplacer ton panneau. Il suit maintenant la même règle que les autres refus : le message porte les quatre balls et remplace le panneau précédent.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-17T23:15:53.354Z",
+          "branch": "claude/practical-ptolemy-qb5aha"
+        }
+      ]
+    },
     {
       "version": "1.11.6",
       "date": "2026-09-17",
@@ -855,26 +882,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "fix",
-      "name": "Le message d'attente respecte le panneau unique",
-      "description": "Le message « attends un peu avant de relancer » échappait encore au panneau unique quand tu cliquais depuis l'annonce : il ouvrait un éphémère de plus, et sans aucun bouton pour relancer. Il remplace désormais ton panneau comme n'importe quel autre lancer, et porte bien les quatre balls.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-17T22:47:13.466Z",
-      "branch": "claude/practical-ptolemy-qb5aha"
-    },
-    {
-      "type": "fix",
-      "name": "Refus de la Master Ball : plus de cul-de-sac",
-      "description": "Cliquer la Master Ball depuis l'annonce avec un solde insuffisant ouvrait un message sans aucun bouton, sans remplacer ton panneau. Il suit maintenant la même règle que les autres refus : le message porte les quatre balls et remplace le panneau précédent.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-17T23:15:53.354Z",
-      "branch": "claude/practical-ptolemy-qb5aha"
-    }
-  ]
+  "pending": []
 }
