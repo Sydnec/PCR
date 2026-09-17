@@ -83,25 +83,23 @@ export async function throwBall(interaction, spawnId, ballKey, { panel = false }
     components: done ? [] : [buildBallRow(spawnId, { panel: true })],
   });
 
-  // Les deux sorties qui précèdent le defer ne doivent surtout PAS réécrire le
-  // panneau : elles sont concurrentes de la réponse au lancer précédent, et rien
-  // n'ordonne les deux interactions entre elles. Un « attends 5s » arrivant après
-  // un « Bravo » effacerait la capture et ferait réapparaître les boutons — et
-  // depuis la confirmation Master Ball, il l'écraserait purement et simplement.
-  // On accuse donc réception sans toucher au message, et la remarque part à côté.
-  const answerAside = async (content) => {
-    if (!panel) {
-      return interaction.reply({ content, flags: MessageFlags.Ephemeral }).catch(() => {});
-    }
-    await interaction.deferUpdate().catch(() => {});
-    return interaction.followUp({ content, flags: MessageFlags.Ephemeral }).catch(() => {});
-  };
+  // Sorties qui précèdent le defer (cooldown, ball inconnue). Elles réécrivent le
+  // texte du panneau, mais ne transmettent délibérément PAS `components` : la clé
+  // absente est exclue du corps JSON, et Discord laisse alors les boutons tels
+  // quels. C'est ce qui rend l'opération sûre, car ces sorties sont concurrentes
+  // de la réponse au lancer précédent et rien n'ordonne les deux interactions —
+  // sans cette précaution, un « attends 5s » arrivant après un « Bravo »
+  // ressusciterait les boutons d'un Pokémon déjà capturé.
+  const answerInPlace = (content) =>
+    panel
+      ? interaction.update({ content }).catch(() => {})
+      : interaction.reply({ content, flags: MessageFlags.Ephemeral }).catch(() => {});
 
-  if (!ball) return answerAside("❌ Ball inconnue.");
+  if (!ball) return answerInPlace("❌ Ball inconnue.");
 
   const remaining = tryConsumeCooldown(userId, config.capture.throwCooldownSeconds * 1000);
   if (remaining > 0) {
-    return answerAside(`⏳ Doucement ! Attends encore **${remaining}s** avant de relancer.`);
+    return answerInPlace(`⏳ Doucement ! Attends encore **${remaining}s** avant de relancer.`);
   }
 
   if (panel) await interaction.deferUpdate();
