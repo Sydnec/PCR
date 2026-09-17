@@ -855,5 +855,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "fix",
+      "name": "Le message d'attente respecte le panneau unique",
+      "description": "Le message « attends un peu avant de relancer » échappait encore au panneau unique quand tu cliquais depuis l'annonce : il ouvrait un éphémère de plus, et sans aucun bouton pour relancer. Il remplace désormais ton panneau comme n'importe quel autre lancer, et porte bien les quatre balls.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-17T22:47:13.466Z",
+      "branch": "claude/practical-ptolemy-qb5aha"
+    }
+  ]
 }
