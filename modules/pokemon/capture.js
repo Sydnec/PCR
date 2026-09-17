@@ -117,17 +117,29 @@ export async function throwBall(interaction, spawnId, ballKey, { panel = false }
     components: done ? [] : [buildBallRow(spawnId, { panel: true })],
   });
 
-  // Sorties qui précèdent le defer (cooldown, ball inconnue). Elles réécrivent le
-  // texte du panneau, mais ne transmettent délibérément PAS `components` : la clé
-  // absente est exclue du corps JSON, et Discord laisse alors les boutons tels
-  // quels. C'est ce qui rend l'opération sûre, car ces sorties sont concurrentes
-  // de la réponse au lancer précédent et rien n'ordonne les deux interactions —
-  // sans cette précaution, un « attends 5s » arrivant après un « Bravo »
-  // ressusciterait les boutons d'un Pokémon déjà capturé.
+  // Sorties qui précèdent le defer (cooldown, ball inconnue). Les deux origines
+  // demandent un traitement opposé.
+  //
+  // Depuis le PANNEAU : on réécrit son texte sans transmettre `components`. La
+  // clé absente est exclue du corps JSON, donc Discord laisse les boutons tels
+  // quels — indispensable, car ces sorties sont concurrentes de la réponse au
+  // lancer précédent et rien n'ordonne les deux interactions : sinon un
+  // « attends 5s » arrivant après un « Bravo » ressusciterait les boutons d'un
+  // Pokémon déjà capturé.
+  //
+  // Depuis l'ANNONCE : c'est un message neuf, il n'y a donc aucun état à
+  // préserver. Il porte la rangée de balls — sans quoi le joueur se retrouve
+  // devant un cul-de-sac sans rien à cliquer — et devient son panneau, ce qui
+  // fait disparaître le précédent.
   const answerInPlace = (content) =>
-    panel
-      ? interaction.update({ content }).catch(() => {})
-      : interaction.reply({ content, flags: MessageFlags.Ephemeral }).catch(() => {});
+    (panel
+      ? interaction.update({ content })
+      : interaction.reply({ ...view(content), flags: MessageFlags.Ephemeral })
+    )
+      // Uniquement en cas de succès : si la réponse échoue, supprimer le panneau
+      // précédent laisserait le dresseur sans rien du tout.
+      .then(() => trackPanel(interaction, spawnId, { replacing: !panel }))
+      .catch(() => {});
 
   if (!ball) return answerInPlace("❌ Ball inconnue.");
 
