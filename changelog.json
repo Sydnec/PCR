@@ -1,7 +1,24 @@
 {
-  "version": "1.11.5",
-  "lastUpdated": "2026-09-17T21:01:22.337Z",
+  "version": "1.11.6",
+  "lastUpdated": "2026-09-17T22:33:03.880Z",
   "releases": [
+    {
+      "version": "1.11.6",
+      "date": "2026-09-17",
+      "title": "Release 1.11.6",
+      "features": [
+        {
+          "type": "enhancement",
+          "name": "Un seul panneau de lancer, où que tu cliques",
+          "description": "Le panneau de lancer était déjà unique tant que tu relançais depuis lui, mais recliquer sur l'annonce publique en rouvrait un à chaque fois. Désormais le nouveau remplace l'ancien : tu n'as jamais qu'un seul panneau ouvert, où que tu cliques. Un panneau resté ouvert sur un Pokémon précédent disparaît aussi tout seul.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-17T22:30:36.437Z",
+          "branch": "claude/practical-ptolemy-qb5aha"
+        }
+      ]
+    },
     {
       "version": "1.11.5",
       "date": "2026-09-17",
@@ -838,16 +855,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "enhancement",
-      "name": "Un seul panneau de lancer, où que tu cliques",
-      "description": "Le panneau de lancer était déjà unique tant que tu relançais depuis lui, mais recliquer sur l'annonce publique en rouvrait un à chaque fois. Désormais le nouveau remplace l'ancien : tu n'as jamais qu'un seul panneau ouvert, où que tu cliques. Un panneau resté ouvert sur un Pokémon précédent disparaît aussi tout seul.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-17T22:30:36.437Z",
-      "branch": "claude/practical-ptolemy-qb5aha"
-    }
-  ]
+  "pending": []
 }
