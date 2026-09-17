@@ -46,12 +46,12 @@ function askMasterBallConfirmation(interaction, spawnId, { panel = false } = {})
   const ball = getPokemonConfig().capture.balls.master;
 
   // Un refus depuis le panneau le réécrit — sinon on empilerait un message de
-  // plus sur celui que le joueur a justement sous les yeux.
+  // plus sur celui que le joueur a justement sous les yeux. `components` n'est
+  // pas transmis : le panneau porte déjà la bonne rangée, et la réaffirmer
+  // pourrait la faire réapparaître sur un Pokémon entre-temps capturé.
   const refuse = (content) =>
     panel
-      ? interaction
-          .update({ content, components: [buildBallRow(spawnId, { panel: true })] })
-          .catch(() => {})
+      ? interaction.update({ content }).catch(() => {})
       : ephemeral(interaction, content);
 
   getBalance(interaction.user.id, (err, balance) => {
