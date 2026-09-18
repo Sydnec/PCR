@@ -1,12 +1,35 @@
 import {
   configChoices,
   formatConfigValue,
-  listConfigPaths,
+  listConfigEntries,
+  previewConfigValue,
   readConfigValue,
 } from "../../modules/config.js";
 
+// Un champ de message Discord plafonne à 2000 caractères ; on s'arrête avant.
+const MAX_BODY = 1800;
+
+// Liste les feuilles sous un préfixe, tronquée. Sans préfixe, c'est tout le
+// fichier ; avec, c'est une branche. Les deux cas passent par ici : afficher une
+// branche via formatConfigValue produisait un bloc JSON de près de 4 000
+// caractères, que Discord refusait purement et simplement.
+function listBranch(prefix) {
+  const entries = listConfigEntries(prefix).filter(
+    (entry) => !prefix || entry.path === prefix || entry.path.startsWith(`${prefix}.`)
+  );
+  let body = "";
+  let shown = 0;
+  for (const { path, current } of entries) {
+    const line = `\`${path}\` = ${previewConfigValue(current)}`;
+    if (body.length + line.length + 1 > MAX_BODY) break;
+    body += `${line}\n`;
+    shown++;
+  }
+  const rest = entries.length - shown;
+  return body + (rest > 0 ? `\n*et ${rest} autre(s) — précise une clé pour les voir.*` : "");
+}
+
 export default {
-  name: "config-voir",
   describe: (sub) =>
     sub
       .setName("config-voir")
@@ -24,31 +47,13 @@ export default {
   },
 
   async execute(interaction) {
-    // Sans clé, on montre la racine : les deux branches du fichier.
     const key = interaction.options.getString("cle") ?? "";
-    const result = key
-      ? readConfigValue(key)
-      : { ok: true, path: "(tout)", current: undefined, fallback: undefined };
+    if (!key) return interaction.editReply({ content: listBranch("") });
 
+    const result = readConfigValue(key);
     if (!result.ok) return interaction.editReply({ content: `❌ ${result.reason}` });
-
-    if (!key) {
-      const lines = listConfigPaths("").map(({ path }) => {
-        const { current } = readConfigValue(path);
-        return `\`${path}\` = ${Array.isArray(current) ? current.join(",") : current}`;
-      });
-      // Un champ Discord plafonne à 2000 caractères : on coupe proprement.
-      let body = "";
-      let shown = 0;
-      for (const line of lines) {
-        if (body.length + line.length + 1 > 1800) break;
-        body += `${line}\n`;
-        shown++;
-      }
-      const rest = lines.length - shown;
-      return interaction.editReply({
-        content: body + (rest > 0 ? `\n*et ${rest} autre(s) — précise une clé pour les voir.*` : ""),
-      });
+    if (result.type === "objet") {
+      return interaction.editReply({ content: `**\`${result.path}\`**\n${listBranch(result.path)}` });
     }
 
     const identical = JSON.stringify(result.current) === JSON.stringify(result.fallback);
@@ -57,7 +62,9 @@ export default {
         content:
           `\`${result.path}\`\n` +
           `Actuel : ${formatConfigValue(result.current)}\n` +
-          (identical ? "*(c'est la valeur par défaut)*" : `Défaut : ${formatConfigValue(result.fallback)}`),
+          (identical
+            ? "*(c'est la valeur par défaut)*"
+            : `Défaut : ${formatConfigValue(result.fallback)}`),
       })
       .catch(() => {});
   },

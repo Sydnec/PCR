@@ -6,7 +6,6 @@ import { log } from "../../modules/utils.js";
 // C'est volontaire, un solde négatif bloquant tous les achats jusqu'à ce qu'il
 // remonte.
 export default {
-  name: "points",
   describe: (sub) =>
     sub
       .setName("points")

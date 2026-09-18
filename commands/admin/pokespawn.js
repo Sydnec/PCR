@@ -1,9 +1,8 @@
-import { handleException, log } from "../../modules/utils.js";
+import { log } from "../../modules/utils.js";
 import { claimForcedSpawn, doSpawn } from "../../modules/pokemon/spawn.js";
 import { getSpecies, searchByName } from "../../modules/pokemon/data.js";
 
 export default {
-  name: "pokespawn",
   describe: (sub) =>
     sub
       .setName("pokespawn")
@@ -70,36 +69,37 @@ export default {
     const announcement = interaction.options.getString("annonce");
     const ping = interaction.options.getBoolean("ping");
 
-
     // Le créneau est revendiqué de la même façon que pour un spawn
     // automatique : compteur remis à zéro et horloge réarmée, sinon un spawn
     // naturel pourrait tomber juste après et faire fuir le Pokémon annoncé.
-    claimForcedSpawn(async (err, acquired) => {
-      if (err) {
-        handleException(err);
-        return interaction.editReply({ content: "❌ Erreur base de données." }).catch(() => {});
-      }
-      if (!acquired) {
-        return interaction
-          .editReply({ content: "⏳ Un spawn est déjà en cours de création, réessaie." })
-          .catch(() => {});
-      }
-
-      await doSpawn(bot ?? interaction.client, {
-        speciesId: species ? species.id : null,
-        forceShiny: forceShiny === null ? null : forceShiny,
-        announcement,
-        ping: ping === null ? null : ping,
-      });
-
-      log(
-        `/admin pokespawn par ${interaction.user.username} : ${species ? species.name : "aléatoire"}${forceShiny ? " ✨" : ""}`
-      );
-      await interaction
-        .editReply({
-          content: `✅ Spawn déclenché : **${species ? species.name : "espèce aléatoire"}**${forceShiny ? " (shiny)" : ""}.`,
-        })
+    //
+    // La revendication est à callback ; on l'attend. Rendre la main avant elle
+    // faisait sortir execute du try/catch du routeur : une erreur dans la suite
+    // partait en rejet non capturé, et l'administrateur restait devant un
+    // « le bot réfléchit… » sans fin.
+    const acquired = await new Promise((resolve, reject) =>
+      claimForcedSpawn((err, ok) => (err ? reject(err) : resolve(ok)))
+    );
+    if (!acquired) {
+      return interaction
+        .editReply({ content: "⏳ Un spawn est déjà en cours de création, réessaie." })
         .catch(() => {});
+    }
+
+    await doSpawn(bot ?? interaction.client, {
+      speciesId: species ? species.id : null,
+      forceShiny: forceShiny === null ? null : forceShiny,
+      announcement,
+      ping: ping === null ? null : ping,
     });
+
+    log(
+      `/admin pokespawn par ${interaction.user.username} : ${species ? species.name : "aléatoire"}${forceShiny ? " ✨" : ""}`
+    );
+    await interaction
+      .editReply({
+        content: `✅ Spawn déclenché : **${species ? species.name : "espèce aléatoire"}**${forceShiny ? " (shiny)" : ""}.`,
+      })
+      .catch(() => {});
   },
 };

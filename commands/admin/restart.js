@@ -1,5 +1,4 @@
 export default {
-  name: "restart",
   describe: (sub) => sub.setName("restart").setDescription("Redémarre le bot"),
 
   async execute(interaction, bot) {

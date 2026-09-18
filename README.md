@@ -132,8 +132,9 @@ même chose.
   atteinte, la revendique par un `UPDATE` gardé (deux ticks simultanés ne peuvent pas déclencher
   deux pots), et calcule la suivante **à partir de l'ancienne** : aucune dérive, et une panne de
   trois semaines donne un seul pot de rattrapage, pas trois.
-- **Réglages** (`config.json`, modifiables à chaud via `/admin config`) : `redistribution.enabled`,
-  `redistribution.intervalHours` (168 par défaut), `redistribution.contributionPercent` (5).
+- **Réglages** (modifiables à chaud via `/admin config`) : `redistribution.enabled`,
+  `redistribution.intervalHours` (168 par défaut), `redistribution.contributionPercent` (5, borné
+  entre 0 et 100 — une faute de frappe y serait irréversible).
 
 ### 🛠️ Utilitaires & Communauté
 
@@ -144,6 +145,25 @@ même chose.
 - **Personnalisation** : `/color` - Changement de la couleur du pseudo.
 - **Threads** : `/join` - Rejoindre rapidement un fil de discussion.
 - **Aide** : `/help` - Liste des commandes disponibles.
+
+### ⚙️ Configuration en trois couches
+
+Les réglages se lisent en empilant trois sources, chacune écrasant la précédente :
+
+1. **`DEFAULTS`** (`modules/config.js`) — le schéma. Une clé qui n'y figure pas n'existe pas, et le
+   type de sa valeur par défaut impose celui qu'on peut écrire. Il sert aussi de repli : un fichier
+   illisible ne fait jamais tomber le bot.
+2. **`config.json`** — le réglage versionné, celui qu'on décide en revue de code.
+3. **`config.local.json`** — ce qu'écrit `/admin config` depuis Discord, **ignoré par git**.
+
+La troisième couche n'est pas un détail d'implémentation. `config.json` est suivi par git, et le
+déploiement enchaîne `git checkout main && git pull` sous `set -e` : une commande qui écrirait
+dedans laisserait le serveur avec un fichier suivi modifié, ferait échouer le déploiement suivant et
+bloquerait `pcr release`, qui refuse de partir d'un arbre sale. La surcharge locale règle le
+problème sans rien perdre : la propriété « clé absente = valeur de la couche du dessous » tient à
+chaque étage, donc supprimer `config.local.json` revient exactement à revenir au réglage versionné.
+
+Tout est relu à chaque accès : une modification prend effet immédiatement, sans redémarrage.
 
 ### 🛡️ Modération & Administration
 
@@ -159,11 +179,11 @@ même chose.
     achats jusqu'à ce qu'il remonte — et signalé comme tel.
   - `/admin points-tous <montant>` : la même chose pour tous les porteurs de `DEFAULT_ROLE_ID`, avec
     le nombre de bénéficiaires et le total distribué.
-  - `/admin config <cle> <valeur>` : modifie `config.json` **à chaud**, sans redémarrage — le fichier
-    est relu à chaque usage. L'autocomplétion propose les chemins avec leur valeur courante et leur
-    type ; le type attendu vient de la valeur par défaut, une clé hors schéma est refusée, et
-    l'écriture est atomique (fichier temporaire relu puis renommé) pour que le bot n'en voie jamais
-    une version tronquée.
+  - `/admin config <cle> <valeur>` : modifie un réglage **à chaud**, sans redémarrage (voir
+    *Configuration en trois couches* ci-dessus). L'autocomplétion propose les chemins avec leur
+    valeur courante et leur type ; le type attendu vient de la valeur par défaut, une clé hors
+    schéma est refusée, les réglages dangereux sont bornés, et l'écriture est atomique (fichier
+    temporaire relu puis renommé) pour que le bot n'en voie jamais une version tronquée.
   - `/admin config-voir [cle]` : valeur courante face à la valeur par défaut. Sans clé, le fichier
     entier.
   - `/admin potcommun [simulation]` : déclenche un pot commun hors calendrier, ou simule le

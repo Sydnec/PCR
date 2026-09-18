@@ -79,6 +79,32 @@ function claimRedistribution(intervalMs, cb) {
   );
 }
 
+// Bail d'exécution. L'échéance protège le minuteur de lui-même, mais pas de
+// /admin potcommun, qui ne la revendique pas : deux pots lancés à la même
+// seconde liraient le même instantané des soldes et prélèveraient deux fois les
+// 5 %. Le bail est pris par tout pot réel, d'où qu'il vienne.
+//
+// Il périme au bout de LEASE_MS pour qu'un arrêt en plein pot ne condamne pas
+// tous les suivants ; un pot met quelques secondes, la marge est large.
+const LEASE_MS = 5 * 60 * 1000;
+
+function takeLease(cb) {
+  const now = Date.now();
+  db.run(
+    `UPDATE economy_state SET redistribution_since = CAST(? AS INTEGER)
+      WHERE id = 1
+        AND (redistribution_since = 0 OR redistribution_since < CAST(? AS INTEGER))`,
+    [now, now - LEASE_MS],
+    function (err) {
+      cb(err, this ? this.changes === 1 : false);
+    }
+  );
+}
+
+function releaseLease(cb = () => {}) {
+  db.run("UPDATE economy_state SET redistribution_since = 0 WHERE id = 1", cb);
+}
+
 // ============================ CALCUL ============================
 
 // Le mouvement complet, sans aucune écriture : c'est aussi ce que montre la
@@ -140,12 +166,14 @@ function readBalances(userIds, cb) {
   );
 }
 
-function journal(plan, percent, triggeredBy) {
+// `failures` fait partie de la trace : sans lui, le journal affirmerait un pot
+// équilibré que le grand livre ne reflète pas.
+function journal(plan, percent, triggeredBy, failures) {
   db.run(
     `INSERT INTO points_redistributions
-       (ran_at, triggered_by, rate, participants, contributors, pot, share)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [Date.now(), triggeredBy, percent, plan.participants, plan.contributors, plan.pot, plan.share],
+       (ran_at, triggered_by, rate, participants, contributors, pot, share, failures)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [Date.now(), triggeredBy, percent, plan.participants, plan.contributors, plan.pot, plan.share, failures],
     (err) => {
       if (err) handleException("Journal du pot commun :", err);
     }
@@ -154,52 +182,79 @@ function journal(plan, percent, triggeredBy) {
 
 // Point d'entrée unique, partagé par le minuteur et par /admin potcommun.
 // `dryRun` calcule tout et n'écrit rien.
-export async function runRedistribution(guild, { triggeredBy = null, dryRun = false } = {}) {
-  const config = getRedistributionConfig();
-  const percent = config.contributionPercent;
+// `resolved` permet au minuteur de passer les membres qu'il a déjà cherchés,
+// pour que la partie qui peut échouer se joue AVANT qu'il ne consomme
+// l'échéance de la semaine.
+export async function runRedistribution(
+  guild,
+  { triggeredBy = null, dryRun = false, resolved = null } = {}
+) {
+  const percent = getRedistributionConfig().contributionPercent;
 
-  const { role, members, error } = await fetchRoleMembers(guild);
-  if (error) return { ok: false, reason: error };
+  const { role, members, reason } = resolved ?? (await fetchRoleMembers(guild));
+  if (reason) return { ok: false, reason };
 
-  const balances = await new Promise((resolve, reject) =>
-    readBalances(
-      members.map((m) => m.id),
-      (err, rows) => (err ? reject(err) : resolve(rows))
-    )
-  );
-
-  const plan = planRedistribution(balances, percent);
-  if (plan.pot <= 0) {
-    return {
-      ok: false,
-      reason: `Personne n'a de quoi cotiser : le pot serait vide.`,
-      plan,
-      role,
-      percent,
-    };
+  // Une simulation ne prend pas le bail : elle ne touche à rien, et le prendre
+  // reviendrait à empêcher le vrai pot de passer.
+  if (!dryRun) {
+    const leased = await new Promise((resolve, reject) =>
+      takeLease((err, ok) => (err ? reject(err) : resolve(ok)))
+    );
+    if (!leased) {
+      return { ok: false, reason: "Un pot commun est déjà en cours. Réessaie dans un instant." };
+    }
   }
 
-  if (dryRun) return { ok: true, dryRun: true, plan, role, percent };
+  try {
+    const balances = await new Promise((resolve, reject) =>
+      readBalances(
+        members.map((m) => m.id),
+        (err, rows) => (err ? reject(err) : resolve(rows))
+      )
+    );
 
-  // Un seul mouvement par membre, le net : personne ne voit son solde plonger
-  // le temps que la redistribution s'achève.
-  const failures = await applyMovements(
-    plan.entries.map((entry) => ({ userId: entry.userId, amount: entry.delta }))
-  );
-  journal(plan, percent, triggeredBy);
-  log(
-    `Pot commun : ${plan.pot} points de ${plan.contributors} cotisant(s), ` +
-      `${plan.share} par tête pour ${plan.participants} membre(s) du rôle ${role.name}` +
-      (failures ? ` — ${failures} échec(s)` : "")
-  );
-  return { ok: true, plan, role, percent, failures };
+    const plan = planRedistribution(balances, percent);
+    if (plan.pot <= 0) {
+      return {
+        ok: false,
+        reason: "Personne n'a de quoi cotiser : le pot serait vide.",
+        plan,
+        role,
+        percent,
+      };
+    }
+
+    if (dryRun) return { ok: true, dryRun: true, plan, role, percent };
+
+    // Un seul mouvement par membre, le net : personne ne voit son solde plonger
+    // le temps que la redistribution s'achève.
+    const failures = await applyMovements(
+      plan.entries.map((entry) => ({ userId: entry.userId, amount: entry.delta }))
+    );
+    journal(plan, percent, triggeredBy, failures);
+    log(
+      `Pot commun : ${plan.pot} points de ${plan.contributors} cotisant(s), ` +
+        `${plan.share} par tête pour ${plan.participants} membre(s) du rôle ${role.name}` +
+        (failures ? ` — ${failures} échec(s)` : "")
+    );
+    return { ok: true, plan, role, percent, failures };
+  } finally {
+    if (!dryRun) {
+      await new Promise((resolve) =>
+        releaseLease((err) => {
+          if (err) handleException("Libération du bail de pot commun :", err);
+          resolve();
+        })
+      );
+    }
+  }
 }
 
 // ============================ RÉCAPITULATIF ============================
 
 // Réservé aux administrateurs : ce récapitulatif ne part jamais dans un salon
 // public, il n'apparaît que dans la réponse éphémère de /admin potcommun.
-export function buildRedistributionEmbed(result, nameOf = (id) => `<@${id}>`) {
+export function buildRedistributionEmbed(result) {
   const { plan, role, percent, dryRun } = result;
   const top = [...plan.entries]
     .filter((e) => e.contribution > 0)
@@ -266,14 +321,28 @@ export async function maybeRunRedistribution(client) {
   // Coup d'œil avant d'aller chercher le serveur : 167 ticks sur 168 n'ont rien
   // à faire, autant ne pas appeler Discord pour rien. Ce n'est qu'une économie —
   // c'est l'UPDATE gardé ci-dessous qui fait office de verrou.
-  const dueAt = await new Promise((resolve) => getNextRedistributionAt((err, at) => resolve(err ? 0 : at)));
+  const dueAt = await new Promise((resolve) =>
+    getNextRedistributionAt((err, at) => resolve(err ? 0 : at))
+  );
   if (!dueAt || dueAt > Date.now()) return null;
 
+  // TOUT ce qui peut échouer se joue avant la revendication, et pas seulement
+  // la résolution du serveur : guild.members.fetch() expire au bout de deux
+  // minutes, tombe sur une reconnexion de la passerelle, ou se heurte à
+  // l'intention GUILD_MEMBERS désactivée. Revendiquer d'abord, c'était brûler
+  // le pot de la semaine sur un hoquet de Discord.
   const guild = await client.guilds.fetch(process.env.GUILD_ID).catch((error) => {
     handleException("Pot commun : serveur introuvable", error);
     return null;
   });
   if (!guild) return null;
+
+  const resolved = await fetchRoleMembers(guild).catch((error) => {
+    handleException("Pot commun : liste des membres indisponible", error);
+    return null;
+  });
+  if (!resolved) return null;
+  if (resolved.reason) return log(`Pot commun reporté : ${resolved.reason}`);
 
   const claimed = await new Promise((resolve) =>
     claimRedistribution(intervalMs, (err, ok) => {
@@ -283,7 +352,7 @@ export async function maybeRunRedistribution(client) {
   );
   if (!claimed) return null;
 
-  const result = await runRedistribution(guild, { triggeredBy: "auto" });
+  const result = await runRedistribution(guild, { triggeredBy: "auto", resolved });
   if (!result.ok) return log(`Pot commun annulé : ${result.reason}`);
   return result;
 }

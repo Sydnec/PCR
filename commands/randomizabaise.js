@@ -13,10 +13,10 @@ export default {
   async execute(interaction) {
     try {
       await interaction.deferReply();
-      const { members: eligibleMembers, error } = await fetchRoleMembers(interaction.guild);
-      if (error) {
-        handleException(error);
-        await interaction.editReply({ content: error });
+      const { members: eligibleMembers, reason } = await fetchRoleMembers(interaction.guild);
+      if (reason) {
+        handleException(reason);
+        await interaction.editReply({ content: `❌ ${reason}` });
         return;
       }
 

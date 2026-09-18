@@ -886,7 +886,7 @@
     {
       "type": "feature",
       "name": "Les commandes d'administration se regroupent sous /admin",
-      "description": "Les commandes réservées aux administrateurs (purge, pokespawn, safarispawn, restart) cessent d'encombrer la liste de tout le monde : elles deviennent des sous-commandes de /admin, que Discord masque aux non-administrateurs. Trois arrivent avec : /admin points et /admin points-tous pour donner (ou retirer) des points à un dresseur ou à tout le serveur, et /admin config pour modifier un réglage du bot depuis Discord, appliqué immédiatement et sans redémarrage.",
+      "description": "Les commandes réservées aux administrateurs (purge, pokespawn, safarispawn, restart) cessent d'encombrer la liste de tout le monde : elles deviennent des sous-commandes de /admin, que Discord masque aux non-administrateurs. Quatre arrivent avec : /admin points et /admin points-tous pour donner (ou retirer) des points à un dresseur ou à tout le serveur, /admin config et /admin config-voir pour régler le bot depuis Discord. Les réglages modifiés à chaud atterrissent dans une surcharge locale ignorée par git, pour que le serveur garde un dépôt propre et que les déploiements continuent de passer.",
       "announce": false,
       "author": "Sydnec",
       "commit": "pending",

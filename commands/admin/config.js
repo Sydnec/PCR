@@ -2,7 +2,6 @@ import { log } from "../../modules/utils.js";
 import { configChoices, formatConfigValue, writeConfigValue } from "../../modules/config.js";
 
 export default {
-  name: "config",
   describe: (sub) =>
     sub
       .setName("config")

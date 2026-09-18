@@ -50,13 +50,26 @@ const db = new sqlite3.Database(dbPath, (err) => {
     db.run(
       `CREATE TABLE IF NOT EXISTS economy_state (
         id INTEGER PRIMARY KEY CHECK (id = 1),
-        next_redistribution_at INTEGER NOT NULL DEFAULT 0
+        next_redistribution_at INTEGER NOT NULL DEFAULT 0,
+        redistribution_since INTEGER NOT NULL DEFAULT 0
       )`,
       (err) => {
         if (err) return handleException("Erreur création table economy_state :", err);
-        db.run("INSERT OR IGNORE INTO economy_state (id) VALUES (1)", (err) => {
-          if (err) handleException("Erreur initialisation economy_state :", err);
-        });
+        // Bail d'exécution : empêche deux pots de tourner en même temps, ce que
+        // l'échéance seule ne garantit pas puisque /admin potcommun la
+        // contourne. Sa péremption évite qu'un arrêt en plein pot ne bloque
+        // tous les suivants.
+        db.run(
+          "ALTER TABLE economy_state ADD COLUMN redistribution_since INTEGER NOT NULL DEFAULT 0",
+          (err) => {
+            if (err && !err.message.includes("duplicate column")) {
+              handleException("Erreur lors de l'ajout de redistribution_since :", err);
+            }
+            db.run("INSERT OR IGNORE INTO economy_state (id) VALUES (1)", (err) => {
+              if (err) handleException("Erreur initialisation economy_state :", err);
+            });
+          }
+        );
       }
     );
 
@@ -71,10 +84,19 @@ const db = new sqlite3.Database(dbPath, (err) => {
         participants INTEGER NOT NULL,
         contributors INTEGER NOT NULL,
         pot INTEGER NOT NULL,
-        share INTEGER NOT NULL
+        share INTEGER NOT NULL,
+        failures INTEGER NOT NULL DEFAULT 0
       )`,
       (err) => {
-        if (err) handleException("Erreur création table points_redistributions :", err);
+        if (err) return handleException("Erreur création table points_redistributions :", err);
+        db.run(
+          "ALTER TABLE points_redistributions ADD COLUMN failures INTEGER NOT NULL DEFAULT 0",
+          (err) => {
+            if (err && !err.message.includes("duplicate column")) {
+              handleException("Erreur lors de l'ajout de failures :", err);
+            }
+          }
+        );
       }
     );
 

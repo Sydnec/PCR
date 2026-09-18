@@ -4,7 +4,6 @@ import { log } from "../../modules/utils.js";
 
 // Distribue le même montant à tous les porteurs du rôle par défaut.
 export default {
-  name: "points-tous",
   describe: (sub) =>
     sub
       .setName("points-tous")
@@ -22,8 +21,8 @@ export default {
       return interaction.editReply({ content: "❌ Un montant de 0 ne changerait rien." });
     }
 
-    const { role, members, error } = await fetchRoleMembers(interaction.guild);
-    if (error) return interaction.editReply({ content: error });
+    const { role, members, reason } = await fetchRoleMembers(interaction.guild);
+    if (reason) return interaction.editReply({ content: `❌ ${reason}` });
 
     const failures = await applyMovements(
       members.map((member) => ({ userId: member.id, amount }))

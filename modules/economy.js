@@ -56,15 +56,32 @@ export function getBalance(userId, cb) {
 // vaut servir 49 membres sur 50 et le signaler que tout abandonner au premier
 // incident. Rend le nombre d'échecs.
 export async function applyMovements(movements) {
+  // Une transaction, et non N écritures indépendantes. Un pot commun est
+  // à somme nulle ; interrompu au deux centième mouvement sur quatre cents, il
+  // crée ou détruit de la monnaie sans laisser trace de l'endroit où il s'est
+  // arrêté. Ici, ou tout est appliqué, ou rien ne l'est.
+  //
+  // Aucun ROLLBACK volontaire : node-sqlite3 sérialise tout sur une connexion
+  // unique, donc les écritures des autres composants émises pendant la fenêtre
+  // entrent dans NOTRE transaction. Les annuler pour un mouvement raté
+  // emporterait leurs points de message avec. On valide donc toujours, et l'on
+  // se contente de compter les échecs ; seul un arrêt brutal déclenche une
+  // annulation, et c'est là précisément qu'on la veut.
+  const exec = (sql) => new Promise((resolve) => db.run(sql, () => resolve()));
+  await exec("BEGIN IMMEDIATE");
   let failures = 0;
-  for (const { userId, amount } of movements) {
-    if (!amount) continue;
-    // eslint-disable-next-line no-await-in-loop
-    const err = await new Promise((resolve) => addPoints(userId, amount, resolve));
-    if (err) {
-      failures++;
-      handleException(`Mouvement de ${amount} points impossible pour ${userId} :`, err);
+  try {
+    for (const { userId, amount } of movements) {
+      if (!amount) continue;
+      // eslint-disable-next-line no-await-in-loop
+      const err = await new Promise((resolve) => addPoints(userId, amount, resolve));
+      if (err) {
+        failures++;
+        handleException(`Mouvement de ${amount} points impossible pour ${userId} :`, err);
+      }
     }
+  } finally {
+    await exec("COMMIT");
   }
   return failures;
 }

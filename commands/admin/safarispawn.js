@@ -6,7 +6,6 @@ import { openPark } from "../../modules/pokemon/safari.js";
 // entrer et les apparitions sont suspendues. Avec `joueur`, le parc lui est
 // réservé et le salon continue sa vie normale.
 export default {
-  name: "safarispawn",
   describe: (sub) =>
     sub
       .setName("safarispawn")

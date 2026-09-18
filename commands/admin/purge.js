@@ -3,7 +3,6 @@ import { log } from "../../modules/utils.js";
 const MAX_MESSAGES = 100;
 
 export default {
-  name: "purge",
   describe: (sub) =>
     sub
       .setName("purge")

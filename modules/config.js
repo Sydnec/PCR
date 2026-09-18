@@ -16,6 +16,19 @@ import { handleException } from "./utils.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const configPath = path.join(__dirname, "../config.json");
+// C'est ICI qu'écrit /admin config, jamais dans config.json.
+//
+// config.json est suivi par git, et le déploiement enchaîne `git checkout main`
+// puis `git pull` sous `set -e` : un fichier suivi modifié sur le serveur fait
+// échouer le déploiement suivant, et `pcr release` refuse de partir d'un arbre
+// sale. Une commande qui écrirait dans config.json casserait donc la chaîne de
+// livraison au premier usage.
+//
+// La surcharge est un troisième étage de la fusion : DEFAULTS, puis config.json
+// (le réglage versionné, décidé en revue), puis ce fichier (l'ajustement fait
+// depuis Discord). La propriété « clé absente = valeur du dessous » tient à
+// chaque étage.
+const overridePath = path.join(__dirname, "../config.local.json");
 
 const POKEMON = {
   enabled: true,
@@ -142,19 +155,22 @@ function merge(defaults, override) {
 // Le fichier tel qu'il est sur le disque, sans fusion. C'est lui qu'on réécrit :
 // sauvegarder la version fusionnée figerait tous les défauts dans le fichier et
 // détruirait la propriété « clé absente = valeur par défaut ».
-function readRaw() {
-  return JSON.parse(fs.readFileSync(configPath, "utf8"));
+// Une couche du fichier, sans fusion. Absente ou cassée, elle vaut {} : la
+// couche du dessous reprend la main plutôt que d'arrêter le bot.
+function readLayer(file, { optional = false } = {}) {
+  try {
+    return JSON.parse(fs.readFileSync(file, "utf8"));
+  } catch (error) {
+    if (!(optional && error.code === "ENOENT")) {
+      handleException(`Lecture de ${path.basename(file)} impossible :`, error);
+    }
+    return {};
+  }
 }
 
 // Relu à chaque appel : tous les nombres du bot sont ajustables sans redémarrer.
-// Un fichier cassé ne doit jamais arrêter le bot, d'où le repli sur DEFAULTS.
 export function getConfig() {
-  try {
-    return merge(DEFAULTS, readRaw());
-  } catch (error) {
-    handleException("Lecture de config.json impossible :", error);
-    return DEFAULTS;
-  }
+  return merge(merge(DEFAULTS, readLayer(configPath)), readLayer(overridePath, { optional: true }));
 }
 
 // ====================== SCHÉMA ======================
@@ -199,14 +215,44 @@ export function readConfigValue(path) {
   const segments = String(path).split(".").filter(Boolean);
   const fallback = descend(DEFAULTS, segments);
   if (fallback === undefined) return { ok: false, reason: `Réglage inconnu : \`${path}\`` };
-  return { ok: true, path: segments.join("."), current: descend(getConfig(), segments), fallback };
+  return {
+    ok: true,
+    path: segments.join("."),
+    type: typeOf(fallback),
+    current: descend(getConfig(), segments),
+    fallback,
+  };
 }
 
 // ====================== ÉCRITURE ======================
 
+// Bornes des réglages dont une faute de frappe ne se rattrape pas. Le type seul
+// ne protège de rien : `contributionPercent: 50` est un nombre parfaitement
+// valide, et couperait en deux la fortune de tout le monde à l'échéance
+// suivante — sans annonce, sans confirmation et sans opération inverse.
+const BOUNDS = {
+  "redistribution.contributionPercent": { min: 0, max: 100 },
+  "redistribution.intervalHours": { min: 1 },
+};
+
+// Par défaut, un réglage dont la valeur par défaut est positive ou nulle refuse
+// le négatif : aucun prix, aucun poids, aucun délai du bot n'a de sens en
+// dessous de zéro, et plusieurs s'y comporteraient de façon absurde.
+function checkBounds(key, value, fallback) {
+  const bounds = BOUNDS[key] ?? {};
+  const min = bounds.min ?? (fallback >= 0 ? 0 : undefined);
+  if (min !== undefined && value < min) {
+    return `\`${value}\` est en dessous du minimum autorisé (${min}).`;
+  }
+  if (bounds.max !== undefined && value > bounds.max) {
+    return `\`${value}\` dépasse le maximum autorisé (${bounds.max}).`;
+  }
+  return null;
+}
+
 // Convertit la saisie brute au type qu'impose la valeur par défaut, ou explique
 // le refus. C'est ici, et nulle part ailleurs, que se décide ce qui est écrivable.
-function coerce(raw, fallback) {
+function coerce(raw, fallback, key) {
   const type = typeOf(fallback);
   if (type === "objet") {
     return { ok: false, reason: "Ce réglage est une branche, pas une valeur : précise une clé dedans." };
@@ -214,6 +260,8 @@ function coerce(raw, fallback) {
   if (type === "nombre") {
     const value = Number(String(raw).replace(",", "."));
     if (!Number.isFinite(value)) return { ok: false, reason: `\`${raw}\` n'est pas un nombre.` };
+    const outOfBounds = checkBounds(key, value, fallback);
+    if (outOfBounds) return { ok: false, reason: outOfBounds };
     return { ok: true, value };
   }
   if (type === "booléen") {
@@ -233,11 +281,11 @@ function coerce(raw, fallback) {
 // Écriture atomique : le bot relit ce fichier en permanence, il ne doit jamais
 // en voir une version tronquée. On écrit à côté, on relit pour prouver que c'est
 // du JSON valide, puis on renomme — atomique sur le même système de fichiers.
-function saveRaw(next) {
-  const temp = `${configPath}.tmp`;
+function saveOverride(next) {
+  const temp = `${overridePath}.tmp`;
   fs.writeFileSync(temp, `${JSON.stringify(next, null, "\t")}\n`, "utf8");
   JSON.parse(fs.readFileSync(temp, "utf8"));
-  fs.renameSync(temp, configPath);
+  fs.renameSync(temp, overridePath);
 }
 
 export function writeConfigValue(path, raw) {
@@ -251,48 +299,71 @@ export function writeConfigValue(path, raw) {
   // refusés sans que le fichier soit touché.
   const fallback = descend(DEFAULTS, segments);
   if (fallback === undefined) return { ok: false, reason: `Réglage inconnu : \`${path}\`` };
-  const coerced = coerce(raw, fallback);
+  const key = segments.join(".");
+  const coerced = coerce(raw, fallback, key);
   if (!coerced.ok) return coerced;
 
   const before = descend(getConfig(), segments);
   try {
-    const next = readRaw();
+    // On repart de la surcharge SEULE, pas de la config fusionnée : réécrire la
+    // fusion figerait tous les défauts dans le fichier et détruirait la
+    // propriété « clé absente = valeur du dessous ».
+    const next = readLayer(overridePath, { optional: true });
     let node = next;
     for (const segment of segments.slice(0, -1)) {
       if (!isPlainObject(node[segment])) node[segment] = {};
       node = node[segment];
     }
     node[segments.at(-1)] = coerced.value;
-    saveRaw(next);
+    saveOverride(next);
   } catch (error) {
-    handleException("Écriture de config.json impossible :", error);
-    return { ok: false, reason: "Impossible d'écrire config.json." };
+    handleException("Écriture de config.local.json impossible :", error);
+    return { ok: false, reason: "Impossible d'écrire la surcharge de configuration." };
   }
 
-  return { ok: true, path: segments.join("."), before, after: coerced.value };
+  return { ok: true, path: key, before, after: coerced.value };
 }
 
-// Rendu d'une valeur pour Discord. Vit ici et non dans les commandes : les deux
-// sous-commandes de configuration en avaient chacune une copie identique, et
-// c'est bien le module qui sait ce qu'est une valeur de réglage.
-export function formatConfigValue(value) {
+// ====================== RENDU ======================
+//
+// Deux formats, une seule définition. Les commandes en avaient chacune leur
+// version, et les trois divergeaient déjà sur le séparateur de liste.
+
+// Forme courte, sur une ligne, sans décoration : pour une liste ou un libellé
+// d'autocomplétion.
+export function previewConfigValue(value) {
   if (Array.isArray(value)) return value.join(", ");
-  if (typeof value === "object" && value !== null) {
-    return `\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\``;
-  }
+  if (isPlainObject(value)) return `{ ${Object.keys(value).length} réglage(s) }`;
+  return String(value);
+}
+
+// Forme détaillée, pour l'affichage d'une valeur seule.
+export function formatConfigValue(value) {
+  if (isPlainObject(value)) return `\`\`\`json\n${JSON.stringify(value, null, 2)}\n\`\`\``;
+  if (Array.isArray(value)) return previewConfigValue(value);
   return `\`${value}\``;
+}
+
+// Les chemins avec leur valeur courante, la config n'étant lue QU'UNE FOIS.
+// readConfigValue relit et refusionne le fichier à chaque appel : l'enchaîner
+// sur les septante-deux feuilles, c'est autant de lectures synchrones qui
+// bloquent la boucle d'événements — et le bot n'en a qu'une.
+export function listConfigEntries(query = "") {
+  const config = getConfig();
+  return listConfigPaths(query).map((entry) => ({
+    ...entry,
+    current: descend(config, entry.path.split(".")),
+  }));
 }
 
 // Les 25 propositions d'autocomplétion, prêtes pour interaction.respond().
 // Chacune montre sa valeur courante : on choisit un réglage en voyant ce qu'on
 // s'apprête à remplacer. Discord plafonne un libellé à 100 caractères.
 export function configChoices(query) {
-  return listConfigPaths(query)
+  return listConfigEntries(query)
     .slice(0, 25)
-    .map(({ path, type }) => {
-      const { current } = readConfigValue(path);
-      const preview = Array.isArray(current) ? current.join(",") : String(current);
-      const name = `${path} — ${preview} (${type})`;
+    .map(({ path, type, current }) => {
+      const name = `${path} — ${previewConfigValue(current)} (${type})`;
       return { name: name.length > 100 ? `${name.slice(0, 97)}...` : name, value: path };
     });
 }

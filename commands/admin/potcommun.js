@@ -12,7 +12,6 @@ import {
 // Le récapitulatif reste éphémère, comme tout /admin : le prélèvement est
 // invisible pour les joueurs, l'afficher publiquement le trahirait.
 export default {
-  name: "potcommun",
   describe: (sub) =>
     sub
       .setName("potcommun")
