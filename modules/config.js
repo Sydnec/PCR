@@ -155,15 +155,24 @@ function merge(defaults, override) {
 // Le fichier tel qu'il est sur le disque, sans fusion. C'est lui qu'on réécrit :
 // sauvegarder la version fusionnée figerait tous les défauts dans le fichier et
 // détruirait la propriété « clé absente = valeur par défaut ».
-// Une couche du fichier, sans fusion. Absente ou cassée, elle vaut {} : la
-// couche du dessous reprend la main plutôt que d'arrêter le bot.
+// Une couche du fichier, sans fusion. C'est la lecture STRICTE : elle lève.
+// L'écriture en dépend — repartir d'un {} sur un fichier illisible effacerait
+// en silence toutes les surcharges déjà posées.
+function readLayerStrict(file) {
+  return JSON.parse(fs.readFileSync(file, "utf8"));
+}
+
+// La même, tolérante : une couche absente ou cassée vaut {}, et celle du
+// dessous reprend la main plutôt que d'arrêter le bot. Réservée à la lecture.
 function readLayer(file, { optional = false } = {}) {
+  // La surcharge n'existe pas tant que personne n'a rien réglé, ce qui est le
+  // cas courant : on l'écarte par un stat plutôt que par une exception, dont la
+  // pile coûterait cher sur un chemin parcouru à chaque message.
+  if (optional && !fs.existsSync(file)) return {};
   try {
-    return JSON.parse(fs.readFileSync(file, "utf8"));
+    return readLayerStrict(file);
   } catch (error) {
-    if (!(optional && error.code === "ENOENT")) {
-      handleException(`Lecture de ${path.basename(file)} impossible :`, error);
-    }
+    handleException(`Lecture de ${path.basename(file)} impossible :`, error);
     return {};
   }
 }
@@ -235,12 +244,17 @@ const BOUNDS = {
   "redistribution.intervalHours": { min: 1 },
 };
 
-// Par défaut, un réglage dont la valeur par défaut est positive ou nulle refuse
-// le négatif : aucun prix, aucun poids, aucun délai du bot n'a de sens en
-// dessous de zéro, et plusieurs s'y comporteraient de façon absurde.
+// Plancher déduit du défaut, faute de mieux : un réglage dont la valeur par
+// défaut vaut au moins 1 refuse le zéro, et tous les autres refusent le négatif.
+//
+// Le zéro compte autant que le négatif, parce que le code divise par plusieurs
+// de ces nombres : `pageSize` à 0 donne un Pokédex de pages en nombre infini,
+// `shinyOdds` à 0 rend chaque apparition shiny. Les réglages qui valent
+// légitimement zéro par défaut — minDelayAfterEndMinutes, les probabilités —
+// gardent évidemment le droit d'y rester.
 function checkBounds(key, value, fallback) {
   const bounds = BOUNDS[key] ?? {};
-  const min = bounds.min ?? (fallback >= 0 ? 0 : undefined);
+  const min = bounds.min ?? (fallback >= 1 ? 1 : fallback >= 0 ? 0 : undefined);
   if (min !== undefined && value < min) {
     return `\`${value}\` est en dessous du minimum autorisé (${min}).`;
   }
@@ -308,7 +322,11 @@ export function writeConfigValue(path, raw) {
     // On repart de la surcharge SEULE, pas de la config fusionnée : réécrire la
     // fusion figerait tous les défauts dans le fichier et détruirait la
     // propriété « clé absente = valeur du dessous ».
-    const next = readLayer(overridePath, { optional: true });
+    //
+    // Et en lecture STRICTE : une surcharge illisible doit faire échouer la
+    // commande, pas repartir d'une page blanche qui effacerait sans un mot tous
+    // les réglages déjà posés.
+    const next = fs.existsSync(overridePath) ? readLayerStrict(overridePath) : {};
     let node = next;
     for (const segment of segments.slice(0, -1)) {
       if (!isPlainObject(node[segment])) node[segment] = {};
@@ -318,7 +336,11 @@ export function writeConfigValue(path, raw) {
     saveOverride(next);
   } catch (error) {
     handleException("Écriture de config.local.json impossible :", error);
-    return { ok: false, reason: "Impossible d'écrire la surcharge de configuration." };
+    return {
+      ok: false,
+      reason:
+        "Impossible d'écrire la surcharge de configuration — `config.local.json` est peut-être illisible.",
+    };
   }
 
   return { ok: true, path: key, before, after: coerced.value };

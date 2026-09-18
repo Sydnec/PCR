@@ -5,7 +5,7 @@ export default {
   describe: (sub) =>
     sub
       .setName("config")
-      .setDescription("Modifie un réglage de config.json, appliqué immédiatement")
+      .setDescription("Modifie un réglage du bot, appliqué immédiatement")
       .addStringOption((option) =>
         option
           .setName("cle")

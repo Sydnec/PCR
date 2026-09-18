@@ -88,6 +88,8 @@ function claimRedistribution(intervalMs, cb) {
 // tous les suivants ; un pot met quelques secondes, la marge est large.
 const LEASE_MS = 5 * 60 * 1000;
 
+// Rend l'estampille posée, qui sert de jeton : c'est elle, et pas un simple
+// booléen, qui permet de ne rendre QUE son propre bail.
 function takeLease(cb) {
   const now = Date.now();
   db.run(
@@ -96,13 +98,38 @@ function takeLease(cb) {
         AND (redistribution_since = 0 OR redistribution_since < CAST(? AS INTEGER))`,
     [now, now - LEASE_MS],
     function (err) {
+      cb(err, this && this.changes === 1 ? now : null);
+    }
+  );
+}
+
+// Libération gardée sur le jeton. Sans la garde, un pot qui déborde de
+// LEASE_MS — boucle d'événements bloquée, disque lent — rendrait en sortant le
+// bail qu'un autre pot a légitimement repris entre-temps, et le suivant
+// prélèverait une deuxième fois sur le même instantané.
+// Rend l'échéance telle qu'elle était, si et seulement si personne ne l'a
+// touchée depuis. Toute la valeur du pot hebdomadaire tient à ce qu'un
+// empêchement ne le fasse pas sauter d'une semaine : la revendication précède
+// forcément des opérations qui peuvent échouer — le bail, la lecture des
+// soldes — et la compensation est la seule façon de couvrir toutes celles qui
+// restent, y compris celles qu'on n'a pas vues venir.
+export function rollbackClaim(previous, claimed, cb = () => {}) {
+  db.run(
+    `UPDATE economy_state SET next_redistribution_at = CAST(? AS INTEGER)
+      WHERE id = 1 AND next_redistribution_at = CAST(? AS INTEGER)`,
+    [previous, claimed],
+    function (err) {
       cb(err, this ? this.changes === 1 : false);
     }
   );
 }
 
-function releaseLease(cb = () => {}) {
-  db.run("UPDATE economy_state SET redistribution_since = 0 WHERE id = 1", cb);
+function releaseLease(token, cb = () => {}) {
+  db.run(
+    "UPDATE economy_state SET redistribution_since = 0 WHERE id = 1 AND redistribution_since = CAST(? AS INTEGER)",
+    [token],
+    cb
+  );
 }
 
 // ============================ CALCUL ============================
@@ -196,11 +223,12 @@ export async function runRedistribution(
 
   // Une simulation ne prend pas le bail : elle ne touche à rien, et le prendre
   // reviendrait à empêcher le vrai pot de passer.
+  let token = null;
   if (!dryRun) {
-    const leased = await new Promise((resolve, reject) =>
-      takeLease((err, ok) => (err ? reject(err) : resolve(ok)))
+    token = await new Promise((resolve, reject) =>
+      takeLease((err, value) => (err ? reject(err) : resolve(value)))
     );
-    if (!leased) {
+    if (!token) {
       return { ok: false, reason: "Un pot commun est déjà en cours. Réessaie dans un instant." };
     }
   }
@@ -239,9 +267,9 @@ export async function runRedistribution(
     );
     return { ok: true, plan, role, percent, failures };
   } finally {
-    if (!dryRun) {
+    if (token) {
       await new Promise((resolve) =>
-        releaseLease((err) => {
+        releaseLease(token, (err) => {
           if (err) handleException("Libération du bail de pot commun :", err);
           resolve();
         })
@@ -351,8 +379,29 @@ export async function maybeRunRedistribution(client) {
     })
   );
   if (!claimed) return null;
+  const claimedAt = await new Promise((resolve) =>
+    getNextRedistributionAt((err, at) => resolve(err ? 0 : at))
+  );
 
-  const result = await runRedistribution(guild, { triggeredBy: "auto", resolved });
-  if (!result.ok) return log(`Pot commun annulé : ${result.reason}`);
+  const result = await runRedistribution(guild, { triggeredBy: "auto", resolved }).catch(
+    (error) => {
+      handleException("Pot commun :", error);
+      return { ok: false, reason: error.message };
+    }
+  );
+
+  if (!result.ok) {
+    await new Promise((resolve) =>
+      rollbackClaim(dueAt, claimedAt, (err, restored) => {
+        if (err) handleException("Restitution de l'échéance :", err);
+        log(
+          `Pot commun annulé : ${result.reason}` +
+            (restored ? " — l'échéance est rendue, le tour suivant réessaiera." : "")
+        );
+        resolve();
+      })
+    );
+    return null;
+  }
   return result;
 }

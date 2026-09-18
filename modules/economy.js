@@ -55,9 +55,28 @@ export function getBalance(userId, cb) {
 // Un échec n'interrompt pas les suivants : sur une distribution de masse, mieux
 // vaut servir 49 membres sur 50 et le signaler que tout abandonner au premier
 // incident. Rend le nombre d'échecs.
-export async function applyMovements(movements) {
-  // Une transaction, et non N écritures indépendantes. Un pot commun est
-  // à somme nulle ; interrompu au deux centième mouvement sur quatre cents, il
+// Un seul mouvement de masse à la fois. Le verrou n'est pas du zèle : sans lui,
+// deux appels concurrents s'emmêlent dans la transaction ci-dessous. SQLite
+// refuse un BEGIN dans un BEGIN, et le COMMIT du plus court referme celle du
+// plus long en plein milieu — on se retrouverait moins bien protégé qu'en
+// n'ayant aucune transaction du tout. La file est en mémoire, et c'est
+// suffisant : le bot est un processus unique, seul écrivain de cette base.
+let queue = Promise.resolve();
+
+export function applyMovements(movements) {
+  const turn = queue.then(() => applyMovementsNow(movements));
+  // La file ne doit pas se rompre sur un échec : on l'enchaîne sur une branche
+  // neutralisée, l'erreur partant à l'appelant par `turn`.
+  queue = turn.then(
+    () => {},
+    () => {}
+  );
+  return turn;
+}
+
+async function applyMovementsNow(movements) {
+  // Une transaction, et non N écritures indépendantes. Un pot commun est à
+  // somme nulle ; interrompu au deux centième mouvement sur quatre cents, il
   // crée ou détruit de la monnaie sans laisser trace de l'endroit où il s'est
   // arrêté. Ici, ou tout est appliqué, ou rien ne l'est.
   //
@@ -67,8 +86,16 @@ export async function applyMovements(movements) {
   // emporterait leurs points de message avec. On valide donc toujours, et l'on
   // se contente de compter les échecs ; seul un arrêt brutal déclenche une
   // annulation, et c'est là précisément qu'on la veut.
-  const exec = (sql) => new Promise((resolve) => db.run(sql, () => resolve()));
-  await exec("BEGIN IMMEDIATE");
+  const exec = (sql) =>
+    new Promise((resolve) => db.run(sql, (err) => resolve(err ?? null)));
+
+  const beginError = await exec("BEGIN IMMEDIATE");
+  if (beginError) {
+    // On continue quand même — les mouvements valent mieux que rien — mais sans
+    // prétendre à l'atomicité, et en le disant.
+    handleException("Pot commun : transaction refusée, mouvements appliqués un à un :", beginError);
+  }
+
   let failures = 0;
   try {
     for (const { userId, amount } of movements) {
@@ -81,7 +108,10 @@ export async function applyMovements(movements) {
       }
     }
   } finally {
-    await exec("COMMIT");
+    if (!beginError) {
+      const commitError = await exec("COMMIT");
+      if (commitError) handleException("Validation des mouvements impossible :", commitError);
+    }
   }
   return failures;
 }
