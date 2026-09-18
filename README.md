@@ -55,10 +55,10 @@ que la capture réussisse ou non.
     embranchement (Évoli) peuvent évoluer au hasard, ou vers une cible choisie pour plus cher.
   - `/echange <membre> <je_donne> <je_recois>` : échange entre dresseurs.
   - `/safari` : paie l'entrée du parc safari (voir ci-dessous). Réponse privée.
-  - `/pokespawn` *(Admin)* : déclenche une apparition pour organiser un événement. Donne accès aux
+  - `/admin pokespawn` *(Admin)* : déclenche une apparition pour organiser un événement. Donne accès aux
     espèces hors pool naturel (légendaires et évolutions par échange), avec forçage du shiny, texte
     d'annonce et mention de rôle.
-  - `/safarispawn` *(Admin)* : ouvre un parc safari à la demande, pour un événement ou pour offrir
+  - `/admin safarispawn` *(Admin)* : ouvre un parc safari à la demande, pour un événement ou pour offrir
     une visite à un dresseur en particulier.
 
 ### 🏕️ Parc Safari
@@ -110,6 +110,31 @@ qu'à lire ces tables, sans aucun filtre de date. La ligne `__global__` porte le
 comme pour `message_stats`. Points brûlés, captures attendues contre captures réelles (donc la chance
 de chacun), records personnels, shinies et légendaires capturés : tout y est.
 
+### 💰 Économie & Pot commun
+
+Les points se gagnent au fil des messages (`messagePointsDistribution` : les premiers de la journée
+rapportent plus) et se dépensent dans les paris, les Pokémon et le parc safari.
+
+**Le pot commun** corrige ce que cette économie a de cumulatif. Une fois par semaine, chacun cotise
+un pourcentage de sa fortune et la cagnotte repart en **parts égales** entre tous les porteurs de
+`DEFAULT_ROLE_ID` — un impôt sur le capital : les gros soldes financent, tout le monde reçoit la
+même chose.
+
+- **Obligatoire, automatique et silencieux.** Aucune annonce, aucune notification, aucune commande
+  pour s'y soustraire. Les soldes évoluent, c'est tout. Seuls les administrateurs en voient le
+  détail, en éphémère.
+- **La masse monétaire est conservée au point près.** Chaque membre reçoit un unique mouvement net
+  (part reçue moins cotisation) : aucun solde ne plonge le temps du calcul, et le reste de la
+  division entière est distribué au hasard plutôt que brûlé.
+- **Les soldes négatifs ou nuls ne cotisent pas** mais touchent leur part : le pot est aussi une
+  bouée.
+- **L'échéance vit en base**, pas dans un cron. Le tick horaire ne fait rien tant qu'elle n'est pas
+  atteinte, la revendique par un `UPDATE` gardé (deux ticks simultanés ne peuvent pas déclencher
+  deux pots), et calcule la suivante **à partir de l'ancienne** : aucune dérive, et une panne de
+  trois semaines donne un seul pot de rattrapage, pas trois.
+- **Réglages** (`config.json`, modifiables à chaud via `/admin config`) : `redistribution.enabled`,
+  `redistribution.intervalHours` (168 par défaut), `redistribution.contributionPercent` (5).
+
 ### 🛠️ Utilitaires & Communauté
 
 - **Rappels** :
@@ -122,12 +147,31 @@ de chacun), records personnels, shinies et légendaires capturés : tout y est.
 
 ### 🛡️ Modération & Administration
 
-- **Nettoyage** :
-  - `/purge` : Suppression de messages en masse. (Admin uniquement).
-  - `/autodel` : Configuration de la suppression automatique des messages dans un salon.
-- **Gestion** :
-  - `/edit` : Permet au bot d'éditer un de ses propres messages.
-  - `/restart` : Redémarre le bot (Admin uniquement).
+- `/autodel` : configuration de la suppression automatique des messages dans un salon.
+- `/edit` : permet au bot d'éditer un de ses propres messages. Ouverte à l'auteur du sondage comme
+  aux administrateurs, elle reste donc hors de `/admin`.
+- **`/admin`** : toutes les commandes d'administration sont regroupées sous une commande unique, que
+  Discord masque aux non-administrateurs (`setDefaultMemberPermissions`). Le masquage n'est que du
+  confort — un serveur peut rouvrir la permission — et la vérification faite à l'exécution, écrite
+  une seule fois dans le routeur, fait foi. Toutes les réponses sont privées.
+  - `/admin points <membre> <montant>` : crédite un dresseur, ou le débite avec un montant négatif.
+    La réponse rappelle l'ancien et le nouveau solde. Un solde négatif est autorisé — il bloque les
+    achats jusqu'à ce qu'il remonte — et signalé comme tel.
+  - `/admin points-tous <montant>` : la même chose pour tous les porteurs de `DEFAULT_ROLE_ID`, avec
+    le nombre de bénéficiaires et le total distribué.
+  - `/admin config <cle> <valeur>` : modifie `config.json` **à chaud**, sans redémarrage — le fichier
+    est relu à chaque usage. L'autocomplétion propose les chemins avec leur valeur courante et leur
+    type ; le type attendu vient de la valeur par défaut, une clé hors schéma est refusée, et
+    l'écriture est atomique (fichier temporaire relu puis renommé) pour que le bot n'en voie jamais
+    une version tronquée.
+  - `/admin config-voir [cle]` : valeur courante face à la valeur par défaut. Sans clé, le fichier
+    entier.
+  - `/admin potcommun [simulation]` : déclenche un pot commun hors calendrier, ou simule le
+    prochain sans toucher aux soldes. L'échéance hebdomadaire n'en est pas décalée.
+  - `/admin purge [lien] [nombre]` : suppression de messages en masse.
+  - `/admin pokespawn [espece] [shiny] [annonce] [ping]` : déclenche une apparition (voir plus haut).
+  - `/admin safarispawn [joueur] [pause]` : ouvre un parc safari (voir plus haut).
+  - `/admin restart` : redémarre le bot.
 
 ## 🚀 Installation & Gestion
 

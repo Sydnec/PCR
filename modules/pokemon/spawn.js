@@ -127,7 +127,7 @@ export function registerMessageForSpawn(client) {
   }
 }
 
-// Revendique le créneau sans condition de seuil : utilisé par /pokespawn.
+// Revendique le créneau sans condition de seuil : utilisé par /admin pokespawn.
 // Remet aussi le compteur et l'horloge à zéro, sinon un spawn automatique
 // pourrait tomber juste après un événement et faire fuir le Pokémon annoncé.
 // La pause d'un parc safari est délibérément ignorée : un administrateur doit

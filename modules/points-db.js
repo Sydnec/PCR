@@ -37,6 +37,47 @@ const db = new sqlite3.Database(dbPath, (err) => {
       }
     );
 
+    // ================== POT COMMUN ==================
+
+    // État de l'économie : une seule ligne, qui porte l'échéance du prochain
+    // pot commun. C'est elle qui sert de verrou — l'UPDATE gardé de
+    // claimRedistribution ne peut réussir qu'une fois par échéance, même si
+    // deux ticks se chevauchent.
+    //
+    // 0 signifie « jamais planifié » : le premier tick pose l'échéance sans
+    // rien redistribuer, sinon une installation neuve prélèverait tout le monde
+    // dès sa première heure.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS economy_state (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        next_redistribution_at INTEGER NOT NULL DEFAULT 0
+      )`,
+      (err) => {
+        if (err) return handleException("Erreur création table economy_state :", err);
+        db.run("INSERT OR IGNORE INTO economy_state (id) VALUES (1)", (err) => {
+          if (err) handleException("Erreur initialisation economy_state :", err);
+        });
+      }
+    );
+
+    // Journal des pots communs : piste d'audit d'un mouvement qui touche tous
+    // les soldes d'un coup, et source du « depuis le dernier pot ».
+    db.run(
+      `CREATE TABLE IF NOT EXISTS points_redistributions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ran_at INTEGER NOT NULL,
+        triggered_by TEXT,
+        rate REAL NOT NULL,
+        participants INTEGER NOT NULL,
+        contributors INTEGER NOT NULL,
+        pot INTEGER NOT NULL,
+        share INTEGER NOT NULL
+      )`,
+      (err) => {
+        if (err) handleException("Erreur création table points_redistributions :", err);
+      }
+    );
+
     // Table des paris
     db.run(
       `CREATE TABLE IF NOT EXISTS bets (

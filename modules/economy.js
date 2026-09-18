@@ -9,6 +9,7 @@
 // synchrone du callback, jusqu'au premier await. Ne comptez pas dessus pour
 // protéger de l'argent — utilisez ces helpers et enchaînez les callbacks.
 import db from "./points-db.js";
+import { handleException } from "./utils.js";
 
 // Débite cost points si le solde le permet.
 // Rappelle cb(err, true) si le débit a eu lieu, cb(err, false) sinon.
@@ -45,4 +46,25 @@ export function getBalance(userId, cb) {
     if (err) return cb(err, 0);
     cb(null, row ? row.balance : 0);
   });
+}
+
+// Applique une série de mouvements { userId, amount } — un don collectif, un
+// pot commun — séquentiellement : chaque addPoints est une écriture SQLite, les
+// lancer en parallèle ne ferait que les mettre en file d'attente.
+//
+// Un échec n'interrompt pas les suivants : sur une distribution de masse, mieux
+// vaut servir 49 membres sur 50 et le signaler que tout abandonner au premier
+// incident. Rend le nombre d'échecs.
+export async function applyMovements(movements) {
+  let failures = 0;
+  for (const { userId, amount } of movements) {
+    if (!amount) continue;
+    // eslint-disable-next-line no-await-in-loop
+    const err = await new Promise((resolve) => addPoints(userId, amount, resolve));
+    if (err) {
+      failures++;
+      handleException(`Mouvement de ${amount} points impossible pour ${userId} :`, err);
+    }
+  }
+  return failures;
 }

@@ -113,6 +113,12 @@ try {
     bot.handleSafariParkOnTimer();
   });
 
+  // Pot commun. Le tick est horaire, l'échéance réelle vit en base : la
+  // périodicité se règle depuis config.json sans redémarrage.
+  cron.schedule("0 * * * *", () => {
+    bot.handleRedistributionOnTimer();
+  });
+
   bot.on("error", (e) => {
     handleException(e);
   });

@@ -882,5 +882,26 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "feature",
+      "name": "Les commandes d'administration se regroupent sous /admin",
+      "description": "Les commandes réservées aux administrateurs (purge, pokespawn, safarispawn, restart) cessent d'encombrer la liste de tout le monde : elles deviennent des sous-commandes de /admin, que Discord masque aux non-administrateurs. Trois arrivent avec : /admin points et /admin points-tous pour donner (ou retirer) des points à un dresseur ou à tout le serveur, et /admin config pour modifier un réglage du bot depuis Discord, appliqué immédiatement et sans redémarrage.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-18T20:34:14.680Z",
+      "branch": "claude/practical-ptolemy-qb5aha"
+    },
+    {
+      "type": "feature",
+      "name": "Pot commun hebdomadaire",
+      "description": "Une fois par semaine, chacun cotise 5 % de sa fortune et la cagnotte repart en parts égales entre tous les membres du rôle par défaut. Le prélèvement est obligatoire, automatique et silencieux : rien n'est annoncé. La masse monétaire est conservée au point près, les soldes négatifs ne cotisent pas mais touchent leur part, et l'échéance vit en base — pas de dérive, et une panne ne déclenche qu'un seul pot de rattrapage. Périodicité et taux se règlent à chaud via /admin config, et /admin potcommun permet d'en déclencher ou d'en simuler un.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-18T21:09:17.140Z",
+      "branch": "claude/practical-ptolemy-qb5aha"
+    }
+  ]
 }

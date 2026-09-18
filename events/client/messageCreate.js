@@ -5,16 +5,10 @@ import { registerMessageForSpawn } from "../../modules/pokemon/spawn.js";
 import { emojiRegex } from "../../modules/regex.js";
 import { twitterRegex } from "../../modules/regex.js";
 import { instagramRegex } from "../../modules/regex.js";
+import { getConfig } from "../../modules/config.js";
 import dotenv from "dotenv";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from 'url';
 
 dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const configPath = path.join(__dirname, "../../config.json");
 
 const name = "messageCreate";
 const once = false;
@@ -76,9 +70,10 @@ async function execute(message) {
         const rank = countToday + 1; // Le rang de CE message
 
         try {
-            const configFile = fs.readFileSync(configPath, 'utf8');
-            const config = JSON.parse(configFile);
-            const distribution = config.messagePointsDistribution;
+            // getConfig applique les valeurs par défaut et survit à un
+            // config.json momentanément invalide — ce que la lecture brute
+            // d'avant ne faisait pas, alors que /admin config y écrit.
+            const distribution = getConfig().messagePointsDistribution;
             
             if (distribution[rank]) {
                 pointsToAdd = distribution[rank];
