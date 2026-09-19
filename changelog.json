@@ -1,7 +1,24 @@
 {
-  "version": "1.12.0",
-  "lastUpdated": "2026-09-19T04:26:24.849Z",
+  "version": "1.12.1",
+  "lastUpdated": "2026-09-19T15:57:44.389Z",
   "releases": [
+    {
+      "version": "1.12.1",
+      "date": "2026-09-19",
+      "title": "Release 1.12.1",
+      "features": [
+        {
+          "type": "feature",
+          "name": "Partager son bilan de safari",
+          "description": "Le bilan de fin de visite du parc safari était privé, donc invisible de tout le monde. Un bouton « Partager mon bilan » le publie désormais dans le salon, signé de ton pseudo et de ton avatar. Une fois par visite, et seulement si tu peux écrire dans ce salon.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-19T13:02:07.676Z",
+          "branch": "claude/practical-ptolemy-qb5aha"
+        }
+      ]
+    },
     {
       "version": "1.12.0",
       "date": "2026-09-19",
@@ -909,16 +926,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "feature",
-      "name": "Partager son bilan de safari",
-      "description": "Le bilan de fin de visite du parc safari était privé, donc invisible de tout le monde. Un bouton « Partager mon bilan » le publie désormais dans le salon, signé de ton pseudo et de ton avatar. Une fois par visite, et seulement si tu peux écrire dans ce salon.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-19T13:02:07.676Z",
-      "branch": "claude/practical-ptolemy-qb5aha"
-    }
-  ]
+  "pending": []
 }
