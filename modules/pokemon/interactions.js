@@ -8,13 +8,21 @@ import {
   ButtonBuilder,
   ButtonStyle,
   MessageFlags,
+  PermissionFlagsBits,
 } from "discord.js";
 import { getBalance } from "../economy.js";
 import { handleException, log } from "../utils.js";
-import { getPokemonConfig } from "./config.js";
+import { getPokemonConfig, getSafariConfig } from "./config.js";
 import { answerThrow, throwBall, trackPanel } from "./capture.js";
 import { getSpawn } from "./spawn.js";
-import { enterPark, playAction, refreshParkMessage } from "./safari.js";
+import {
+  claimShare,
+  enterPark,
+  playAction,
+  prepareShare,
+  refreshParkMessage,
+  releaseShare,
+} from "./safari.js";
 import { getSpecies } from "./data.js";
 import {
   acceptTrade,
@@ -29,6 +37,7 @@ import {
   buildBallRow,
   buildDexEmbed,
   buildDexRow,
+  buildSafariRecapEmbed,
   buildSafariView,
   buildTradeEmbed,
   buildTradeRow,
@@ -312,6 +321,77 @@ function handleSafariEnter(interaction, parkId) {
   });
 }
 
+// Partage du bilan dans le salon courant.
+//
+// L'ordre est dicté par ce qui peut échouer : on vérifie les autorisations
+// AVANT de revendiquer, sinon un salon en lecture seule consommerait le droit
+// de partager ; et on rend ce droit si l'envoi échoue quand même.
+//
+// La vérification porte sur DEUX permissions, pas une. Que le bot puisse écrire
+// ne suffit pas : le parc s'annonce parfois dans un salon où les membres ne
+// postent pas, et le bouton deviendrait un moyen d'y faire parler le bot.
+function handleSafariShare(interaction, sessionId) {
+  const channel = interaction.channel;
+  if (!channel) return ephemeral(interaction, "❌ Salon introuvable.");
+
+  prepareShare(interaction.user.id, Number(sessionId), async (err, result) => {
+    if (err) {
+      handleException(err);
+      return ephemeral(interaction, "❌ Erreur base de données.");
+    }
+    if (!result.ok) return ephemeral(interaction, `❌ ${result.reason}`);
+
+    const besoin = channel.isThread()
+      ? PermissionFlagsBits.SendMessagesInThreads
+      : PermissionFlagsBits.SendMessages;
+    const dresseur = channel.permissionsFor(interaction.member);
+    if (!dresseur?.has(PermissionFlagsBits.ViewChannel) || !dresseur.has(besoin)) {
+      return ephemeral(interaction, `❌ Tu ne peux pas écrire dans ${channel}.`);
+    }
+    const moi = channel.permissionsFor(interaction.guild.members.me);
+    if (!moi?.has(PermissionFlagsBits.ViewChannel) || !moi.has(besoin)) {
+      return ephemeral(interaction, `❌ Je n'ai pas accès à ${channel}.`);
+    }
+
+    const claimed = await new Promise((resolve) =>
+      claimShare(result.session.id, (err, ok) => {
+        if (err) handleException("Revendication du partage :", err);
+        resolve(ok);
+      })
+    );
+    if (!claimed) return ephemeral(interaction, "❌ Ce bilan a déjà été partagé.");
+
+    const embed = buildSafariRecapEmbed(result.session, result.catches, getSafariConfig(), {
+      author: {
+        displayName: interaction.member?.displayName ?? interaction.user.username,
+        avatarURL: interaction.user.displayAvatarURL(),
+      },
+    });
+
+    try {
+      await channel.send({ embeds: [embed] });
+    } catch (error) {
+      handleException("Partage du bilan de safari :", error);
+      // Attendu, pas tiré puis oublié : le message invite à réessayer, la base
+      // doit donc être dans l'état annoncé avant qu'il ne s'affiche.
+      await new Promise((resolve) => releaseShare(result.session.id, resolve));
+      return ephemeral(interaction, `❌ L'envoi dans ${channel} a échoué. Tu peux réessayer.`);
+    }
+
+    log(`Partage de bilan safari #${result.session.id} par ${interaction.user.username}`);
+    // On réécrit l'éphémère : le bouton disparaît, et la confirmation prend la
+    // place de l'invitation à partager.
+    interaction
+      .update({
+        content: `✅ Bilan partagé dans ${channel}.`,
+        ...buildSafariView({ ...result.session, shared_at: Date.now() }, {
+          catches: result.catches,
+        }),
+      })
+      .catch(() => {});
+  });
+}
+
 function handleSafariAction(interaction, action, sessionId, token) {
   playAction(interaction.user.id, Number(sessionId), token, action, (err, result) => {
     if (err) {
@@ -395,6 +475,9 @@ export async function handlePokemonButton(interaction) {
       return handleSafariAction(interaction, "BAIT", args[0], args[1]);
     case "poke_safari_flee":
       return handleSafariAction(interaction, "FLEE", args[0], args[1]);
+
+    case "poke_safari_share":
+      return handleSafariShare(interaction, args[0]);
 
     case "poke_trade_accept":
       return handleTradeButton(interaction, "accept", args[0]);

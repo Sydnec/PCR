@@ -384,10 +384,19 @@ const db = new sqlite3.Database(dbPath, (err) => {
         encounter_species_id INTEGER,
         encounter_is_shiny INTEGER NOT NULL DEFAULT 0,
         encounter_catch_rate INTEGER,
-        encounter_bait INTEGER NOT NULL DEFAULT 0
+        encounter_bait INTEGER NOT NULL DEFAULT 0,
+        shared_at INTEGER
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_safari_sessions :", err);
+        // Partage du bilan : une seule fois par visite. La colonne sert de
+        // verrou — un UPDATE gardé dessus, comme partout ailleurs ici — plutôt
+        // que de compter sur la disparition du bouton côté client.
+        db.run("ALTER TABLE pokemon_safari_sessions ADD COLUMN shared_at INTEGER", (err) => {
+          if (err && !err.message.includes("duplicate column")) {
+            handleException("Erreur lors de l'ajout de shared_at :", err);
+          }
+        });
         // Une seule session à la fois par dresseur, garanti en base.
         db.run(
           `CREATE UNIQUE INDEX IF NOT EXISTS idx_pokemon_safari_session_active

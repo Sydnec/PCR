@@ -558,6 +558,18 @@ function buildSafariRow(session, config) {
   );
 }
 
+// Partage du bilan, dans le salon où l'on se trouve. Un bouton et rien d'autre :
+// le bilan est éphémère, donc invisible des autres tant qu'on ne le publie pas.
+function buildSafariShareRow(session) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`poke_safari_share|${session.id}`)
+      .setLabel("Partager mon bilan")
+      .setEmoji("\u{1F4E4}")
+      .setStyle(ButtonStyle.Secondary)
+  );
+}
+
 // Une visite du parc ne s'affiche que de deux façons : la rencontre en cours, ou
 // le bilan une fois les actions épuisées. Un seul point d'entrée, pour que la
 // commande, le bouton d'entrée et les trois actions rendent rigoureusement la
@@ -571,9 +583,14 @@ export function buildSafariView(session, { result = null, catches = [], owned = 
       : null;
 
   if (!species) {
+    // Le bouton n'apparaît que sur une visite réellement terminée et pas encore
+    // partagée — exactement la règle que prepareShare applique. On tombe aussi
+    // ici quand l'espèce en cours est introuvable, et proposer un partage que la
+    // base refuserait ensuite serait une promesse en l'air.
+    const finie = session.status !== "ACTIVE" || session.actions_left <= 0;
     return {
       embeds: [buildSafariRecapEmbed(session, catches, config, { intro })],
-      components: [],
+      components: finie && !session.shared_at ? [buildSafariShareRow(session)] : [],
     };
   }
   return {
@@ -582,7 +599,9 @@ export function buildSafariView(session, { result = null, catches = [], owned = 
   };
 }
 
-function buildSafariRecapEmbed(session, catches, config, { intro = null } = {}) {
+// `author` bascule le bilan en version publique : même embed, signé. Une
+// seconde fonction aurait divergé du privé au premier champ ajouté.
+export function buildSafariRecapEmbed(session, catches, config, { intro = null, author = null } = {}) {
   const lines = catches.map((row) => {
     const species = getSpecies(row.species_id);
     if (!species) return null;
@@ -591,18 +610,20 @@ function buildSafariRecapEmbed(session, catches, config, { intro = null } = {}) 
   });
   const caught = lines.filter(Boolean);
 
+  const qui = author ? `**${author.displayName}**` : "Tu";
+  const verbe = author ? "ressort" : "ressors";
   const embed = new EmbedBuilder()
     .setTitle("\u{1F3D5}\uFE0F Fin de la visite")
     .setColor(caught.length ? SAFARI_COLOR : 0x4f545c)
     .setDescription(
       (intro ? `${intro}\n\n` : "") +
         (caught.length
-          ? `Tu ressors du parc avec **${caught.length}** Pokémon.`
-          : "Tu ressors du parc les mains vides. Ça arrive.")
+          ? `${qui} ${verbe} du parc avec **${caught.length}** Pokémon.`
+          : `${qui} ${verbe} du parc les mains vides. Ça arrive.`)
     )
     .addFields(
       {
-        name: "Tes prises",
+        name: author ? "Ses prises" : "Tes prises",
         value: caught.length ? caught.join("\n") : "*Rien du tout.*",
         inline: false,
       },
@@ -617,5 +638,6 @@ function buildSafariRecapEmbed(session, catches, config, { intro = null } = {}) 
     )
     .setFooter({ text: `Session #${session.id}` });
 
+  if (author) embed.setThumbnail(author.avatarURL);
   return embed;
 }
