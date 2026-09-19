@@ -91,6 +91,12 @@ temps d'une visite. C'est le seul contenu Pokémon où les actions ne coûtent r
 - **Entrée payante** : `/safari` ouvre une visite hors événement pour **5 000 points**, avec un
   cooldown de 24 h. Si un parc gratuit attend le dresseur, la commande le lui dit au lieu de
   débiter. Une visite entamée expire au bout d'une heure.
+- **Partage du bilan** : la visite est privée de bout en bout, donc son bilan aussi. Un bouton
+  **« 📤 Partager mon bilan »** le publie dans le salon courant, signé du dresseur et de son avatar.
+  Une fois par visite — le verrou est en base, pas dans la disparition du bouton — et seulement si
+  le dresseur **comme** le bot peuvent écrire dans ce salon : le parc s'annonce parfois là où les
+  membres ne postent pas, et le bouton y deviendrait un moyen de faire parler le bot. Un envoi qui
+  échoue rend le droit de réessayer.
 - Tout l'état vit en base : les boutons répondent encore après un redémarrage du bot, et un
   double-clic ne peut pas jouer deux fois la même action.
 

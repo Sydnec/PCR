@@ -8,13 +8,21 @@ import {
   ButtonBuilder,
   ButtonStyle,
   MessageFlags,
+  PermissionFlagsBits,
 } from "discord.js";
 import { getBalance } from "../economy.js";
 import { handleException, log } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
 import { answerThrow, throwBall, trackPanel } from "./capture.js";
 import { getSpawn } from "./spawn.js";
-import { enterPark, playAction, refreshParkMessage } from "./safari.js";
+import {
+  claimShare,
+  enterPark,
+  playAction,
+  prepareShare,
+  refreshParkMessage,
+  releaseShare,
+} from "./safari.js";
 import { getSpecies } from "./data.js";
 import {
   acceptTrade,
@@ -29,6 +37,7 @@ import {
   buildBallRow,
   buildDexEmbed,
   buildDexRow,
+  buildSafariRecapEmbed,
   buildSafariView,
   buildTradeEmbed,
   buildTradeRow,
@@ -312,6 +321,127 @@ function handleSafariEnter(interaction, parkId) {
   });
 }
 
+// Codes d'erreur Discord qui PROUVENT que rien n'a été publié. Une coupure
+// réseau, un délai dépassé ou un 5xx n'en font pas partie : la requête a pu
+// aboutir malgré l'exception, et rouvrir le partage republierait le bilan une
+// seconde fois — exactement l'invariant que shared_at existe pour tenir.
+const ENVOI_IMPOSSIBLE = new Set([
+  50001, // Missing Access
+  50013, // Missing Permissions
+  10003, // Unknown Channel
+  50083, // Thread is archived
+]);
+
+// Partage du bilan dans le salon courant.
+//
+// L'ordre est dicté par ce qui peut échouer : les autorisations d'abord, sinon
+// un salon en lecture seule consommerait le droit de partager ; la revendication
+// ensuite ; et l'acquittement de l'interaction avant l'envoi, parce qu'une
+// limite de débit sur le salon peut faire dépasser les trois secondes que
+// Discord laisse pour répondre — au retour, le jeton serait mort.
+//
+// La vérification porte sur les deux côtés, pas seulement le bot. Le parc
+// s'annonce parfois dans un salon où les membres ne postent pas, et le bouton y
+// deviendrait un moyen d'y faire parler le bot.
+function handleSafariShare(interaction, sessionId) {
+  const channel = interaction.channel;
+  if (!channel) return ephemeral(interaction, "❌ Salon introuvable.");
+
+  prepareShare(interaction.user.id, Number(sessionId), async (dbError, result) => {
+    // Ce corps est asynchrone et détaché : le try/catch du routeur a déjà rendu
+    // la main quand il s'exécute. Sans filet ici, la moindre exception partirait
+    // en rejet non capturé et le dresseur resterait devant « l'application n'a
+    // pas répondu ».
+    let acquitte = false;
+    const dire = (content) =>
+      (acquitte
+        ? interaction.followUp({ content, flags: MessageFlags.Ephemeral })
+        : interaction.reply({ content, flags: MessageFlags.Ephemeral })
+      ).catch(() => {});
+
+    try {
+      if (dbError) {
+        handleException("Préparation du partage :", dbError);
+        return dire("❌ Erreur base de données.");
+      }
+      if (!result.ok) return dire(`❌ ${result.reason}`);
+
+      const envoi = channel.isThread()
+        ? PermissionFlagsBits.SendMessagesInThreads
+        : PermissionFlagsBits.SendMessages;
+      const dresseur = channel.permissionsFor(interaction.member);
+      if (!dresseur?.has([PermissionFlagsBits.ViewChannel, envoi])) {
+        return dire(`❌ Tu ne peux pas écrire dans ${channel}.`);
+      }
+      // EmbedLinks en plus pour le bot : sans elle Discord refuse l'embed, et la
+      // garde raterait la seule chose qu'elle est censée voir venir.
+      const moi = channel.permissionsFor(interaction.guild?.members.me);
+      if (!moi?.has([PermissionFlagsBits.ViewChannel, envoi, PermissionFlagsBits.EmbedLinks])) {
+        return dire(`❌ Je ne peux pas publier d'embed dans ${channel}.`);
+      }
+      if (channel.isThread() && channel.locked) {
+        return dire(`❌ ${channel} est verrouillé.`);
+      }
+
+      const claim = await new Promise((resolve) =>
+        claimShare(result.session.id, (err, ok) => resolve({ err, ok }))
+      );
+      // Une erreur de base n'est pas un bilan déjà partagé : le dire ainsi
+      // inventerait un état qui n'existe pas, et enverrait chercher le bug au
+      // mauvais endroit.
+      if (claim.err) {
+        handleException("Revendication du partage :", claim.err);
+        return dire("❌ Erreur base de données.");
+      }
+      if (!claim.ok) return dire("❌ Ce bilan a déjà été partagé.");
+
+      await interaction.deferUpdate();
+      acquitte = true;
+
+      const embed = buildSafariRecapEmbed(result.session, result.catches, {
+        author: {
+          // Pseudo ET avatar du membre : mélanger le surnom du serveur avec
+          // l'avatar global signerait le bilan de deux personnes différentes.
+          displayName: interaction.member?.displayName ?? interaction.user.username,
+          avatarURL:
+            interaction.member?.displayAvatarURL?.() ?? interaction.user.displayAvatarURL(),
+        },
+      });
+
+      try {
+        await channel.send({ embeds: [embed] });
+      } catch (error) {
+        handleException("Partage du bilan de safari :", error);
+        if (!ENVOI_IMPOSSIBLE.has(error?.code)) {
+          return dire(
+            "⚠️ L'envoi a échoué, mais il a peut-être abouti quand même. Je ne rouvre pas le " +
+              "partage pour ne pas risquer de publier ton bilan deux fois — va voir le salon."
+          );
+        }
+        const releaseError = await new Promise((resolve) =>
+          releaseShare(result.session.id, resolve)
+        );
+        if (releaseError) {
+          handleException("Restitution du droit de partage :", releaseError);
+          return dire("❌ L'envoi a échoué et je n'ai pas pu rouvrir le partage. Voir les logs.");
+        }
+        return dire(`❌ Je n'ai pas pu publier dans ${channel}. Tu peux réessayer.`);
+      }
+
+      log(`Partage de bilan safari #${result.session.id} par ${interaction.user.username}`);
+      // On ne réécrit QUE les composants : omettre `embeds` l'exclut du corps
+      // envoyé à Discord, qui laisse donc l'embed en place — la ligne de
+      // résultat du dernier lancer reste sous les yeux du dresseur.
+      await interaction
+        .editReply({ content: `✅ Bilan partagé dans ${channel}.`, components: [] })
+        .catch(() => {});
+    } catch (error) {
+      handleException("Partage du bilan de safari :", error);
+      await dire("❌ Erreur pendant le partage.");
+    }
+  });
+}
+
 function handleSafariAction(interaction, action, sessionId, token) {
   playAction(interaction.user.id, Number(sessionId), token, action, (err, result) => {
     if (err) {
@@ -395,6 +525,9 @@ export async function handlePokemonButton(interaction) {
       return handleSafariAction(interaction, "BAIT", args[0], args[1]);
     case "poke_safari_flee":
       return handleSafariAction(interaction, "FLEE", args[0], args[1]);
+
+    case "poke_safari_share":
+      return handleSafariShare(interaction, args[0]);
 
     case "poke_trade_accept":
       return handleTradeButton(interaction, "accept", args[0]);

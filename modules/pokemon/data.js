@@ -133,6 +133,15 @@ export const safariBaitCapped = (baitStacks, safariConfig) =>
 // legendaryWeight : le bloc safari lui est passé tel quel, il n'y a pas de
 // second tirage à maintenir. Les évolutions par échange restent hors pool,
 // spawnWeight leur donne déjà un poids nul.
+// Une visite est terminée quand son statut a changé ou qu'il ne reste plus une
+// action. Le prédicat vivait recopié dans trois fonctions de deux modules, dont
+// deux qui devaient s'accorder au mot près — le bouton de partage et la garde
+// qui l'autorise. Il vit ici parce que safari.js importe embeds.js : l'inverse
+// ferait un cycle, et data.js est le seul module que les deux importent déjà.
+export function isSafariFinished(session) {
+  return session.status !== "ACTIVE" || session.actions_left <= 0;
+}
+
 export function rollSafariEncounter(safariConfig) {
   const species = pickWeightedSpecies(safariConfig);
   if (!species) return null;

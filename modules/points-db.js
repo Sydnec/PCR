@@ -384,32 +384,48 @@ const db = new sqlite3.Database(dbPath, (err) => {
         encounter_species_id INTEGER,
         encounter_is_shiny INTEGER NOT NULL DEFAULT 0,
         encounter_catch_rate INTEGER,
-        encounter_bait INTEGER NOT NULL DEFAULT 0
+        encounter_bait INTEGER NOT NULL DEFAULT 0,
+        shared_at INTEGER
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_safari_sessions :", err);
-        // Une seule session à la fois par dresseur, garanti en base.
-        db.run(
-          `CREATE UNIQUE INDEX IF NOT EXISTS idx_pokemon_safari_session_active
-             ON pokemon_safari_sessions(user_id) WHERE status = 'ACTIVE'`,
-          (err) => {
-            if (err) {
-              return handleException("Erreur création index pokemon_safari_session_active :", err);
-            }
-            // Une entrée gratuite par dresseur et par parc. park_id NULL (entrée
-            // payante) échappe à l'index : SQLite traite chaque NULL comme distinct,
-            // donc les /safari successifs restent possibles.
-            db.run(
-              `CREATE UNIQUE INDEX IF NOT EXISTS idx_pokemon_safari_session_park
-                 ON pokemon_safari_sessions(park_id, user_id) WHERE park_id IS NOT NULL`,
-              (err) => {
-                if (err) {
-                  handleException("Erreur création index pokemon_safari_session_park :", err);
-                }
-              }
-            );
+        // Partage du bilan : une seule fois par visite. La colonne sert de
+        // verrou — un UPDATE gardé dessus, comme partout ailleurs ici — plutôt
+        // que de compter sur la disparition du bouton côté client.
+        //
+        // La suite est DANS le callback, comme les autres migrations de ce
+        // fichier : sqlite3 n'ordonne pas deux db.run successifs, et rien de ce
+        // qui touche à la nouvelle colonne ne doit partir avant qu'elle existe.
+        db.run("ALTER TABLE pokemon_safari_sessions ADD COLUMN shared_at INTEGER", (err) => {
+          if (err && !err.message.includes("duplicate column")) {
+            handleException("Erreur lors de l'ajout de shared_at :", err);
           }
-        );
+          // Une seule session à la fois par dresseur, garanti en base.
+          db.run(
+            `CREATE UNIQUE INDEX IF NOT EXISTS idx_pokemon_safari_session_active
+               ON pokemon_safari_sessions(user_id) WHERE status = 'ACTIVE'`,
+            (err) => {
+              if (err) {
+                return handleException(
+                  "Erreur création index pokemon_safari_session_active :",
+                  err
+                );
+              }
+              // Une entrée gratuite par dresseur et par parc. park_id NULL (entrée
+              // payante) échappe à l'index : SQLite traite chaque NULL comme distinct,
+              // donc les /safari successifs restent possibles.
+              db.run(
+                `CREATE UNIQUE INDEX IF NOT EXISTS idx_pokemon_safari_session_park
+                   ON pokemon_safari_sessions(park_id, user_id) WHERE park_id IS NOT NULL`,
+                (err) => {
+                  if (err) {
+                    handleException("Erreur création index pokemon_safari_session_park :", err);
+                  }
+                }
+              );
+            }
+          );
+        });
       }
     );
 

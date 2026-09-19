@@ -17,6 +17,7 @@ import { handleException, log } from "../utils.js";
 import { getPokemonConfig, getSafariConfig } from "./config.js";
 import {
   getSpecies,
+  isSafariFinished,
   rollSafariEncounter,
   safariBaitCapped,
   safariCatchProbability,
@@ -89,12 +90,61 @@ export function findFreeParkFor(userId, cb) {
   );
 }
 
-function getSessionCatches(sessionId, cb) {
+export function getSessionCatches(sessionId, cb) {
   db.all(
     `SELECT species_id, is_shiny FROM pokemon_safari_catches
       WHERE session_id = ? ORDER BY id`,
     [sessionId],
     (err, rows) => cb(err, rows || [])
+  );
+}
+
+// ====================== PARTAGE DU BILAN ======================
+
+// Tout ce que la base a à dire sur un partage : la visite existe, elle est bien
+// celle de qui clique, elle est terminée, et elle n'a pas déjà été partagée.
+// Ne revendique RIEN — les autorisations du salon se vérifient avant, sinon un
+// salon interdit consommerait le droit de partager.
+export function prepareShare(userId, sessionId, cb) {
+  getSession(sessionId, (err, session) => {
+    if (err) return cb(err);
+    if (!session || session.user_id !== userId) {
+      return cb(null, { ok: false, reason: "Cette visite du parc n'est pas la tienne." });
+    }
+    if (!isSafariFinished(session)) {
+      return cb(null, { ok: false, reason: "Ta visite n'est pas terminée." });
+    }
+    if (session.shared_at) {
+      return cb(null, { ok: false, reason: "Ce bilan a déjà été partagé." });
+    }
+    getSessionCatches(sessionId, (err, catches) => {
+      if (err) return cb(err);
+      cb(null, { ok: true, session, catches });
+    });
+  });
+}
+
+// Revendique le droit de partager, une fois pour toutes. Le verrou est en base
+// et non dans la disparition du bouton côté client : deux clics rapprochés
+// arrivent comme deux interactions distinctes, et seule la première doit
+// publier.
+export function claimShare(sessionId, cb) {
+  db.run(
+    "UPDATE pokemon_safari_sessions SET shared_at = ? WHERE id = ? AND shared_at IS NULL",
+    [Date.now(), sessionId],
+    function (err) {
+      cb(err, this ? this.changes === 1 : false);
+    }
+  );
+}
+
+// Compensation : l'envoi a échoué, le droit de partager est rendu. Sans elle,
+// un salon momentanément inaccessible coûterait le partage définitivement.
+export function releaseShare(sessionId, cb = () => {}) {
+  db.run(
+    "UPDATE pokemon_safari_sessions SET shared_at = NULL WHERE id = ?",
+    [sessionId],
+    cb
   );
 }
 
@@ -124,9 +174,7 @@ function rollNextEncounter(sessionId, config, cb) {
 function withOwned(payload, cb) {
   const session = payload.session;
   // Une visite terminée affiche son bilan, pas une rencontre : rien à lire.
-  if (!session || session.status !== "ACTIVE" || session.actions_left <= 0) {
-    return cb(null, payload);
-  }
+  if (!session || isSafariFinished(session)) return cb(null, payload);
   getOwnedVariants(session.user_id, session.encounter_species_id, (err, owned) => {
     // Une collection illisible ne doit jamais faire échouer une action déjà
     // jouée et déjà décomptée : on affiche la rencontre sans la pastille.
