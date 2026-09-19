@@ -1,7 +1,34 @@
 {
-  "version": "1.11.7",
-  "lastUpdated": "2026-09-17T23:19:39.808Z",
+  "version": "1.12.0",
+  "lastUpdated": "2026-09-19T04:26:24.849Z",
   "releases": [
+    {
+      "version": "1.12.0",
+      "date": "2026-09-19",
+      "title": "Release 1.12.0",
+      "features": [
+        {
+          "type": "feature",
+          "name": "Les commandes d'administration se regroupent sous /admin",
+          "description": "Les commandes réservées aux administrateurs (purge, pokespawn, safarispawn, restart) cessent d'encombrer la liste de tout le monde : elles deviennent des sous-commandes de /admin, que Discord masque aux non-administrateurs. Quatre arrivent avec : /admin points et /admin points-tous pour donner (ou retirer) des points à un dresseur ou à tout le serveur, /admin config et /admin config-voir pour régler le bot depuis Discord. Les réglages modifiés à chaud atterrissent dans une surcharge locale ignorée par git, pour que le serveur garde un dépôt propre et que les déploiements continuent de passer.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-18T20:34:14.680Z",
+          "branch": "claude/practical-ptolemy-qb5aha"
+        },
+        {
+          "type": "feature",
+          "name": "Pot commun hebdomadaire",
+          "description": "Une fois par semaine, chacun cotise 5 % de sa fortune et la cagnotte repart en parts égales entre tous les membres du rôle par défaut. Le prélèvement est obligatoire, automatique et silencieux : rien n'est annoncé. La masse monétaire est conservée au point près, les soldes négatifs ne cotisent pas mais touchent leur part, et l'échéance vit en base — pas de dérive, et une panne ne déclenche qu'un seul pot de rattrapage. Périodicité et taux se règlent à chaud via /admin config, et /admin potcommun permet d'en déclencher ou d'en simuler un.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-18T21:09:17.140Z",
+          "branch": "claude/practical-ptolemy-qb5aha"
+        }
+      ]
+    },
     {
       "version": "1.11.7",
       "date": "2026-09-17",
@@ -882,26 +909,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "feature",
-      "name": "Les commandes d'administration se regroupent sous /admin",
-      "description": "Les commandes réservées aux administrateurs (purge, pokespawn, safarispawn, restart) cessent d'encombrer la liste de tout le monde : elles deviennent des sous-commandes de /admin, que Discord masque aux non-administrateurs. Quatre arrivent avec : /admin points et /admin points-tous pour donner (ou retirer) des points à un dresseur ou à tout le serveur, /admin config et /admin config-voir pour régler le bot depuis Discord. Les réglages modifiés à chaud atterrissent dans une surcharge locale ignorée par git, pour que le serveur garde un dépôt propre et que les déploiements continuent de passer.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-18T20:34:14.680Z",
-      "branch": "claude/practical-ptolemy-qb5aha"
-    },
-    {
-      "type": "feature",
-      "name": "Pot commun hebdomadaire",
-      "description": "Une fois par semaine, chacun cotise 5 % de sa fortune et la cagnotte repart en parts égales entre tous les membres du rôle par défaut. Le prélèvement est obligatoire, automatique et silencieux : rien n'est annoncé. La masse monétaire est conservée au point près, les soldes négatifs ne cotisent pas mais touchent leur part, et l'échéance vit en base — pas de dérive, et une panne ne déclenche qu'un seul pot de rattrapage. Périodicité et taux se règlent à chaud via /admin config, et /admin potcommun permet d'en déclencher ou d'en simuler un.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-18T21:09:17.140Z",
-      "branch": "claude/practical-ptolemy-qb5aha"
-    }
-  ]
+  "pending": []
 }
