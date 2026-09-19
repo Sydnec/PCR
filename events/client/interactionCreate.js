@@ -41,9 +41,18 @@ function claimBetResolution(betId, status, winningIndex, cb) {
 }
 async function execute(interaction, bot) {
     if (interaction.isChatInputCommand()) {
+        // Les commandes à sous-commandes (/admin) comptent et se journalisent
+        // par sous-commande : sans ça, les cinq commandes d'administration
+        // regroupées se confondraient en une seule ligne « admin » et le récap
+        // annuel perdrait leur détail.
+        const subcommand = interaction.options.getSubcommand(false);
+        const commandLabel = subcommand
+            ? `${interaction.commandName} ${subcommand}`
+            : interaction.commandName;
+
         if (interaction.commandName != 'safe-place')
             log(
-                `/${interaction.commandName} par ${interaction.member?.displayName ?? interaction.user.username}`
+                `/${commandLabel} par ${interaction.member?.displayName ?? interaction.user.username}`
             );
         // --- Statistiques commandes les plus utilisées ---
         try {
@@ -51,7 +60,7 @@ async function execute(interaction, bot) {
             db.run(
                 `INSERT INTO command_stats (command, count) VALUES (?, 1)
                 ON CONFLICT(command) DO UPDATE SET count = count + 1`,
-                [interaction.commandName]
+                [commandLabel]
             );
         } catch (err) {
             handleException(err);

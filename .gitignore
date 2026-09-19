@@ -10,3 +10,8 @@ last-announced-version.txt
 .env.dev
 .env.prod
 .env.local
+
+# Surcharge de configuration écrite par /admin config depuis Discord. Elle doit
+# rester hors de git : le déploiement fait `git checkout main && git pull` sous
+# `set -e`, et un fichier suivi modifié sur le serveur le ferait échouer.
+config.local.json*
