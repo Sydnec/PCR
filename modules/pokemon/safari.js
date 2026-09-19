@@ -17,6 +17,7 @@ import { handleException, log } from "../utils.js";
 import { getPokemonConfig, getSafariConfig } from "./config.js";
 import {
   getSpecies,
+  isSafariFinished,
   rollSafariEncounter,
   safariBaitCapped,
   safariCatchProbability,
@@ -110,7 +111,7 @@ export function prepareShare(userId, sessionId, cb) {
     if (!session || session.user_id !== userId) {
       return cb(null, { ok: false, reason: "Cette visite du parc n'est pas la tienne." });
     }
-    if (session.status === "ACTIVE" && session.actions_left > 0) {
+    if (!isSafariFinished(session)) {
       return cb(null, { ok: false, reason: "Ta visite n'est pas terminée." });
     }
     if (session.shared_at) {
@@ -173,9 +174,7 @@ function rollNextEncounter(sessionId, config, cb) {
 function withOwned(payload, cb) {
   const session = payload.session;
   // Une visite terminée affiche son bilan, pas une rencontre : rien à lire.
-  if (!session || session.status !== "ACTIVE" || session.actions_left <= 0) {
-    return cb(null, payload);
-  }
+  if (!session || isSafariFinished(session)) return cb(null, payload);
   getOwnedVariants(session.user_id, session.encounter_species_id, (err, owned) => {
     // Une collection illisible ne doit jamais faire échouer une action déjà
     // jouée et déjà décomptée : on affiche la rencontre sans la pastille.

@@ -13,6 +13,7 @@ import {
   difficultyLabel,
   embedColor,
   getSpecies,
+  isSafariFinished,
   probabilitiesByBall,
   rarityOf,
   safariBaitCapped,
@@ -577,19 +578,17 @@ function buildSafariShareRow(session) {
 export function buildSafariView(session, { result = null, catches = [], owned = null } = {}) {
   const config = getSafariConfig();
   const intro = result ? safariOutcomeLine(result, config) : null;
-  const species =
-    session.status === "ACTIVE" && session.actions_left > 0
-      ? getSpecies(session.encounter_species_id)
-      : null;
+  const finie = isSafariFinished(session);
+  const species = finie ? null : getSpecies(session.encounter_species_id);
 
   if (!species) {
     // Le bouton n'apparaît que sur une visite réellement terminée et pas encore
-    // partagée — exactement la règle que prepareShare applique. On tombe aussi
-    // ici quand l'espèce en cours est introuvable, et proposer un partage que la
-    // base refuserait ensuite serait une promesse en l'air.
-    const finie = session.status !== "ACTIVE" || session.actions_left <= 0;
+    // partagée — la même garde que prepareShare, et le même prédicat, pas une
+    // copie. On tombe aussi ici quand l'espèce en cours est introuvable :
+    // proposer un partage que la base refuserait ensuite serait une promesse en
+    // l'air.
     return {
-      embeds: [buildSafariRecapEmbed(session, catches, config, { intro })],
+      embeds: [buildSafariRecapEmbed(session, catches, { intro, config })],
       components: finie && !session.shared_at ? [buildSafariShareRow(session)] : [],
     };
   }
@@ -601,7 +600,14 @@ export function buildSafariView(session, { result = null, catches = [], owned = 
 
 // `author` bascule le bilan en version publique : même embed, signé. Une
 // seconde fonction aurait divergé du privé au premier champ ajouté.
-export function buildSafariRecapEmbed(session, catches, config, { intro = null, author = null } = {}) {
+export function buildSafariRecapEmbed(
+  session,
+  catches,
+  // La config se récupère toute seule : l'appelant public n'a pas à réimporter
+  // getSafariConfig pour atteindre ce que le chemin privé obtient gratuitement,
+  // ni à risquer d'en passer une périmée.
+  { intro = null, author = null, config = getSafariConfig() } = {}
+) {
   const lines = catches.map((row) => {
     const species = getSpecies(row.species_id);
     if (!species) return null;
