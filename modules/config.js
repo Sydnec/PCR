@@ -158,22 +158,39 @@ function merge(defaults, override) {
 // Une couche du fichier, sans fusion. C'est la lecture STRICTE : elle lève.
 // L'écriture en dépend — repartir d'un {} sur un fichier illisible effacerait
 // en silence toutes les surcharges déjà posées.
-function readLayerStrict(file) {
-  return JSON.parse(fs.readFileSync(file, "utf8"));
-}
-
-// La même, tolérante : une couche absente ou cassée vaut {}, et celle du
-// dessous reprend la main plutôt que d'arrêter le bot. Réservée à la lecture.
-function readLayer(file, { optional = false } = {}) {
+function readLayer(file, { optional = false, strict = false } = {}) {
   // La surcharge n'existe pas tant que personne n'a rien réglé, ce qui est le
   // cas courant : on l'écarte par un stat plutôt que par une exception, dont la
   // pile coûterait cher sur un chemin parcouru à chaque message.
   if (optional && !fs.existsSync(file)) return {};
+  // `strict` lève au lieu de rendre {}. La lecture en est le seul usage
+  // tolérant : l'écriture, elle, doit échouer plutôt que de repartir d'une page
+  // blanche qui effacerait en silence toutes les surcharges déjà posées.
+  if (strict) return JSON.parse(fs.readFileSync(file, "utf8"));
   try {
-    return readLayerStrict(file);
+    return JSON.parse(fs.readFileSync(file, "utf8"));
   } catch (error) {
     handleException(`Lecture de ${path.basename(file)} impossible :`, error);
     return {};
+  }
+}
+
+// La surcharge est-elle lisible ? Sans cette question, un fichier corrompu fait
+// silencieusement retomber tous les réglages sur leurs défauts, et
+// /admin config-voir affiche ces défauts comme valeur courante sans un mot.
+export function configOverrideStatus() {
+  if (!fs.existsSync(overridePath)) return { ok: true, exists: false };
+  try {
+    readLayer(overridePath, { strict: true });
+    return { ok: true, exists: true };
+  } catch (error) {
+    return {
+      ok: false,
+      exists: true,
+      reason:
+        "⚠️ `config.local.json` est illisible : **tous les réglages modifiés depuis Discord sont " +
+        `ignorés** et les valeurs par défaut s'appliquent. Détail : ${error.message}`,
+    };
   }
 }
 
@@ -242,19 +259,26 @@ export function readConfigValue(path) {
 const BOUNDS = {
   "redistribution.contributionPercent": { min: 0, max: 100 },
   "redistribution.intervalHours": { min: 1 },
+  // Diviseur : embeds.js fait Math.ceil(dexSize() / pageSize), donc 0 donne un
+  // Pokédex au nombre de pages infini et vide.
+  "pokemon.pokedex.pageSize": { min: 1 },
+  // Math.floor(Math.random() * odds) === 0 : à 0, tout devient shiny.
+  "pokemon.spawn.shinyOdds": { min: 1 },
+  "pokemon.safari.shinyOdds": { min: 1 },
 };
 
-// Plancher déduit du défaut, faute de mieux : un réglage dont la valeur par
-// défaut vaut au moins 1 refuse le zéro, et tous les autres refusent le négatif.
+// Plancher déduit du défaut : un réglage dont la valeur par défaut est positive
+// ou nulle refuse le négatif. Rien de plus.
 //
-// Le zéro compte autant que le négatif, parce que le code divise par plusieurs
-// de ces nombres : `pageSize` à 0 donne un Pokédex de pages en nombre infini,
-// `shinyOdds` à 0 rend chaque apparition shiny. Les réglages qui valent
-// légitimement zéro par défaut — minDelayAfterEndMinutes, les probabilités —
-// gardent évidemment le droit d'y rester.
+// Déduire un plancher de 1 des défauts valant au moins 1 était tentant et faux :
+// cela interdisait du même coup toute valeur fractionnaire en dessous de 1, donc
+// globalMultiplier à 0,5 — le seul levier pour durcir les captures — et
+// ball.multiplier en dessous de son défaut. Le zéro aussi est légitime presque
+// partout : un poids de stade à 0 exclut ce stade, un prix d'entrée à 0 rend le
+// parc gratuit. Les vrais pièges sont nommés un par un dans BOUNDS.
 function checkBounds(key, value, fallback) {
   const bounds = BOUNDS[key] ?? {};
-  const min = bounds.min ?? (fallback >= 1 ? 1 : fallback >= 0 ? 0 : undefined);
+  const min = bounds.min ?? (fallback >= 0 ? 0 : undefined);
   if (min !== undefined && value < min) {
     return `\`${value}\` est en dessous du minimum autorisé (${min}).`;
   }
@@ -326,7 +350,7 @@ export function writeConfigValue(path, raw) {
     // Et en lecture STRICTE : une surcharge illisible doit faire échouer la
     // commande, pas repartir d'une page blanche qui effacerait sans un mot tous
     // les réglages déjà posés.
-    const next = fs.existsSync(overridePath) ? readLayerStrict(overridePath) : {};
+    const next = readLayer(overridePath, { optional: true, strict: true });
     let node = next;
     for (const segment of segments.slice(0, -1)) {
       if (!isPlainObject(node[segment])) node[segment] = {};

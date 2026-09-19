@@ -1,5 +1,10 @@
 import { log } from "../../modules/utils.js";
-import { configChoices, formatConfigValue, writeConfigValue } from "../../modules/config.js";
+import {
+  configChoices,
+  configOverrideStatus,
+  formatConfigValue,
+  writeConfigValue,
+} from "../../modules/config.js";
 
 export default {
   describe: (sub) =>
@@ -30,7 +35,12 @@ export default {
 
     const result = writeConfigValue(key, raw);
     if (!result.ok) {
-      return interaction.editReply({ content: `❌ ${result.reason}` });
+      // Quand l'écriture bute sur une surcharge illisible, autant nommer la
+      // cause exacte plutôt que de laisser l'administrateur deviner.
+      const statut = configOverrideStatus();
+      return interaction.editReply({
+        content: `❌ ${result.reason}` + (statut.ok ? "" : `\n${statut.reason}`),
+      });
     }
 
     log(

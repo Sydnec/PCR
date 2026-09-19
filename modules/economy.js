@@ -50,11 +50,11 @@ export function getBalance(userId, cb) {
 
 // Applique une série de mouvements { userId, amount } — un don collectif, un
 // pot commun — séquentiellement : chaque addPoints est une écriture SQLite, les
-// lancer en parallèle ne ferait que les mettre en file d'attente.
-//
-// Un échec n'interrompt pas les suivants : sur une distribution de masse, mieux
-// vaut servir 49 membres sur 50 et le signaler que tout abandonner au premier
+// lancer en parallèle ne ferait que les mettre en file d'attente. Un échec
+// n'interrompt pas les suivants : sur une distribution de masse, mieux vaut
+// servir 49 membres sur 50 et le signaler que tout abandonner au premier
 // incident. Rend le nombre d'échecs.
+//
 // Un seul mouvement de masse à la fois. Le verrou n'est pas du zèle : sans lui,
 // deux appels concurrents s'emmêlent dans la transaction ci-dessous. SQLite
 // refuse un BEGIN dans un BEGIN, et le COMMIT du plus court referme celle du
@@ -92,11 +92,13 @@ async function applyMovementsNow(movements) {
   const beginError = await exec("BEGIN IMMEDIATE");
   if (beginError) {
     // On continue quand même — les mouvements valent mieux que rien — mais sans
-    // prétendre à l'atomicité, et en le disant.
-    handleException("Pot commun : transaction refusée, mouvements appliqués un à un :", beginError);
+    // prétendre à l'atomicité, et en le disant. Message neutre : cette fonction
+    // sert aussi /admin points-tous, qui n'a rien à voir avec le pot commun.
+    handleException("Transaction refusée, mouvements appliqués un à un :", beginError);
   }
 
   let failures = 0;
+  let commitError = null;
   try {
     for (const { userId, amount } of movements) {
       if (!amount) continue;
@@ -108,10 +110,22 @@ async function applyMovementsNow(movements) {
       }
     }
   } finally {
-    if (!beginError) {
-      const commitError = await exec("COMMIT");
-      if (commitError) handleException("Validation des mouvements impossible :", commitError);
-    }
+    // COMMIT tenté DANS TOUS LES CAS, y compris après un BEGIN refusé. Le sauter
+    // était une erreur : un COMMIT raté laisse la transaction ouverte, tous les
+    // BEGIN suivants échouent donc, et si chacun saute son COMMIT à son tour,
+    // plus rien n'est jamais validé — ni les pots, ni les points de message, qui
+    // partagent la connexion. Invisible jusqu'au redémarrage, qui annule tout.
+    commitError = await exec("COMMIT");
+    // « no transaction is active » est le cas bénin : il n'y en avait pas à
+    // fermer, et c'est très bien.
+    if (commitError && /no transaction is active/i.test(commitError.message)) commitError = null;
+  }
+
+  if (commitError) {
+    handleException("Validation des mouvements impossible :", commitError);
+    // SQLite a tout annulé : aucun solde n'a bougé. Rendre `failures: 0` ferait
+    // journaliser un pot fantôme et consommerait l'échéance de la semaine.
+    throw commitError;
   }
   return failures;
 }

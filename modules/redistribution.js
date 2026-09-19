@@ -74,7 +74,11 @@ function claimRedistribution(intervalMs, cb) {
         AND next_redistribution_at <= CAST(? AS INTEGER)`,
     [now, intervalMs, intervalMs, now],
     function (err) {
-      cb(err, this ? this.changes === 1 : false);
+      // On rend l'échéance qu'on vient de poser, pas un booléen : une relecture
+      // séparée pouvait échouer, et son repli à 0 désarmait silencieusement la
+      // compensation ci-dessous.
+      if (err || !this || this.changes !== 1) return cb(err, null);
+      getNextRedistributionAt((readError, at) => cb(readError, readError ? null : at));
     }
   );
 }
@@ -103,17 +107,16 @@ function takeLease(cb) {
   );
 }
 
-// Libération gardée sur le jeton. Sans la garde, un pot qui déborde de
-// LEASE_MS — boucle d'événements bloquée, disque lent — rendrait en sortant le
-// bail qu'un autre pot a légitimement repris entre-temps, et le suivant
-// prélèverait une deuxième fois sur le même instantané.
 // Rend l'échéance telle qu'elle était, si et seulement si personne ne l'a
-// touchée depuis. Toute la valeur du pot hebdomadaire tient à ce qu'un
-// empêchement ne le fasse pas sauter d'une semaine : la revendication précède
-// forcément des opérations qui peuvent échouer — le bail, la lecture des
-// soldes — et la compensation est la seule façon de couvrir toutes celles qui
-// restent, y compris celles qu'on n'a pas vues venir.
-export function rollbackClaim(previous, claimed, cb = () => {}) {
+// touchée depuis. Un empêchement passager ne doit pas faire sauter le pot d'une
+// semaine, et la revendication précède forcément des opérations qui peuvent
+// échouer — le bail, la lecture des soldes.
+//
+// Réservée aux échecs PASSAGERS, et seulement tant que l'argent n'a pas bougé :
+// rendre une échéance déjà dépassée sur un échec permanent transformerait le pot
+// hebdomadaire en boucle horaire, et la rendre après un versement ferait
+// prélever tout le monde une seconde fois au tour suivant.
+function rollbackClaim(previous, claimed, cb = () => {}) {
   db.run(
     `UPDATE economy_state SET next_redistribution_at = CAST(? AS INTEGER)
       WHERE id = 1 AND next_redistribution_at = CAST(? AS INTEGER)`,
@@ -124,11 +127,26 @@ export function rollbackClaim(previous, claimed, cb = () => {}) {
   );
 }
 
+// Libération gardée sur le jeton. Sans la garde, un pot qui déborde de
+// LEASE_MS — boucle d'événements bloquée, disque lent — rendrait en sortant le
+// bail qu'un autre pot a légitimement repris entre-temps, et le suivant
+// prélèverait une deuxième fois sur le même instantané.
+//
+// Ne rien toucher n'est donc pas un cas anodin : c'est la preuve que deux pots
+// ont pu tourner en même temps. On le dit, sinon l'invariant se viole en silence.
 function releaseLease(token, cb = () => {}) {
   db.run(
     "UPDATE economy_state SET redistribution_since = 0 WHERE id = 1 AND redistribution_since = CAST(? AS INTEGER)",
     [token],
-    cb
+    function (err) {
+      if (!err && this && this.changes === 0) {
+        handleException(
+          "Pot commun : le bail avait été repris avant la fin — deux pots ont pu " +
+            "tourner sur le même instantané des soldes. Vérifier points_redistributions."
+        );
+      }
+      cb(err);
+    }
   );
 }
 
@@ -224,12 +242,17 @@ export async function runRedistribution(
   // Une simulation ne prend pas le bail : elle ne touche à rien, et le prendre
   // reviendrait à empêcher le vrai pot de passer.
   let token = null;
+  let applied = false;
   if (!dryRun) {
     token = await new Promise((resolve, reject) =>
       takeLease((err, value) => (err ? reject(err) : resolve(value)))
     );
     if (!token) {
-      return { ok: false, reason: "Un pot commun est déjà en cours. Réessaie dans un instant." };
+      return {
+        ok: false,
+        transient: true,
+        reason: "Un pot commun est déjà en cours. Réessaie dans un instant.",
+      };
     }
   }
 
@@ -243,6 +266,10 @@ export async function runRedistribution(
 
     const plan = planRedistribution(balances, percent);
     if (plan.pot <= 0) {
+      // Pas passager : tant que les soldes ne remontent pas, réessayer dans une
+      // heure ne donnerait rien de plus. L'échéance est donc consommée, sinon le
+      // pot hebdomadaire se transforme en boucle horaire qui refait un
+      // guild.members.fetch() complet à chaque tour, indéfiniment.
       return {
         ok: false,
         reason: "Personne n'a de quoi cotiser : le pot serait vide.",
@@ -259,13 +286,23 @@ export async function runRedistribution(
     const failures = await applyMovements(
       plan.entries.map((entry) => ({ userId: entry.userId, amount: entry.delta }))
     );
+    // À partir d'ici l'argent a bougé. Tout ce qui échoue après ne doit plus
+    // JAMAIS faire rendre l'échéance : le tour suivant prélèverait une seconde
+    // fois. applyMovements lève si la transaction n'a pas été validée, donc
+    // arriver ici veut bien dire que les soldes sont à jour.
+    applied = true;
     journal(plan, percent, triggeredBy, failures);
     log(
       `Pot commun : ${plan.pot} points de ${plan.contributors} cotisant(s), ` +
         `${plan.share} par tête pour ${plan.participants} membre(s) du rôle ${role.name}` +
         (failures ? ` — ${failures} échec(s)` : "")
     );
-    return { ok: true, plan, role, percent, failures };
+    return { ok: true, plan, role, percent, failures, applied };
+  } catch (error) {
+    // Le marqueur voyage avec l'exception : c'est lui qui interdit au minuteur
+    // de rendre une échéance dont le versement a déjà eu lieu.
+    error.applied = applied;
+    throw error;
   } finally {
     if (token) {
       await new Promise((resolve) =>
@@ -372,36 +409,43 @@ export async function maybeRunRedistribution(client) {
   if (!resolved) return null;
   if (resolved.reason) return log(`Pot commun reporté : ${resolved.reason}`);
 
-  const claimed = await new Promise((resolve) =>
-    claimRedistribution(intervalMs, (err, ok) => {
+  const claimedAt = await new Promise((resolve) =>
+    claimRedistribution(intervalMs, (err, at) => {
       if (err) handleException("Revendication du pot commun :", err);
-      resolve(ok);
+      resolve(at);
     })
   );
-  if (!claimed) return null;
-  const claimedAt = await new Promise((resolve) =>
-    getNextRedistributionAt((err, at) => resolve(err ? 0 : at))
-  );
+  if (!claimedAt) return null;
 
   const result = await runRedistribution(guild, { triggeredBy: "auto", resolved }).catch(
     (error) => {
       handleException("Pot commun :", error);
-      return { ok: false, reason: error.message };
+      // Une exception levée APRÈS le versement reste un pot qui a eu lieu :
+      // l'échéance doit rester consommée, sous peine de tout reprélever.
+      return { ok: false, reason: error.message, transient: !error.applied, applied: error.applied };
     }
   );
 
-  if (!result.ok) {
-    await new Promise((resolve) =>
-      rollbackClaim(dueAt, claimedAt, (err, restored) => {
-        if (err) handleException("Restitution de l'échéance :", err);
-        log(
-          `Pot commun annulé : ${result.reason}` +
-            (restored ? " — l'échéance est rendue, le tour suivant réessaiera." : "")
-        );
-        resolve();
-      })
-    );
-    return null;
+  if (result.ok) return result;
+
+  // L'échéance n'est rendue que sur un empêchement PASSAGER, et jamais si
+  // l'argent a bougé. Un pot vide, lui, consomme la semaine : la rendre ferait
+  // reprendre le tick chaque heure, guild.members.fetch() compris, sans fin.
+  if (!result.transient || result.applied) {
+    return log(`Pot commun annulé : ${result.reason} — l'échéance reste consommée.`);
   }
-  return result;
+
+  await new Promise((resolve) =>
+    rollbackClaim(dueAt, claimedAt, (err, restored) => {
+      if (err) handleException("Restitution de l'échéance :", err);
+      log(
+        `Pot commun reporté : ${result.reason}` +
+          (restored
+            ? " — l'échéance est rendue, le tour suivant réessaiera."
+            : " — l'échéance n'a PAS pu être rendue, le pot saute son tour.")
+      );
+      resolve();
+    })
+  );
+  return null;
 }

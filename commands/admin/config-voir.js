@@ -1,5 +1,6 @@
 import {
   configChoices,
+  configOverrideStatus,
   formatConfigValue,
   listConfigEntries,
   previewConfigValue,
@@ -47,19 +48,27 @@ export default {
   },
 
   async execute(interaction) {
+    // Une surcharge illisible fait retomber tout sur les défauts sans un mot :
+    // c'est précisément ici qu'on viendrait constater qu'un réglage « n'a pas
+    // pris », et c'est donc ici qu'il faut le dire.
+    const statut = configOverrideStatus();
+    const alerte = statut.ok ? "" : `${statut.reason}\n\n`;
     const key = interaction.options.getString("cle") ?? "";
-    if (!key) return interaction.editReply({ content: listBranch("") });
+    if (!key) return interaction.editReply({ content: alerte + listBranch("") });
 
     const result = readConfigValue(key);
-    if (!result.ok) return interaction.editReply({ content: `❌ ${result.reason}` });
+    if (!result.ok) return interaction.editReply({ content: alerte + `❌ ${result.reason}` });
     if (result.type === "objet") {
-      return interaction.editReply({ content: `**\`${result.path}\`**\n${listBranch(result.path)}` });
+      return interaction.editReply({
+        content: `${alerte}**\`${result.path}\`**\n${listBranch(result.path)}`,
+      });
     }
 
     const identical = JSON.stringify(result.current) === JSON.stringify(result.fallback);
     await interaction
       .editReply({
         content:
+          alerte +
           `\`${result.path}\`\n` +
           `Actuel : ${formatConfigValue(result.current)}\n` +
           (identical
