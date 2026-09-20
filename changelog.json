@@ -1,7 +1,44 @@
 {
-  "version": "1.12.1",
-  "lastUpdated": "2026-09-19T15:57:44.389Z",
+  "version": "1.12.2",
+  "lastUpdated": "2026-09-20T20:04:40.580Z",
   "releases": [
+    {
+      "version": "1.12.2",
+      "date": "2026-09-20",
+      "title": "Release 1.12.2",
+      "features": [
+        {
+          "type": "enhancement",
+          "name": "Le parc safari se reprend, et dure aussi longtemps que lui",
+          "description": "Fermer le message privé du parc ne coûte plus la visite : le bouton « Entrer dans le parc » et /safari la rouvrent là où elle en était, sans reprendre d'action ni débiter le moindre point. Et une visite ne se termine plus au bout d'une heure mais à la fermeture des grilles — 24 h après l'ouverture du parc — avec une heure garantie à qui entre au dernier moment.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-20T19:56:33.513408Z",
+          "branch": "claude/sleepy-cerf-hxgk8t"
+        },
+        {
+          "type": "feature",
+          "name": "Une vraie fiche de Pokémon",
+          "description": "/pokeinfo va à l'essentiel — numéro, nom, type, rareté, difficulté et chances à la Poké Ball — et affiche désormais toute la lignée évolutive, stade par stade, en indiquant pour chacun si tu l'as déjà. Le bouton des apparitions sert la même fiche : « Je l'ai déjà ? » devient « Infos du Pokémon » et répond aux deux questions d'un coup.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-20T19:56:33.513408Z",
+          "branch": "claude/sleepy-cerf-hxgk8t"
+        },
+        {
+          "type": "fix",
+          "name": "Partage du bilan de safari sans autorisation superflue",
+          "description": "Partager son bilan de visite exigeait que le dresseur puisse lui-même écrire dans le salon. C'est le bot qui publie : seules ses permissions à lui sont désormais vérifiées.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-20T19:56:33.513408Z",
+          "branch": "claude/sleepy-cerf-hxgk8t"
+        }
+      ]
+    },
     {
       "version": "1.12.1",
       "date": "2026-09-19",
@@ -926,36 +963,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "enhancement",
-      "name": "Le parc safari se reprend, et dure aussi longtemps que lui",
-      "description": "Fermer le message privé du parc ne coûte plus la visite : le bouton « Entrer dans le parc » et /safari la rouvrent là où elle en était, sans reprendre d'action ni débiter le moindre point. Et une visite ne se termine plus au bout d'une heure mais à la fermeture des grilles — 24 h après l'ouverture du parc — avec une heure garantie à qui entre au dernier moment.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-20T19:56:33.513408Z",
-      "branch": "claude/sleepy-cerf-hxgk8t"
-    },
-    {
-      "type": "feature",
-      "name": "Une vraie fiche de Pokémon",
-      "description": "/pokeinfo va à l'essentiel — numéro, nom, type, rareté, difficulté et chances à la Poké Ball — et affiche désormais toute la lignée évolutive, stade par stade, en indiquant pour chacun si tu l'as déjà. Le bouton des apparitions sert la même fiche : « Je l'ai déjà ? » devient « Infos du Pokémon » et répond aux deux questions d'un coup.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-20T19:56:33.513408Z",
-      "branch": "claude/sleepy-cerf-hxgk8t"
-    },
-    {
-      "type": "fix",
-      "name": "Partage du bilan de safari sans autorisation superflue",
-      "description": "Partager son bilan de visite exigeait que le dresseur puisse lui-même écrire dans le salon. C'est le bot qui publie : seules ses permissions à lui sont désormais vérifiées.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-20T19:56:33.513408Z",
-      "branch": "claude/sleepy-cerf-hxgk8t"
-    }
-  ]
+  "pending": []
 }
