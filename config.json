@@ -18,10 +18,10 @@
 			"globalMultiplier":1,
 			"throwCooldownSeconds":5,
 			"balls":{
-				"poke":{"label":"Poké Ball","emoji":"⚪","price":120,"multiplier":1},
-				"super":{"label":"Super Ball","emoji":"🔵","price":210,"multiplier":2},
-				"hyper":{"label":"Hyper Ball","emoji":"🟡","price":400,"multiplier":4},
-				"master":{"label":"Master Ball","emoji":"🟣","price":22500,"multiplier":255,"guaranteed":true}
+				"poke":{"label":"Poké Ball","emoji":"<:pokeball:1551325915160514690>","price":120,"multiplier":1},
+				"super":{"label":"Super Ball","emoji":"<:superball:1551325951361679411>","price":210,"multiplier":2},
+				"hyper":{"label":"Hyper Ball","emoji":"<:hyperball:1551326031431077898>","price":400,"multiplier":4},
+				"master":{"label":"Master Ball","emoji":"<:masterball:1551326387455926432>","price":22500,"multiplier":255,"guaranteed":true}
 			}
 		},
 		"evolution":{

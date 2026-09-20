@@ -963,5 +963,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Les balls ont leur vraie icône",
+      "description": "Poké Ball, Super Ball, Hyper Ball et Master Ball s'affichent avec les emojis du serveur au lieu des pastilles de couleur, partout : sur les boutons de lancer, dans les annonces d'apparition et sur les fiches de Pokémon.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-20T20:21:11.267242Z",
+      "branch": "claude/sleepy-cerf-hxgk8t"
+    }
+  ]
 }

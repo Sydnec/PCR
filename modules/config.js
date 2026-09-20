@@ -51,13 +51,20 @@ const POKEMON = {
   capture: {
     globalMultiplier: 1,
     throwCooldownSeconds: 5,
+    // Les emoji des balls sont ceux du serveur, au format Discord `<:nom:id>`.
+    // C'est l'identifiant qui décide de l'image affichée, jamais le nom : le
+    // renommer côté serveur ne casse rien, le supprimer si. Ce format-là rend
+    // aussi bien dans le texte d'un embed que sur un bouton, là où l'identifiant
+    // nu ne marcherait que sur le bouton. Un emoji unicode ordinaire reste une
+    // valeur valide, ce qui laisse de quoi dépanner depuis /admin config si le
+    // bot perd l'accès au serveur qui les héberge.
     balls: {
-      poke: { label: "Poké Ball", emoji: "⚪", price: 150, multiplier: 1 },
-      super: { label: "Super Ball", emoji: "🔵", price: 400, multiplier: 2 },
-      hyper: { label: "Hyper Ball", emoji: "🟡", price: 1000, multiplier: 4 },
+      poke: { label: "Poké Ball", emoji: "<:pokeball:1551325915160514690>", price: 150, multiplier: 1 },
+      super: { label: "Super Ball", emoji: "<:superball:1551325951361679411>", price: 400, multiplier: 2 },
+      hyper: { label: "Hyper Ball", emoji: "<:hyperball:1551326031431077898>", price: 1000, multiplier: 4 },
       master: {
         label: "Master Ball",
-        emoji: "🟣",
+        emoji: "<:masterball:1551326387455926432>",
         price: 50000,
         multiplier: 255,
         guaranteed: true,
