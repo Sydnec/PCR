@@ -1,7 +1,24 @@
 {
-  "version": "1.12.2",
-  "lastUpdated": "2026-09-20T20:04:40.580Z",
+  "version": "1.12.3",
+  "lastUpdated": "2026-09-20T20:21:57.383Z",
   "releases": [
+    {
+      "version": "1.12.3",
+      "date": "2026-09-20",
+      "title": "Release 1.12.3",
+      "features": [
+        {
+          "type": "enhancement",
+          "name": "Les balls ont leur vraie icône",
+          "description": "Poké Ball, Super Ball, Hyper Ball et Master Ball s'affichent avec les emojis du serveur au lieu des pastilles de couleur, partout : sur les boutons de lancer, dans les annonces d'apparition et sur les fiches de Pokémon.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-20T20:21:11.267242Z",
+          "branch": "claude/sleepy-cerf-hxgk8t"
+        }
+      ]
+    },
     {
       "version": "1.12.2",
       "date": "2026-09-20",
@@ -963,16 +980,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "enhancement",
-      "name": "Les balls ont leur vraie icône",
-      "description": "Poké Ball, Super Ball, Hyper Ball et Master Ball s'affichent avec les emojis du serveur au lieu des pastilles de couleur, partout : sur les boutons de lancer, dans les annonces d'apparition et sur les fiches de Pokémon.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-20T20:21:11.267242Z",
-      "branch": "claude/sleepy-cerf-hxgk8t"
-    }
-  ]
+  "pending": []
 }
