@@ -48,6 +48,33 @@ export function getOwnedVariants(userId, speciesId, cb) {
   );
 }
 
+// Les mêmes variantes, pour plusieurs espèces d'un coup. La fiche d'un Pokémon
+// affiche toute sa lignée évolutive : une requête par maillon, ce serait quatre
+// allers-retours pour une seule réponse. Renvoie une entrée par identifiant
+// demandé, même à zéro, pour que l'appelant n'ait aucun cas absent à traiter.
+export function getOwnedVariantsFor(userId, speciesIds, cb) {
+  const ids = [...new Set(speciesIds.map(Number))].filter(Number.isInteger);
+  const counts = new Map(ids.map((id) => [id, { normal: 0, shiny: 0 }]));
+  if (!ids.length) return cb(null, counts);
+
+  db.all(
+    `SELECT species_id, is_shiny, count FROM pokemon_collection
+      WHERE user_id = ? AND count > 0
+        AND species_id IN (${ids.map(() => "?").join(", ")})`,
+    [userId, ...ids],
+    (err, rows) => {
+      if (err) return cb(err, counts);
+      for (const row of rows || []) {
+        const entry = counts.get(row.species_id);
+        if (!entry) continue;
+        if (row.is_shiny) entry.shiny = row.count;
+        else entry.normal = row.count;
+      }
+      cb(null, counts);
+    }
+  );
+}
+
 export function getLeaderboard(limit, cb) {
   db.all(
     `SELECT user_id,

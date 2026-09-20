@@ -1,22 +1,20 @@
-import { SlashCommandBuilder, EmbedBuilder, MessageFlags } from "discord.js";
+import { SlashCommandBuilder, MessageFlags } from "discord.js";
 import { handleException } from "../modules/utils.js";
 import {
-  RARITIES,
-  difficultyLabel,
-  embedColor,
-  evolutionTargets,
+  evolutionChain,
   getSpecies,
-  probabilitiesByBall,
-  rarityOf,
   searchByName,
-  spriteUrl,
 } from "../modules/pokemon/data.js";
-import { getOwned } from "../modules/pokemon/collection.js";
+import { getOwnedVariantsFor } from "../modules/pokemon/collection.js";
+import { buildSpeciesInfoEmbed } from "../modules/pokemon/embeds.js";
 
+// La fiche est construite par embeds.js, exactement comme celle du bouton
+// « Infos du Pokémon » des apparitions : une seule mise en forme, donc une
+// commande et un bouton qui ne peuvent pas répondre deux choses différentes.
 export default {
   data: new SlashCommandBuilder()
     .setName("pokeinfo")
-    .setDescription("Fiche d'un Pokémon : rareté, difficulté et chances de capture")
+    .setDescription("Fiche d'un Pokémon : type, rareté, difficulté et lignée évolutive")
     .addStringOption((option) =>
       option
         .setName("pokemon")
@@ -45,57 +43,23 @@ export default {
         });
       }
 
-      const rarity = RARITIES[rarityOf(species)];
-      const probabilities = probabilitiesByBall(species.catchRate)
-        .filter((ball) => !ball.guaranteed)
-        .map(
-          (ball) =>
-            `${ball.emoji} **${ball.label}** — ${(ball.probability * 100).toFixed(1)} % · ${ball.price} pts`
-        )
-        .join("\n");
-
-      const evolutions = evolutionTargets(species);
-      const embed = new EmbedBuilder()
-        .setTitle(`#${String(species.id).padStart(3, "0")} ${species.name}`)
-        .setColor(embedColor(species, false))
-        .setThumbnail(spriteUrl(species, false))
-        .addFields(
-          { name: "Type", value: species.types.join(" / "), inline: true },
-          { name: "Rareté", value: `${rarity.icon} ${rarity.label}`, inline: true },
-          {
-            name: "Difficulté",
-            value: `${difficultyLabel(species.catchRate)} (taux ${species.catchRate})`,
-            inline: true,
-          },
-          { name: "Chances de capture", value: probabilities, inline: false }
-        );
-
-      if (species.tradeEvolution) {
-        embed.addFields({
-          name: "⚠️ Introuvable à l'état sauvage",
-          value: "Ce Pokémon s'obtient uniquement par fusion de doublons.",
-          inline: false,
-        });
-      }
-
-      if (evolutions.length) {
-        embed.addFields({
-          name: "Évolutions",
-          value: evolutions.map((target) => `→ ${target.name}`).join("\n"),
-          inline: false,
-        });
-      }
-
-      getOwned(interaction.user.id, species.id, false, (err, count) => {
-        if (!err) {
-          embed.setFooter({
-            text: count ? `Tu en possèdes ${count}` : "Tu n'en possèdes aucun",
-          });
+      const chain = evolutionChain(species);
+      getOwnedVariantsFor(
+        interaction.user.id,
+        chain.map((link) => link.id),
+        (err, owned) => {
+          // Une collection illisible ne doit pas priver le dresseur de la
+          // fiche : getOwnedVariantsFor rend des compteurs à zéro, et la lignée
+          // s'affiche simplement sans ses pastilles de possession.
+          if (err) handleException("Lecture de la collection pour /pokeinfo :", err);
+          interaction
+            .reply({
+              embeds: [buildSpeciesInfoEmbed(species, { owned })],
+              flags: MessageFlags.Ephemeral,
+            })
+            .catch(() => {});
         }
-        interaction
-          .reply({ embeds: [embed], flags: MessageFlags.Ephemeral })
-          .catch(() => {});
-      });
+      );
     } catch (error) {
       handleException(error);
     }

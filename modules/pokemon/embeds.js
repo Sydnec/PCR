@@ -12,6 +12,7 @@ import {
   dexSize,
   difficultyLabel,
   embedColor,
+  evolutionChain,
   getSpecies,
   isSafariFinished,
   probabilitiesByBall,
@@ -124,15 +125,124 @@ export function buildBallRow(spawnId, { disabled = false, panel = false } = {}) 
 
 // Un message Discord est identique pour tous ses lecteurs : impossible d'y
 // afficher « tu l'as déjà » personnalisé. Ce bouton contourne la limite en
-// répondant à chacun en privé selon SA collection.
-export function buildOwnedRow(spawnId) {
+// répondant à chacun en privé selon SA collection — et tant qu'on lui ouvre un
+// éphémère, il y sert la fiche complète plutôt que la seule ligne de possession.
+//
+// Le customId reste `poke_owned` : il est gravé dans les messages déjà postés,
+// et le renommer ferait taire les boutons des apparitions en cours.
+export function buildInfoRow(spawnId) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`poke_owned|${spawnId}`)
-      .setLabel("Je l'ai déjà ?")
-      .setEmoji("❓")
+      .setLabel("Infos du Pokémon")
+      .setEmoji("ℹ️")
       .setStyle(ButtonStyle.Secondary)
   );
+}
+
+// ====================== FICHE D'ESPÈCE ======================
+
+const dexNumber = (species) => `#${String(species.id).padStart(3, "0")}`;
+
+// Les stades tels que le dataset les numérote : 1 = forme de base.
+const STAGE_LABELS = ["Forme de base", "Stade 1", "Stade 2"];
+
+// La ball de référence : la moins puissante de celles qui ne garantissent rien,
+// donc la Poké Ball avec les réglages par défaut. Une seule probabilité suffit à
+// situer la difficulté, les autres s'en déduisent par leur multiplicateur — et
+// la fiche tient sur un écran de téléphone.
+function referenceBall(catchRate) {
+  return (
+    probabilitiesByBall(catchRate)
+      .filter((ball) => !ball.guaranteed)
+      .sort((a, b) => a.multiplier - b.multiplier)[0] ?? null
+  );
+}
+
+// Un maillon de la lignée : possession, numéro, nom. La variante qui compte est
+// celle qu'on a sous les yeux — sur une apparition shiny, « je l'ai » veut dire
+// « je l'ai en shiny », un shiny étant une entrée de Pokédex distincte. Les deux
+// compteurs restent affichés : « pas en shiny, mais j'en ai deux normaux » est
+// précisément ce que le dresseur cherche à savoir avant de lancer une ball.
+function chainLine(species, counts, { current = false, focusShiny = false } = {}) {
+  const owned = counts ?? { normal: 0, shiny: 0 };
+  const has = focusShiny ? owned.shiny > 0 : owned.normal > 0;
+  const marks = [];
+  if (owned.normal > 0) marks.push(`\u00D7${owned.normal}`);
+  if (owned.shiny > 0) marks.push(`\u2728\u00D7${owned.shiny}`);
+
+  return (
+    `${has ? "\u2705" : "\u2754"} \`${dexNumber(species)}\` ` +
+    `${current ? `**${species.name}**` : species.name}` +
+    `${species.tradeEvolution ? " \u{1F512}" : ""}` +
+    `${marks.length ? ` ${marks.join(" ")}` : ""}`
+  );
+}
+
+// Fiche d'une espèce : ce qu'elle est, ce qu'elle coûte à attraper, et où en est
+// le dresseur dans sa lignée. Elle sert /pokeinfo comme le bouton des
+// apparitions : « je l'ai déjà ? » n'est qu'un cas particulier de « parle-moi de
+// ce Pokémon », et deux réponses séparées auraient fini par diverger.
+export function buildSpeciesInfoEmbed(
+  species,
+  // catchRate se passe explicitement : une apparition fige le sien à la
+  // naissance du spawn, et la fiche doit annoncer le même chiffre que l'embed
+  // d'où l'on vient, pas celui d'un dataset régénéré entre-temps.
+  { owned = new Map(), isShiny = false, catchRate = species.catchRate } = {}
+) {
+  const rarity = RARITIES[rarityOf(species)];
+  const ball = referenceBall(catchRate);
+  const chain = evolutionChain(species);
+
+  const embed = new EmbedBuilder()
+    .setTitle(`${isShiny ? "\u2728 " : ""}${dexNumber(species)} ${species.name}`)
+    .setColor(embedColor(species, isShiny))
+    .setThumbnail(spriteUrl(species, isShiny))
+    .addFields(
+      { name: "Type", value: species.types.join(" / "), inline: true },
+      { name: "Rareté", value: `${rarity.icon} ${rarity.label}`, inline: true },
+      {
+        name: "Difficulté",
+        value:
+          difficultyLabel(catchRate) +
+          (ball ? `\n${ball.emoji} ${formatPercent(ball.probability)}` : ""),
+        inline: true,
+      }
+    );
+
+  // Un champ par stade : la rangée se lit de gauche à droite comme la lignée
+  // elle-même, et un embranchement (Évoli) empile ses trois cibles dans le
+  // champ de son stade, là où une liste à flèches aurait laissé croire à une
+  // chaîne unique.
+  const stages = new Map();
+  for (const link of chain) {
+    const lines = stages.get(link.stage) ?? [];
+    lines.push(
+      chainLine(link, owned.get(link.id), {
+        current: link.id === species.id,
+        focusShiny: isShiny,
+      })
+    );
+    stages.set(link.stage, lines);
+  }
+
+  const solo = stages.size <= 1;
+  for (const [stage, lines] of [...stages].sort((a, b) => a[0] - b[0])) {
+    embed.addFields({
+      // Sans lignée, « Forme de base » ne veut rien dire : le champ ne répond
+      // plus qu'à une question, celle de la collection.
+      name: solo ? "Ton Pokédex" : STAGE_LABELS[stage - 1] ?? `Stade ${stage - 1}`,
+      value: lines.join("\n"),
+      inline: true,
+    });
+  }
+
+  if (chain.some((link) => link.tradeEvolution)) {
+    embed.setFooter({
+      text: "\u{1F512} Introuvable à l'état sauvage : uniquement par fusion de doublons.",
+    });
+  }
+  return embed;
 }
 
 const formatPoints = (value) => value.toLocaleString("fr-FR");
@@ -559,6 +669,12 @@ function buildSafariRow(session, config) {
   );
 }
 
+// Un éphémère se ferme d'un geste, et personne ne peut le rouvrir à la place de
+// son destinataire : le bouton du parc et /safari le refont, avec la visite là
+// où elle en était. Sans cette phrase, le dresseur croirait avoir perdu les
+// actions déjà jouées en retrouvant un plateau entamé.
+const SAFARI_RESUMED = "\u{1F3D5}\uFE0F Tu reprends ta visite là où tu l'avais laissée.";
+
 // Partage du bilan, dans le salon où l'on se trouve. Un bouton et rien d'autre :
 // le bilan est éphémère, donc invisible des autres tant qu'on ne le publie pas.
 function buildSafariShareRow(session) {
@@ -575,11 +691,21 @@ function buildSafariShareRow(session) {
 // le bilan une fois les actions épuisées. Un seul point d'entrée, pour que la
 // commande, le bouton d'entrée et les trois actions rendent rigoureusement la
 // même chose — et qu'ajouter un champ ne demande qu'une seule retouche.
-export function buildSafariView(session, { result = null, catches = [], owned = null } = {}) {
+//
+// `content` fait partie de la vue, et vaut null par défaut : les actions
+// réécrivent le même message, et une ligne « tu reprends ta visite » laissée par
+// une reprise resterait affichée jusqu'à la fin de la partie si personne ne
+// l'effaçait. Les appelants qui ont leur propre phrase l'écrivent APRÈS avoir
+// étalé la vue.
+export function buildSafariView(
+  session,
+  { result = null, catches = [], owned = null, resumed = false } = {}
+) {
   const config = getSafariConfig();
   const intro = result ? safariOutcomeLine(result, config) : null;
   const finie = isSafariFinished(session);
   const species = finie ? null : getSpecies(session.encounter_species_id);
+  const content = resumed ? SAFARI_RESUMED : null;
 
   if (!species) {
     // Le bouton n'apparaît que sur une visite réellement terminée et pas encore
@@ -588,11 +714,13 @@ export function buildSafariView(session, { result = null, catches = [], owned = 
     // proposer un partage que la base refuserait ensuite serait une promesse en
     // l'air.
     return {
+      content,
       embeds: [buildSafariRecapEmbed(session, catches, { intro, config })],
       components: finie && !session.shared_at ? [buildSafariShareRow(session)] : [],
     };
   }
   return {
+    content,
     embeds: [buildEncounterEmbed(session, species, config, { intro, owned })],
     components: [buildSafariRow(session, config)],
   };

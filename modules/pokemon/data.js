@@ -195,6 +195,36 @@ export function searchByName(query, limit = 25) {
 export const evolutionTargets = (species) =>
   species.evolvesInto.map(getSpecies).filter(Boolean);
 
+// La lignée complète d'une espèce, de la forme de base aux évolutions les plus
+// avancées, dans l'ordre des stades. On remonte par evolvesFrom puis on
+// redescend en largeur par evolvesInto : « qu'est-ce qu'il me manque dans cette
+// famille ? » ne se pose pas différemment selon le maillon consulté, donc la
+// fiche affiche la même lignée qu'on l'ouvre sur Bulbizarre ou sur Florizarre.
+// Le garde-fou sur les identifiants déjà vus n'est pas décoratif : un dataset
+// régénéré avec un cycle ferait tourner ces deux boucles indéfiniment.
+export function evolutionChain(species) {
+  let root = species;
+  const climbed = new Set([root.id]);
+  while (root.evolvesFrom) {
+    const parent = getSpecies(root.evolvesFrom);
+    if (!parent || climbed.has(parent.id)) break;
+    climbed.add(parent.id);
+    root = parent;
+  }
+
+  const chain = [];
+  const seen = new Set();
+  const queue = [root];
+  while (queue.length) {
+    const current = queue.shift();
+    if (seen.has(current.id)) continue;
+    seen.add(current.id);
+    chain.push(current);
+    queue.push(...evolutionTargets(current));
+  }
+  return chain;
+}
+
 // Le coût d'une évolution dépend du stade de la CIBLE : passer en stade 2 coûte
 // moins cher que passer en stade 3.
 export function evolutionCost(targetSpecies, evolutionConfig) {

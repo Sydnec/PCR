@@ -41,8 +41,10 @@ const ACTION_COLUMNS = {
 // Refus que plusieurs gardes peuvent produire — l'index unique et la
 // vérification qui le précède, par exemple. Un seul libellé, pour que le joueur
 // lise la même phrase quel que soit le chemin qui l'a arrêté.
+//
+// « Tu es déjà dans le parc » n'en fait plus partie : une visite en cours ne se
+// refuse pas, elle se rouvre (voir resumeSession).
 const REFUSALS = {
-  ALREADY_IN_PARK: "Tu es déjà dans le parc ! Termine ta visite en cours d'abord.",
   ALREADY_ENTERED: "Tu es déjà entré dans ce parc safari : c'est une visite par dresseur.",
   REPLAYED: "Cette action a déjà été jouée.",
 };
@@ -203,32 +205,71 @@ function expireStaleSessions(userId, cb) {
   );
 }
 
-// Deux index uniques peuvent refuser l'insertion d'une session. SQLite nomme les
-// colonnes en conflit et non l'index, et ce texte n'est pas un contrat : on
-// demande donc à la base laquelle des deux règles a joué, plutôt que de lire
-// dans l'erreur.
-function explainSessionConflict(userId, parkId, cb) {
-  db.get(
-    `SELECT
-       EXISTS(SELECT 1 FROM pokemon_safari_sessions
-               WHERE user_id = ? AND status = 'ACTIVE') AS in_park,
-       EXISTS(SELECT 1 FROM pokemon_safari_sessions
-               WHERE user_id = ? AND park_id IS NOT NULL AND park_id = ?) AS entered`,
-    [userId, userId, parkId],
-    (err, row) => {
-      if (err) return cb(err);
-      if (row?.in_park) return cb(null, refuse("ALREADY_IN_PARK"));
-      if (row?.entered) return cb(null, refuse("ALREADY_ENTERED"));
-      // Aucune des deux règles ne s'applique : la contrainte violée n'est pas
-      // celle qu'on croit, et la masquer rendrait le bug introuvable.
-      cb(new Error("Insertion de session de parc safari refusée par la base."));
-    }
-  );
+// La visite en cours d'un dresseur, rencontre comprise et prête à réafficher.
+// Fermer l'éphémère est un geste banal — sur mobile il suffit de le balayer — et
+// il ne doit pas coûter une visite : tant que la session est ouverte, le bouton
+// du parc comme /safari la rouvrent au lieu de refuser l'entrée.
+//
+// La garde sur expires_at double celle d'expireStaleSessions : si l'UPDATE
+// d'expiration a échoué, mieux vaut ne rien rouvrir que de servir un plateau
+// dont tous les boutons seront refusés.
+export function resumeSession(userId, cb) {
+  expireStaleSessions(userId, () => {
+    db.get(
+      `SELECT * FROM pokemon_safari_sessions
+        WHERE user_id = ? AND status = 'ACTIVE' AND expires_at > ?`,
+      [userId, Date.now()],
+      (err, session) => {
+        if (err) return cb(err);
+        if (!session) return cb(null, null);
+        withOwned({ ok: true, session, resumed: true }, cb);
+      }
+    );
+  });
 }
 
-function startSession(userId, { parkId = null, entryCost = 0 }, cb) {
+// Deux index uniques peuvent refuser l'insertion d'une session, et la réponse
+// n'est pas la même : une visite encore ouverte se rouvre, une visite déjà
+// consommée se refuse. SQLite nomme les colonnes en conflit et non l'index, et
+// ce texte n'est pas un contrat : on demande donc à la base laquelle des deux
+// règles a joué, plutôt que de lire dans l'erreur.
+function resolveSessionConflict(userId, parkId, cb) {
+  resumeSession(userId, (err, ongoing) => {
+    if (err) return cb(err);
+    // Course entre deux clics : la visite existe déjà, on la rend plutôt que de
+    // refuser une entrée qui a bel et bien eu lieu.
+    if (ongoing) return cb(null, ongoing);
+
+    db.get(
+      `SELECT 1 AS entered FROM pokemon_safari_sessions
+        WHERE user_id = ? AND park_id IS NOT NULL AND park_id = ?`,
+      [userId, parkId],
+      (err, row) => {
+        if (err) return cb(err);
+        if (row) return cb(null, refuse("ALREADY_ENTERED"));
+        // Aucune des deux règles ne s'applique : la contrainte violée n'est pas
+        // celle qu'on croit, et la masquer rendrait le bug introuvable.
+        cb(new Error("Insertion de session de parc safari refusée par la base."));
+      }
+    );
+  });
+}
+
+// Une visite dure jusqu'à la fermeture du parc : c'est le parc qui est
+// l'événement, et un dresseur entré au début ne doit pas avoir moins de temps
+// devant lui que son message n'en affiche. Le plancher est là pour l'autre bout
+// de la fenêtre — entrer dix minutes avant la fermeture donnerait dix minutes de
+// jeu, et 25 actions ne se jouent pas en dix minutes. Une entrée payante n'a pas
+// de parc derrière elle : le plancher fait alors toute la durée.
+function sessionExpiry(park, config) {
+  const floor = Date.now() + config.sessionMinDurationMinutes * 60 * 1000;
+  return Math.max(floor, park?.expires_at ?? 0);
+}
+
+function startSession(userId, { park = null, entryCost = 0 }, cb) {
   const config = getSafariConfig();
   const now = Date.now();
+  const parkId = park?.id ?? null;
 
   expireStaleSessions(userId, () => {
     const encounter = rollSafariEncounter(config);
@@ -247,7 +288,7 @@ function startSession(userId, { parkId = null, entryCost = 0 }, cb) {
         config.actionsPerSession,
         entryCost,
         now,
-        now + config.sessionDurationMinutes * 60 * 1000,
+        sessionExpiry(park, config),
         encounter.species.id,
         encounter.isShiny ? 1 : 0,
         encounter.catchRate,
@@ -257,7 +298,7 @@ function startSession(userId, { parkId = null, entryCost = 0 }, cb) {
         // fenêtre entre la vérification et l'insertion.
         if (err) {
           if (err.code !== "SQLITE_CONSTRAINT") return cb(err);
-          return explainSessionConflict(userId, parkId, cb);
+          return resolveSessionConflict(userId, parkId, cb);
         }
 
         getSession(this.lastID, (err, session) => {
@@ -275,22 +316,32 @@ function startSession(userId, { parkId = null, entryCost = 0 }, cb) {
 
 // Entrée gratuite par le bouton du message de parc.
 export function enterPark(userId, parkId, cb) {
-  getPark(parkId, (err, park) => {
+  // Une visite déjà ouverte passe avant toute autre considération, y compris la
+  // fermeture du parc : celui qui reclique veut retrouver sa partie, et ses
+  // actions lui restent acquises jusqu'à l'expiration de sa session.
+  resumeSession(userId, (err, ongoing) => {
     if (err) return cb(err);
-    if (!park || park.status !== "OPEN" || park.expires_at <= Date.now()) {
-      return cb(null, { ok: false, reason: "Ce parc safari a fermé ses portes." });
-    }
-    if (park.reserved_for && park.reserved_for !== userId) {
-      return cb(null, {
-        ok: false,
-        reason: "Ce parc safari est réservé à un autre dresseur.",
-      });
-    }
+    if (ongoing) return cb(null, ongoing);
 
-    startSession(userId, { parkId, entryCost: 0 }, (err, result) => {
+    getPark(parkId, (err, park) => {
       if (err) return cb(err);
-      if (result.ok) bumpParkEntries(parkId);
-      cb(null, result);
+      if (!park || park.status !== "OPEN" || park.expires_at <= Date.now()) {
+        return cb(null, { ok: false, reason: "Ce parc safari a fermé ses portes." });
+      }
+      if (park.reserved_for && park.reserved_for !== userId) {
+        return cb(null, {
+          ok: false,
+          reason: "Ce parc safari est réservé à un autre dresseur.",
+        });
+      }
+
+      startSession(userId, { park, entryCost: 0 }, (err, result) => {
+        if (err) return cb(err);
+        // Une session rendue par la résolution de course n'est pas une entrée
+        // de plus : le compteur du parc l'a déjà comptée.
+        if (result.ok && !result.resumed) bumpParkEntries(parkId);
+        cb(null, result);
+      });
     });
   });
 }
@@ -302,24 +353,25 @@ export function startPaidSession(userId, cb) {
   const now = Date.now();
   const cooldownMs = config.entryCooldownHours * HOUR;
 
-  // Les sessions abandonnées sont closes d'abord, sinon un joueur qui a quitté
-  // en cours de route se verrait refuser l'entrée pour une visite finie.
-  expireStaleSessions(userId, () => {
+  // Une visite en cours se rouvre plutôt que de se refuser, et avant tout débit :
+  // payer pour récupérer la partie qu'on avait déjà serait le pire des deux
+  // mondes. La reprise clôt au passage les sessions abandonnées, sans quoi un
+  // joueur parti en cours de route se verrait refuser l'entrée pour une visite
+  // finie.
+  resumeSession(userId, (err, ongoing) => {
+    if (err) return cb(err);
+    if (ongoing) return cb(null, ongoing);
+
     db.get(
-      `SELECT
-         EXISTS(SELECT 1 FROM pokemon_safari_sessions
-                 WHERE user_id = ? AND status = 'ACTIVE') AS in_park,
-         (SELECT MAX(started_at) FROM pokemon_safari_sessions
-           WHERE user_id = ? AND entry_cost > 0) AS last_paid`,
-      [userId, userId],
+      `SELECT MAX(started_at) AS last_paid FROM pokemon_safari_sessions
+        WHERE user_id = ? AND entry_cost > 0`,
+      [userId],
       (err, row) => {
         if (err) return cb(err);
 
-        // Les deux refus prévisibles passent avant le débit : l'index unique
-        // rattraperait le cas, mais au prix d'un aller-retour débit/remboursement
-        // que le joueur verrait passer sur son solde.
-        if (row?.in_park) return cb(null, refuse("ALREADY_IN_PARK"));
-
+        // Le refus prévisible passe avant le débit : l'index unique rattraperait
+        // le cas, mais au prix d'un aller-retour débit/remboursement que le
+        // joueur verrait passer sur son solde.
         const lastAt = row?.last_paid ?? 0;
         if (lastAt && now - lastAt < cooldownMs) {
           return cb(null, {
@@ -345,11 +397,14 @@ export function startPaidSession(userId, cb) {
             );
           }
 
-          startSession(userId, { parkId: null, entryCost: price }, (err, result) => {
-            // Filet de sécurité pour les courses que les gardes ci-dessus ne
-            // peuvent pas couvrir. Chemin de remboursement unique et journalisé :
-            // on ne rembourse qu'après un débit réussi, donc la ligne existe.
-            if (err || !result.ok) {
+          startSession(userId, { entryCost: price }, (err, result) => {
+            // Filet de sécurité pour les courses que la garde ci-dessus ne peut
+            // pas couvrir. Chemin de remboursement unique et journalisé : on ne
+            // rembourse qu'après un débit réussi, donc la ligne existe. Une
+            // session rendue par la résolution de course n'est pas celle qu'on
+            // vient de payer — elle existait déjà — donc les points repartent
+            // aussi.
+            if (err || !result.ok || result.resumed) {
               addPoints(userId, price, (refundErr) => {
                 if (refundErr) {
                   handleException("Remboursement de l'entrée du parc safari :", refundErr);

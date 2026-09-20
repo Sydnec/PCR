@@ -12,7 +12,7 @@ import {
   buildBallRow,
   buildCaughtEmbed,
   buildFledEmbed,
-  buildOwnedRow,
+  buildInfoRow,
   buildSpawnEmbed,
 } from "./embeds.js";
 import { recordSpawn, recordSpawnEnd } from "./stats.js";
@@ -242,7 +242,7 @@ function createSpawn(client, channel, species, isShiny, announcement, ping, prev
         const message = await channel.send({
           content,
           embeds: [buildSpawnEmbed(spawn, species, [], announcement)],
-          components: [buildBallRow(spawnId), buildOwnedRow(spawnId)],
+          components: [buildBallRow(spawnId), buildInfoRow(spawnId)],
         });
 
         db.run(

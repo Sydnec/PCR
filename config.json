@@ -37,7 +37,7 @@
 			"minHoursBetweenParks":48,
 			"parkDurationHours":24,
 			"spawnPauseHours":6,
-			"sessionDurationMinutes":60,
+			"sessionMinDurationMinutes":60,
 			"actionsPerSession":25,
 			"entryPrice":5000,
 			"entryCooldownHours":24,

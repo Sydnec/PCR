@@ -82,7 +82,10 @@ const POKEMON = {
     minHoursBetweenParks: 48,
     parkDurationHours: 24,
     spawnPauseHours: 6,
-    sessionDurationMinutes: 60,
+    // Une visite court jusqu'à la fermeture du parc ; ceci n'en est que le
+    // plancher, pour qui entre juste avant la fin — et toute la durée d'une
+    // entrée payante, qui n'a pas de parc derrière elle.
+    sessionMinDurationMinutes: 60,
     actionsPerSession: 25,
     entryPrice: 5000,
     entryCooldownHours: 24,

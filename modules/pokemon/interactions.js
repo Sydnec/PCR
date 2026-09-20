@@ -23,13 +23,13 @@ import {
   refreshParkMessage,
   releaseShare,
 } from "./safari.js";
-import { getSpecies } from "./data.js";
+import { evolutionChain, getSpecies } from "./data.js";
 import {
   acceptTrade,
   describeEvolution,
   evolve,
   getCollection,
-  getOwnedVariants,
+  getOwnedVariantsFor,
   getTrade,
   resolveTradeAs,
 } from "./collection.js";
@@ -39,6 +39,7 @@ import {
   buildDexRow,
   buildSafariRecapEmbed,
   buildSafariView,
+  buildSpeciesInfoEmbed,
   buildTradeEmbed,
   buildTradeRow,
   displayName,
@@ -102,11 +103,13 @@ function askMasterBallConfirmation(interaction, spawnId, { panel = false } = {})
   });
 }
 
-// ---------------------- « Je l'ai déjà ? » ----------------------
+// ---------------------- Fiche du Pokémon ----------------------
 
-// Répond en privé au cliqueur, ce qu'un embed public ne peut pas faire :
-// un message Discord est identique pour tous ses lecteurs.
-function answerAlreadyOwned(interaction, spawnId) {
+// Répond en privé au cliqueur, ce qu'un embed public ne peut pas faire : un
+// message Discord est identique pour tous ses lecteurs. La fiche est celle de
+// /pokeinfo, à ceci près qu'elle épouse l'apparition d'où vient le clic — sa
+// variante shiny et son taux de capture figé.
+function answerSpeciesInfo(interaction, spawnId) {
   getSpawn(spawnId, (err, spawn) => {
     if (err) {
       handleException(err);
@@ -117,41 +120,28 @@ function answerAlreadyOwned(interaction, spawnId) {
     const species = getSpecies(spawn.species_id);
     if (!species) return ephemeral(interaction, "❌ Espèce inconnue.");
 
-    getOwnedVariants(interaction.user.id, species.id, (err, owned) => {
-      if (err) {
-        handleException(err);
-        return ephemeral(interaction, "❌ Erreur base de données.");
+    const chain = evolutionChain(species);
+    getOwnedVariantsFor(
+      interaction.user.id,
+      chain.map((link) => link.id),
+      (err, owned) => {
+        // Compteurs à zéro en cas d'erreur : mieux vaut la fiche sans les
+        // pastilles de possession qu'un refus sec devant une apparition.
+        if (err) handleException("Lecture de la collection pour la fiche :", err);
+        interaction
+          .reply({
+            embeds: [
+              buildSpeciesInfoEmbed(species, {
+                owned,
+                isShiny: Boolean(spawn.is_shiny),
+                catchRate: spawn.catch_rate,
+              }),
+            ],
+            flags: MessageFlags.Ephemeral,
+          })
+          .catch(() => {});
       }
-
-      const plural = (n) => (n > 1 ? ` (×${n})` : "");
-
-      if (spawn.is_shiny) {
-        if (owned.shiny > 0) {
-          return ephemeral(
-            interaction,
-            `✅ Tu as déjà **${species.name}** ✨ dans ton Pokédex${plural(owned.shiny)}.`
-          );
-        }
-        return ephemeral(
-          interaction,
-          `🆕 Tu n'as pas encore **${species.name}** en shiny !` +
-            (owned.normal > 0
-              ? ` (tu possèdes la version normale${plural(owned.normal)})`
-              : ` Et tu n'as même pas la version normale.`)
-        );
-      }
-
-      if (owned.normal > 0) {
-        return ephemeral(
-          interaction,
-          `✅ Tu as déjà **${species.name}** dans ton Pokédex${plural(owned.normal)}.`
-        );
-      }
-      return ephemeral(
-        interaction,
-        `🆕 **${species.name}** n'est pas encore dans ton Pokédex !`
-      );
-    });
+    );
   });
 }
 
@@ -302,6 +292,10 @@ function handleTradeButton(interaction, action, tradeId) {
 // Le parc vit dans un message éphémère réécrit à chaque clic : chaque bouton est
 // une nouvelle interaction, donc un nouveau token, et la visite survit largement
 // aux 15 minutes de validité d'un token d'interaction.
+//
+// Cet éphémère reste néanmoins un message que son destinataire peut fermer, et
+// personne ne peut le lui rouvrir : c'est le bouton du parc qui le refait, avec
+// la visite là où elle en était.
 
 function handleSafariEnter(interaction, parkId) {
   enterPark(interaction.user.id, Number(parkId), (err, result) => {
@@ -311,10 +305,14 @@ function handleSafariEnter(interaction, parkId) {
     }
     if (!result.ok) return ephemeral(interaction, `❌ ${result.reason}`);
 
-    refreshParkMessage(interaction.client, Number(parkId));
+    // Une reprise n'est pas une entrée : le compteur du parc n'a pas bougé.
+    if (!result.resumed) refreshParkMessage(interaction.client, Number(parkId));
     interaction
       .reply({
-        ...buildSafariView(result.session, { owned: result.owned }),
+        ...buildSafariView(result.session, {
+          owned: result.owned,
+          resumed: result.resumed,
+        }),
         flags: MessageFlags.Ephemeral,
       })
       .catch(() => {});
@@ -340,9 +338,11 @@ const ENVOI_IMPOSSIBLE = new Set([
 // limite de débit sur le salon peut faire dépasser les trois secondes que
 // Discord laisse pour répondre — au retour, le jeton serait mort.
 //
-// La vérification porte sur les deux côtés, pas seulement le bot. Le parc
-// s'annonce parfois dans un salon où les membres ne postent pas, et le bouton y
-// deviendrait un moyen d'y faire parler le bot.
+// Seules les permissions du BOT sont vérifiées : c'est lui qui publie. Exiger
+// que le dresseur puisse écrire dans le salon revenait à lui refuser un bouton
+// que le bot lui avait mis sous les yeux, dans le salon même où le parc s'était
+// annoncé — et ce bouton ne poste rien d'autre que le bilan d'une visite que le
+// bot a lui-même arbitrée.
 function handleSafariShare(interaction, sessionId) {
   const channel = interaction.channel;
   if (!channel) return ephemeral(interaction, "❌ Salon introuvable.");
@@ -369,11 +369,7 @@ function handleSafariShare(interaction, sessionId) {
       const envoi = channel.isThread()
         ? PermissionFlagsBits.SendMessagesInThreads
         : PermissionFlagsBits.SendMessages;
-      const dresseur = channel.permissionsFor(interaction.member);
-      if (!dresseur?.has([PermissionFlagsBits.ViewChannel, envoi])) {
-        return dire(`❌ Tu ne peux pas écrire dans ${channel}.`);
-      }
-      // EmbedLinks en plus pour le bot : sans elle Discord refuse l'embed, et la
+      // EmbedLinks en plus de l'envoi : sans elle Discord refuse l'embed, et la
       // garde raterait la seule chose qu'elle est censée voir venir.
       const moi = channel.permissionsFor(interaction.guild?.members.me);
       if (!moi?.has([PermissionFlagsBits.ViewChannel, envoi, PermissionFlagsBits.EmbedLinks])) {
@@ -497,8 +493,10 @@ export async function handlePokemonButton(interaction) {
         })
         .catch(() => {});
 
+    // Le customId date du bouton « Je l'ai déjà ? », que la fiche a remplacé :
+    // les apparitions déjà postées le portent encore.
     case "poke_owned":
-      return answerAlreadyOwned(interaction, args[0]);
+      return answerSpeciesInfo(interaction, args[0]);
 
     case "poke_dex":
       return showDexPage(interaction, args[0], Number(args[1]));

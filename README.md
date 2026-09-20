@@ -43,14 +43,16 @@ que la capture réussisse ou non.
   avec confirmation obligatoire). Les probabilités suivent la formule officielle de la génération 3,
   à partir du taux de capture réel de chaque espèce.
 - **Shiny** (~1/500) comptant comme une entrée de Pokédex distincte.
-- **Bouton « ❓ Je l'ai déjà ? »** sur chaque apparition : un message Discord étant identique pour
-  tous ses lecteurs, ce bouton répond à chacun en privé selon sa propre collection.
+- **Bouton « ℹ️ Infos du Pokémon »** sur chaque apparition : un message Discord étant identique
+  pour tous ses lecteurs, ce bouton ouvre à chacun en privé la fiche de l'espèce — type, rareté,
+  chances à la Poké Ball, et toute la lignée évolutive avec ce qu'il en possède déjà.
 - À la capture comme à la fuite, l'embed affiche le **classement des points perdus** par dresseur,
   et le total part en pied de page.
 - **Commandes** :
   - `/pokedex [membre]` : collection, doublons, shinies et progression. Réponse privée.
   - `/pokeclassement` : classement des dresseurs par espèces distinctes.
-  - `/pokeinfo <pokemon>` : fiche, rareté et chances de capture par ball.
+  - `/pokeinfo <pokemon>` : la même fiche que le bouton des apparitions — type, rareté,
+    difficulté, et la lignée évolutive stade par stade avec ce que le dresseur en a déjà.
   - `/evolution <pokemon>` : fait évoluer un Pokémon en sacrifiant des doublons. Les lignées à
     embranchement (Évoli) peuvent évoluer au hasard, ou vers une cible choisie pour plus cher.
   - `/echange <membre> <je_donne> <je_recois>` : échange entre dresseurs.
@@ -88,14 +90,20 @@ temps d'une visite. C'est le seul contenu Pokémon où les actions ne coûtent r
 - **Raretés compensées** : stade 2 ×2, stade 3 (les *rares*) ×4, légendaires ×3, shiny 1/250 au lieu
   de 1/500. Les rares passent de 1,3 % à 4 % du pool et les légendaires de 0,4 % à 1 %. Les
   évolutions par échange restent hors pool, comme à l'état sauvage.
+- **Une visite dure autant que le parc** : elle expire à la fermeture des grilles, avec un
+  plancher d'une heure pour qui entre juste avant — 25 actions ne se jouent pas en dix minutes.
+- **La visite se reprend** : l'éphémère se ferme d'un geste et personne ne peut le rouvrir à la
+  place de son destinataire. Le bouton *« Entrer dans le parc »* le refait donc, avec la partie là
+  où elle en était, et `/safari` fait de même — y compris une fois le parc fermé, quand son message
+  n'a plus de bouton mais que la session court encore. Aucune action perdue, aucun point débité.
 - **Entrée payante** : `/safari` ouvre une visite hors événement pour **5 000 points**, avec un
   cooldown de 24 h. Si un parc gratuit attend le dresseur, la commande le lui dit au lieu de
-  débiter. Une visite entamée expire au bout d'une heure.
+  débiter. Sans parc derrière elle, cette visite-là dure le plancher : une heure.
 - **Partage du bilan** : la visite est privée de bout en bout, donc son bilan aussi. Un bouton
   **« 📤 Partager mon bilan »** le publie dans le salon courant, signé du dresseur et de son avatar.
-  Une fois par visite — le verrou est en base, pas dans la disparition du bouton — et seulement si
-  le dresseur **comme** le bot peuvent écrire dans ce salon : le parc s'annonce parfois là où les
-  membres ne postent pas, et le bouton y deviendrait un moyen de faire parler le bot. Un envoi qui
+  Une fois par visite — le verrou est en base, pas dans la disparition du bouton — et à la seule
+  condition que **le bot** puisse y publier un embed : c'est lui qui poste, et exiger la même chose
+  du dresseur revenait à lui refuser un bouton qu'on lui avait mis sous les yeux. Un envoi qui
   échoue rend le droit de réessayer.
 - Tout l'état vit en base : les boutons répondent encore après un redémarrage du bot, et un
   double-clic ne peut pas jouer deux fois la même action.

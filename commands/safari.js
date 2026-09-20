@@ -2,11 +2,19 @@ import { SlashCommandBuilder, MessageFlags } from "discord.js";
 import { handleException } from "../modules/utils.js";
 import { getPokemonConfig, getSafariConfig } from "../modules/pokemon/config.js";
 import { buildSafariView } from "../modules/pokemon/embeds.js";
-import { findFreeParkFor, startPaidSession } from "../modules/pokemon/safari.js";
+import {
+  findFreeParkFor,
+  resumeSession,
+  startPaidSession,
+} from "../modules/pokemon/safari.js";
 
 // Entrée payante du parc safari. L'événement aléatoire, lui, est gratuit et
 // passe par le bouton de son message — cette commande sert à s'offrir une visite
 // entre deux parcs.
+//
+// C'est aussi le seul moyen de rouvrir une visite en cours une fois le parc
+// fermé derrière elle : son message n'a plus de bouton, la session, elle, court
+// encore.
 export default {
   data: new SlashCommandBuilder()
     .setName("safari")
@@ -26,47 +34,76 @@ export default {
 
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-      findFreeParkFor(interaction.user.id, (err, freePark) => {
+      const erreur = () =>
+        interaction.editReply({ content: "❌ Erreur base de données." }).catch(() => {});
+
+      // Une visite déjà ouverte se rouvre, et rien d'autre : ni parc offert à
+      // annoncer, ni entrée à faire payer une seconde fois.
+      resumeSession(interaction.user.id, (err, ongoing) => {
         if (err) {
           handleException(err);
-          return interaction.editReply({ content: "❌ Erreur base de données." }).catch(() => {});
+          return erreur();
         }
-
-        // Une visite offerte attend : on ne débite pas 4 000 points pour la
-        // même chose sans le dire.
-        if (freePark) {
+        if (ongoing) {
           return interaction
-            .editReply({
-              content:
-                "🏕️ Un parc safari est ouvert en ce moment et **ton entrée est offerte** !\n" +
-                "Utilise le bouton *« Entrer dans le parc »* sur son message plutôt que " +
-                `de payer **${config.entryPrice}** points.`,
-            })
+            .editReply(
+              buildSafariView(ongoing.session, { owned: ongoing.owned, resumed: true })
+            )
             .catch(() => {});
         }
 
-        startPaidSession(interaction.user.id, (err, result) => {
+        findFreeParkFor(interaction.user.id, (err, freePark) => {
           if (err) {
             handleException(err);
-            return interaction.editReply({ content: "❌ Erreur base de données." }).catch(() => {});
+            return erreur();
           }
 
-          if (!result.ok) {
-            const content =
-              result.code === "COOLDOWN"
-                ? `⏳ Tu as déjà visité le parc récemment. Prochaine entrée possible <t:${Math.floor(result.retryAt / 1000)}:R>.`
-                : `❌ ${result.reason}`;
-            return interaction.editReply({ content }).catch(() => {});
+          // Une visite offerte attend : on ne débite pas 5 000 points pour la
+          // même chose sans le dire.
+          if (freePark) {
+            return interaction
+              .editReply({
+                content:
+                  "🏕️ Un parc safari est ouvert en ce moment et **ton entrée est offerte** !\n" +
+                  "Utilise le bouton *« Entrer dans le parc »* sur son message plutôt que " +
+                  `de payer **${config.entryPrice}** points.`,
+              })
+              .catch(() => {});
           }
 
-          interaction
-            .editReply({
-              content:
-                `🏕️ Tu paies **${config.entryPrice}** points et franchis les grilles du parc safari. ` +
-                `**${config.actionsPerSession} actions**, et plus rien à débourser.`,
-              ...buildSafariView(result.session, { owned: result.owned }),
-            })
-            .catch(() => {});
+          startPaidSession(interaction.user.id, (err, result) => {
+            if (err) {
+              handleException(err);
+              return erreur();
+            }
+
+            if (!result.ok) {
+              const content =
+                result.code === "COOLDOWN"
+                  ? `⏳ Tu as déjà visité le parc récemment. Prochaine entrée possible <t:${Math.floor(result.retryAt / 1000)}:R>.`
+                  : `❌ ${result.reason}`;
+              return interaction.editReply({ content }).catch(() => {});
+            }
+
+            // Le contenu s'écrit APRÈS l'étalement de la vue : celle-ci porte le
+            // sien (la phrase de reprise, ou null pour effacer ce qui traîne),
+            // et l'ordre inverse le ferait écraser.
+            //
+            // Une visite ouverte entre la vérification et le débit est rendue
+            // telle quelle, points remboursés : c'est une reprise, pas l'entrée
+            // qu'on vient de payer.
+            const view = buildSafariView(result.session, {
+              owned: result.owned,
+              resumed: result.resumed,
+            });
+            const content = result.resumed
+              ? view.content +
+                (result.refunded ? ` Tes **${result.refunded}** points t'ont été rendus.` : "")
+              : `🏕️ Tu paies **${config.entryPrice}** points et franchis les grilles du parc safari. ` +
+                `**${config.actionsPerSession} actions**, et plus rien à débourser.`;
+
+            interaction.editReply({ ...view, content }).catch(() => {});
+          });
         });
       });
     } catch (error) {
