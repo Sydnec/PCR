@@ -10,7 +10,7 @@ import {
   MessageFlags,
   PermissionFlagsBits,
 } from "discord.js";
-import { getBalance } from "../economy.js";
+import { buildBalanceEmbed, getBalance } from "../economy.js";
 import { handleException, log } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
 import { answerThrow, throwBall, trackPanel } from "./capture.js";
@@ -109,6 +109,10 @@ function askMasterBallConfirmation(interaction, spawnId, { panel = false } = {})
 // message Discord est identique pour tous ses lecteurs. La fiche est celle de
 // /pokeinfo, à ceci près qu'elle épouse l'apparition d'où vient le clic — sa
 // variante shiny et son taux de capture figé.
+//
+// Le solde suit dans un second embed : les deux questions qu'on se pose devant
+// une apparition sont « est-ce que je l'ai déjà ? » et « est-ce que je peux me
+// payer une ball ? », et le prix de chacune est déjà sur les boutons d'à côté.
 function answerSpeciesInfo(interaction, spawnId) {
   getSpawn(spawnId, (err, spawn) => {
     if (err) {
@@ -128,18 +132,25 @@ function answerSpeciesInfo(interaction, spawnId) {
         // Compteurs à zéro en cas d'erreur : mieux vaut la fiche sans les
         // pastilles de possession qu'un refus sec devant une apparition.
         if (err) handleException("Lecture de la collection pour la fiche :", err);
-        interaction
-          .reply({
-            embeds: [
-              buildSpeciesInfoEmbed(species, {
-                owned,
-                isShiny: Boolean(spawn.is_shiny),
-                catchRate: spawn.catch_rate,
-              }),
-            ],
-            flags: MessageFlags.Ephemeral,
-          })
-          .catch(() => {});
+
+        const fiche = buildSpeciesInfoEmbed(species, {
+          owned,
+          isShiny: Boolean(spawn.is_shiny),
+          catchRate: spawn.catch_rate,
+        });
+
+        getBalance(interaction.user.id, (err, balance) => {
+          // getBalance rend 0 sur erreur, ce qui ici serait un mensonge : mieux
+          // vaut ne pas montrer un solde illisible que d'en montrer un faux. La
+          // fiche, elle, part quand même.
+          if (err) handleException("Lecture du solde pour la fiche :", err);
+          interaction
+            .reply({
+              embeds: err ? [fiche] : [fiche, buildBalanceEmbed(balance)],
+              flags: MessageFlags.Ephemeral,
+            })
+            .catch(() => {});
+        });
       }
     );
   });

@@ -980,5 +980,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Ton solde sous chaque apparition",
+      "description": "Le bouton « Infos du Pokémon » affiche maintenant ton solde de points juste sous la fiche de l'espèce : plus besoin de passer par /solde pour savoir si tu peux te payer la ball que tu regardes.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-21T09:20:08.378713Z",
+      "branch": "claude/sleepy-cerf-hxgk8t"
+    }
+  ]
 }

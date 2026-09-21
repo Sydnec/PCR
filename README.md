@@ -45,7 +45,8 @@ que la capture réussisse ou non.
 - **Shiny** (~1/500) comptant comme une entrée de Pokédex distincte.
 - **Bouton « ℹ️ Infos du Pokémon »** sur chaque apparition : un message Discord étant identique
   pour tous ses lecteurs, ce bouton ouvre à chacun en privé la fiche de l'espèce — type, rareté,
-  chances à la Poké Ball, et toute la lignée évolutive avec ce qu'il en possède déjà.
+  chances à la Poké Ball, et toute la lignée évolutive avec ce qu'il en possède déjà — suivie de
+  **son solde de points**, l'autre question qu'on se pose devant une apparition.
 - À la capture comme à la fuite, l'embed affiche le **classement des points perdus** par dresseur,
   et le total part en pied de page.
 - **Commandes** :

@@ -8,6 +8,7 @@
 // À noter : db.serialize(async () => {...}) ne sérialise QUE la portion
 // synchrone du callback, jusqu'au premier await. Ne comptez pas dessus pour
 // protéger de l'argent — utilisez ces helpers et enchaînez les callbacks.
+import { EmbedBuilder } from "discord.js";
 import db from "./points-db.js";
 import { handleException } from "./utils.js";
 
@@ -46,6 +47,21 @@ export function getBalance(userId, cb) {
     if (err) return cb(err, 0);
     cb(null, row ? row.balance : 0);
   });
+}
+
+// Le solde mis en forme, et pas seulement calculé : il s'affiche à plusieurs
+// endroits — sous une apparition, quand on le demande — et un montant à cinq
+// chiffres sans séparateur ne se lit pas d'un coup d'œil. Une seule fonction
+// pour tous ces endroits, comme la fiche d'espèce sert la commande et le bouton.
+//
+// Un embed de présentation dans un module de mutations, c'est délibéré : le
+// solde est une notion d'économie, pas de Pokémon, et le prochain appelant n'a
+// pas à aller le chercher dans les embeds du jeu.
+export function buildBalanceEmbed(balance) {
+  return new EmbedBuilder()
+    .setTitle("\u{1F4B0} Ton solde")
+    .setColor(0xf1c40f)
+    .setDescription(`**${balance.toLocaleString("fr-FR")}** points`);
 }
 
 // Applique une série de mouvements { userId, amount } — un don collectif, un
