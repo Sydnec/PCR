@@ -984,11 +984,21 @@
     {
       "type": "enhancement",
       "name": "Ton solde sous chaque apparition",
-      "description": "Le bouton « Infos du Pokémon » affiche maintenant ton solde de points juste sous la fiche de l'espèce : plus besoin de passer par /solde pour savoir si tu peux te payer la ball que tu regardes.",
+      "description": "Le bouton « Infos du Pokémon » affiche maintenant ton solde de points juste sous la fiche de l'espèce : plus besoin de passer par /solde pour savoir si tu peux te payer la ball que tu regardes. Et /solde répond désormais avec ce même embed, avatar compris, au lieu d'une ligne de texte.",
       "announce": true,
       "author": "Sydnec",
       "commit": "pending",
       "timestamp": "2026-09-21T09:20:08.378713Z",
+      "branch": "claude/sleepy-cerf-hxgk8t"
+    },
+    {
+      "type": "enhancement",
+      "name": "Le Pokémon consulté ressort dans sa lignée",
+      "description": "Sur une fiche de Pokémon, celui qu'on consulte est signalé par un chevron et son nom souligné : on le retrouve d'un coup d'œil au milieu de ses évolutions, y compris sur les lignées à embranchement comme celle d'Évoli.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-21T09:29:51.084037Z",
       "branch": "claude/sleepy-cerf-hxgk8t"
     }
   ]

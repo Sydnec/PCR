@@ -171,9 +171,15 @@ function chainLine(species, counts, { current = false, focusShiny = false } = {}
   if (owned.normal > 0) marks.push(`\u00D7${owned.normal}`);
   if (owned.shiny > 0) marks.push(`\u2728\u00D7${owned.shiny}`);
 
+  // Deux repères pour le maillon consulté, parce qu'ils ne font pas le même
+  // travail : le chevron le fait dépasser de sa colonne, donc il se repère sans
+  // lire ; le gras souligné le distingue une fois l'œil posé dessus. Le titre et
+  // la vignette nomment déjà l'espèce — ce qui manquait, c'était de la retrouver
+  // AU MILIEU de sa lignée, surtout sur un embranchement où trois cibles
+  // partagent le même champ.
   return (
-    `${has ? "\u2705" : "\u2754"} \`${dexNumber(species)}\` ` +
-    `${current ? `**${species.name}**` : species.name}` +
+    `${current ? "\u25B8 " : ""}${has ? "\u2705" : "\u2754"} \`${dexNumber(species)}\` ` +
+    `${current ? `__**${species.name}**__` : species.name}` +
     `${species.tradeEvolution ? " \u{1F512}" : ""}` +
     `${marks.length ? ` ${marks.join(" ")}` : ""}`
   );

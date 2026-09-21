@@ -57,11 +57,20 @@ export function getBalance(userId, cb) {
 // Un embed de présentation dans un module de mutations, c'est délibéré : le
 // solde est une notion d'économie, pas de Pokémon, et le prochain appelant n'a
 // pas à aller le chercher dans les embeds du jeu.
-export function buildBalanceEmbed(balance) {
-  return new EmbedBuilder()
-    .setTitle("\u{1F4B0} Ton solde")
+export function buildBalanceEmbed(balance, { user = null } = {}) {
+  const embed = new EmbedBuilder()
     .setColor(0xf1c40f)
     .setDescription(`**${balance.toLocaleString("fr-FR")}** points`);
+
+  // Sans destinataire nommé, on tutoie : c'est le cas de l'éphémère ouvert sous
+  // une apparition, où le solde ne peut être que celui du cliqueur. /solde, lui,
+  // peut viser quelqu'un d'autre, alors il le nomme et pose son avatar — deux
+  // soldes affichés coup sur coup ne doivent pas pouvoir se confondre.
+  if (!user) return embed.setTitle("\u{1F4B0} Ton solde");
+
+  const avatar = user.displayAvatarURL?.();
+  if (avatar) embed.setThumbnail(avatar);
+  return embed.setTitle(`\u{1F4B0} Solde de ${user.displayName ?? user.username}`);
 }
 
 // Applique une série de mouvements { userId, amount } — un don collectif, un
