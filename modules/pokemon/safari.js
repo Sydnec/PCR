@@ -24,6 +24,7 @@ import {
   safariFleeChance,
 } from "./data.js";
 import { creditSpecies, getOwnedVariants } from "./collection.js";
+import { consumeItem, getItem, grantItem } from "./items.js";
 import { resolveChannel } from "./spawn.js";
 import { recordSafariCatch, recordSafariEntry } from "./stats.js";
 import { buildParkEmbed, buildParkRow } from "./embeds.js";
@@ -346,7 +347,16 @@ export function enterPark(userId, parkId, cb) {
   });
 }
 
-// Entrée payante par /safari.
+// La clé de l'objet qui ouvre le parc, s'il en existe un au catalogue.
+const TICKET = "ticket_safari";
+
+// Entrée par /safari : un ticket s'il y en a un dans l'inventaire, des points
+// sinon.
+//
+// Le ticket passe avant le solde, comme une ball offerte avant les points, et il
+// ignore le délai entre deux entrées payantes : ce délai borne ce qu'on peut
+// s'ACHETER, alors qu'un ticket se trouve — il est déjà rare par construction,
+// le brider deux fois reviendrait à ne pas le donner.
 export function startPaidSession(userId, cb) {
   const config = getSafariConfig();
   const price = Math.max(0, Math.round(config.entryPrice));
@@ -362,6 +372,31 @@ export function startPaidSession(userId, cb) {
     if (err) return cb(err);
     if (ongoing) return cb(null, ongoing);
 
+    const ticket = getItem(TICKET);
+    if (!ticket) return payer();
+    consumeItem(userId, TICKET, 1, { source: "safari" }, (err, used) => {
+      // Une erreur de base n'autorise pas à faire payer : on la remonte plutôt
+      // que de basculer en silence sur le solde du dresseur.
+      if (err) return cb(err);
+      if (!used) return payer();
+
+      startSession(userId, { entryCost: 0 }, (err, result) => {
+        // Le ticket revient si la visite n'a pas pu s'ouvrir — y compris quand
+        // la résolution de course rend une visite déjà en cours, qui n'est pas
+        // celle qu'on vient de payer.
+        if (err || !result.ok || result.resumed) {
+          grantItem(userId, TICKET, 1, { source: "safari-annule" }, (restoreError) => {
+            if (restoreError) handleException("Restitution du Ticket Safari :", restoreError);
+          });
+          return err ? cb(err) : cb(null, { ...result, ticketRendu: true });
+        }
+        log(`Parc safari : ${userId} entre avec un ${ticket.label}`);
+        cb(null, { ...result, ticket });
+      });
+    });
+  });
+
+  function payer() {
     db.get(
       `SELECT MAX(started_at) AS last_paid FROM pokemon_safari_sessions
         WHERE user_id = ? AND entry_cost > 0`,
@@ -418,7 +453,7 @@ export function startPaidSession(userId, cb) {
         });
       }
     );
-  });
+  }
 }
 
 // ====================== ACTIONS ======================

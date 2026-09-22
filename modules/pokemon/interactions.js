@@ -201,8 +201,8 @@ function showDexPage(interaction, targetUserId, page) {
 
 // ---------------------- Évolution ----------------------
 
-function runEvolution(interaction, speciesId, isShiny, chosenTargetId) {
-  evolve(interaction.user.id, speciesId, isShiny, chosenTargetId, (err, result) => {
+function runEvolution(interaction, speciesId, isShiny, chosenTargetId, helperKey = null) {
+  evolve(interaction.user.id, speciesId, isShiny, chosenTargetId, helperKey, (err, result) => {
     if (err) {
       handleException(err);
       return interaction
@@ -216,16 +216,23 @@ function runEvolution(interaction, speciesId, isShiny, chosenTargetId) {
     }
 
     const source = getSpecies(speciesId);
+    const aide = result.plan.helper;
+    const paye = [
+      `-${result.plan.duplicates} doublon${result.plan.duplicates > 1 ? "s" : ""}`,
+      aide ? `-${aide.quantity} ${aide.item.label}` : null,
+      result.plan.points > 0 ? `-${result.plan.points} points` : null,
+    ].filter(Boolean);
+
     log(
       `Fusion : ${interaction.user.id} transforme ${source.name} en ${result.target.name}` +
-        ` (${result.plan.duplicates} doublons, ${result.plan.points} pts)`
+        ` (${result.plan.duplicates} doublons, ${result.plan.points} pts` +
+        `${aide ? `, ${aide.quantity}× ${aide.item.label}` : ""})`
     );
     interaction
       .update({
         content:
           `✨ Félicitations ! Ton **${displayName(source, isShiny)}** a évolué en ` +
-          `**${displayName(result.target, isShiny)}** ! ` +
-          `(-${result.plan.duplicates} doublons, -${result.plan.points} points)`,
+          `**${displayName(result.target, isShiny)}** ! (${paye.join(", ")})`,
         embeds: [],
         components: [],
       })
@@ -532,17 +539,25 @@ export async function handlePokemonButton(interaction) {
     case "poke_dex":
       return showDexPage(interaction, args[0], Number(args[1]));
 
+    // Le cinquième segment, facultatif, est l'objet qui aide la fusion : une
+    // pierre impose alors sa cible, un bonbon remplace un exemplaire manquant.
     case "poke_evo": {
-      const [speciesId, shiny, mode] = args;
+      const [speciesId, shiny, mode, helper] = args;
       if (mode === "choose") {
         return showEvolutionChoices(interaction, Number(speciesId), shiny === "1");
       }
-      return runEvolution(interaction, Number(speciesId), shiny === "1", null);
+      return runEvolution(interaction, Number(speciesId), shiny === "1", null, helper ?? null);
     }
 
     case "poke_evo_pick": {
-      const [speciesId, shiny, targetId] = args;
-      return runEvolution(interaction, Number(speciesId), shiny === "1", Number(targetId));
+      const [speciesId, shiny, targetId, helper] = args;
+      return runEvolution(
+        interaction,
+        Number(speciesId),
+        shiny === "1",
+        Number(targetId),
+        helper ?? null
+      );
     }
 
     case "poke_safari_enter":

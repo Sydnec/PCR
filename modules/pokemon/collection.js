@@ -8,6 +8,7 @@ import { spendPoints } from "../economy.js";
 import { handleException } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
 import { evolutionTargets, getSpecies } from "./data.js";
+import { consumeItem, getItem, grantItem } from "./items.js";
 import { recordFusion, recordTrade } from "./stats.js";
 
 // Une entrée de collection, c'est une espèce ET une variante : un shiny est une
@@ -125,9 +126,7 @@ export function creditSpecies(userId, speciesId, isShiny, cb) {
 // l'invariant du Pokédex : une fusion, une revente, rien ne doit pouvoir effacer
 // une entrée durement gagnée. Le `count >= quantity + 1` du WHERE le tient en
 // une instruction, donc deux retraits simultanés ne peuvent pas passer à deux.
-//
-// (evolve() fait le même calcul en ligne, avec son propre `plan.required` :
-// c'est la même garde, dite deux fois.)
+
 export function reserveDuplicates(userId, speciesId, isShiny, quantity, cb) {
   if (!Number.isInteger(quantity) || quantity <= 0) {
     return cb(new Error(`Quantité invalide : ${quantity}`), false);
@@ -156,10 +155,39 @@ export function restoreDuplicates(userId, speciesId, isShiny, quantity, cb = () 
 
 // ====================== FUSION / ÉVOLUTION ======================
 
+// L'aide qu'un objet apporte à une fusion, ou null. C'est le catalogue qui la
+// décrit — combien d'exemplaires de l'objet, combien d'exemplaires du Pokémon
+// qu'ils remplacent, et s'ils dispensent du coût en points — et cette fonction
+// ne fait que la relire et la refuser quand elle ne s'applique pas.
+//
+// `from` enferme l'objet dans une lignée : une Pierre Feu ne sert que sur un
+// Évoli, et rien n'empêcherait autrement de la jeter sur un Chenipan.
+export function describeHelper(helperKey, speciesId) {
+  if (!helperKey) return { helper: null };
+  const item = getItem(helperKey);
+  if (!item?.evolution) return { error: "Cet objet ne sert pas aux évolutions." };
+
+  const { copies = 1, quantity = 1, freePoints = false, from = null, target = null } =
+    item.evolution;
+  if (from && Number(from) !== Number(speciesId)) {
+    const source = getSpecies(from);
+    return {
+      error: `**${item.label}** ne s'utilise que sur ${source ? source.name : "une autre espèce"}.`,
+    };
+  }
+  if (!Number.isInteger(quantity) || quantity <= 0 || !Number.isInteger(copies) || copies <= 0) {
+    return { error: `**${item.label}** est mal configuré.` };
+  }
+  return { helper: { item, copies, quantity, freePoints, target: target ? Number(target) : null } };
+}
+
 // Décrit ce que coûte une évolution, sans rien modifier.
 // `chosenTargetId` non nul sur une lignée à embranchement (Évoli) déclenche le
 // tarif « choix », plus cher que le tirage au sort.
-export function describeEvolution(speciesId, chosenTargetId = null) {
+//
+// `helperKey` désigne un objet qui prend une partie de la facture à sa charge :
+// il remplace des exemplaires, parfois les points, et peut imposer la cible.
+export function describeEvolution(speciesId, chosenTargetId = null, helperKey = null) {
   const config = getPokemonConfig().evolution;
   const species = getSpecies(speciesId);
   if (!species) return { error: "Espèce inconnue." };
@@ -172,14 +200,20 @@ export function describeEvolution(speciesId, chosenTargetId = null) {
   const targets = evolutionTargets(species);
   if (!targets.length) return { error: `${species.name} n'a pas d'évolution.` };
 
+  const { helper, error } = describeHelper(helperKey, speciesId);
+  if (error) return { error };
+
   const branching = targets.length > 1;
-  const target = chosenTargetId
-    ? targets.find((t) => t.id === Number(chosenTargetId))
+  // Une pierre désigne sa cible : c'est tout ce qui la distingue d'un bonbon, et
+  // ce qui en fait le seul moyen de choisir son Évoli sans payer le supplément.
+  const wanted = helper?.target ?? chosenTargetId;
+  const target = wanted
+    ? targets.find((t) => t.id === Number(wanted))
     : branching
     ? null
     : targets[0];
 
-  if (chosenTargetId && !target) {
+  if (wanted && !target) {
     return { error: `${species.name} ne peut pas évoluer en cette forme.` };
   }
 
@@ -189,86 +223,136 @@ export function describeEvolution(speciesId, chosenTargetId = null) {
   const stageCost = config[referenceStage];
   if (!stageCost) return { error: "Aucun coût configuré pour ce stade." };
 
-  const points =
-    branching && chosenTargetId ? config.branchChoicePoints : stageCost.points;
+  // Le supplément « choix » ne se paie que sur un choix DU JOUEUR : une pierre
+  // impose sa cible, ce n'est pas le dresseur qui trie.
+  const basePoints =
+    branching && chosenTargetId && !helper?.target
+      ? config.branchChoicePoints
+      : stageCost.points;
+
+  // L'aide retire des exemplaires à fournir, jamais en dessous de zéro : un
+  // objet trop généreux ne doit pas rendre une fusion négative.
+  const duplicates = Math.max(0, stageCost.duplicates - (helper?.copies ?? 0));
 
   return {
     species,
     targets,
     target,
     branching,
-    duplicates: stageCost.duplicates,
-    points,
+    helper,
+    duplicates,
+    points: helper?.freePoints ? 0 : basePoints,
     // On exige un exemplaire de plus que les doublons consommés : l'entrée du
     // Pokédex n'est jamais perdue à cause d'une fusion.
-    required: stageCost.duplicates + 1,
+    required: duplicates + 1,
   };
 }
 
-// Exécute la fusion. Enchaînement ordonné avec compensation : si le débit des
-// points échoue après la réservation des doublons, on les rend.
-export function evolve(userId, speciesId, isShiny, chosenTargetId, cb) {
-  const plan = describeEvolution(speciesId, chosenTargetId);
+// Exécute la fusion. Enchaînement ordonné avec compensation : chaque étape rend
+// ce que les précédentes ont réservé si elle échoue. L'ordre n'est pas
+// indifférent — on prend d'abord ce qui est le plus probable de manquer, pour
+// que le cas courant (« il te manque un exemplaire ») ne déplace rien du tout.
+export function evolve(userId, speciesId, isShiny, chosenTargetId, helperKey, cb) {
+  const plan = describeEvolution(speciesId, chosenTargetId, helperKey);
   if (plan.error) return cb(null, { ok: false, reason: plan.error });
 
   const target =
     plan.target ?? plan.targets[Math.floor(Math.random() * plan.targets.length)];
+  const helper = plan.helper;
 
-  db.run(
-    `UPDATE pokemon_collection SET count = count - ?
-      WHERE user_id = ? AND species_id = ? AND is_shiny = ? AND count >= ?`,
-    [plan.duplicates, userId, speciesId, isShiny ? 1 : 0, plan.required],
-    function (err) {
-      if (err) return cb(err);
-      if (this.changes === 0) {
-        return cb(null, {
-          ok: false,
-          reason: `Il te faut **${plan.required}** exemplaires de ${plan.species.name} (${plan.duplicates} consommés + 1 conservé).`,
-        });
-      }
-
-      spendPoints(userId, plan.points, (err, debited) => {
-        if (err || !debited) {
-          // Compensation : les doublons réservés sont rendus.
-          db.run(
-            "UPDATE pokemon_collection SET count = count + ? WHERE user_id = ? AND species_id = ? AND is_shiny = ?",
-            [plan.duplicates, userId, speciesId, isShiny ? 1 : 0],
-            (compensationError) => {
-              if (compensationError) {
-                handleException("Compensation de fusion impossible :", compensationError);
-              }
-              if (err) return cb(err);
-              cb(null, {
-                ok: false,
-                reason: `Solde insuffisant : cette évolution coûte **${plan.points}** points.`,
-              });
-            }
-          );
-          return;
-        }
-
-        // Un shiny évolue en shiny : is_shiny est conservé.
-        creditSpecies(userId, target.id, isShiny, (err) => {
-          if (err) return cb(err);
-          db.run(
-            `INSERT INTO pokemon_fusions
-               (user_id, from_species_id, to_species_id, is_shiny, duplicates_spent, points_spent, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)`,
-            [userId, speciesId, target.id, isShiny ? 1 : 0, plan.duplicates, plan.points, Date.now()],
-            (err) => {
-              if (err) handleException("Journal de fusion :", err);
-              recordFusion({
-                userId,
-                duplicates: plan.duplicates,
-                points: plan.points,
-              });
-              cb(null, { ok: true, target, plan });
-            }
-          );
-        });
+  // Étape 3 : les points. Zéro se saute au lieu de se débiter — spendPoints
+  // refuserait un dresseur sans ligne de solde, et une fusion gratuite n'a pas à
+  // dépendre de ça.
+  const payer = (rendreExemplaires) => {
+    const finir = () => {
+      // Un shiny évolue en shiny : is_shiny est conservé.
+      creditSpecies(userId, target.id, isShiny, (err) => {
+        if (err) return cb(err);
+        db.run(
+          `INSERT INTO pokemon_fusions
+             (user_id, from_species_id, to_species_id, is_shiny, duplicates_spent, points_spent, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [userId, speciesId, target.id, isShiny ? 1 : 0, plan.duplicates, plan.points, Date.now()],
+          (err) => {
+            if (err) handleException("Journal de fusion :", err);
+            recordFusion({ userId, duplicates: plan.duplicates, points: plan.points });
+            cb(null, { ok: true, target, plan });
+          }
+        );
       });
-    }
-  );
+    };
+
+    if (plan.points <= 0) return finir();
+    spendPoints(userId, plan.points, (err, debited) => {
+      if (err || !debited) {
+        rendreExemplaires(() => {
+          if (err) return cb(err);
+          cb(null, {
+            ok: false,
+            reason: `Solde insuffisant : cette évolution coûte **${plan.points}** points.`,
+          });
+        });
+        return;
+      }
+      finir();
+    });
+  };
+
+  // Étape 2 : l'aide, s'il y en a une. Elle est consommée après les exemplaires
+  // parce qu'elle est plus rare : mieux vaut rendre un doublon qu'une pierre.
+  const prendreAide = (rendreExemplaires) => {
+    if (!helper) return payer(rendreExemplaires);
+    consumeItem(userId, helper.item.key, helper.quantity, { source: "fusion" }, (err, pris) => {
+      if (err) return rendreExemplaires(() => cb(err));
+      if (!pris) {
+        return rendreExemplaires(() =>
+          cb(null, {
+            ok: false,
+            reason:
+              `Il te faut **${helper.quantity}** ${helper.item.emoji} ${helper.item.label} ` +
+              `pour cette fusion.`,
+          })
+        );
+      }
+      payer((suite) =>
+        // Compensation en cascade : l'aide revient, puis les exemplaires.
+        grantItem(userId, helper.item.key, helper.quantity, { source: "fusion-annulee" }, (err) => {
+          if (err) handleException("Restitution d'une aide de fusion :", err);
+          rendreExemplaires(suite);
+        })
+      );
+    });
+  };
+
+  // Étape 1 : les exemplaires. `plan.duplicates` peut valoir zéro si une aide
+  // couvre tout : il n'y a alors rien à réserver, seulement à vérifier qu'il
+  // reste bien le Pokémon qu'on fait évoluer.
+  const manque = () =>
+    cb(null, {
+      ok: false,
+      reason:
+        `Il te faut **${plan.required}** exemplaires de ${plan.species.name} ` +
+        `(${plan.duplicates} consommés + 1 conservé).`,
+    });
+
+  if (plan.duplicates <= 0) {
+    return getOwned(userId, speciesId, isShiny, (err, owned) => {
+      if (err) return cb(err);
+      if (owned < 1) return manque();
+      prendreAide((suite) => suite());
+    });
+  }
+
+  reserveDuplicates(userId, speciesId, isShiny, plan.duplicates, (err, reserved) => {
+    if (err) return cb(err);
+    if (!reserved) return manque();
+    prendreAide((suite) =>
+      restoreDuplicates(userId, speciesId, isShiny, plan.duplicates, (err) => {
+        if (err) handleException("Compensation de fusion impossible :", err);
+        suite();
+      })
+    );
+  });
 }
 
 // ====================== ÉCHANGES ======================

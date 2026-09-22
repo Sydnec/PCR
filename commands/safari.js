@@ -96,11 +96,18 @@ export default {
               owned: result.owned,
               resumed: result.resumed,
             });
+            const rendu = result.refunded
+              ? ` Tes **${result.refunded}** points t'ont été rendus.`
+              : result.ticketRendu
+                ? " Ton **Ticket Safari** t'a été rendu."
+                : "";
             const content = result.resumed
-              ? view.content +
-                (result.refunded ? ` Tes **${result.refunded}** points t'ont été rendus.` : "")
-              : `🏕️ Tu paies **${config.entryPrice}** points et franchis les grilles du parc safari. ` +
-                `**${config.actionsPerSession} actions**, et plus rien à débourser.`;
+              ? view.content + rendu
+              : result.ticket
+                ? `🎟️ Tu présentes ton **${result.ticket.label}** à l'entrée et franchis les grilles ` +
+                  `du parc safari. **${config.actionsPerSession} actions**, et pas un point dépensé.`
+                : `🏕️ Tu paies **${config.entryPrice}** points et franchis les grilles du parc safari. ` +
+                  `**${config.actionsPerSession} actions**, et plus rien à débourser.`;
 
             interaction.editReply({ ...view, content }).catch(() => {});
           });

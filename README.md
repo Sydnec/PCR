@@ -55,7 +55,8 @@ que la capture réussisse ou non.
   - `/pokeinfo <pokemon>` : la même fiche que le bouton des apparitions — type, rareté,
     difficulté, et la lignée évolutive stade par stade avec ce que le dresseur en a déjà.
   - `/evolution <pokemon>` : fait évoluer un Pokémon en sacrifiant des doublons. Les lignées à
-    embranchement (Évoli) peuvent évoluer au hasard, ou vers une cible choisie pour plus cher.
+    embranchement (Évoli) peuvent évoluer au hasard, ou vers une cible choisie pour plus cher. La
+    commande ne propose que les chemins réellement praticables, objets d'évolution compris.
   - `/echange <membre> <je_donne> <je_recois>` : échange entre dresseurs.
   - `/safari` : paie l'entrée du parc safari (voir ci-dessous). Réponse privée.
   - `/inventaire [membre]` : les objets qu'un dresseur a en poche (voir *Objets* ci-dessous).
@@ -73,36 +74,46 @@ que la capture réussisse ou non.
 shiny et le taux de capture : ce qu'il porte lui appartient, ça ne se rejoue pas à chaque lancer.
 L'annonce n'en dit rien — sinon un objet rare ferait monter les enchères sur un Roucool — et tout le
 monde le découvre à la fin : celui qui l'attrape l'empoche, **celui qui le laisse fuir le voit
-partir avec**.
+partir avec**. Le parc safari, lui, ne fait rien tomber : 25 rencontres par visite noieraient la
+table.
+
+| Objet | Part des trouvailles | Ce qu'il fait | Revente |
+|---|---|---|---|
+| Poké Ball | 43 % | un lancer offert | — |
+| Super Ball | 22 % | un lancer offert | — |
+| 🍬 Super Bonbon | 13 % | **trois** tiennent lieu d'un exemplaire manquant dans une fusion | 300 |
+| Hyper Ball | 8,7 % | un lancer offert | — |
+| 🔥⚡💧 Pierres | 3,3 % chacune | font évoluer un Évoli vers *leur* forme, sans exemplaire ni point en plus | 500 |
+| 💎 Pépite | 2,2 % | rien, sinon se revendre | 1 000 |
+| 🎟️ Ticket Safari | 0,9 % | une entrée du parc, sans passer par la caisse | — |
+| Master Ball | **0,33 %** | la capture garantie, offerte | — |
 
 - **Un objet est une clé et un compteur.** Nom, icône et description vivent dans `pokemon.items` —
-  réglables à chaud, comme les balls. Mieux : une entrée `ball: "poke"` lui fait *emprunter* le
-  libellé et l'icône de la ball correspondante, si bien que changer l'emoji d'une ball suffit.
-- **Trois attributs décident de tout** : `sellValue` le rend revendable, `dropWeight` le fait tomber,
-  et rien d'autre. Un objet dont l'effet n'est pas encore branché n'a pas de poids, **donc personne
-  ne peut se retrouver avec un objet qui ne fait rien**.
-- **La table de butin**, du plus commun au plus rare : Poké Ball (57 % des trouvailles), Super Ball
-  (28 %), Hyper Ball (11 %), 💎 Pépite (2,8 %) et, tout au bout, la **Master Ball** (0,4 %, soit une
-  toutes les ~2 300 apparitions). Le Super Bonbon, les pierres et le Ticket Safari rejoindront la
-  table quand leur effet sera branché.
+  réglables à chaud, comme les balls. Une entrée `ball: "poke"` lui fait *emprunter* le libellé et
+  l'icône de la ball correspondante, si bien que changer l'emoji d'une ball suffit.
+- **Trois attributs décident du reste** : `sellValue` le rend revendable, `dropWeight` le fait
+  tomber, `evolution` le rend utilisable dans une fusion — combien d'exemplaires de l'objet valent
+  combien d'exemplaires du Pokémon, s'ils dispensent des points, et à quelle lignée ils sont
+  réservés. C'est ce dernier point qui fait des pierres des objets à Évoli : une Pierre Feu jetée
+  sur un Chenipan est refusée, elle ne part pas.
 - **Les balls offertes partent d'elles-mêmes.** Cliquer sur *Poké Ball (120)* en ayant une Poké Ball
   dans son inventaire ne coûte rien : l'objet passe avant le solde, parce qu'un objet posé dans un
   sac ne doit pas dormir pendant qu'on prend la monnaie de son propriétaire. La Master Ball garde sa
-  confirmation — elle ne coûte rien mais ne se retrouve pas.
+  confirmation — elle ne coûte rien mais ne se retrouve pas. Le Ticket Safari suit la même règle
+  dans `/safari`, et il ignore le délai de 24 h : ce délai borne ce qu'on peut s'**acheter**.
 - **Une ball offerte se rend en ball.** Battu à la milliseconde sur un Pokémon, on récupère l'objet,
   jamais sa valeur en points : la convertir en monnaie ferait d'un Pokémon disputé une petite
   imprimerie. Le lancer est alors journalisé à coût nul, ce qui garde honnête le classement des
-  points brûlés.
+  points brûlés. Même chose pour un ticket dont la visite n'a pas pu s'ouvrir.
+- **Une fusion aidée rend tout ce qu'elle a pris si elle échoue** : les exemplaires d'abord, l'aide
+  ensuite, dans l'ordre inverse où ils ont été réservés. Un solde insuffisant au dernier moment ne
+  coûte ni un doublon ni un bonbon.
 - **Une seule écriture retire un objet**, et elle est gardée (`count >= ?`, puis `this.changes`) :
-  deux clics simultanés sur le même ticket, un seul l'emporte. Le perdant reçoit « tu ne l'as plus »,
-  pas une erreur.
+  deux clics simultanés sur le même ticket, un seul l'emporte.
 - **Tout mouvement est journalisé** dans `pokemon_item_log` avec sa provenance (`lancer`,
-  `capture:42`, `vente`, `admin:…`). Le compteur dit ce qu'on a, le journal dit d'où ça vient.
+  `capture:42`, `fusion`, `safari`, `vente`, `admin:…`).
 - **La ligne survit à zéro**, comme dans le Pokédex : `first_obtained_at` ne se retrouve pas après
   coup. Toute lecture filtre donc sur `count > 0`.
-
-*Restent à brancher : le Super Bonbon (tenir lieu d'un exemplaire manquant dans une fusion) et les
-trois pierres (faire évoluer un Évoli sans dépenser un point).*
 
 ### 💱 Revente
 
@@ -114,9 +125,11 @@ ne se monnaie pas.
   de l'UPDATE gardé le tient en une instruction, donc six ventes simultanées sur trois doublons en
   laissent passer exactement trois, et le dernier exemplaire ne bouge jamais.
 - **Le barème suit la rareté** (`pokemon.sell.byRarity`) : **170** points pour un commun, **500**
-  pour un peu commun, **1 800** pour un rare. C'est une consolation, pas un commerce : attraper un
-  commun à la Poké Ball coûte ~2 000 points en moyenne. **Aucun tarif ne doit dépasser le coût
-  espéré d'une capture**, sans quoi la chasse devient une imprimerie à points.
+  pour un peu commun, **1 800** pour un rare. La règle qui le gouverne : **aucun tarif ne doit
+  dépasser le coût espéré d'une capture**, sans quoi la chasse devient une imprimerie à points. Ce
+  coût, à l'Hyper Ball et au taux moyen de chaque tranche, vaut ~510 points pour un commun (revente
+  à 33 %), ~1 030 pour un peu commun (49 %) et ~1 690 pour un rare — soit **107 %**, le seul tarif
+  qui passe au-dessus de sa propre limite.
 - **Les légendaires et les shinies ne se revendent pas.** Les premiers n'ont pas de ligne au barème,
   les seconds un multiplicateur nul : ce sont des entrées de Pokédex qu'on ne retrouve pas, et
   personne ne doit pouvoir les brader d'un clic.

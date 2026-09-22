@@ -35,13 +35,13 @@
 		"items":{
 			"ball_poke":{"ball":"poke","description":"Un lancer offert : tu la tiens déjà, elle ne te coûtera rien.","dropWeight":400},
 			"ball_super":{"ball":"super","description":"Un lancer offert : tu la tiens déjà, elle ne te coûtera rien.","dropWeight":200},
-			"super_bonbon":{"label":"Super Bonbon","emoji":"🍬","description":"Tient lieu d'un exemplaire manquant dans une fusion."},
+			"super_bonbon":{"label":"Super Bonbon","emoji":"🍬","description":"Trois d'entre eux tiennent lieu d'un exemplaire manquant dans une fusion.","sellValue":300,"dropWeight":120,"evolution":{"copies":1,"quantity":3}},
 			"ball_hyper":{"ball":"hyper","description":"Un lancer offert : tu la tiens déjà, elle ne te coûtera rien.","dropWeight":80},
-			"pierre_feu":{"label":"Pierre Feu","emoji":"🔥","description":"Fait évoluer un Évoli en Pyroli, sans un point dépensé.","sellValue":500},
-			"pierre_foudre":{"label":"Pierre Foudre","emoji":"⚡","description":"Fait évoluer un Évoli en Voltali, sans un point dépensé.","sellValue":500},
-			"pierre_eau":{"label":"Pierre Eau","emoji":"💧","description":"Fait évoluer un Évoli en Aquali, sans un point dépensé.","sellValue":500},
+			"pierre_feu":{"label":"Pierre Feu","emoji":"🔥","description":"Fait évoluer un Évoli en Pyroli : un exemplaire suffit, et c'est gratuit.","sellValue":500,"dropWeight":30,"evolution":{"copies":1,"quantity":1,"freePoints":true,"from":133,"target":136}},
+			"pierre_foudre":{"label":"Pierre Foudre","emoji":"⚡","description":"Fait évoluer un Évoli en Voltali : un exemplaire suffit, et c'est gratuit.","sellValue":500,"dropWeight":30,"evolution":{"copies":1,"quantity":1,"freePoints":true,"from":133,"target":135}},
+			"pierre_eau":{"label":"Pierre Eau","emoji":"💧","description":"Fait évoluer un Évoli en Aquali : un exemplaire suffit, et c'est gratuit.","sellValue":500,"dropWeight":30,"evolution":{"copies":1,"quantity":1,"freePoints":true,"from":133,"target":134}},
 			"pepite":{"label":"Pépite","emoji":"💎","description":"Ça brille, et ça ne sert qu'à ça : se revendre.","sellValue":1000,"dropWeight":20},
-			"ticket_safari":{"label":"Ticket Safari","emoji":"🎟️","description":"Une entrée pour le parc safari, sans passer par la caisse."},
+			"ticket_safari":{"label":"Ticket Safari","emoji":"🎟️","description":"Une entrée pour le parc safari. Elle s'utilise, elle ne se monnaie pas.","dropWeight":8},
 			"ball_master":{"ball":"master","description":"La capture garantie, offerte. Autant dire qu'elle ne se trouve pas.","dropWeight":3}
 		},
 		"sell":{

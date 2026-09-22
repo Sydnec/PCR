@@ -91,13 +91,17 @@ const POKEMON = {
   // `ball` fait pointer l'objet vers une ball de capture : il en emprunte le
   // libellé et l'icône, donc changer l'emoji d'une ball suffit, l'objet suit.
   // `sellValue` rend l'objet revendable, et rien d'autre ne le rend revendable.
-  // `dropWeight` le fait tomber des Pokémon, et rien d'autre : un objet dont
-  // l'effet n'est pas encore branché n'a pas de poids, donc personne ne peut se
-  // retrouver avec un objet qui ne fait rien. L'ordre des clés est celui de
-  // l'affichage, et les poids vont du plus commun au plus rare.
+  // `dropWeight` le fait tomber des Pokémon, et rien d'autre : un objet sans
+  // poids ne se trouve pas. L'ordre des clés est celui de l'affichage, et les
+  // poids vont du plus commun au plus rare.
   //
-  // Repère : avec 10 % de porteurs, le total des poids (~703) place la Master
-  // Ball autour d'une trouvaille tous les deux cents objets tombés.
+  // `evolution` le rend utilisable dans une fusion : `quantity` exemplaires de
+  // l'objet tiennent lieu de `copies` exemplaires du Pokémon, `freePoints`
+  // dispense du coût en points, et `from`/`target` l'enferment dans une lignée
+  // précise — c'est ce qui fait des pierres des objets à Évoli.
+  //
+  // Repère : avec 10 % de porteurs et 921 de poids total, la Master Ball tombe
+  // une fois sur trois mille apparitions environ.
   //
   // Ajouter un objet demande de toucher ici ET au code qui le consomme :
   // /admin config modifie une valeur existante, il n'invente pas de clé.
@@ -114,8 +118,11 @@ const POKEMON = {
     },
     super_bonbon: {
       label: "Super Bonbon",
-      emoji: "\u{1F36C}",
-      description: "Tient lieu d'un exemplaire manquant dans une fusion.",
+      emoji: "🍬",
+      description: "Trois d'entre eux tiennent lieu d'un exemplaire manquant dans une fusion.",
+      sellValue: 300,
+      dropWeight: 120,
+      evolution: { copies: 1, quantity: 3 },
     },
     ball_hyper: {
       ball: "hyper",
@@ -124,33 +131,40 @@ const POKEMON = {
     },
     pierre_feu: {
       label: "Pierre Feu",
-      emoji: "\u{1F525}",
-      description: "Fait évoluer un Évoli en Pyroli, sans un point dépensé.",
+      emoji: "🔥",
+      description: "Fait évoluer un Évoli en Pyroli : un exemplaire suffit, et c'est gratuit.",
       sellValue: 500,
+      dropWeight: 30,
+      evolution: { copies: 1, quantity: 1, freePoints: true, from: 133, target: 136 },
     },
     pierre_foudre: {
       label: "Pierre Foudre",
-      emoji: "\u26A1",
-      description: "Fait évoluer un Évoli en Voltali, sans un point dépensé.",
+      emoji: "⚡",
+      description: "Fait évoluer un Évoli en Voltali : un exemplaire suffit, et c'est gratuit.",
       sellValue: 500,
+      dropWeight: 30,
+      evolution: { copies: 1, quantity: 1, freePoints: true, from: 133, target: 135 },
     },
     pierre_eau: {
       label: "Pierre Eau",
-      emoji: "\u{1F4A7}",
-      description: "Fait évoluer un Évoli en Aquali, sans un point dépensé.",
+      emoji: "💧",
+      description: "Fait évoluer un Évoli en Aquali : un exemplaire suffit, et c'est gratuit.",
       sellValue: 500,
+      dropWeight: 30,
+      evolution: { copies: 1, quantity: 1, freePoints: true, from: 133, target: 134 },
     },
     pepite: {
       label: "Pépite",
-      emoji: "\u{1F48E}",
+      emoji: "💎",
       description: "Ça brille, et ça ne sert qu'à ça : se revendre.",
       sellValue: 1000,
       dropWeight: 20,
     },
     ticket_safari: {
       label: "Ticket Safari",
-      emoji: "\u{1F39F}\uFE0F",
-      description: "Une entrée pour le parc safari, sans passer par la caisse.",
+      emoji: "🎟️",
+      description: "Une entrée pour le parc safari. Elle s'utilise, elle ne se monnaie pas.",
+      dropWeight: 8,
     },
     ball_master: {
       ball: "master",

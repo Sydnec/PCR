@@ -1011,7 +1011,7 @@
     {
       "type": "feature",
       "name": "L'inventaire des dresseurs",
-      "description": "Les dresseurs ont maintenant un inventaire, consultable avec /inventaire. Au catalogue : des balls offrant un lancer gratuit, un Super Bonbon, trois pierres d'évolution, un Ticket Safari et une Pépite. Le Super Bonbon et les pierres attendent encore leur effet, et ne tombent donc pas.",
+      "description": "Les dresseurs ont maintenant un inventaire, consultable avec /inventaire. Au catalogue : des balls offrant un lancer gratuit, des Super Bonbons, trois pierres d'évolution, un Ticket Safari et des Pépites — tous trouvables sur les Pokémon que tu attrapes.",
       "announce": false,
       "author": "Sydnec",
       "commit": "pending",
@@ -1031,11 +1031,21 @@
     {
       "type": "feature",
       "name": "Les Pokémon tiennent des objets",
-      "description": "Un Pokémon sur dix tient quelque chose, et celui qui l'attrape l'empoche — celui qui le laisse fuir le voit partir avec. On y trouve surtout des balls, qui offrent un lancer : cliquer sur Poké Ball quand tu en as une dans ton inventaire ne te coûte plus rien, elle part toute seule. Et tout au bout de la table, une Master Ball, à peu près une toutes les deux mille apparitions.",
+      "description": "Un Pokémon sur dix tient quelque chose, et celui qui l'attrape l'empoche — celui qui le laisse fuir le voit partir avec. Des balls surtout, qui offrent un lancer : cliquer sur Poké Ball quand tu en as une ne te coûte plus rien, elle part toute seule. Puis des Super Bonbons, des pierres, un Ticket Safari qui t'ouvre le parc sans payer, et tout au bout une Master Ball, à peu près une toutes les trois mille apparitions.",
       "announce": true,
       "author": "Sydnec",
       "commit": "pending",
       "timestamp": "2026-09-22T08:01:47.208012Z",
+      "branch": "claude/sleepy-cerf-hxgk8t"
+    },
+    {
+      "type": "feature",
+      "name": "Les objets qui font évoluer",
+      "description": "Trois Super Bonbons tiennent lieu d'un exemplaire manquant : avec deux Pikachu et trois bonbons, tu obtiens un Pikachu et un Raichu. Les Pierres Feu, Foudre et Eau font mieux pour Évoli — un exemplaire de moins ET pas un point à payer — et chacune impose sa forme, ce qui en fait le seul moyen de choisir son Évoli sans payer le supplément. /evolution ne te propose que les chemins que tu peux réellement emprunter.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-22T08:21:22.840989Z",
       "branch": "claude/sleepy-cerf-hxgk8t"
     }
   ]
