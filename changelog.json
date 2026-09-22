@@ -1,7 +1,24 @@
 {
-  "version": "1.13.1",
-  "lastUpdated": "2026-09-22T09:22:25.056Z",
+  "version": "1.13.2",
+  "lastUpdated": "2026-09-22T09:40:23.874Z",
   "releases": [
+    {
+      "version": "1.13.2",
+      "date": "2026-09-22",
+      "title": "Release 1.13.2",
+      "features": [
+        {
+          "type": "enhancement",
+          "name": "Un cadenas sur les Pokémon qu'on ne croisera jamais",
+          "description": "Alakazam, Mackogneur, Grolem et Ectoplasma n'apparaissent pas à l'état sauvage : ils ne s'obtiennent qu'en fusionnant leur pré-évolution. Le Pokédex les marque maintenant d'un 🔒, avec la légende qui va avec — de quoi cesser de les chasser pour rien.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-22T09:39:03.642807Z",
+          "branch": "claude/sleepy-cerf-hxgk8t"
+        }
+      ]
+    },
     {
       "version": "1.13.1",
       "date": "2026-09-22",
@@ -1111,16 +1128,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "enhancement",
-      "name": "Un cadenas sur les Pokémon qu'on ne croisera jamais",
-      "description": "Alakazam, Mackogneur, Grolem et Ectoplasma n'apparaissent pas à l'état sauvage : ils ne s'obtiennent qu'en fusionnant leur pré-évolution. Le Pokédex les marque maintenant d'un 🔒, avec la légende qui va avec — de quoi cesser de les chasser pour rien.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-22T09:39:03.642807Z",
-      "branch": "claude/sleepy-cerf-hxgk8t"
-    }
-  ]
+  "pending": []
 }
