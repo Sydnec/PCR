@@ -78,6 +78,30 @@ const POKEMON = {
   },
   trade: { expiryHours: 24 },
   pokedex: { pageSize: 30 },
+  // Catalogue des objets. Le sac ne stocke qu'une clé et un compteur : c'est ici
+  // que la clé prend un nom et une icône, réglables à chaud comme ceux des
+  // balls. L'effet, lui, vit dans le code de la fonctionnalité qui consomme
+  // l'objet — une clé sans effet reste un objet de collection valide.
+  //
+  // Ajouter un objet demande donc de toucher ici ET au code qui le consomme :
+  // /admin config modifie une valeur existante, il n'invente pas de clé.
+  items: {
+    ticket_safari: {
+      label: "Ticket Safari",
+      emoji: "\u{1F39F}\uFE0F",
+      description: "Une entrée pour le parc safari, sans passer par la caisse.",
+    },
+    super_bonbon: {
+      label: "Super Bonbon",
+      emoji: "\u{1F36C}",
+      description: "De quoi faire évoluer un Pokémon sans y laisser de points.",
+    },
+    pepite: {
+      label: "Pépite",
+      emoji: "\u{1F48E}",
+      description: "Ça brille, ça se revend cher. Un classique du Parc Safari.",
+    },
+  },
   // Parc safari. Les poids d'apparition y compensent partiellement le malus
   // infligé aux évolutions dans le pool naturel : c'est toute la raison d'être
   // du parc, et la seule façon de croiser un stade 3 ou un légendaire sans y

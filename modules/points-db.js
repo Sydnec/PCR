@@ -326,6 +326,62 @@ const db = new sqlite3.Database(dbPath, (err) => {
       }
     );
 
+    // ================== OBJETS ==================
+
+    // Le sac des dresseurs. Un objet n'est rien d'autre qu'un compteur par clé :
+    // c'est le catalogue, dans la configuration, qui lui donne un nom, une icône
+    // et un sens — et le code qui lui donne un effet, s'il en a un.
+    //
+    // La ligne survit à count = 0, comme dans pokemon_collection et pour la même
+    // raison : first_obtained_at raconte depuis quand le dresseur connaît
+    // l'objet, et ça ne se retrouve pas après coup. TOUTE lecture filtre donc
+    // sur count > 0.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_inventory (
+        user_id TEXT NOT NULL,
+        item_key TEXT NOT NULL,
+        count INTEGER NOT NULL DEFAULT 0,
+        first_obtained_at INTEGER,
+        last_obtained_at INTEGER,
+        PRIMARY KEY (user_id, item_key)
+      )`,
+      (err) => {
+        if (err) return handleException("Erreur création table pokemon_inventory :", err);
+        db.run(
+          "CREATE INDEX IF NOT EXISTS idx_pokemon_inventory_user ON pokemon_inventory(user_id)",
+          (err) => {
+            if (err) handleException("Erreur création index pokemon_inventory_user :", err);
+          }
+        );
+      }
+    );
+
+    // Journal des mouvements d'objets, sur le modèle de pokemon_fusions : le
+    // compteur dit ce qu'on a, le journal dit d'où ça vient. Un objet consommé
+    // disparaît du sac et ne laisserait aucune trace autrement — or c'est
+    // précisément ce qu'on voudra relire le jour où un dresseur jure n'avoir
+    // jamais reçu son ticket.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_item_log (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        item_key TEXT NOT NULL,
+        delta INTEGER NOT NULL,
+        source TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      )`,
+      (err) => {
+        if (err) return handleException("Erreur création table pokemon_item_log :", err);
+        db.run(
+          `CREATE INDEX IF NOT EXISTS idx_pokemon_item_log_user
+             ON pokemon_item_log(user_id, id)`,
+          (err) => {
+            if (err) handleException("Erreur création index pokemon_item_log_user :", err);
+          }
+        );
+      }
+    );
+
     // ================== PARC SAFARI ==================
 
     // Un parc est l'événement public : le message à bouton, sa fenêtre

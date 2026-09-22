@@ -58,11 +58,33 @@ que la capture réussisse ou non.
     embranchement (Évoli) peuvent évoluer au hasard, ou vers une cible choisie pour plus cher.
   - `/echange <membre> <je_donne> <je_recois>` : échange entre dresseurs.
   - `/safari` : paie l'entrée du parc safari (voir ci-dessous). Réponse privée.
+  - `/sac [membre]` : les objets qu'un dresseur a en poche (voir *Objets* ci-dessous).
   - `/admin pokespawn` *(Admin)* : déclenche une apparition pour organiser un événement. Donne accès aux
     espèces hors pool naturel (légendaires et évolutions par échange), avec forçage du shiny, texte
     d'annonce et mention de rôle.
   - `/admin safarispawn` *(Admin)* : ouvre un parc safari à la demande, pour un événement ou pour offrir
     une visite à un dresseur en particulier.
+
+### 🎒 Objets
+
+Le sac d'un dresseur, et rien de plus pour l'instant : la plomberie est posée, aucun objet ne tombe
+encore tout seul. Le jour où des trésors apparaîtront, ils n'auront qu'à appeler `grantItem`.
+
+- **Un objet est une clé et un compteur.** Ce qui lui donne un nom, une icône et une description vit
+  dans `pokemon.items` de la configuration — donc réglable à chaud, comme les balls. Ce qui lui donne
+  un *effet* vit dans le code de la fonctionnalité qui le consomme, et une clé sans effet reste un
+  objet de collection parfaitement valide.
+- **Une seule écriture retire un objet**, et elle est gardée (`count >= ?`, puis `this.changes`) :
+  deux clics simultanés sur le même ticket, un seul l'emporte. Le perdant reçoit « tu ne l'as plus »,
+  pas une erreur — ce n'est pas une panne.
+- **Tout mouvement est journalisé** dans `pokemon_item_log` avec sa provenance. Le compteur dit ce
+  qu'on a, le journal dit d'où ça vient : un objet consommé disparaît du sac et ne laisserait sinon
+  aucune trace, alors que c'est précisément ce qu'on voudra relire.
+- **La ligne survit à zéro**, comme dans le Pokédex et pour la même raison : `first_obtained_at`
+  raconte depuis quand le dresseur connaît l'objet, et ça ne se retrouve pas après coup. Toute
+  lecture filtre donc sur `count > 0`.
+- **Catalogue de départ** : 🎟️ Ticket Safari, 🍬 Super Bonbon, 💎 Pépite. Aucun n'a encore d'effet,
+  et seul `/admin item` peut en distribuer.
 
 ### 🏕️ Parc Safari
 
@@ -194,6 +216,9 @@ Tout est relu à chaque accès : une modification prend effet immédiatement, sa
     achats jusqu'à ce qu'il remonte — et signalé comme tel.
   - `/admin points-tous <montant>` : la même chose pour tous les porteurs de `DEFAULT_ROLE_ID`, avec
     le nombre de bénéficiaires et le total distribué.
+  - `/admin item <membre> <objet> [quantite]` : donne un objet à un dresseur, ou le lui retire avec
+    une quantité négative. Contrairement aux points, le retrait a un plancher : un sac ne descend
+    pas sous zéro, la commande refuse plutôt que de creuser.
   - `/admin config <cle> <valeur>` : modifie un réglage **à chaud**, sans redémarrage (voir
     *Configuration en trois couches* ci-dessus). L'autocomplétion propose les chemins avec leur
     valeur courante et leur type ; le type attendu vient de la valeur par défaut, une clé hors

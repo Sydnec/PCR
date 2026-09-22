@@ -3,6 +3,7 @@ import { handleException, isAdmin } from "../modules/utils.js";
 
 import points from "./admin/points.js";
 import pointsTous from "./admin/points-tous.js";
+import item from "./admin/item.js";
 import config from "./admin/config.js";
 import configVoir from "./admin/config-voir.js";
 import potcommun from "./admin/potcommun.js";
@@ -21,6 +22,7 @@ import restart from "./admin/restart.js";
 const SUBCOMMANDS = [
   points,
   pointsTous,
+  item,
   config,
   configVoir,
   potcommun,

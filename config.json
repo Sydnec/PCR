@@ -31,6 +31,11 @@
 		},
 		"trade":{"expiryHours":24},
 		"pokedex":{"pageSize":30},
+		"items":{
+			"ticket_safari":{"label":"Ticket Safari","emoji":"🎟️","description":"Une entrée pour le parc safari, sans passer par la caisse."},
+			"super_bonbon":{"label":"Super Bonbon","emoji":"🍬","description":"De quoi faire évoluer un Pokémon sans y laisser de points."},
+			"pepite":{"label":"Pépite","emoji":"💎","description":"Ça brille, ça se revend cher. Un classique du Parc Safari."}
+		},
 		"safari":{
 			"enabled":true,
 			"randomChancePerHour":0.01,

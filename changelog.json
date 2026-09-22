@@ -1007,5 +1007,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "feature",
+      "name": "Le sac des dresseurs",
+      "description": "Les dresseurs ont maintenant un sac, consultable avec /sac : de quoi recevoir et garder des objets. Rien n'y tombe encore tout seul — c'est la fondation des trésors à venir, et seuls les administrateurs peuvent en distribuer pour l'instant.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-22T07:11:52.699413Z",
+      "branch": "claude/sleepy-cerf-hxgk8t"
+    }
+  ]
 }

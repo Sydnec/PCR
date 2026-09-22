@@ -6,6 +6,7 @@ import {
   EmbedBuilder,
 } from "discord.js";
 import { getPokemonConfig, getSafariConfig } from "./config.js";
+import { getItem } from "./items.js";
 import {
   RARITIES,
   allSpecies,
@@ -316,6 +317,42 @@ export function buildFledEmbed(spawn, species, spending) {
     .setFooter({
       text: `Spawn #${spawn.id} · Pokédex n°${species.id} · ${formatPoints(total)} pts partis en fumée`,
     });
+}
+
+// ====================== SAC ======================
+
+// Le sac d'un dresseur. Une ligne par objet : icône, nom, quantité, puis à quoi
+// il sert — un objet dont on ne sait pas ce qu'il fait n'est qu'un chiffre.
+//
+// Une clé absente du catalogue s'affiche quand même, en brut. Elle ne devrait
+// pas exister, mais si elle existe c'est qu'un renommage a laissé du monde avec
+// quelque chose en poche : le faire disparaître en silence serait le pire des
+// trois comportements possibles.
+export function buildBagEmbed(rows, { user = null } = {}) {
+  const embed = new EmbedBuilder()
+    .setTitle(user ? `\u{1F392} Sac de ${user.displayName ?? user.username}` : "\u{1F392} Ton sac")
+    .setColor(0xc27c0e);
+
+  if (!rows.length) {
+    return embed.setDescription(
+      user ? "*Son sac est vide.*" : "*Ton sac est vide.* Les objets se trouvent, ils ne s'achètent pas."
+    );
+  }
+
+  const total = rows.reduce((sum, row) => sum + row.count, 0);
+  embed.setDescription(`**${total}** objet${total > 1 ? "s" : ""} en poche.`);
+
+  for (const row of rows) {
+    const item = getItem(row.item_key);
+    embed.addFields({
+      name: item
+        ? `${item.emoji} ${item.label} \u00D7${row.count}`
+        : `\u2754 \`${row.item_key}\` \u00D7${row.count}`,
+      value: item?.description ?? "*Objet retiré du catalogue.*",
+      inline: false,
+    });
+  }
+  return embed;
 }
 
 // ====================== POKÉDEX ======================
