@@ -101,6 +101,10 @@ const POKEMON = {
   // poids ne se trouve pas. L'ordre des clés est celui de l'affichage, et les
   // poids vont du plus commun au plus rare.
   //
+  // `lot` est la fourchette dans laquelle la loterie tire une quantité. Un objet
+  // sans `lot` se gagne à l'unité, ce qui est le cas de tout ce qui ne se joue
+  // pas par poignées : une pierre, une pépite, un ticket, une Master Ball.
+  //
   // `evolution` le rend utilisable dans une fusion : `quantity` exemplaires de
   // l'objet tiennent lieu de `copies` exemplaires du Pokémon, `freePoints`
   // dispense du coût en points, et `from`/`target` l'enferment dans une lignée
@@ -116,11 +120,13 @@ const POKEMON = {
       ball: "poke",
       description: "Un lancer offert : tu la tiens déjà, elle ne te coûtera rien.",
       dropWeight: 400,
+      lot: { min: 1, max: 5 },
     },
     ball_super: {
       ball: "super",
       description: "Un lancer offert : tu la tiens déjà, elle ne te coûtera rien.",
       dropWeight: 200,
+      lot: { min: 1, max: 3 },
     },
     super_bonbon: {
       label: "Super Bonbon",
@@ -129,11 +135,13 @@ const POKEMON = {
       sellValue: 300,
       dropWeight: 120,
       evolution: { copies: 1, quantity: 3 },
+      lot: { min: 1, max: 2 },
     },
     ball_hyper: {
       ball: "hyper",
       description: "Un lancer offert : tu la tiens déjà, elle ne te coûtera rien.",
       dropWeight: 80,
+      lot: { min: 1, max: 2 },
     },
     pierre_feu: {
       label: "Pierre Feu",
@@ -192,6 +200,22 @@ const POKEMON = {
     // 0 : un shiny ne se revend pas. C'est une entrée de Pokédex qu'on ne
     // retrouve pas, et personne ne doit pouvoir la brader d'un clic.
     shinyMultiplier: 0,
+  },
+  // Le tirage quotidien. Un seul par dresseur et par jour UTC, comme le
+  // classement des messages qui se remet à zéro sur la même journée : deux
+  // découpages différents du mot « jour » dans le même bot seraient ingérables.
+  //
+  // Il tire dans la même table que le butin des Pokémon, `dropWeight`, parce
+  // qu'il n'y a qu'un ordre de rareté dans le jeu et qu'en maintenir deux, c'est
+  // les voir diverger. Seule la porte d'entrée change : 7 % des Pokémon tiennent
+  // un objet, la moitié des tirages en donnent un.
+  //
+  // Repère à 50 % et aux poids actuels : ~284 points de valeur par jour et par
+  // dresseur, soit un dixième d'une journée de messages, et une Master Ball tous
+  // les 600 jours environ.
+  lottery: {
+    enabled: true,
+    winChance: 0.5,
   },
   safari: {
     enabled: true,

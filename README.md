@@ -59,16 +59,21 @@ que la capture réussisse ou non.
   serveur ni les mentions.
 - **Commandes** :
   - `/pokedex [membre]` : collection, doublons, shinies et progression. Réponse privée. Un 🔒 marque
-    les espèces qu'aucune apparition ne donnera jamais — elles ne s'obtiennent que par fusion.
+    les espèces qu'aucune apparition ne donnera jamais — elles ne s'obtiennent que par fusion ou
+    par échange.
   - `/pokeclassement` : classement des dresseurs par espèces distinctes.
   - `/pokeinfo <pokemon>` : la même fiche que le bouton des apparitions — type, rareté,
     difficulté, et la lignée évolutive stade par stade avec ce que le dresseur en a déjà.
   - `/evolution <pokemon>` : fait évoluer un Pokémon en sacrifiant des doublons. Les lignées à
     embranchement (Évoli) peuvent évoluer au hasard, ou vers une cible choisie pour plus cher. La
     commande ne propose que les chemins réellement praticables, objets d'évolution compris.
-  - `/echange <membre> <je_donne> <je_recois>` : échange entre dresseurs.
+  - `/echange <membre> <je_donne> <je_recois>` : échange entre dresseurs. **Kadabra, Machopeur,
+    Gravalanch et Spectrum évoluent en changeant de dresseur**, comme en première génération : c'est
+    celui qui *reçoit* le Pokémon qui reçoit sa forme évoluée. La proposition l'annonce avant le
+    clic, et un shiny reste shiny en évoluant.
   - `/safari` : paie l'entrée du parc safari (voir ci-dessous). Réponse privée.
   - `/inventaire [membre]` : les objets qu'un dresseur a en poche (voir *Objets* ci-dessous).
+  - `/loterie` : un tirage par jour et par dresseur (voir *Loterie* ci-dessous). Réponse privée.
   - `/revendre pokemon <doublon> [quantite]` / `/revendre objet <objet> [quantite]` : convertit
     en points ce qu'on a en trop. Un exemplaire est **toujours** conservé.
   - `/admin pokespawn` *(Admin)* : déclenche une apparition pour organiser un événement. Donne accès aux
@@ -97,7 +102,7 @@ noieraient la table.
 | Master Ball | **0,33 %** | la capture garantie, offerte | — |
 
 `dropWeight` est un **poids**, pas un pourcentage : la part d'un objet vaut son poids divisé par la
-somme de tous (921 aujourd'hui). `/admin poids` fait la conversion pour les trois tables de tirage du
+somme de tous (921 aujourd'hui). `/admin poids` fait la conversion pour les quatre tables de tirage du
 jeu, cadence comprise — la Master Ball tombe une fois sur 4 386 apparitions.
 
 **Une fois sur cinq, il le lâche en partant.** Capturé ou enfui, un Pokémon qui tenait quelque chose
@@ -133,6 +138,43 @@ que de le faire disparaître.
   `capture:42`, `sol:8`, `fusion`, `safari`, `vente`, `admin:…`).
 - **La ligne survit à zéro**, comme dans le Pokédex : `first_obtained_at` ne se retrouve pas après
   coup. Toute lecture filtre donc sur `count > 0`.
+
+### 🎰 Loterie
+
+`/loterie` offre **un tirage par dresseur et par jour**, et **une fois sur deux il ne donne rien**.
+C'est ce qui en fait un tirage : un cadeau certain ne serait qu'une allocation quotidienne. Le
+reste du temps il rend un lot, pris dans la **même table que le butin** ci-dessus — il n'y a qu'un
+ordre de rareté dans ce jeu, et en maintenir deux, c'est les voir diverger. Seule la porte d'entrée
+change : 7 % des apparitions d'un côté, la moitié des tirages de l'autre.
+
+Ce qui change aussi, c'est le **volume** : les objets courants se gagnent par poignées.
+
+| Lot | Quantité | Un tirage sur |
+|---|---|---|
+| Poké Ball | 1 à 5 | 5 |
+| Super Ball | 1 à 3 | 9 |
+| 🍬 Super Bonbon | 1 à 2 | 15 |
+| Hyper Ball | 1 à 2 | 23 |
+| 🔥⚡💧 Pierres | 1 | 61 chacune |
+| 💎 Pépite | 1 | 92 |
+| 🎟️ Ticket Safari | 1 | 230 |
+| Master Ball | 1 | **614** |
+
+La fourchette d'un lot vit dans le catalogue (`lot: { min, max }`) : un objet sans `lot` se gagne à
+l'unité, ce qui évite d'écrire `1` à `1` sur les deux tiers des lignes. `/admin poids loterie`
+affiche la table complète, quantités comprises.
+
+À ces réglages, un tirage rapporte **~284 points de valeur par jour et par dresseur** — un dixième
+d'une journée de messages. C'est un rituel, pas un revenu.
+
+- **La journée est UTC**, comme le classement des messages : deux découpages du mot « jour » dans
+  le même bot seraient une source de bugs sans fin. L'embed annonce l'heure exacte du prochain
+  tirage plutôt qu'un « reviens demain », pour que personne n'ait à deviner le fuseau.
+- **Le tirage du jour se revendique**, comme un spawn ou un objet au sol : un INSERT gardé sur la
+  journée déjà jouée, dont on inspecte `this.changes`. Dix commandes lancées en même temps n'en
+  obtiennent qu'un seul.
+- **Un crédit qui échoue rend la journée.** Personne ne perd son tirage à cause d'une panne de
+  base ; le lot, lui, sera retiré au sort — c'est une loterie.
 
 ### 💱 Revente
 

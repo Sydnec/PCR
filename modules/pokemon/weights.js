@@ -11,7 +11,7 @@
 // serait pire que pas de table du tout : elle ferait régler le jeu à côté.
 import { getPokemonConfig, getSafariConfig } from "./config.js";
 import { allSpecies, isLegendary, spawnWeight } from "./data.js";
-import { getItems, itemDropWeight } from "./items.js";
+import { getItems, itemDropWeight, itemLot } from "./items.js";
 
 // Une ligne de table : un groupe de tirages qui partagent le même poids.
 // `count` vaut 1 pour un objet, et le nombre d'espèces pour un groupe de
@@ -19,7 +19,7 @@ import { getItems, itemDropWeight } from "./items.js";
 // légendaire à poids 8 s'il y en a moins.
 const row = (label, count, weight) => ({ label, count, weight, total: count * weight });
 
-function table({ key, name, note, subject, gate = null, rows }) {
+function table({ key, name, note, subject, gate = null, lots = false, rows }) {
   const kept = rows.filter((r) => r.count > 0);
   const total = kept.reduce((sum, r) => sum + r.total, 0);
   return {
@@ -32,6 +32,10 @@ function table({ key, name, note, subject, gate = null, rows }) {
     // Pokémon tient quelque chose, alors qu'une apparition tire toujours une
     // espèce.
     gate,
+    // Vrai quand les lignes portent une fourchette de quantité : le tableau
+    // gagne alors une colonne, parce qu'une part de tirage ne dit rien du volume
+    // gagné si un lot va de un à cinq.
+    lots,
     total,
     rows: kept.map((r) => ({
       ...r,
@@ -105,6 +109,31 @@ export function describeDropPool() {
   });
 }
 
+// La loterie tire dans la même table que le butin — mêmes poids, même ordre de
+// rareté — et n'en change que deux choses : la porte d'entrée, et le fait qu'un
+// gain puisse venir par poignées. Les deux tableaux se lisent donc côte à côte,
+// et régler un `dropWeight` déplace les deux : c'est voulu, et c'est visible.
+export function describeLotteryPool() {
+  const chance = Number(getPokemonConfig().lottery?.winChance) || 0;
+  return table({
+    key: "loterie",
+    name: "Loterie quotidienne",
+    subject: "objet",
+    note: "Le lot d'un tirage, un par dresseur et par jour. Mêmes poids que le butin.",
+    gate: { label: "des tirages donnent un lot", chance },
+    lots: true,
+    rows: getItems().map((item) => {
+      const { min, max } = itemLot(item);
+      return { ...row(item.label, 1, itemDropWeight(item)), lot: min === max ? `${min}` : `${min}-${max}` };
+    }),
+  });
+}
+
 export function describeWeightTables() {
-  return [describeSpawnPool(), describeSafariPool(), describeDropPool()];
+  return [
+    describeSpawnPool(),
+    describeSafariPool(),
+    describeDropPool(),
+    describeLotteryPool(),
+  ];
 }

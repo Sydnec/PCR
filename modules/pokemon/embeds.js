@@ -34,6 +34,11 @@ const formatPercent = (probability) => {
   return `${percent.toFixed(2)} %`;
 };
 
+// Un instant rendu par Discord dans le fuseau de celui qui lit. Il ne s'affiche
+// que dans une description ou une valeur de champ — jamais dans un titre ni un
+// pied de page, où la balise resterait en clair.
+const timestamp = (ms) => `<t:${Math.floor(ms / 1000)}:R>`;
+
 const ballResultIcon = (result) => (result === "CATCH" ? "✅" : "❌");
 
 // Le nom affiché porte la marque shiny partout où il apparaît.
@@ -385,6 +390,47 @@ export function buildDropRow(dropId, { disabled = false } = {}) {
   );
 }
 
+// ====================== LOTERIE ======================
+
+// Le résultat d'un tirage. Tout tient dans la DESCRIPTION : l'icône d'un objet
+// peut être un emoji personnalisé (les balls le sont) et l'heure du prochain
+// tirage est une balise `<t:>`, deux choses qu'un titre ou un pied de page
+// afficheraient en clair.
+//
+// Trois issues, une seule fonction : gagné, rien, et « tu as déjà joué ». La
+// dernière n'est pas une erreur — c'est la règle du jeu, et elle mérite le même
+// embed que les deux autres plutôt qu'un message rouge.
+export function buildLotteryEmbed({ prize = null, nextAt, played = false } = {}) {
+  const quand = nextAt ? `\nProchain tirage ${timestamp(nextAt)}.` : "";
+
+  if (played) {
+    return new EmbedBuilder()
+      .setTitle("\u{1F3B0} Loterie du jour")
+      .setColor(0x4f545c)
+      .setDescription(`Tu as déjà tenté ta chance aujourd'hui.${quand}`);
+  }
+
+  if (!prize) {
+    return new EmbedBuilder()
+      .setTitle("\u{1F3B0} Loterie du jour")
+      .setColor(0x4f545c)
+      .setDescription(`Rien cette fois.${quand}`);
+  }
+
+  const { item, quantity } = prize;
+  // Le gras enveloppe la quantité ET le nom d'un seul tenant : deux paires de
+  // ** imbriquées se referment l'une l'autre et laissent les astérisques en
+  // clair, ce qui est exactement ce qui arrivait au message de revente.
+  return new EmbedBuilder()
+    .setTitle("\u{1F3B0} Loterie du jour")
+    .setColor(0xc27c0e)
+    .setDescription(
+      `${item.emoji} Tu gagnes **${quantity}\u00D7 ${item.label}** !` +
+        (item.description ? `\n*${item.description}*` : "") +
+        quand
+    );
+}
+
 // ====================== INVENTAIRE ======================
 
 // L'inventaire d'un dresseur. Une ligne par objet : icône, nom, quantité, puis à
@@ -647,7 +693,6 @@ export function buildTradeRow(tradeId, { disabled = false } = {}) {
 // ====================== PARC SAFARI ======================
 
 const SAFARI_COLOR = 0x2ecc71;
-const timestamp = (ms) => `<t:${Math.floor(ms / 1000)}:R>`;
 
 export function buildParkEmbed(park, { closed = false } = {}) {
   const config = getSafariConfig();

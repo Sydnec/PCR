@@ -444,6 +444,23 @@ const db = new sqlite3.Database(dbPath, (err) => {
       }
     );
 
+    // Loterie quotidienne. Une ligne par dresseur, et `last_day` porte à elle
+    // seule la règle du « une fois par jour » : c'est la colonne que garde
+    // l'écriture de pokemon/lottery.js, donc deux commandes lancées en même
+    // temps ne peuvent pas tirer deux fois.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_lottery (
+        user_id TEXT PRIMARY KEY,
+        last_day TEXT NOT NULL DEFAULT '',
+        last_draw_at INTEGER NOT NULL DEFAULT 0,
+        draws INTEGER NOT NULL DEFAULT 0,
+        wins INTEGER NOT NULL DEFAULT 0
+      )`,
+      (err) => {
+        if (err) handleException("Erreur création table pokemon_lottery :", err);
+      }
+    );
+
     // ================== PARC SAFARI ==================
 
     // Un parc est l'événement public : le message à bouton, sa fenêtre

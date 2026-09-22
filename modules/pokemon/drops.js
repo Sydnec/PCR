@@ -50,10 +50,17 @@ export function dropItem(client, { spawn, itemKey }, cb = () => {}) {
       // laisser OUVERT en base, c'est une ligne que personne ne pourra jamais
       // réclamer. On le déclare perdu, comme pour un envoi qui échoue.
       if (!client || !spawn?.channel_id) {
-        db.run("UPDATE pokemon_drops SET status = 'LOST' WHERE id = ?", [dropId], (err) => {
-          if (err) handleException("Abandon d'un objet au sol :", err);
-        });
-        return cb(null, null);
+        // Le rappel attend l'écriture : quand il part, la ligne est close. Sans
+        // cela l'appelant reprend la main pendant que l'UPDATE est encore en vol
+        // et peut relire un statut qui n'est pas encore le bon.
+        return db.run(
+          "UPDATE pokemon_drops SET status = 'LOST' WHERE id = ?",
+          [dropId],
+          (err) => {
+            if (err) handleException("Abandon d'un objet au sol :", err);
+            cb(null, null);
+          }
+        );
       }
       try {
         const channel = await client.channels.fetch(spawn.channel_id);

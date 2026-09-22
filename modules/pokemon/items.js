@@ -84,7 +84,7 @@ export const itemDropWeight = (item) => Math.max(0, Number(item?.dropWeight) || 
 
 // Tirage pondéré, même forme que pickWeightedSpecies : un cumul, un tirage, et
 // le dernier en filet si l'arrondi flottant passe juste au-dessus du total.
-function pickWeightedItem() {
+export function pickWeightedItem() {
   const pool = [];
   let total = 0;
   for (const item of getItems()) {
@@ -97,6 +97,28 @@ function pickWeightedItem() {
   if (!total) return null;
   const roll = Math.random() * total;
   return (pool.find((entry) => roll < entry.cumulative) ?? pool[pool.length - 1]).item;
+}
+
+// Combien d'exemplaires d'un objet forment un lot de loterie. Le catalogue
+// donne une fourchette aux objets qui se gagnent par poignées ; les autres n'en
+// ont pas et se gagnent à l'unité, ce qui évite d'écrire `lot: { min: 1, max: 1 }`
+// sur les deux tiers du catalogue.
+//
+// Les bornes sont relues à chaque tirage plutôt que figées : `lot.max` se règle
+// à chaud comme le reste, et une borne absurde (max sous min, valeur négative)
+// se rabat sur quelque chose de jouable au lieu de faire planter la commande.
+export function itemLot(item) {
+  const borne = (value, fallback) => {
+    const number = Math.round(Number(value));
+    return Number.isFinite(number) && number > 0 ? number : fallback;
+  };
+  const min = borne(item?.lot?.min, 1);
+  return { min, max: Math.max(min, borne(item?.lot?.max, min)) };
+}
+
+export function rollLot(item) {
+  const { min, max } = itemLot(item);
+  return min + Math.floor(Math.random() * (max - min + 1));
 }
 
 // Ce que tient un Pokémon qui vient d'apparaître, ou null. Tiré à l'apparition

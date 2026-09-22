@@ -34,7 +34,7 @@ function renderTable(table) {
 
   const head = multiple
     ? [table.subject, "espèces", "poids", "total", "part", "par espèce"]
-    : [table.subject, "poids", "part", "au tirage", "soit"];
+    : [table.subject, "poids", ...(table.lots ? ["lot"] : []), "part", "au tirage", "soit"];
 
   // Un poids nul n'est pas « 0,0 % de chances » : la ligne est simplement hors
   // du tirage, que ce soit une évolution par échange ou un objet de collection.
@@ -52,6 +52,7 @@ function renderTable(table) {
       : [
           r.label,
           entier(r.weight),
+          ...(table.lots ? [r.weight > 0 ? r.lot ?? "1" : "—"] : []),
           r.weight > 0 ? pourcent(r.share, 1) : "hors pool",
           r.weight > 0 ? pourcent(gate * r.share, 3) : "—",
           r.weight > 0 ? surN(gate * r.share) : "—",
@@ -60,7 +61,14 @@ function renderTable(table) {
 
   const totalLine = multiple
     ? ["TOTAL", entier(table.rows.reduce((s, r) => s + r.count, 0)), "", entier(table.total), "100 %", ""]
-    : ["TOTAL", entier(table.total), "100 %", pourcent(gate, 3), surN(gate)];
+    : [
+        "TOTAL",
+        entier(table.total),
+        ...(table.lots ? [""] : []),
+        "100 %",
+        pourcent(gate, 3),
+        surN(gate),
+      ];
 
   const all = [head, ...lines, totalLine];
   // Largeur par colonne, déduite du contenu : la première à gauche, les
@@ -94,7 +102,8 @@ export default {
           .addChoices(
             { name: "Apparitions sauvages", value: "spawn" },
             { name: "Rencontres du parc safari", value: "safari" },
-            { name: "Butin des Pokémon", value: "butin" }
+            { name: "Butin des Pokémon", value: "butin" },
+            { name: "Loterie quotidienne", value: "loterie" }
           )
       ),
 

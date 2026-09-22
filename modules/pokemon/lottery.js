@@ -1,0 +1,137 @@
+// La loterie quotidienne : un tirage par dresseur et par jour.
+//
+// Une fois sur deux elle ne donne rien, et c'est l'essentiel du jeu — un cadeau
+// certain n'est pas un tirage, c'est une allocation. Le reste du temps elle rend
+// un lot pris dans la MÊME table que le butin des Pokémon, `dropWeight` : il n'y
+// a qu'un ordre de rareté dans ce jeu, et en maintenir deux, c'est les voir
+// diverger. Seule la porte d'entrée change, 7 % des apparitions d'un côté, la
+// moitié des tirages de l'autre.
+//
+// Deux règles de sûreté, et ce sont les mêmes que partout ailleurs :
+// le tirage du jour se revendique par un UPDATE gardé dont on inspecte
+// this.changes, donc deux commandes lancées en même temps n'en obtiennent
+// qu'un ; et si le crédit échoue, la revendication est rendue, donc personne ne
+// perd sa journée à cause d'une panne de base.
+import db from "../points-db.js";
+import { handleException, log } from "../utils.js";
+import { getPokemonConfig } from "./config.js";
+import { grantItem, pickWeightedItem, rollLot } from "./items.js";
+
+const SOURCE = "loterie";
+
+// Une journée qui n'a pas encore eu lieu : la valeur que prend `last_day` quand
+// on rend un tirage. Aucune date réelle ne peut lui être égale, donc le dresseur
+// retrouve son droit de tirer quel que soit le jour.
+const AUCUN_JOUR = "";
+
+export const getLotteryConfig = () => getPokemonConfig().lottery ?? {};
+
+// Le jour du tirage, en UTC. C'est le découpage que le classement des messages
+// utilise déjà (toISOString sur dix caractères) : deux définitions du mot
+// « jour » dans le même bot seraient une source de bugs sans fin.
+export const lotteryDay = (now = Date.now()) => new Date(now).toISOString().slice(0, 10);
+
+// Le prochain minuit UTC, c'est-à-dire l'instant exact où le tirage revient.
+// On l'affiche plutôt qu'un « reviens demain » : le dresseur n'a pas à deviner
+// dans quel fuseau le bot compte ses journées.
+export function nextDrawAt(now = Date.now()) {
+  const date = new Date(now);
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + 1);
+}
+
+export function getTicket(userId, cb) {
+  db.get("SELECT * FROM pokemon_lottery WHERE user_id = ?", [userId], cb);
+}
+
+// Revendication du tirage du jour. Le WHERE porte sur la journée déjà jouée :
+// c'est lui, et rien d'autre, qui tient la règle du « une fois par jour ».
+// L'INSERT couvre le premier tirage d'un dresseur, le DO UPDATE tous les
+// suivants, et les deux rendent this.changes === 1 quand le tirage est accordé.
+function claimDraw(userId, day, cb) {
+  db.run(
+    `INSERT INTO pokemon_lottery (user_id, last_day, last_draw_at, draws)
+     VALUES (?, ?, ?, 1)
+     ON CONFLICT(user_id) DO UPDATE SET
+       last_day = excluded.last_day,
+       last_draw_at = excluded.last_draw_at,
+       draws = draws + 1
+     WHERE pokemon_lottery.last_day <> excluded.last_day`,
+    [userId, day, Date.now()],
+    function (err) {
+      cb(err, this ? this.changes === 1 : false);
+    }
+  );
+}
+
+// Compensation : le tirage revendiqué est rendu. La garde sur la journée en
+// cours évite de rendre celui d'un autre appel, et `draws` repart avec, sinon le
+// compteur raconterait des tirages qui n'ont pas eu lieu.
+function releaseDraw(userId, day, cb) {
+  db.run(
+    `UPDATE pokemon_lottery SET last_day = ?, draws = MAX(0, draws - 1)
+      WHERE user_id = ? AND last_day = ?`,
+    [AUCUN_JOUR, userId, day],
+    (err) => {
+      if (err) handleException("Restitution d'un tirage de loterie :", err);
+      cb();
+    }
+  );
+}
+
+// Le tirage, et lui seul : deux hasards enchaînés, la porte puis le lot. Sortir
+// l'aléatoire de la décision rend le reste testable, comme pour les objets au
+// sol. Renvoie null quand le dresseur repart les mains vides.
+export function rollLottery() {
+  const chance = Number(getLotteryConfig().winChance);
+  if (!(chance > 0) || Math.random() >= chance) return null;
+  const item = pickWeightedItem();
+  if (!item) return null;
+  return { item, quantity: rollLot(item) };
+}
+
+// Un tirage complet : on revendique la journée, on tire, on crédite.
+// L'ordre compte. Revendiquer d'abord coûte la journée si le crédit échoue,
+// d'où la restitution ; tirer d'abord ouvrirait la porte à deux commandes
+// simultanées qui gagnent chacune leur lot avant que l'une ne perde la course.
+export function play(userId, cb) {
+  const config = getLotteryConfig();
+  const nextAt = nextDrawAt();
+  if (!config.enabled) {
+    return cb(null, { ok: false, reason: "La loterie est fermée.", nextAt });
+  }
+
+  const day = lotteryDay();
+  claimDraw(userId, day, (err, claimed) => {
+    if (err) return cb(err);
+    if (!claimed) {
+      return cb(null, {
+        ok: false,
+        reason: "Tu as déjà tenté ta chance aujourd'hui.",
+        played: true,
+        nextAt,
+      });
+    }
+
+    const prize = rollLottery();
+    if (!prize) {
+      log(`Loterie : ${userId} repart les mains vides`);
+      return cb(null, { ok: true, prize: null, nextAt });
+    }
+
+    grantItem(userId, prize.item.key, prize.quantity, { source: SOURCE }, (err) => {
+      // Le crédit a échoué : le tirage est rendu plutôt que perdu. Le lot, lui,
+      // est oublié — il sera retiré au sort, et c'est bien une loterie.
+      if (err) return releaseDraw(userId, day, () => cb(err));
+
+      db.run(
+        "UPDATE pokemon_lottery SET wins = wins + 1 WHERE user_id = ?",
+        [userId],
+        (err) => {
+          if (err) handleException("Comptage d'un gain de loterie :", err);
+        }
+      );
+      log(`Loterie : ${userId} gagne ${prize.quantity}× ${prize.item.label}`);
+      cb(null, { ok: true, prize, nextAt });
+    });
+  });
+}
