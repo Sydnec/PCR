@@ -1,5 +1,9 @@
 # PCR — consignes pour Claude
 
+## Réponses
+
+Toujours en français, et concises : juste de quoi comprendre ce qui a été fait.
+
 ## Livraison d'une feature ou d'un correctif
 
 Le mainteneur ne fait que `git pull && pcr release <fix|minor|major>` sur `main`. Une livraison
