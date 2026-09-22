@@ -7,17 +7,14 @@ import {
   ButtonStyle,
 } from "discord.js";
 import { handleException } from "../modules/utils.js";
-import { getCollection, describeEvolution } from "../modules/pokemon/collection.js";
+import {
+  decodeEntry,
+  describeEvolution,
+  encodeEntry,
+  getCollection,
+} from "../modules/pokemon/collection.js";
 import { embedColor, getSpecies, spriteUrl } from "../modules/pokemon/data.js";
 import { displayName } from "../modules/pokemon/embeds.js";
-
-// Les options d'inventaire encodent l'espèce ET la variante shiny, car un
-// shiny est une entrée de Pokédex distincte qui évolue séparément.
-const encode = (speciesId, isShiny) => `${speciesId}:${isShiny ? 1 : 0}`;
-export const decode = (value) => {
-  const [speciesId, shiny] = String(value).split(":");
-  return { speciesId: Number(speciesId), isShiny: shiny === "1" };
-};
 
 // Discord n'autorise pas de liste vide accompagnée d'un message : une
 // proposition inerte est le seul moyen d'expliquer pourquoi il n'y a rien à
@@ -70,7 +67,7 @@ export default {
       const choices = entries
         .map((entry) => ({
           name: `${label(entry)} (×${entry.count})`,
-          value: encode(entry.species_id, entry.is_shiny),
+          value: encodeEntry(entry.species_id, entry.is_shiny),
         }))
         .filter((choice) => choice.name.toLowerCase().includes(query))
         .slice(0, 25);
@@ -105,7 +102,7 @@ export default {
 
   async execute(interaction) {
     try {
-      const { speciesId, isShiny } = decode(interaction.options.getString("pokemon"));
+      const { speciesId, isShiny } = decodeEntry(interaction.options.getString("pokemon"));
       if (!getSpecies(speciesId)) {
         return interaction.reply({
           content:

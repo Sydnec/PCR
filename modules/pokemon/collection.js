@@ -10,6 +10,17 @@ import { getPokemonConfig } from "./config.js";
 import { evolutionTargets, getSpecies } from "./data.js";
 import { recordFusion, recordTrade } from "./stats.js";
 
+// Une entrée de collection, c'est une espèce ET une variante : un shiny est une
+// entrée de Pokédex distincte, qui évolue, s'échange et se revend séparément.
+// Les commandes encodent donc les deux dans la valeur d'une option — ce couple
+// vivait dans commands/evolution.js, que deux autres commandes importaient.
+export const encodeEntry = (speciesId, isShiny) => `${speciesId}:${isShiny ? 1 : 0}`;
+
+export const decodeEntry = (value) => {
+  const [speciesId, shiny] = String(value).split(":");
+  return { speciesId: Number(speciesId), isShiny: shiny === "1" };
+};
+
 export function getCollection(userId, cb) {
   db.all(
     `SELECT species_id, is_shiny, count, first_caught_at
@@ -104,6 +115,41 @@ export function creditSpecies(userId, speciesId, isShiny, cb) {
        first_caught_at = COALESCE(first_caught_at, excluded.first_caught_at),
        last_caught_at = excluded.last_caught_at`,
     [userId, speciesId, isShiny ? 1 : 0, now, now],
+    cb
+  );
+}
+
+// ====================== DOUBLONS ======================
+
+// Retire des exemplaires en garantissant qu'il en reste TOUJOURS un. C'est
+// l'invariant du Pokédex : une fusion, une revente, rien ne doit pouvoir effacer
+// une entrée durement gagnée. Le `count >= quantity + 1` du WHERE le tient en
+// une instruction, donc deux retraits simultanés ne peuvent pas passer à deux.
+//
+// (evolve() fait le même calcul en ligne, avec son propre `plan.required` :
+// c'est la même garde, dite deux fois.)
+export function reserveDuplicates(userId, speciesId, isShiny, quantity, cb) {
+  if (!Number.isInteger(quantity) || quantity <= 0) {
+    return cb(new Error(`Quantité invalide : ${quantity}`), false);
+  }
+  db.run(
+    `UPDATE pokemon_collection SET count = count - ?
+      WHERE user_id = ? AND species_id = ? AND is_shiny = ? AND count >= ?`,
+    [quantity, userId, speciesId, isShiny ? 1 : 0, quantity + 1],
+    function (err) {
+      cb(err, this ? this.changes === 1 : false);
+    }
+  );
+}
+
+// Rend des exemplaires réservés, quand la suite de l'opération a échoué. Jamais
+// un chemin de crédit ordinaire : creditSpecies l'est, et lui tient
+// first_caught_at à jour.
+export function restoreDuplicates(userId, speciesId, isShiny, quantity, cb = () => {}) {
+  db.run(
+    `UPDATE pokemon_collection SET count = count + ?
+      WHERE user_id = ? AND species_id = ? AND is_shiny = ?`,
+    [quantity, userId, speciesId, isShiny ? 1 : 0],
     cb
   );
 }

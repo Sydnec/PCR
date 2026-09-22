@@ -78,14 +78,30 @@ const POKEMON = {
   },
   trade: { expiryHours: 24 },
   pokedex: { pageSize: 30 },
-  // Catalogue des objets. Le sac ne stocke qu'une clé et un compteur : c'est ici
-  // que la clé prend un nom et une icône, réglables à chaud comme ceux des
-  // balls. L'effet, lui, vit dans le code de la fonctionnalité qui consomme
+  // Catalogue des objets. L'inventaire ne stocke qu'une clé et un compteur :
+  // c'est ici que la clé prend un nom et une icône, réglables à chaud comme ceux
+  // des balls. L'effet, lui, vit dans le code de la fonctionnalité qui consomme
   // l'objet — une clé sans effet reste un objet de collection valide.
   //
-  // Ajouter un objet demande donc de toucher ici ET au code qui le consomme :
+  // `ball` fait pointer l'objet vers une ball de capture : il en emprunte le
+  // libellé et l'icône, donc changer l'emoji d'une ball suffit, l'objet suit.
+  // `sellValue` rend l'objet revendable, et rien d'autre ne le rend revendable.
+  //
+  // Ajouter un objet demande de toucher ici ET au code qui le consomme :
   // /admin config modifie une valeur existante, il n'invente pas de clé.
   items: {
+    ball_poke: {
+      ball: "poke",
+      description: "Un lancer offert : tu la tiens déjà, elle ne te coûtera rien.",
+    },
+    ball_super: {
+      ball: "super",
+      description: "Un lancer offert : tu la tiens déjà, elle ne te coûtera rien.",
+    },
+    ball_hyper: {
+      ball: "hyper",
+      description: "Un lancer offert : tu la tiens déjà, elle ne te coûtera rien.",
+    },
     ticket_safari: {
       label: "Ticket Safari",
       emoji: "\u{1F39F}\uFE0F",
@@ -94,19 +110,29 @@ const POKEMON = {
     super_bonbon: {
       label: "Super Bonbon",
       emoji: "\u{1F36C}",
-      description: "De quoi faire évoluer un Pokémon sans y laisser de points.",
+      description: "Une fusion offerte : elle consomme tes doublons, pas tes points.",
     },
     pepite: {
       label: "Pépite",
       emoji: "\u{1F48E}",
-      description: "Ça brille, ça se revend cher. Un classique du Parc Safari.",
+      description: "Ça brille, et ça ne sert qu'à ça : se revendre.",
+      sellValue: 1000,
     },
   },
-  // Parc safari. Les poids d'apparition y compensent partiellement le malus
-  // infligé aux évolutions dans le pool naturel : c'est toute la raison d'être
-  // du parc, et la seule façon de croiser un stade 3 ou un légendaire sans y
-  // passer la semaine. La Safari Ball vit ici et non dans capture.balls, sinon
-  // elle apparaîtrait sur les spawns publics et dans /pokeinfo.
+  // Revente d'un doublon, par rareté. C'est une consolation, pas un commerce :
+  // attraper un commun à la Poké Ball coûte ~2 000 points en moyenne, le
+  // revendre en rend 150. Aucun tarif ne doit jamais dépasser le coût espéré
+  // d'une capture, sans quoi la chasse devient une imprimerie à points.
+  //
+  // Le barème suit la rareté affichée partout ailleurs (la pastille de couleur)
+  // plutôt que le taux de capture : c'est le repère que les dresseurs ont déjà.
+  sell: {
+    byRarity: { COMMUN: 150, PEU_COMMUN: 400, RARE: 1200, LEGENDAIRE: 6000 },
+    // Un shiny est une entrée de Pokédex distincte, et bien plus rare qu'un
+    // stade 3 : sans ce facteur, revendre un shiny en double rapporterait le
+    // prix d'un commun.
+    shinyMultiplier: 10,
+  },
   safari: {
     enabled: true,
     randomChancePerHour: 0.01,

@@ -382,6 +382,31 @@ const db = new sqlite3.Database(dbPath, (err) => {
       }
     );
 
+    // Journal des reventes de doublons. Une vente détruit définitivement des
+    // exemplaires : le compteur de la collection ne dira jamais qu'ils ont
+    // existé, et c'est bien ce qu'on voudra relire. Les objets, eux, ont déjà
+    // leur journal.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_sales (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        species_id INTEGER NOT NULL,
+        is_shiny INTEGER NOT NULL DEFAULT 0,
+        quantity INTEGER NOT NULL,
+        points INTEGER NOT NULL,
+        sold_at INTEGER NOT NULL
+      )`,
+      (err) => {
+        if (err) return handleException("Erreur création table pokemon_sales :", err);
+        db.run(
+          "CREATE INDEX IF NOT EXISTS idx_pokemon_sales_user ON pokemon_sales(user_id, id)",
+          (err) => {
+            if (err) handleException("Erreur création index pokemon_sales_user :", err);
+          }
+        );
+      }
+    );
+
     // ================== PARC SAFARI ==================
 
     // Un parc est l'événement public : le message à bouton, sa fenêtre

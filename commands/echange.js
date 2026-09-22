@@ -1,9 +1,13 @@
 import { SlashCommandBuilder, MessageFlags } from "discord.js";
 import { handleException } from "../modules/utils.js";
-import { createTrade, getCollection, setTradeMessage } from "../modules/pokemon/collection.js";
+import {
+  createTrade,
+  decodeEntry,
+  getCollection,
+  setTradeMessage,
+} from "../modules/pokemon/collection.js";
 import { getSpecies } from "../modules/pokemon/data.js";
 import { buildTradeEmbed, buildTradeRow } from "../modules/pokemon/embeds.js";
-import { decode } from "./evolution.js";
 
 // Discord n'autorise pas de liste vide accompagnée d'un message : une
 // proposition inerte est le seul moyen d'expliquer pourquoi il n'y a rien à
@@ -100,8 +104,8 @@ export default {
   async execute(interaction) {
     try {
       const target = interaction.options.getUser("membre");
-      const offer = decode(interaction.options.getString("je_donne"));
-      const request = decode(interaction.options.getString("je_recois"));
+      const offer = decodeEntry(interaction.options.getString("je_donne"));
+      const request = decodeEntry(interaction.options.getString("je_recois"));
 
       if (target.id === interaction.user.id) {
         return interaction.reply({

@@ -32,9 +32,16 @@
 		"trade":{"expiryHours":24},
 		"pokedex":{"pageSize":30},
 		"items":{
+			"ball_poke":{"ball":"poke","description":"Un lancer offert : tu la tiens déjà, elle ne te coûtera rien."},
+			"ball_super":{"ball":"super","description":"Un lancer offert : tu la tiens déjà, elle ne te coûtera rien."},
+			"ball_hyper":{"ball":"hyper","description":"Un lancer offert : tu la tiens déjà, elle ne te coûtera rien."},
 			"ticket_safari":{"label":"Ticket Safari","emoji":"🎟️","description":"Une entrée pour le parc safari, sans passer par la caisse."},
-			"super_bonbon":{"label":"Super Bonbon","emoji":"🍬","description":"De quoi faire évoluer un Pokémon sans y laisser de points."},
-			"pepite":{"label":"Pépite","emoji":"💎","description":"Ça brille, ça se revend cher. Un classique du Parc Safari."}
+			"super_bonbon":{"label":"Super Bonbon","emoji":"🍬","description":"Une fusion offerte : elle consomme tes doublons, pas tes points."},
+			"pepite":{"label":"Pépite","emoji":"💎","description":"Ça brille, et ça ne sert qu'à ça : se revendre.","sellValue":1000}
+		},
+		"sell":{
+			"byRarity":{"COMMUN":150,"PEU_COMMUN":400,"RARE":1200,"LEGENDAIRE":6000},
+			"shinyMultiplier":10
 		},
 		"safari":{
 			"enabled":true,

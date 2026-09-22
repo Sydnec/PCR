@@ -1,4 +1,4 @@
-// Le sac des dresseurs : catalogue, crédits, consommations.
+// L'inventaire des dresseurs : catalogue, crédits, consommations.
 //
 // Un objet n'est qu'un compteur par clé. Ce qui lui donne un nom et une icône
 // vit dans `pokemon.items` de la configuration, comme les balls, donc tout ça se
@@ -12,7 +12,7 @@
 // spendPoints évite déjà sur les points.
 import db from "../points-db.js";
 import { handleException } from "../utils.js";
-import { getPokemonConfig } from "./config.js";
+import { getBall, getPokemonConfig } from "./config.js";
 
 // D'où vient le mouvement. Journalisé tel quel : le jour où un dresseur jure
 // n'avoir jamais reçu son ticket, c'est cette colonne qui répond.
@@ -20,9 +20,24 @@ const SOURCE_INCONNUE = "inconnu";
 
 // ====================== CATALOGUE ======================
 
+// Une définition complète, prête à afficher. Un objet adossé à une ball
+// (`ball: "poke"`) en emprunte le libellé et l'icône : changer l'emoji d'une
+// ball suffit alors, l'objet suit, et il n'y a pas deux endroits à maintenir
+// d'accord. L'objet garde le dernier mot s'il pose les siens.
+function resolve(key, item) {
+  if (!item) return null;
+  const ball = item.ball ? getBall(item.ball) : null;
+  return {
+    key,
+    ...item,
+    label: item.label ?? ball?.label ?? key,
+    emoji: item.emoji ?? ball?.emoji ?? "\u{1F4E6}",
+  };
+}
+
 export function getItems() {
   const items = getPokemonConfig().items ?? {};
-  return Object.entries(items).map(([key, item]) => ({ key, ...item }));
+  return Object.entries(items).map(([key, item]) => resolve(key, item));
 }
 
 // Renvoie la définition d'un objet, ou null si la clé est inconnue.
@@ -33,8 +48,24 @@ export function getItem(key) {
   if (typeof key !== "string" || !Object.prototype.hasOwnProperty.call(items, key)) {
     return null;
   }
-  const item = items[key];
-  return item ? { key, ...item } : null;
+  return resolve(key, items[key]);
+}
+
+// Ce qui se revend, et à combien. Un objet sans sellValue ne se revend pas :
+// c'est le catalogue qui décide, pas la commande.
+export const itemSellValue = (item) => {
+  const value = Math.round(Number(item?.sellValue) || 0);
+  return value > 0 ? value : 0;
+};
+
+// Trie des lignes d'inventaire dans l'ordre du catalogue. La base rend un tri
+// alphabétique sur les clés, où « ball_hyper » précède « ball_poke » — un ordre
+// qui n'a de sens pour personne. Les clés hors catalogue ferment la marche
+// plutôt que de disparaître.
+export function sortByCatalogue(rows) {
+  const order = new Map(Object.keys(getPokemonConfig().items ?? {}).map((key, i) => [key, i]));
+  const rank = (row) => order.get(row.item_key) ?? Number.MAX_SAFE_INTEGER;
+  return [...rows].sort((a, b) => rank(a) - rank(b) || a.item_key.localeCompare(b.item_key));
 }
 
 // Un nom affichable pour une clé qui n'est plus au catalogue. Renommer une clé
@@ -44,7 +75,7 @@ export const itemLabel = (key) => getItem(key)?.label ?? key;
 
 // ====================== LECTURES ======================
 
-// Le sac, objets épuisés exclus. La ligne à zéro reste en base pour garder
+// L'inventaire, objets épuisés exclus. La ligne à zéro reste en base pour garder
 // first_obtained_at, donc c'est bien au filtre de l'écarter.
 export function getInventory(userId, cb) {
   db.all(

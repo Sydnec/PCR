@@ -1010,12 +1010,22 @@
   "pending": [
     {
       "type": "feature",
-      "name": "Le sac des dresseurs",
-      "description": "Les dresseurs ont maintenant un sac, consultable avec /sac : de quoi recevoir et garder des objets. Rien n'y tombe encore tout seul — c'est la fondation des trésors à venir, et seuls les administrateurs peuvent en distribuer pour l'instant.",
+      "name": "L'inventaire des dresseurs",
+      "description": "Les dresseurs ont maintenant un inventaire, consultable avec /inventaire : de quoi recevoir et garder des objets. Au catalogue : des balls offrant un lancer gratuit, un Ticket Safari, un Super Bonbon et une Pépite. Rien n'y tombe encore tout seul et seule la Pépite a son effet complet (elle se revend) — c'est la fondation des trésors à venir.",
       "announce": false,
       "author": "Sydnec",
       "commit": "pending",
-      "timestamp": "2026-09-22T07:11:52.699413Z",
+      "timestamp": "2026-09-22T07:26:37.829781Z",
+      "branch": "claude/sleepy-cerf-hxgk8t"
+    },
+    {
+      "type": "feature",
+      "name": "Revendre ce qu'on a en trop",
+      "description": "/revendre convertit tes doublons en points : 150 pour un commun, 400 pour un peu commun, 1 200 pour un rare, 6 000 pour un légendaire, et dix fois plus pour un shiny. Un exemplaire est toujours conservé, ton Pokédex ne peut pas y perdre une entrée. Les objets prévus pour ça se revendent aussi — la Pépite part à 1 000 points.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-22T07:26:37.829781Z",
       "branch": "claude/sleepy-cerf-hxgk8t"
     }
   ]

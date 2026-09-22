@@ -6,7 +6,7 @@ import {
   EmbedBuilder,
 } from "discord.js";
 import { getPokemonConfig, getSafariConfig } from "./config.js";
-import { getItem } from "./items.js";
+import { getItem, sortByCatalogue } from "./items.js";
 import {
   RARITIES,
   allSpecies,
@@ -319,36 +319,50 @@ export function buildFledEmbed(spawn, species, spending) {
     });
 }
 
-// ====================== SAC ======================
+// ====================== INVENTAIRE ======================
 
-// Le sac d'un dresseur. Une ligne par objet : icône, nom, quantité, puis à quoi
-// il sert — un objet dont on ne sait pas ce qu'il fait n'est qu'un chiffre.
+// L'inventaire d'un dresseur. Une ligne par objet : icône, nom, quantité, puis à
+// quoi il sert — un objet dont on ne sait pas ce qu'il fait n'est qu'un chiffre.
+//
+// L'ordre vient du catalogue et non de la base, qui rendrait un tri
+// alphabétique sur les clés : « ball_hyper » avant « ball_poke » n'a de sens
+// pour personne.
 //
 // Une clé absente du catalogue s'affiche quand même, en brut. Elle ne devrait
 // pas exister, mais si elle existe c'est qu'un renommage a laissé du monde avec
 // quelque chose en poche : le faire disparaître en silence serait le pire des
 // trois comportements possibles.
-export function buildBagEmbed(rows, { user = null } = {}) {
+export function buildInventoryEmbed(rows, { user = null } = {}) {
   const embed = new EmbedBuilder()
-    .setTitle(user ? `\u{1F392} Sac de ${user.displayName ?? user.username}` : "\u{1F392} Ton sac")
+    .setTitle(
+      user
+        ? `\u{1F392} Inventaire de ${user.displayName ?? user.username}`
+        : "\u{1F392} Ton inventaire"
+    )
     .setColor(0xc27c0e);
 
   if (!rows.length) {
     return embed.setDescription(
-      user ? "*Son sac est vide.*" : "*Ton sac est vide.* Les objets se trouvent, ils ne s'achètent pas."
+      user
+        ? "*Son inventaire est vide.*"
+        : "*Ton inventaire est vide.* Les objets se trouvent, ils ne s'achètent pas."
     );
   }
 
   const total = rows.reduce((sum, row) => sum + row.count, 0);
   embed.setDescription(`**${total}** objet${total > 1 ? "s" : ""} en poche.`);
 
-  for (const row of rows) {
+  for (const row of sortByCatalogue(rows)) {
     const item = getItem(row.item_key);
+    const value = item?.description ?? "*Objet retiré du catalogue.*";
     embed.addFields({
       name: item
         ? `${item.emoji} ${item.label} \u00D7${row.count}`
         : `\u2754 \`${row.item_key}\` \u00D7${row.count}`,
-      value: item?.description ?? "*Objet retiré du catalogue.*",
+      // La valeur de revente n'est écrite qu'une fois, là où elle est décidée.
+      value: item?.sellValue
+        ? `${value}\n*Se revend **${item.sellValue.toLocaleString("fr-FR")}** points pièce.*`
+        : value,
       inline: false,
     });
   }

@@ -2,19 +2,19 @@ import { SlashCommandBuilder, MessageFlags } from "discord.js";
 import { handleException } from "../modules/utils.js";
 import { getPokemonConfig } from "../modules/pokemon/config.js";
 import { getInventory } from "../modules/pokemon/items.js";
-import { buildBagEmbed } from "../modules/pokemon/embeds.js";
+import { buildInventoryEmbed } from "../modules/pokemon/embeds.js";
 
-// Le sac d'un dresseur. Réponse privée, comme le Pokédex : ce qu'on a en poche
-// regarde d'abord son propriétaire, et un sac vide n'a pas à s'afficher devant
-// tout le salon.
+// L'inventaire d'un dresseur. Réponse privée, comme le Pokédex : ce qu'on a en
+// poche regarde d'abord son propriétaire, et un inventaire vide n'a pas à
+// s'afficher devant tout le salon.
 export default {
   data: new SlashCommandBuilder()
-    .setName("sac")
+    .setName("inventaire")
     .setDescription("Affiche les objets que tu as trouvés")
     .addUserOption((option) =>
       option
         .setName("membre")
-        .setDescription("Le dresseur dont tu veux voir le sac")
+        .setDescription("Le dresseur dont tu veux voir l'inventaire")
         .setRequired(false)
     ),
 
@@ -32,7 +32,7 @@ export default {
 
       getInventory(owner.id, (err, rows) => {
         if (err) {
-          handleException("Lecture du sac :", err);
+          handleException("Lecture de l'inventaire :", err);
           return interaction
             .reply({
               content: "❌ Erreur base de données.",
@@ -43,9 +43,9 @@ export default {
 
         interaction
           .reply({
-            // `user` n'est passé que pour le sac de quelqu'un d'autre : sinon
-            // l'embed tutoie, comme celui du solde.
-            embeds: [buildBagEmbed(rows, { user: target })],
+            // `user` n'est passé que pour l'inventaire de quelqu'un d'autre :
+            // sinon l'embed tutoie, comme celui du solde.
+            embeds: [buildInventoryEmbed(rows, { user: target })],
             flags: MessageFlags.Ephemeral,
           })
           .catch(() => {});
