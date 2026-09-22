@@ -12,7 +12,8 @@
 			"legendaryWeight":8,
 			"pingRarities":["RARE","LEGENDAIRE"],
 			"throwLogSize":8,
-			"heldItemChance":0.1,
+			"heldItemChance":0.07,
+			"itemDropChance":0.2,
 			"embedRefreshMs":2000
 		},
 		"capture":{
@@ -40,12 +41,12 @@
 			"pierre_feu":{"label":"Pierre Feu","emoji":"🔥","description":"Fait évoluer un Évoli en Pyroli : un exemplaire suffit, et c'est gratuit.","sellValue":500,"dropWeight":30,"evolution":{"copies":1,"quantity":1,"freePoints":true,"from":133,"target":136}},
 			"pierre_foudre":{"label":"Pierre Foudre","emoji":"⚡","description":"Fait évoluer un Évoli en Voltali : un exemplaire suffit, et c'est gratuit.","sellValue":500,"dropWeight":30,"evolution":{"copies":1,"quantity":1,"freePoints":true,"from":133,"target":135}},
 			"pierre_eau":{"label":"Pierre Eau","emoji":"💧","description":"Fait évoluer un Évoli en Aquali : un exemplaire suffit, et c'est gratuit.","sellValue":500,"dropWeight":30,"evolution":{"copies":1,"quantity":1,"freePoints":true,"from":133,"target":134}},
-			"pepite":{"label":"Pépite","emoji":"💎","description":"Ça brille, et ça ne sert qu'à ça : se revendre.","sellValue":1000,"dropWeight":20},
+			"pepite":{"label":"Pépite","emoji":"💎","description":"Ça brille, et ça ne sert qu'à ça : se revendre.","sellValue":2000,"dropWeight":20},
 			"ticket_safari":{"label":"Ticket Safari","emoji":"🎟️","description":"Une entrée pour le parc safari. Elle s'utilise, elle ne se monnaie pas.","dropWeight":8},
 			"ball_master":{"ball":"master","description":"La capture garantie, offerte. Autant dire qu'elle ne se trouve pas.","dropWeight":3}
 		},
 		"sell":{
-			"byRarity":{"COMMUN":170,"PEU_COMMUN":500,"RARE":1800},
+			"byRarity":{"COMMUN":250,"PEU_COMMUN":600,"RARE":1500},
 			"shinyMultiplier":0
 		},
 		"safari":{

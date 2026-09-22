@@ -48,14 +48,16 @@ function probabilityLine(catchRate) {
     .join(" · ");
 }
 
+// Le journal des lancers. L'emoji de la ball plutôt que son nom : une colonne de
+// « Super Ball » répétée n'apprend rien, là où les pastilles se lisent d'un coup
+// d'œil et disent la même chose en un caractère.
 function throwLogField(throws) {
   if (!throws.length) return "*Personne n'a encore tenté sa chance.*";
+  const balls = getPokemonConfig().capture.balls;
   return throws
     .map(
       (row) =>
-        `${ballResultIcon(row.result)} <@${row.user_id}> — ${
-          getPokemonConfig().capture.balls[row.ball]?.label ?? row.ball
-        }`
+        `${ballResultIcon(row.result)} <@${row.user_id}> ${balls[row.ball]?.emoji ?? row.ball}`
     )
     .join("\n");
 }
@@ -254,28 +256,35 @@ export function buildSpeciesInfoEmbed(
 
 const formatPoints = (value) => value.toLocaleString("fr-FR");
 
-// Classement des points perdus sur un spawn. Le champ d'embed est plafonné à
-// 1024 caractères, d'où la coupe au top 5 avec un reliquat agrégé.
-const SPENDERS_SHOWN = 5;
+// Qui a lancé quoi. Le champ d'embed est plafonné à 1024 caractères, d'où la
+// coupe au top 5 avec un reliquat agrégé.
+const PARTICIPANTS_SHOWN = 5;
 
-function spendersField(spending) {
-  const spenders = spending?.spenders ?? [];
-  if (!spenders.length) return "*Personne n'a perdu un seul point.*";
+// Les balls d'un dresseur, groupées et comptées : « 1×🟡 2×🔵 ». Les pastilles
+// racontent l'engagement bien mieux qu'un total en points — on voit du premier
+// coup qui a sorti l'artillerie et qui a tenté sa chance à l'économie.
+function ballsLine(balls) {
+  const config = getPokemonConfig().capture.balls;
+  return Object.entries(balls)
+    .filter(([, count]) => count > 0)
+    // L'ordre du catalogue, donc de la moins chère à la plus chère : la ligne se
+    // lit toujours dans le même sens d'un dresseur à l'autre.
+    .sort(([a], [b]) => Object.keys(config).indexOf(a) - Object.keys(config).indexOf(b))
+    .map(([key, count]) => `${count}\u00D7${config[key]?.emoji ?? key}`)
+    .join(" ");
+}
 
-  const lines = spenders
-    .slice(0, SPENDERS_SHOWN)
-    .map((row, index) => {
-      const medal = ["🥇", "🥈", "🥉"][index] ?? "▪️";
-      return `${medal} <@${row.user_id}> — ${formatPoints(row.burned)} pts`;
-    });
+function participantsField(spending) {
+  const participants = spending?.participants ?? [];
+  if (!participants.length) return "*Personne n'a tenté sa chance.*";
 
-  const rest = spenders.length - SPENDERS_SHOWN;
-  if (rest > 0) {
-    const restTotal = spenders
-      .slice(SPENDERS_SHOWN)
-      .reduce((sum, row) => sum + row.burned, 0);
-    lines.push(`*et ${rest} autre${rest > 1 ? "s" : ""} — ${formatPoints(restTotal)} pts*`);
-  }
+  const lines = participants.slice(0, PARTICIPANTS_SHOWN).map((row, index) => {
+    const medal = ["\u{1F947}", "\u{1F948}", "\u{1F949}"][index] ?? "\u25AA\uFE0F";
+    return `${medal} <@${row.user_id}> (${ballsLine(row.balls)})`;
+  });
+
+  const rest = participants.length - PARTICIPANTS_SHOWN;
+  if (rest > 0) lines.push(`*et ${rest} autre${rest > 1 ? "s" : ""}*`);
   return lines.join("\n");
 }
 
@@ -295,22 +304,29 @@ function heldItemField(spawn, { fled = false } = {}) {
   ];
 }
 
+// La capture, annoncée par la ball qui l'a emportée.
+//
+// Tout tient dans la DESCRIPTION et non dans le titre, et ce n'est pas une
+// question de goût : Discord ne rend ni les emoji personnalisés ni les mentions
+// dans un titre d'embed, qui afficherait « <:superball:155…> » et l'identifiant
+// brut du dresseur. La ligne dit donc à elle seule avec quoi et par qui — ce qui
+// rendait la phrase d'avant, « Untel l'a attrapé avec une Super Ball »,
+// entièrement redondante.
 export function buildCaughtEmbed(spawn, species, winnerId, ballKey, spending) {
   const isShiny = Boolean(spawn.is_shiny);
   const ball = getPokemonConfig().capture.balls[ballKey];
   const total = spending?.total ?? 0;
 
   return new EmbedBuilder()
-    .setTitle(`🎉 ${displayName(species, isShiny)} a été capturé !`)
     .setDescription(
-      `<@${winnerId}> l'a attrapé avec une **${ball?.label ?? ballKey}** !`
+      `${ball?.emoji ?? ""} **${displayName(species, isShiny)}** a été capturé par <@${winnerId}> !`
     )
     .setColor(embedColor(species, isShiny))
     .setThumbnail(spriteUrl(species, isShiny))
     .addFields(
       { name: "Lancers", value: `${spawn.throw_count}`, inline: true },
       ...heldItemField(spawn),
-      { name: "💸 Ils ont payé pour rien", value: spendersField(spending), inline: false }
+      { name: "Participants", value: participantsField(spending), inline: false }
     )
     .setFooter({
       // Le total reste visible : c'est la mesure du puits, raison d'être du système.
@@ -323,18 +339,45 @@ export function buildFledEmbed(spawn, species, spending) {
   const total = spending?.total ?? 0;
 
   return new EmbedBuilder()
-    .setTitle(`💨 ${displayName(species, isShiny)} s'est enfui...`)
+    .setTitle(`\u{1F4A8} ${displayName(species, isShiny)} s'est enfui...`)
     .setDescription("Personne n'a réussi à le capturer à temps.")
     .setColor(0x4f545c)
     .setThumbnail(spriteUrl(species, isShiny))
     .addFields(
       { name: "Lancers", value: `${spawn.throw_count}`, inline: true },
       ...heldItemField(spawn, { fled: true }),
-      { name: "💸 Ils ont payé pour rien", value: spendersField(spending), inline: false }
+      { name: "Participants", value: participantsField(spending), inline: false }
     )
     .setFooter({
       text: `Spawn #${spawn.id} · Pokédex n°${species.id} · ${formatPoints(total)} pts partis en fumée`,
     });
+}
+
+// ====================== OBJET AU SOL ======================
+
+// Un objet lâché par un Pokémon qui s'en va. Message public, bouton unique : la
+// course est ouverte à tout le monde, y compris à qui n'a pas lancé une ball.
+export function buildDropEmbed(item, { claimedBy = null } = {}) {
+  const embed = new EmbedBuilder().setColor(claimedBy ? 0x4f545c : 0xc27c0e);
+  if (claimedBy) {
+    return embed.setDescription(
+      `${item.emoji} <@${claimedBy}> ramasse **${item.label}** !`
+    );
+  }
+  return embed.setDescription(
+    `${item.emoji} Il a laissé tomber **${item.label}** !\n*Au plus rapide.*`
+  );
+}
+
+export function buildDropRow(dropId, { disabled = false } = {}) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`poke_drop|${dropId}`)
+      .setLabel("Ramasser")
+      .setEmoji("\u{1F91A}")
+      .setStyle(ButtonStyle.Success)
+      .setDisabled(disabled)
+  );
 }
 
 // ====================== INVENTAIRE ======================

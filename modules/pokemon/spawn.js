@@ -9,6 +9,7 @@ import { handleException, log } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
 import { getSpecies, pickWeightedSpecies, rarityOf } from "./data.js";
 import { rollHeldItem } from "./items.js";
+import { dropItem, leavesItemBehind } from "./drops.js";
 import {
   buildBallRow,
   buildCaughtEmbed,
@@ -30,22 +31,41 @@ export function getSpawn(spawnId, cb) {
   db.get("SELECT * FROM pokemon_spawns WHERE id = ?", [spawnId], cb);
 }
 
-// Qui a perdu combien sur ce spawn, et le total. Ce sont les points brûlés :
-// les lancers ratés, jamais la capture gagnante ni les remboursements.
+// Qui a lancé quoi sur ce spawn, et combien de points y ont brûlé.
+//
+// Deux agrégats en une requête, et ils ne comptent pas la même chose : les
+// lancers de chacun, capture comprise — c'est la participation — et seulement
+// les ratés pour les points brûlés, qui mesurent le puits. Un lancer VOID a été
+// remboursé, il n'a donc jamais eu lieu.
 export function spendingBreakdown(spawnId, cb) {
   db.all(
-    `SELECT user_id, SUM(cost) AS burned
+    `SELECT user_id, ball, COUNT(*) AS throws,
+            SUM(CASE WHEN result = 'MISS' THEN cost ELSE 0 END) AS burned
        FROM pokemon_throws
-      WHERE spawn_id = ? AND result = 'MISS'
-      GROUP BY user_id
-      ORDER BY burned DESC`,
+      WHERE spawn_id = ? AND result != 'VOID'
+      GROUP BY user_id, ball`,
     [spawnId],
     (err, rows) => {
-      if (err) return cb(err, { total: 0, spenders: [] });
-      const spenders = rows || [];
+      if (err) return cb(err, { total: 0, participants: [] });
+
+      const byUser = new Map();
+      for (const row of rows || []) {
+        const entry = byUser.get(row.user_id) ?? { user_id: row.user_id, throws: 0, burned: 0, balls: {} };
+        entry.throws += row.throws;
+        entry.burned += row.burned;
+        entry.balls[row.ball] = (entry.balls[row.ball] ?? 0) + row.throws;
+        byUser.set(row.user_id, entry);
+      }
+
+      // Le plus investi d'abord : c'est ce que les médailles promettent. À
+      // nombre de lancers égal, celui qui y a laissé le plus de points passe
+      // devant — une salve d'Hyper Balls n'est pas une salve de Poké Balls.
+      const participants = [...byUser.values()].sort(
+        (a, b) => b.throws - a.throws || b.burned - a.burned
+      );
       cb(null, {
-        total: spenders.reduce((sum, row) => sum + row.burned, 0),
-        spenders,
+        total: participants.reduce((sum, row) => sum + row.burned, 0),
+        participants,
       });
     }
   );
@@ -300,6 +320,13 @@ export function endSpawnAsFled(client, spawn) {
   if (!species) return;
 
   recordSpawnEnd(spawn, species);
+
+  // Il part avec ce qu'il tenait, sauf s'il le lâche en chemin. C'est la seule
+  // chose qu'une apparition perdue peut encore donner, et elle ne demande pas
+  // d'avoir lancé la moindre ball.
+  if (spawn.held_item && leavesItemBehind()) {
+    dropItem(client, { spawn, itemKey: spawn.held_item });
+  }
 
   if (!spawn.channel_id || !spawn.message_id) return;
 

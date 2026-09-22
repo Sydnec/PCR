@@ -16,6 +16,7 @@ import { handleException, log } from "../utils.js";
 import { getBall, getPokemonConfig } from "./config.js";
 import { creditSpecies } from "./collection.js";
 import { consumeItem, getBallItem, getItem, grantItem } from "./items.js";
+import { dropItem, leavesItemBehind } from "./drops.js";
 import { catchProbability, getSpecies } from "./data.js";
 import { buildBallRow, displayName } from "./embeds.js";
 import { finalizeCaughtSpawn, refreshSpawnEmbed } from "./spawn.js";
@@ -348,6 +349,17 @@ export async function throwBall(interaction, spawnId, ballKey, { panel = false }
                 .catch(() => {});
 
             if (!held) return annonce("");
+
+            // Il le lâche parfois au lieu de le céder : l'objet tombe alors au
+            // sol, et c'est une seconde course — ouverte à tous, celui qui vient
+            // de gagner la première y compris.
+            if (leavesItemBehind()) {
+              dropItem(interaction.client, { spawn, itemKey: held.key });
+              return annonce(
+                `\n${held.emoji} Il tenait **${held.label}**... et l'a lâché en partant !`
+              );
+            }
+
             grantItem(userId, held.key, 1, { source: `capture:${spawnId}` }, (err) => {
               if (err) {
                 handleException("Remise de l'objet tenu :", err);

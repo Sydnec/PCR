@@ -1021,7 +1021,7 @@
     {
       "type": "feature",
       "name": "Revendre ce qu'on a en trop",
-      "description": "/revendre convertit tes doublons en points : 170 pour un commun, 500 pour un peu commun, 1 800 pour un rare. Un exemplaire est toujours conservé, ton Pokédex ne peut pas y perdre une entrée — et les légendaires comme les shinies ne se bradent pas du tout. Les objets prévus pour ça se revendent aussi : la Pépite part à 1 000 points, les pierres à 500.",
+      "description": "/revendre convertit tes doublons en points : 250 pour un commun, 600 pour un peu commun, 1 500 pour un rare. Un exemplaire est toujours conservé, ton Pokédex ne peut pas y perdre une entrée — et les légendaires comme les shinies ne se bradent pas du tout. Les objets prévus pour ça se revendent aussi : la Pépite part à 2 000 points, les pierres à 500, les bonbons à 300.",
       "announce": true,
       "author": "Sydnec",
       "commit": "pending",
@@ -1031,7 +1031,7 @@
     {
       "type": "feature",
       "name": "Les Pokémon tiennent des objets",
-      "description": "Un Pokémon sur dix tient quelque chose, et celui qui l'attrape l'empoche — celui qui le laisse fuir le voit partir avec. Des balls surtout, qui offrent un lancer : cliquer sur Poké Ball quand tu en as une ne te coûte plus rien, elle part toute seule. Puis des Super Bonbons, des pierres, un Ticket Safari qui t'ouvre le parc sans payer, et tout au bout une Master Ball, à peu près une toutes les trois mille apparitions.",
+      "description": "Un Pokémon sur quinze tient quelque chose. Des balls surtout, qui offrent un lancer : cliquer sur Poké Ball quand tu en as une ne te coûte plus rien, elle part toute seule. Puis des Super Bonbons, des pierres, un Ticket Safari qui t'ouvre le parc sans payer, et tout au bout une Master Ball, à peu près une toutes les trois mille apparitions.",
       "announce": true,
       "author": "Sydnec",
       "commit": "pending",
@@ -1046,6 +1046,26 @@
       "author": "Sydnec",
       "commit": "pending",
       "timestamp": "2026-09-22T08:21:22.840989Z",
+      "branch": "claude/sleepy-cerf-hxgk8t"
+    },
+    {
+      "type": "feature",
+      "name": "Les objets qui tombent par terre",
+      "description": "Une fois sur cinq, un Pokémon qui tenait un objet le lâche en partant au lieu de le céder à celui qui l'attrape — et il le lâche aussi quand il s'enfuit. L'objet reste par terre avec un bouton « Ramasser », au plus rapide : c'est la seule récompense qui ne demande pas d'avoir gagné la course, et la seule chose qu'une apparition perdue peut encore donner.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-22T08:38:54.814366Z",
+      "branch": "claude/sleepy-cerf-hxgk8t"
+    },
+    {
+      "type": "enhancement",
+      "name": "Les annonces de capture parlent en balls",
+      "description": "« Ils ont payé pour rien » devient « Participants », et chacun y apparaît avec les balls qu'il a lancées plutôt qu'avec un total en points. Le journal des lancers affiche lui aussi les balls par leur icône, et la capture s'annonce désormais par la ball qui l'a emportée, vainqueur nommé dans la même ligne.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-22T08:38:54.814411Z",
       "branch": "claude/sleepy-cerf-hxgk8t"
     }
   ]

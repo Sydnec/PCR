@@ -16,6 +16,8 @@ import { getPokemonConfig } from "./config.js";
 import { answerThrow, throwBall, trackPanel } from "./capture.js";
 import { getSpawn } from "./spawn.js";
 import { getBallItem, getItemCount } from "./items.js";
+import { claimDrop } from "./drops.js";
+
 import {
   claimShare,
   enterPark,
@@ -38,6 +40,7 @@ import {
   buildBallRow,
   buildDexEmbed,
   buildDexRow,
+  buildDropEmbed,
   buildSafariRecapEmbed,
   buildSafariView,
   buildSpeciesInfoEmbed,
@@ -173,6 +176,33 @@ function answerSpeciesInfo(interaction, spawnId) {
         });
       }
     );
+  });
+}
+
+// ---------------------- Objet au sol ----------------------
+
+// Le ramassage est une course à un seul vainqueur, exactement comme la capture :
+// le verrou est en base, pas dans la disparition du bouton. Le gagnant réécrit
+// le message public — ce qui fait tomber le bouton pour tout le monde — et les
+// autres reçoivent un mot en privé, parce que rien ne prouve qu'ils ont vu
+// passer le message entre-temps.
+function handleDropClaim(interaction, dropId) {
+  claimDrop(interaction.user.id, Number(dropId), (err, claimed) => {
+    if (err) {
+      handleException("Ramassage d'un objet au sol :", err);
+      return ephemeral(interaction, "❌ Erreur base de données.");
+    }
+    if (!claimed) {
+      return ephemeral(interaction, "💨 Trop tard, quelqu'un a été plus rapide !");
+    }
+
+    log(`Ramassage : ${interaction.user.username} prend ${claimed.item.label}`);
+    interaction
+      .update({
+        embeds: [buildDropEmbed(claimed.item, { claimedBy: interaction.user.id })],
+        components: [],
+      })
+      .catch(() => {});
   });
 }
 
@@ -535,6 +565,9 @@ export async function handlePokemonButton(interaction) {
     // les apparitions déjà postées le portent encore.
     case "poke_owned":
       return answerSpeciesInfo(interaction, args[0]);
+
+    case "poke_drop":
+      return handleDropClaim(interaction, args[0]);
 
     case "poke_dex":
       return showDexPage(interaction, args[0], Number(args[1]));

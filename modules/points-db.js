@@ -416,6 +416,34 @@ const db = new sqlite3.Database(dbPath, (err) => {
       }
     );
 
+    // Objets tombés par terre. Un Pokémon qui s'en va — capturé ou enfui — lâche
+    // parfois ce qu'il tenait, et le premier à cliquer le ramasse. Une ligne par
+    // objet au sol, avec le même verrou que partout ailleurs : un UPDATE gardé
+    // sur le statut, donc exactement un cliqueur repart avec.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_drops (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        spawn_id INTEGER,
+        item_key TEXT NOT NULL,
+        species_id INTEGER,
+        status TEXT NOT NULL DEFAULT 'OPEN',
+        channel_id TEXT,
+        message_id TEXT,
+        dropped_at INTEGER NOT NULL,
+        claimed_by TEXT,
+        claimed_at INTEGER
+      )`,
+      (err) => {
+        if (err) return handleException("Erreur création table pokemon_drops :", err);
+        db.run(
+          "CREATE INDEX IF NOT EXISTS idx_pokemon_drops_open ON pokemon_drops(status, id)",
+          (err) => {
+            if (err) handleException("Erreur création index pokemon_drops_open :", err);
+          }
+        );
+      }
+    );
+
     // ================== PARC SAFARI ==================
 
     // Un parc est l'événement public : le message à bouton, sa fenêtre

@@ -46,11 +46,17 @@ const POKEMON = {
     legendaryWeight: 8,
     pingRarities: ["RARE", "LEGENDAIRE"],
     throwLogSize: 8,
-    // Un Pokémon sur dix tient quelque chose. C'est tiré à l'apparition et figé
-    // dans la ligne, comme le shiny et le taux de capture : ce que porte un
+    // Un Pokémon sur quinze tient quelque chose. C'est tiré à l'apparition et
+    // figé dans la ligne, comme le shiny et le taux de capture : ce que porte un
     // Pokémon lui appartient, ça ne se retire pas au moment où on l'attrape.
-    // Celui qui s'enfuit part avec, ce qui est la moindre des choses.
-    heldItemChance: 0.1,
+    //
+    // Et ce qu'il tient ne finit pas toujours dans la poche de celui qui
+    // l'attrape : une fois sur cinq il le lâche en partant — capturé ou enfui —
+    // et l'objet reste par terre pour le plus rapide. C'est la seule récompense
+    // du jeu qui ne demande pas d'avoir gagné la course, et la seule chose qu'un
+    // Pokémon qui s'échappe laisse derrière lui.
+    heldItemChance: 0.07,
+    itemDropChance: 0.2,
     embedRefreshMs: 2000,
   },
   capture: {
@@ -157,7 +163,7 @@ const POKEMON = {
       label: "Pépite",
       emoji: "💎",
       description: "Ça brille, et ça ne sert qu'à ça : se revendre.",
-      sellValue: 1000,
+      sellValue: 2000,
       dropWeight: 20,
     },
     ticket_safari: {
@@ -173,16 +179,16 @@ const POKEMON = {
     },
   },
   // Revente d'un doublon, par rareté. C'est une consolation, pas un commerce :
-  // attraper un commun à la Poké Ball coûte ~2 000 points en moyenne, le
-  // revendre en rend 170. Aucun tarif ne doit jamais dépasser le coût espéré
-  // d'une capture, sans quoi la chasse devient une imprimerie à points.
+  // au taux moyen de chaque tranche et à l'Hyper Ball, une capture coûte ~510,
+  // ~1 030 et ~1 690 points. Aucun tarif ne doit jamais dépasser ce coût espéré,
+  // sans quoi la chasse devient une imprimerie à points.
   //
   // Le barème suit la rareté affichée partout ailleurs (la pastille de couleur)
   // plutôt que le taux de capture : c'est le repère que les dresseurs ont déjà.
   // Une rareté absente du barème ne se revend pas — c'est le cas des
   // légendaires, qu'on ne monnaie pas.
   sell: {
-    byRarity: { COMMUN: 170, PEU_COMMUN: 500, RARE: 1800 },
+    byRarity: { COMMUN: 250, PEU_COMMUN: 600, RARE: 1500 },
     // 0 : un shiny ne se revend pas. C'est une entrée de Pokédex qu'on ne
     // retrouve pas, et personne ne doit pouvoir la brader d'un clic.
     shinyMultiplier: 0,
