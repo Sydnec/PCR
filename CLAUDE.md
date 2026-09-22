@@ -15,7 +15,8 @@ n'est donc terminée que lorsqu'elle est **mergée dans `main`** :
    faisait, et `pcr release` la reprend telle quelle) :
    `type` (`feature` / `fix` / `enhancement` / `chore`), `name`, `description` (texte destiné aux
    joueurs), `announce` (annoncé sur Discord ou non), `author: "Sydnec"`, `commit: "pending"`,
-   `timestamp`, `branch`.
+   `timestamp`, `branch`. `name` et `description` restent **concis** : une ou deux phrases qui
+   disent ce qui change pour les joueurs, sans justification ni détail technique.
 3. Mettre à jour le `README.md` si le comportement visible change.
 4. Ouvrir la PR vers `main`, attendre la CI verte, puis la merger (merge commit).
 
