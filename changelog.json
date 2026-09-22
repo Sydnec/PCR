@@ -1,7 +1,24 @@
 {
-  "version": "1.13.3",
-  "lastUpdated": "2026-09-22T17:43:57.407Z",
+  "version": "1.13.4",
+  "lastUpdated": "2026-09-22T18:17:26.581Z",
   "releases": [
+    {
+      "version": "1.13.4",
+      "date": "2026-09-22",
+      "title": "Release 1.13.4",
+      "features": [
+        {
+          "type": "fix",
+          "name": "Le dernier exemplaire d'un Pokémon ne s'échange plus",
+          "description": "Un échange pouvait céder le seul exemplaire qu'on possédait d'un Pokémon, et le faire disparaître du Pokédex. Comme pour la fusion et la revente, le premier exemplaire de chaque entrée — un shiny compte à part — reste désormais verrouillé : seuls les doublons s'échangent. /echange ne propose plus que ce qu'on a en trop, de part et d'autre, et refuse d'emblée une offre qui ne pourrait pas aboutir.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-22T18:30:00.000Z",
+          "branch": "claude/adoring-darwin-4o541o"
+        }
+      ]
+    },
     {
       "version": "1.13.3",
       "date": "2026-09-22",
@@ -1155,16 +1172,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "fix",
-      "name": "Le dernier exemplaire d'un Pokémon ne s'échange plus",
-      "description": "Un échange pouvait céder le seul exemplaire qu'on possédait d'un Pokémon, et le faire disparaître du Pokédex. Comme pour la fusion et la revente, le premier exemplaire de chaque entrée — un shiny compte à part — reste désormais verrouillé : seuls les doublons s'échangent. /echange ne propose plus que ce qu'on a en trop, de part et d'autre, et refuse d'emblée une offre qui ne pourrait pas aboutir.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-22T18:30:00.000Z",
-      "branch": "claude/adoring-darwin-4o541o"
-    }
-  ]
+  "pending": []
 }
