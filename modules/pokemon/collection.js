@@ -1,8 +1,9 @@
 // Collection des dresseurs : lecture, fusion (évolution) et échanges.
 //
-// Règle valable partout : une ligne de pokemon_collection peut retomber à
-// count = 0 après une fusion ou un échange. On la conserve pour préserver
-// first_caught_at, donc TOUTE lecture filtre sur count > 0.
+// Règle valable partout : une ligne de pokemon_collection peut valoir
+// count = 0 — les échanges d'avant le verrouillage du premier exemplaire en ont
+// laissé. On la conserve pour préserver first_caught_at, donc TOUTE lecture
+// filtre sur count > 0.
 import db from "../points-db.js";
 import { addPoints, spendPoints } from "../economy.js";
 import { handleException } from "../utils.js";
@@ -123,9 +124,12 @@ export function creditSpecies(userId, speciesId, isShiny, cb) {
 // ====================== DOUBLONS ======================
 
 // Retire des exemplaires en garantissant qu'il en reste TOUJOURS un. C'est
-// l'invariant du Pokédex : une fusion, une revente, rien ne doit pouvoir effacer
-// une entrée durement gagnée. Le `count >= quantity + 1` du WHERE le tient en
-// une instruction, donc deux retraits simultanés ne peuvent pas passer à deux.
+// l'invariant du Pokédex : une fusion, une revente, un échange, rien ne doit
+// pouvoir effacer une entrée durement gagnée. Contrairement aux jeux, avoir
+// capturé un Pokémon ne suffit pas à le garder au Pokédex, il faut le posséder :
+// le premier exemplaire de chaque entrée est donc verrouillé, et seuls les
+// doublons circulent. Le `count >= quantity + 1` du WHERE le tient en une
+// instruction, donc deux retraits simultanés ne peuvent pas passer à deux.
 
 export function reserveDuplicates(userId, speciesId, isShiny, quantity, cb) {
   if (!Number.isInteger(quantity) || quantity <= 0) {
@@ -451,38 +455,48 @@ export function acceptTrade(tradeId, cb) {
         if (err || !trade) return cb(err || new Error("Échange introuvable"));
 
         // Retrait chez l'initiateur, puis chez la cible, avec compensation si
-        // le second échoue (le Pokémon a pu être fusionné entre-temps).
-        db.run(
-          `UPDATE pokemon_collection SET count = count - 1
-            WHERE user_id = ? AND species_id = ? AND is_shiny = ? AND count >= 1`,
-          [trade.from_user_id, trade.offer_species_id, trade.offer_is_shiny],
-          function (err) {
+        // le second échoue (le Pokémon a pu être fusionné entre-temps). Chacun
+        // ne cède qu'un doublon : reserveDuplicates refuse de toucher au
+        // dernier exemplaire, exactement comme pour une fusion ou une revente.
+        reserveDuplicates(
+          trade.from_user_id,
+          trade.offer_species_id,
+          trade.offer_is_shiny,
+          1,
+          (err, reserved) => {
             if (err) return cb(err);
-            if (this.changes === 0) {
+            if (!reserved) {
               return releaseTrade(tradeId, "FAILED", () =>
                 cb(null, {
                   ok: false,
-                  reason: "L'initiateur ne possède plus le Pokémon proposé.",
+                  reason:
+                    "L'initiateur n'a plus de doublon du Pokémon proposé : son dernier " +
+                    "exemplaire reste dans son Pokédex.",
                 })
               );
             }
 
-            db.run(
-              `UPDATE pokemon_collection SET count = count - 1
-                WHERE user_id = ? AND species_id = ? AND is_shiny = ? AND count >= 1`,
-              [trade.to_user_id, trade.request_species_id, trade.request_is_shiny],
-              function (err) {
+            reserveDuplicates(
+              trade.to_user_id,
+              trade.request_species_id,
+              trade.request_is_shiny,
+              1,
+              (err, reserved) => {
                 if (err) return cb(err);
-                if (this.changes === 0) {
+                if (!reserved) {
                   // Compensation : on rend son Pokémon à l'initiateur.
-                  return db.run(
-                    "UPDATE pokemon_collection SET count = count + 1 WHERE user_id = ? AND species_id = ? AND is_shiny = ?",
-                    [trade.from_user_id, trade.offer_species_id, trade.offer_is_shiny],
+                  return restoreDuplicates(
+                    trade.from_user_id,
+                    trade.offer_species_id,
+                    trade.offer_is_shiny,
+                    1,
                     () =>
                       releaseTrade(tradeId, "FAILED", () =>
                         cb(null, {
                           ok: false,
-                          reason: "Tu ne possèdes plus le Pokémon demandé.",
+                          reason:
+                            "Tu n'as plus de doublon du Pokémon demandé : ton dernier " +
+                            "exemplaire reste dans ton Pokédex.",
                         })
                       )
                   );

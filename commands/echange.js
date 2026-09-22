@@ -5,10 +5,11 @@ import {
   decodeEntry,
   encodeEntry,
   getCollection,
+  getOwned,
   setTradeMessage,
 } from "../modules/pokemon/collection.js";
 import { getSpecies, tradeEvolutionTarget } from "../modules/pokemon/data.js";
-import { buildTradeEmbed, buildTradeRow } from "../modules/pokemon/embeds.js";
+import { buildTradeEmbed, buildTradeRow, displayName } from "../modules/pokemon/embeds.js";
 
 // Discord n'autorise pas de liste vide accompagnée d'un message : une
 // proposition inerte est le seul moyen d'expliquer pourquoi il n'y a rien à
@@ -17,7 +18,19 @@ const HINT_VALUE = "0:0";
 const hint = (interaction, name) =>
   interaction.respond([{ name, value: HINT_VALUE }]).catch(() => {});
 
-// Propose les Pokémon réellement possédés par `userId`.
+// Le premier exemplaire de chaque entrée reste au Pokédex : on ne peut céder
+// que ce qu'on a en plus. acceptTrade tient la règle ; ce chiffre ne sert qu'à
+// ne proposer et n'accepter que des échanges qui ont une chance d'aboutir.
+const spareCopies = (count) => Math.max(0, count - 1);
+
+const ownedCopies = (userId, entry) =>
+  new Promise((resolve, reject) =>
+    getOwned(userId, entry.speciesId, entry.isShiny, (err, count) =>
+      err ? reject(err) : resolve(count)
+    )
+  );
+
+// Propose les doublons réellement possédés par `userId`.
 function respondWithOwned(interaction, userId, query, emptyLabel) {
   getCollection(userId, async (err, rows) => {
     if (err) {
@@ -28,7 +41,8 @@ function respondWithOwned(interaction, userId, query, emptyLabel) {
     const choices = (rows || [])
       .map((row) => {
         const species = getSpecies(row.species_id);
-        if (!species) return null;
+        const spare = spareCopies(row.count);
+        if (!species || spare === 0) return null;
         // Les quatre évolutions par échange se déclarent ici plutôt que dans un
         // message d'aide que personne ne lit : c'est l'instant exact où on
         // choisit ce qu'on donne. Le filtre portant sur le libellé, taper
@@ -36,7 +50,7 @@ function respondWithOwned(interaction, userId, query, emptyLabel) {
         const evolved = tradeEvolutionTarget(species);
         return {
           name:
-            `${row.is_shiny ? "✨ " : ""}${species.name} (×${row.count})` +
+            `${row.is_shiny ? "✨ " : ""}${species.name} (${spare} en trop)` +
             (evolved ? ` — évolue en ${evolved.name}` : ""),
           value: encodeEntry(row.species_id, row.is_shiny),
         };
@@ -45,7 +59,7 @@ function respondWithOwned(interaction, userId, query, emptyLabel) {
       .slice(0, 25);
 
     // Une liste vide est indiscernable d'une commande cassée : on dit
-    // explicitement que le dresseur n'a rien à échanger.
+    // explicitement que le dresseur n'a aucun doublon à échanger.
     if (choices.length === 0 && emptyLabel) return hint(interaction, emptyLabel);
     await interaction.respond(choices).catch(() => {});
   });
@@ -98,14 +112,14 @@ export default {
         interaction,
         String(targetId),
         focused.value,
-        "Ce dresseur n'a aucun Pokémon à échanger"
+        "Ce dresseur n'a aucun doublon à échanger"
       );
     }
     return respondWithOwned(
       interaction,
       interaction.user.id,
       focused.value,
-      "Tu n'as aucun Pokémon à échanger"
+      "Tu n'as aucun doublon à échanger : ton premier exemplaire reste au Pokédex"
     );
   },
 
@@ -127,10 +141,47 @@ export default {
           flags: MessageFlags.Ephemeral,
         });
       }
-      if (!getSpecies(offer.speciesId) || !getSpecies(request.speciesId)) {
+      const offered = getSpecies(offer.speciesId);
+      const requested = getSpecies(request.speciesId);
+      if (!offered || !requested) {
         return interaction.reply({
           content:
             "❌ Pokémon inconnu : choisis une proposition dans la liste d'autocomplétion.",
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+
+      // Une valeur tapée à la main contourne l'autocomplétion : sans ce
+      // contrôle, on publierait une offre qu'acceptTrade refuserait au clic.
+      // Le refus reste privé, avant que la proposition n'existe.
+      let offerCopies, requestCopies;
+      try {
+        [offerCopies, requestCopies] = await Promise.all([
+          ownedCopies(interaction.user.id, offer),
+          ownedCopies(target.id, request),
+        ]);
+      } catch (err) {
+        handleException("Lecture des collections pour /echange :", err);
+        return interaction.reply({
+          content: "❌ Erreur base de données.",
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      if (spareCopies(offerCopies) === 0) {
+        return interaction.reply({
+          content:
+            `❌ Tu n'as pas de doublon de **${displayName(offered, offer.isShiny)}** : ` +
+            `le premier exemplaire de chaque Pokémon reste dans ton Pokédex, seuls les ` +
+            `doublons s'échangent.`,
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      if (spareCopies(requestCopies) === 0) {
+        return interaction.reply({
+          content:
+            `❌ <@${target.id}> n'a pas de doublon de ` +
+            `**${displayName(requested, request.isShiny)}** à échanger : son premier ` +
+            `exemplaire reste dans son Pokédex.`,
           flags: MessageFlags.Ephemeral,
         });
       }
