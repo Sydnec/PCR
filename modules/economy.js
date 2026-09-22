@@ -72,8 +72,8 @@ export function buildBalanceEmbed(balance, { user = null, balls = null } = {}) {
         : ["*Aucune ball en poche.*"])
     );
   }
-  // La description et non des champs : Discord ne rend pas les emoji du serveur
-  // dans le nom d'un champ, et ce sont eux qui disent de quelle ball on parle.
+  // Tout tient dans la description, sous le montant : c'est une seule réponse —
+  // de quoi lancer — et non des rubriques à parcourir.
   const embed = new EmbedBuilder().setColor(0xf1c40f).setDescription(lines.join("\n"));
 
   // Sans destinataire nommé, on tutoie : c'est le cas de l'éphémère ouvert sous
