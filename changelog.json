@@ -1172,5 +1172,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Tes balls affichées avec ton solde",
+      "description": "/solde et le bouton « ℹ️ Infos du Pokémon » affichent désormais, sous les points, les balls que tu as en poche — Poké Ball, Super Ball, Hyper Ball, Master Ball — avec leur nombre. Une ball offerte se lance sans toucher au solde : c'est la moitié de la réponse à « est-ce que je peux lancer ? ».",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-22T19:00:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    }
+  ]
 }
