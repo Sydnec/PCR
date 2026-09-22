@@ -323,10 +323,11 @@ export function endSpawnAsFled(client, spawn) {
 
   // Il part avec ce qu'il tenait, sauf s'il le lâche en chemin. C'est la seule
   // chose qu'une apparition perdue peut encore donner, et elle ne demande pas
-  // d'avoir lancé la moindre ball.
-  if (spawn.held_item && leavesItemBehind()) {
-    dropItem(client, { spawn, itemKey: spawn.held_item });
-  }
+  // d'avoir lancé la moindre ball. Le tirage est fait ICI et son résultat suit
+  // jusqu'à l'embed : celui-ci doit dire « il lâche » et non « il emporte »
+  // quand un bouton « Ramasser » vient d'apparaître juste en dessous.
+  const dropped = Boolean(spawn.held_item) && leavesItemBehind();
+  if (dropped) dropItem(client, { spawn, itemKey: spawn.held_item });
 
   if (!spawn.channel_id || !spawn.message_id) return;
 
@@ -337,7 +338,7 @@ export function endSpawnAsFled(client, spawn) {
       const message = await channel.messages.fetch(spawn.message_id);
       await message.edit({
         content: null,
-        embeds: [buildFledEmbed(spawn, species, spending)],
+        embeds: [buildFledEmbed(spawn, species, spending, { dropped })],
         components: [],
       });
     } catch (error) {

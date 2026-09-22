@@ -1094,6 +1094,16 @@
       "commit": "pending",
       "timestamp": "2026-09-22T09:00:12.188695Z",
       "branch": "claude/sleepy-cerf-hxgk8t"
+    },
+    {
+      "type": "fix",
+      "name": "Une Master Ball offerte ne peut plus se payer en points",
+      "description": "La confirmation annonçait « ta Master Ball offerte » sans montrer de prix ; si l'objet disparaissait entre l'ouverture de la fenêtre et le clic, le lancer se rabattait sur ton solde et prélevait 22 500 points en silence. Il refuse désormais et te le dit. Au passage, une fusion qui échoue à la toute dernière étape rend enfin les doublons, l'objet et les points au lieu de tout garder, et un Pokémon qui s'enfuit n'annonce plus qu'il « emporte » un objet qui gît dans le salon.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-22T09:00:12.188695Z",
+      "branch": "claude/sleepy-cerf-hxgk8t"
     }
   ]
 }

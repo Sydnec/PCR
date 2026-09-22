@@ -16,7 +16,12 @@ import { describeWeightTables } from "../../modules/pokemon/weights.js";
 const pourcent = (value, decimals = 2) =>
   `${(value * 100).toFixed(decimals).replace(".", ",")} %`;
 
-const entier = (value) => value.toLocaleString("fr-FR");
+// Le séparateur de milliers du format fr-FR est une espace insécable ÉTROITE
+// (U+202F). Elle compte pour un caractère dans String.length, qui sert à calculer
+// les largeurs, mais ne vaut pas une cellule en chasse fixe : toutes les lignes
+// à quatre chiffres décalaient leurs colonnes de droite. On la ramène à une
+// espace ordinaire, qui vaut exactement une cellule.
+const entier = (value) => value.toLocaleString("fr-FR").replace(/[\u202F\u00A0]/g, " ");
 
 // « une chance sur N », qui se lit mieux qu'un pourcentage à trois décimales
 // quand l'événement est rare.
@@ -31,10 +36,26 @@ function renderTable(table) {
     ? [table.subject, "espèces", "poids", "total", "part", "par espèce"]
     : [table.subject, "poids", "part", "au tirage", "soit"];
 
+  // Un poids nul n'est pas « 0,0 % de chances » : la ligne est simplement hors
+  // du tirage, que ce soit une évolution par échange ou un objet de collection.
+  // Afficher un pourcentage lui donnerait l'air d'être dans le pool.
   const lines = table.rows.map((r) =>
     multiple
-      ? [r.label, entier(r.count), entier(r.weight), entier(r.total), pourcent(r.share, 1), pourcent(r.unitShare)]
-      : [r.label, entier(r.weight), pourcent(r.share, 1), pourcent(gate * r.share, 3), surN(gate * r.share)]
+      ? [
+          r.label,
+          entier(r.count),
+          entier(r.weight),
+          entier(r.total),
+          r.weight > 0 ? pourcent(r.share, 1) : "hors pool",
+          r.weight > 0 ? pourcent(r.unitShare) : "—",
+        ]
+      : [
+          r.label,
+          entier(r.weight),
+          r.weight > 0 ? pourcent(r.share, 1) : "hors pool",
+          r.weight > 0 ? pourcent(gate * r.share, 3) : "—",
+          r.weight > 0 ? surN(gate * r.share) : "—",
+        ]
   );
 
   const totalLine = multiple

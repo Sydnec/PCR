@@ -46,7 +46,15 @@ export function dropItem(client, { spawn, itemKey }, cb = () => {}) {
       }
       const dropId = this.lastID;
 
-      if (!client || !spawn?.channel_id) return cb(null, dropId);
+      // Sans salon où l'annoncer, l'objet n'a aucun bouton derrière lui : le
+      // laisser OUVERT en base, c'est une ligne que personne ne pourra jamais
+      // réclamer. On le déclare perdu, comme pour un envoi qui échoue.
+      if (!client || !spawn?.channel_id) {
+        db.run("UPDATE pokemon_drops SET status = 'LOST' WHERE id = ?", [dropId], (err) => {
+          if (err) handleException("Abandon d'un objet au sol :", err);
+        });
+        return cb(null, null);
+      }
       try {
         const channel = await client.channels.fetch(spawn.channel_id);
         const message = await channel.send({
@@ -71,6 +79,21 @@ export function dropItem(client, { spawn, itemKey }, cb = () => {}) {
   );
 }
 
+// Repose l'objet par terre après une revendication qui n'a pas abouti. Les trois
+// colonnes repartent ensemble : un statut OUVERT qui garderait un ramasseur ou
+// une heure de ramassage serait un état que rien ne sait plus lire.
+function reopen(dropId, cb) {
+  db.run(
+    `UPDATE pokemon_drops SET status = 'OPEN', claimed_by = NULL, claimed_at = NULL
+      WHERE id = ?`,
+    [dropId],
+    (err) => {
+      if (err) handleException("Réouverture d'un objet au sol :", err);
+      cb();
+    }
+  );
+}
+
 // Revendication atomique. Rend la définition de l'objet au vainqueur, et null à
 // tous les autres : « quelqu'un a été plus rapide » n'est pas une erreur.
 export function claimDrop(userId, dropId, cb) {
@@ -87,23 +110,19 @@ export function claimDrop(userId, dropId, cb) {
         const item = getItem(drop.item_key);
         if (!item) {
           // Clé disparue du catalogue entre le dépôt et le ramassage : on rouvre
-          // plutôt que de faire disparaître l'objet dans le vide.
-          db.run("UPDATE pokemon_drops SET status = 'OPEN', claimed_by = NULL WHERE id = ?", [dropId], () => {});
-          return cb(new Error(`Objet au sol inconnu : ${drop.item_key}`), null);
+          // plutôt que de faire disparaître l'objet dans le vide. claimed_at
+          // part avec claimed_by — une ligne OUVERTE qui garde l'heure d'une
+          // revendication annulée ferait mentir n'importe quelle relecture.
+          return reopen(dropId, () =>
+            cb(new Error(`Objet au sol inconnu : ${drop.item_key}`), null)
+          );
         }
 
         grantItem(userId, drop.item_key, 1, { source: `sol:${dropId}` }, (err) => {
           if (err) {
             // Le crédit a échoué : l'objet retourne par terre, sans quoi il
             // serait perdu pour tout le monde.
-            db.run(
-              "UPDATE pokemon_drops SET status = 'OPEN', claimed_by = NULL, claimed_at = NULL WHERE id = ?",
-              [dropId],
-              (reopenError) => {
-                if (reopenError) handleException("Réouverture d'un objet au sol :", reopenError);
-              }
-            );
-            return cb(err, null);
+            return reopen(dropId, () => cb(err, null));
           }
           log(`Objet au sol #${dropId} ramassé par ${userId} (${item.label})`);
           cb(null, { drop, item });

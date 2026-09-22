@@ -79,7 +79,10 @@ function askMasterBallConfirmation(interaction, spawnId, { panel = false } = {})
 
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
-          .setCustomId(`poke_master_ok|${spawnId}`)
+          // Le customId porte la promesse faite au dresseur : si la Master Ball
+          // annoncée gratuite a disparu entre-temps, le lancer doit refuser, pas
+          // se rabattre sur 22 500 points jamais mentionnés.
+          .setCustomId(`poke_master_ok|${spawnId}${gratuite ? "|item" : ""}`)
           .setLabel(gratuite ? "Utiliser ma Master Ball" : `Confirmer (-${ball.price})`)
           .setEmoji(ball.emoji)
           .setStyle(ButtonStyle.Danger),
@@ -551,7 +554,10 @@ export async function handlePokemonButton(interaction) {
     // Toujours cliqué depuis un éphémère (la confirmation), donc toujours une
     // réécriture.
     case "poke_master_ok":
-      return throwBall(interaction, args[0], "master", { panel: true });
+      return throwBall(interaction, args[0], "master", {
+        panel: true,
+        requireItem: args[1] === "item",
+      });
 
     case "poke_master_cancel":
       return interaction
@@ -582,15 +588,13 @@ export async function handlePokemonButton(interaction) {
       return runEvolution(interaction, Number(speciesId), shiny === "1", null, helper ?? null);
     }
 
+    // Pas d'aide ici, et ce n'est pas un oubli : choisir sa cible et utiliser un
+    // objet sont deux chemins distincts. Une pierre impose déjà sa forme — c'est
+    // précisément ce qui en fait le moyen de choisir son Évoli sans payer le
+    // supplément — et un bonbon laisse le hasard trancher.
     case "poke_evo_pick": {
-      const [speciesId, shiny, targetId, helper] = args;
-      return runEvolution(
-        interaction,
-        Number(speciesId),
-        shiny === "1",
-        Number(targetId),
-        helper ?? null
-      );
+      const [speciesId, shiny, targetId] = args;
+      return runEvolution(interaction, Number(speciesId), shiny === "1", Number(targetId));
     }
 
     case "poke_safari_enter":

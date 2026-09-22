@@ -77,12 +77,22 @@ export default {
               return erreur();
             }
 
+            // Ce que l'entrée a rendu, s'il a fallu défaire quelque chose. La
+            // phrase suit les DEUX sorties : un refus après un ticket consommé
+            // laissait croire que l'objet le plus rare du jeu avait été mangé
+            // pour rien.
+            const rendu = result.refunded
+              ? ` Tes **${result.refunded}** points t'ont été rendus.`
+              : result.ticketRendu
+                ? " Ton **Ticket Safari** t'a été rendu."
+                : "";
+
             if (!result.ok) {
               const content =
                 result.code === "COOLDOWN"
                   ? `⏳ Tu as déjà visité le parc récemment. Prochaine entrée possible <t:${Math.floor(result.retryAt / 1000)}:R>.`
                   : `❌ ${result.reason}`;
-              return interaction.editReply({ content }).catch(() => {});
+              return interaction.editReply({ content: content + rendu }).catch(() => {});
             }
 
             // Le contenu s'écrit APRÈS l'étalement de la vue : celle-ci porte le
@@ -90,17 +100,11 @@ export default {
             // et l'ordre inverse le ferait écraser.
             //
             // Une visite ouverte entre la vérification et le débit est rendue
-            // telle quelle, points remboursés : c'est une reprise, pas l'entrée
-            // qu'on vient de payer.
+            // telle quelle : c'est une reprise, pas l'entrée qu'on vient de payer.
             const view = buildSafariView(result.session, {
               owned: result.owned,
               resumed: result.resumed,
             });
-            const rendu = result.refunded
-              ? ` Tes **${result.refunded}** points t'ont été rendus.`
-              : result.ticketRendu
-                ? " Ton **Ticket Safari** t'a été rendu."
-                : "";
             const content = result.resumed
               ? view.content + rendu
               : result.ticket

@@ -119,14 +119,23 @@ function logThrow(spawnId, userId, ballKey, cost, probability, result) {
 // UPDATE gardé que tout le reste, donc deux clics simultanés n'en dépensent
 // jamais qu'une.
 //
-// Rend { item } pour une ball offerte, { points } pour un achat, ou null si le
-// solde ne suffit pas.
-function payThrow(userId, ball, cb) {
+// Rend { item } pour une ball offerte, { points } pour un achat, ou null si rien
+// n'a pu payer.
+//
+// `requireItem` interdit la bascule vers les points. Il sert au seul chemin qui
+// en a besoin : la confirmation Master Ball, qui annonce « ta Master Ball
+// offerte » sans montrer le moindre prix ni regarder le solde. Si l'objet a
+// disparu entre l'ouverture de la confirmation et le clic — un second panneau
+// ouvert ailleurs suffit — payer 22 500 points en silence serait exactement le
+// mésclic irrattrapable que cette confirmation existe pour empêcher.
+function payThrow(userId, ball, { requireItem = false } = {}, cb) {
   const item = getBallItem(ball.key);
   const tryPoints = () =>
-    spendPoints(userId, ball.price, (err, debited) =>
-      cb(err, debited ? { points: ball.price } : null)
-    );
+    requireItem
+      ? cb(null, null)
+      : spendPoints(userId, ball.price, (err, debited) =>
+          cb(err, debited ? { points: ball.price } : null)
+        );
 
   if (!item) return tryPoints();
   consumeItem(userId, item.key, 1, { source: "lancer" }, (err, consumed) => {
@@ -168,7 +177,12 @@ function refundThrow(interaction, spawnId, ball, probability, view, payment) {
 // `panel` distingue les deux origines d'un clic : l'annonce publique, où l'on
 // ouvre un éphémère, et le panneau de relance, où l'on réécrit celui d'où vient
 // le clic. Sans ça, dix lancers laissaient dix messages empilés.
-export async function throwBall(interaction, spawnId, ballKey, { panel = false } = {}) {
+export async function throwBall(
+  interaction,
+  spawnId,
+  ballKey,
+  { panel = false, requireItem = false } = {}
+) {
   const config = getPokemonConfig();
   const ball = getBall(ballKey);
   const userId = interaction.user.id;
@@ -227,13 +241,24 @@ export async function throwBall(interaction, spawnId, ballKey, { panel = false }
 
     // 1. Paiement atomique : une ball offerte d'abord, le solde ensuite, et
     // refusé sans rien prélever si ni l'un ni l'autre ne suffit.
-    payThrow(userId, ball, (err, payment) => {
+    payThrow(userId, ball, { requireItem }, (err, payment) => {
       if (err) {
         handleException("Paiement du lancer :", err);
         return interaction.editReply(view("❌ Erreur base de données.")).catch(() => {});
       }
 
       if (!payment) {
+        // Promis gratuit, et l'objet n'y est plus : on le dit, on ne débite pas.
+        if (requireItem) {
+          return interaction
+            .editReply(
+              view(
+                `❌ Tu n'as plus de **${ball.label}** dans ton inventaire. ` +
+                  `Rien n'a été débité.`
+              )
+            )
+            .catch(() => {});
+        }
         return getBalance(userId, (err, balance) => {
           interaction
             .editReply(

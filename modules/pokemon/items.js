@@ -68,11 +68,6 @@ export function sortByCatalogue(rows) {
   return [...rows].sort((a, b) => rank(a) - rank(b) || a.item_key.localeCompare(b.item_key));
 }
 
-// Un nom affichable pour une clé qui n'est plus au catalogue. Renommer une clé
-// ne doit pas faire disparaître en silence ce que les dresseurs ont en poche :
-// mieux vaut afficher la clé brute et qu'on vienne poser la question.
-export const itemLabel = (key) => getItem(key)?.label ?? key;
-
 // L'objet qui offre un lancer de cette ball, s'il existe. On interroge le
 // catalogue plutôt que de composer « ball_ » + la clé : c'est le catalogue qui
 // décide, et une convention de nommage n'est pas un contrat.

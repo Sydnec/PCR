@@ -194,14 +194,20 @@ export default {
                   .join(", ")}.\n\n` +
                   `Tu peux laisser le hasard décider, ou payer plus cher pour choisir.`
               : `**${species.name}** peut évoluer en **${plan.targets[0].name}**.`
-          )
-          .addFields({
+          );
+
+        // Le coût de la fusion ordinaire n'a sa place que si elle est
+        // proposée : au-dessus d'un unique bouton « Pierre Feu → Pyroli
+        // (gratuit) », annoncer « 2 doublons et 2000 points » se contredit.
+        if (owned >= plan.required) {
+          embed.addFields({
             name: "Coût",
             value:
               `**${plan.duplicates}** doublons consommés (il t'en faut **${plan.required}** au total, ` +
               `un exemplaire est toujours conservé) et **${plan.points}** points`,
             inline: false,
           });
+        }
 
         const rows = [];
         const normale = new ActionRowBuilder();

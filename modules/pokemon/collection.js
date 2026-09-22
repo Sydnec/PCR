@@ -4,7 +4,7 @@
 // count = 0 après une fusion ou un échange. On la conserve pour préserver
 // first_caught_at, donc TOUTE lecture filtre sur count > 0.
 import db from "../points-db.js";
-import { spendPoints } from "../economy.js";
+import { addPoints, spendPoints } from "../economy.js";
 import { handleException } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
 import { evolutionTargets, getSpecies } from "./data.js";
@@ -264,10 +264,15 @@ export function evolve(userId, speciesId, isShiny, chosenTargetId, helperKey, cb
   // refuserait un dresseur sans ligne de solde, et une fusion gratuite n'a pas à
   // dépendre de ça.
   const payer = (rendreExemplaires) => {
-    const finir = () => {
+    // `rendreTout` est la compensation COMPLÈTE au point où on l'appelle : les
+    // exemplaires, l'aide, et les points s'ils sont déjà partis. Sans elle, un
+    // crédit de collection raté au tout dernier moment laissait le dresseur
+    // délesté de tout et sans rien — exactement ce que cette cascade existe pour
+    // empêcher, et la seule étape qui y échappait.
+    const finir = (rendreTout) => {
       // Un shiny évolue en shiny : is_shiny est conservé.
       creditSpecies(userId, target.id, isShiny, (err) => {
-        if (err) return cb(err);
+        if (err) return rendreTout(() => cb(err));
         db.run(
           `INSERT INTO pokemon_fusions
              (user_id, from_species_id, to_species_id, is_shiny, duplicates_spent, points_spent, created_at)
@@ -282,7 +287,7 @@ export function evolve(userId, speciesId, isShiny, chosenTargetId, helperKey, cb
       });
     };
 
-    if (plan.points <= 0) return finir();
+    if (plan.points <= 0) return finir(rendreExemplaires);
     spendPoints(userId, plan.points, (err, debited) => {
       if (err || !debited) {
         rendreExemplaires(() => {
@@ -294,7 +299,13 @@ export function evolve(userId, speciesId, isShiny, chosenTargetId, helperKey, cb
         });
         return;
       }
-      finir();
+      // Les points sont partis : à partir d'ici, tout retour en arrière les rend.
+      finir((suite) =>
+        addPoints(userId, plan.points, (err) => {
+          if (err) handleException("Remboursement d'une fusion échouée :", err);
+          rendreExemplaires(suite);
+        })
+      );
     });
   };
 

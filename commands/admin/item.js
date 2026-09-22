@@ -102,7 +102,13 @@ export default {
       );
     }
 
-    const after = before + quantity;
+    // Relecture plutôt qu'addition : grantItem et consumeItem font leur
+    // arithmétique en SQL, et deux administrateurs servant le même dresseur au
+    // même instant liraient tous deux l'ancien compteur. Annoncer un total qui
+    // n'a jamais existé, et le journaliser, vaut moins qu'une requête de plus.
+    const after = await new Promise((resolve, reject) =>
+      getItemCount(target.id, key, (err, count) => (err ? reject(err) : resolve(count)))
+    );
     log(
       `/admin item par ${interaction.user.username} : ${quantity > 0 ? "+" : ""}${quantity} ` +
         `${item.label} à ${target.username} (${before} → ${after})`

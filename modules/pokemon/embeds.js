@@ -292,12 +292,15 @@ function participantsField(spending) {
 // savoir : l'annonce ne le montre pas, sans quoi un objet rare ferait monter les
 // enchères sur un Pokémon commun. Après, tout le monde le voit — y compris quand
 // il s'enfuit avec, ce qui est la moitié du sel de l'affaire.
-function heldItemField(spawn, { fled = false } = {}) {
+function heldItemField(spawn, { fled = false, dropped = false } = {}) {
   const item = getItem(spawn.held_item);
   if (!item) return [];
   return [
     {
-      name: fled ? "Et il emporte" : "Il tenait",
+      // Trois états, et le troisième n'est pas cosmétique : annoncer « et il
+      // emporte » d'un objet qui gît dans le salon, bouton compris, ferait
+      // renoncer à le ramasser.
+      name: dropped ? "Et il lâche" : fled ? "Et il emporte" : "Il tenait",
       value: `${item.emoji} **${item.label}**`,
       inline: true,
     },
@@ -334,7 +337,7 @@ export function buildCaughtEmbed(spawn, species, winnerId, ballKey, spending) {
     });
 }
 
-export function buildFledEmbed(spawn, species, spending) {
+export function buildFledEmbed(spawn, species, spending, { dropped = false } = {}) {
   const isShiny = Boolean(spawn.is_shiny);
   const total = spending?.total ?? 0;
 
@@ -345,7 +348,7 @@ export function buildFledEmbed(spawn, species, spending) {
     .setThumbnail(spriteUrl(species, isShiny))
     .addFields(
       { name: "Lancers", value: `${spawn.throw_count}`, inline: true },
-      ...heldItemField(spawn, { fled: true }),
+      ...heldItemField(spawn, { fled: true, dropped }),
       { name: "Participants", value: participantsField(spending), inline: false }
     )
     .setFooter({

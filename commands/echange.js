@@ -3,6 +3,7 @@ import { handleException } from "../modules/utils.js";
 import {
   createTrade,
   decodeEntry,
+  encodeEntry,
   getCollection,
   setTradeMessage,
 } from "../modules/pokemon/collection.js";
@@ -30,7 +31,7 @@ function respondWithOwned(interaction, userId, query, emptyLabel) {
         if (!species) return null;
         return {
           name: `${row.is_shiny ? "✨ " : ""}${species.name} (×${row.count})`,
-          value: `${row.species_id}:${row.is_shiny}`,
+          value: encodeEntry(row.species_id, row.is_shiny),
         };
       })
       .filter((choice) => choice && choice.name.toLowerCase().includes(needle))
