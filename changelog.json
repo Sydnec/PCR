@@ -1,7 +1,24 @@
 {
-  "version": "1.13.4",
-  "lastUpdated": "2026-09-22T18:17:26.581Z",
+  "version": "1.13.5",
+  "lastUpdated": "2026-09-22T18:28:07.876Z",
   "releases": [
+    {
+      "version": "1.13.5",
+      "date": "2026-09-22",
+      "title": "Release 1.13.5",
+      "features": [
+        {
+          "type": "enhancement",
+          "name": "Tes balls affichées avec ton solde",
+          "description": "/solde et le bouton « ℹ️ Infos du Pokémon » affichent désormais, sous les points, les balls que tu as en poche — Poké Ball, Super Ball, Hyper Ball, Master Ball — avec leur nombre. Une ball offerte se lance sans toucher au solde : c'est la moitié de la réponse à « est-ce que je peux lancer ? ».",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-22T19:00:00.000Z",
+          "branch": "claude/adoring-darwin-4o541o"
+        }
+      ]
+    },
     {
       "version": "1.13.4",
       "date": "2026-09-22",
@@ -1172,16 +1189,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "enhancement",
-      "name": "Tes balls affichées avec ton solde",
-      "description": "/solde et le bouton « ℹ️ Infos du Pokémon » affichent désormais, sous les points, les balls que tu as en poche — Poké Ball, Super Ball, Hyper Ball, Master Ball — avec leur nombre. Une ball offerte se lance sans toucher au solde : c'est la moitié de la réponse à « est-ce que je peux lancer ? ».",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-22T19:00:00.000Z",
-      "branch": "claude/adoring-darwin-4o541o"
-    }
-  ]
+  "pending": []
 }
