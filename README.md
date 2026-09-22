@@ -51,7 +51,8 @@ que la capture réussisse ou non.
 - **Bouton « ℹ️ Infos du Pokémon »** sur chaque apparition : un message Discord étant identique
   pour tous ses lecteurs, ce bouton ouvre à chacun en privé la fiche de l'espèce — type, rareté,
   chances à la Poké Ball, et toute la lignée évolutive avec ce qu'il en possède déjà — suivie de
-  **son solde de points**, l'autre question qu'on se pose devant une apparition.
+  **son solde de points et des balls qu'il a en poche**, l'autre question qu'on se pose devant une
+  apparition. `/solde` affiche le même embed.
 - À la capture comme à la fuite, l'embed affiche les **participants** avec les balls que chacun a
   lancées — `🥇 @Hoolan (1×🟡 2×🔵)` — et le total des points brûlés part en pied de page. La
   capture s'annonce par la ball qui l'a emportée et nomme son vainqueur dans la même ligne. Cette

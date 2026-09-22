@@ -57,10 +57,24 @@ export function getBalance(userId, cb) {
 // Un embed de présentation dans un module de mutations, c'est délibéré : le
 // solde est une notion d'économie, pas de Pokémon, et le prochain appelant n'a
 // pas à aller le chercher dans les embeds du jeu.
-export function buildBalanceEmbed(balance, { user = null } = {}) {
-  const embed = new EmbedBuilder()
-    .setColor(0xf1c40f)
-    .setDescription(`**${balance.toLocaleString("fr-FR")}** points`);
+//
+// `balls` ajoute les balls en poche ({ label, emoji, count }, voir getBallStock) :
+// les points ne disent pas tout de ce qu'on peut lancer, une ball offerte passant
+// avant le solde. Absent — lecture de l'inventaire ratée — la ligne est omise
+// plutôt que d'afficher un « aucune ball » qui serait faux.
+export function buildBalanceEmbed(balance, { user = null, balls = null } = {}) {
+  const lines = [`**${balance.toLocaleString("fr-FR")}** points`];
+  if (balls) {
+    lines.push(
+      "",
+      ...(balls.length
+        ? balls.map((ball) => `${ball.emoji} ${ball.label} **\u00D7${ball.count}**`)
+        : ["*Aucune ball en poche.*"])
+    );
+  }
+  // La description et non des champs : Discord ne rend pas les emoji du serveur
+  // dans le nom d'un champ, et ce sont eux qui disent de quelle ball on parle.
+  const embed = new EmbedBuilder().setColor(0xf1c40f).setDescription(lines.join("\n"));
 
   // Sans destinataire nommé, on tutoie : c'est le cas de l'éphémère ouvert sous
   // une apparition, où le solde ne peut être que celui du cliqueur. /solde, lui,

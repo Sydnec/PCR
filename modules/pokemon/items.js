@@ -159,6 +159,23 @@ export function getInventory(userId, cb) {
   );
 }
 
+// Les balls en poche, dans l'ordre du catalogue : ce qu'on peut lancer sans
+// payer. Est une ball tout objet adossé à une ball (`ball: "poke"`), quelle que
+// soit sa clé — c'est le catalogue qui décide, comme pour getBallItem. Rend des
+// lignes déjà mises en forme ({ label, emoji, count }) : l'embed du solde vit
+// dans economy.js, qui n'a pas à connaître le catalogue.
+export function getBallStock(userId, cb) {
+  getInventory(userId, (err, rows) => {
+    if (err) return cb(err, []);
+    const stock = [];
+    for (const row of sortByCatalogue(rows)) {
+      const item = getItem(row.item_key);
+      if (item?.ball) stock.push({ label: item.label, emoji: item.emoji, count: row.count });
+    }
+    cb(null, stock);
+  });
+}
+
 export function getItemCount(userId, key, cb) {
   db.get(
     "SELECT count FROM pokemon_inventory WHERE user_id = ? AND item_key = ?",

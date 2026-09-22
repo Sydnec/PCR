@@ -15,7 +15,7 @@ import { handleException, log } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
 import { answerThrow, throwBall, trackPanel } from "./capture.js";
 import { getSpawn } from "./spawn.js";
-import { getBallItem, getItemCount } from "./items.js";
+import { getBallItem, getBallStock, getItemCount } from "./items.js";
 import { claimDrop } from "./drops.js";
 
 import {
@@ -139,6 +139,7 @@ function askMasterBallConfirmation(interaction, spawnId, { panel = false } = {})
 // Le solde suit dans un second embed : les deux questions qu'on se pose devant
 // une apparition sont « est-ce que je l'ai déjà ? » et « est-ce que je peux me
 // payer une ball ? », et le prix de chacune est déjà sur les boutons d'à côté.
+// Les balls en poche y figurent aussi, puisqu'elles passent avant le solde.
 function answerSpeciesInfo(interaction, spawnId) {
   getSpawn(spawnId, (err, spawn) => {
     if (err) {
@@ -170,12 +171,18 @@ function answerSpeciesInfo(interaction, spawnId) {
           // vaut ne pas montrer un solde illisible que d'en montrer un faux. La
           // fiche, elle, part quand même.
           if (err) handleException("Lecture du solde pour la fiche :", err);
-          interaction
-            .reply({
-              embeds: err ? [fiche] : [fiche, buildBalanceEmbed(balance)],
-              flags: MessageFlags.Ephemeral,
-            })
-            .catch(() => {});
+          const soldeKo = Boolean(err);
+          getBallStock(interaction.user.id, (err, balls) => {
+            if (err) handleException("Lecture des balls pour la fiche :", err);
+            interaction
+              .reply({
+                embeds: soldeKo
+                  ? [fiche]
+                  : [fiche, buildBalanceEmbed(balance, { balls: err ? null : balls })],
+                flags: MessageFlags.Ephemeral,
+              })
+              .catch(() => {});
+          });
         });
       }
     );
