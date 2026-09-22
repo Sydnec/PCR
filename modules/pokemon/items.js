@@ -85,7 +85,7 @@ export function getBallItem(ballKey) {
 // Un objet ne tombe que si le catalogue lui donne un poids. Celui dont l'effet
 // n'est pas encore branché n'en a pas, donc personne ne peut se retrouver avec
 // un objet qui ne fait rien.
-const dropWeight = (item) => Math.max(0, Number(item?.dropWeight) || 0);
+export const itemDropWeight = (item) => Math.max(0, Number(item?.dropWeight) || 0);
 
 // Tirage pondéré, même forme que pickWeightedSpecies : un cumul, un tirage, et
 // le dernier en filet si l'arrondi flottant passe juste au-dessus du total.
@@ -93,7 +93,7 @@ function pickWeightedItem() {
   const pool = [];
   let total = 0;
   for (const item of getItems()) {
-    const weight = dropWeight(item);
+    const weight = itemDropWeight(item);
     if (weight > 0) {
       total += weight;
       pool.push({ item, cumulative: total });

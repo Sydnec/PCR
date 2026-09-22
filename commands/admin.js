@@ -6,6 +6,7 @@ import pointsTous from "./admin/points-tous.js";
 import item from "./admin/item.js";
 import config from "./admin/config.js";
 import configVoir from "./admin/config-voir.js";
+import poids from "./admin/poids.js";
 import potcommun from "./admin/potcommun.js";
 import purge from "./admin/purge.js";
 import pokespawn from "./admin/pokespawn.js";
@@ -25,6 +26,7 @@ const SUBCOMMANDS = [
   item,
   config,
   configVoir,
+  poids,
   potcommun,
   purge,
   pokespawn,

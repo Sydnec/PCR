@@ -176,14 +176,15 @@ export default {
           return interaction.editReply({ content: `❌ ${result.reason}` }).catch(() => {});
         }
 
+        // Le gras est posé UNE fois, autour de la quantité et du nom ensemble :
+        // imbriquer deux paires de ** referme la première et laisse les
+        // astérisques en clair dans le message.
         const what = isItem
-          ? `${result.item.emoji} **${result.item.label}**`
-          : `**${displayName(result.species, result.isShiny)}**`;
+          ? `${result.item.emoji} **${result.quantity}× ${result.item.label}**`
+          : `**${result.quantity}× ${displayName(result.species, result.isShiny)}**`;
         interaction
           .editReply({
-            content:
-              `✅ Tu revends **${result.quantity}× ${what}** pour ` +
-              `**${points(result.points)}** points.`,
+            content: `✅ Tu revends ${what} pour **${points(result.points)}** points.`,
           })
           .catch(() => {});
       };

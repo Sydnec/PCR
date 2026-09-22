@@ -90,6 +90,10 @@ noieraient la table.
 | 🎟️ Ticket Safari | 0,9 % | une entrée du parc, sans passer par la caisse | — |
 | Master Ball | **0,33 %** | la capture garantie, offerte | — |
 
+`dropWeight` est un **poids**, pas un pourcentage : la part d'un objet vaut son poids divisé par la
+somme de tous (921 aujourd'hui). `/admin poids` fait la conversion pour les trois tables de tirage du
+jeu, cadence comprise — la Master Ball tombe une fois sur 4 386 apparitions.
+
 **Une fois sur cinq, il le lâche en partant.** Capturé ou enfui, un Pokémon qui tenait quelque chose
 a 20 % de chances de le laisser par terre plutôt que de le céder à son vainqueur. Un message public
 s'affiche alors avec un bouton **« 🤚 Ramasser »**, et c'est une seconde course — ouverte à tout le
@@ -284,6 +288,10 @@ Tout est relu à chaque accès : une modification prend effet immédiatement, sa
     valeur courante et leur type ; le type attendu vient de la valeur par défaut, une clé hors
     schéma est refusée, les réglages dangereux sont bornés, et l'écriture est atomique (fichier
     temporaire relu puis renommé) pour que le bot n'en voie jamais une version tronquée.
+  - `/admin poids [table]` : convertit les poids de tirage en probabilités réelles — apparitions
+    sauvages, rencontres du parc, butin des Pokémon. Un poids n'est pas un pourcentage mais une part
+    d'un total qui bouge à chaque ligne ajoutée, et la table se construit avec les **mêmes**
+    fonctions que les tirages : elle ne peut pas diverger de ce qu'elle décrit.
   - `/admin config-voir [cle]` : valeur courante face à la valeur par défaut. Sans clé, le fichier
     entier.
   - `/admin potcommun [simulation]` : déclenche un pot commun hors calendrier, ou simule le

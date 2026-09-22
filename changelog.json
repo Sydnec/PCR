@@ -1074,5 +1074,26 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Les poids de tirage se lisent en clair",
+      "description": "/admin poids convertit les tables de tirage pondéré du jeu en probabilités réelles : quelle espèce apparaît, laquelle on croise au parc, quel objet tombe et à quelle cadence. Un poids n'est pas un pourcentage, et régler à l'aveugle un nombre dont on ignore le total n'a jamais marché.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-22T09:00:12.188695Z",
+      "branch": "claude/sleepy-cerf-hxgk8t"
+    },
+    {
+      "type": "fix",
+      "name": "Le message de revente s'affichait avec des astérisques",
+      "description": "La confirmation d'une revente imbriquait deux paires de ** autour du nom, ce qui laissait les astérisques en clair dans le message au lieu de le mettre en gras.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-22T09:00:12.188695Z",
+      "branch": "claude/sleepy-cerf-hxgk8t"
+    }
+  ]
 }
