@@ -18,13 +18,18 @@ import { getOwned, reserveDuplicates, restoreDuplicates } from "./collection.js"
 import { consumeItem, getItem, grantItem, itemSellValue } from "./items.js";
 
 // Ce que vaut un exemplaire. Un tarif absent vaut zéro, donc invendable : mieux
-// vaut une espèce qu'on ne peut pas revendre qu'un prix inventé.
+// vaut une espèce qu'on ne peut pas revendre qu'un prix inventé. C'est ce qui
+// met les légendaires hors commerce — leur rareté n'a pas de ligne au barème —
+// et les shinies avec, via un multiplicateur nul.
 export function pokemonSellValue(species, isShiny) {
   if (!species) return 0;
   const config = getPokemonConfig().sell ?? {};
   const base = Math.round(Number(config.byRarity?.[rarityOf(species)]) || 0);
   if (base <= 0) return 0;
-  const multiplier = isShiny ? Number(config.shinyMultiplier) || 1 : 1;
+  // `|| 1` serait faux ici : shinyMultiplier vaut 0 quand les shinies ne se
+  // revendent pas, et 0 || 1 rendrait justement le tarif qu'on refuse.
+  const raw = Number(config.shinyMultiplier);
+  const multiplier = isShiny ? (Number.isFinite(raw) ? raw : 0) : 1;
   return Math.max(0, Math.round(base * multiplier));
 }
 

@@ -73,6 +73,46 @@ export function sortByCatalogue(rows) {
 // mieux vaut afficher la clé brute et qu'on vienne poser la question.
 export const itemLabel = (key) => getItem(key)?.label ?? key;
 
+// L'objet qui offre un lancer de cette ball, s'il existe. On interroge le
+// catalogue plutôt que de composer « ball_ » + la clé : c'est le catalogue qui
+// décide, et une convention de nommage n'est pas un contrat.
+export function getBallItem(ballKey) {
+  return getItems().find((item) => item.ball === ballKey) ?? null;
+}
+
+// ====================== BUTIN ======================
+
+// Un objet ne tombe que si le catalogue lui donne un poids. Celui dont l'effet
+// n'est pas encore branché n'en a pas, donc personne ne peut se retrouver avec
+// un objet qui ne fait rien.
+const dropWeight = (item) => Math.max(0, Number(item?.dropWeight) || 0);
+
+// Tirage pondéré, même forme que pickWeightedSpecies : un cumul, un tirage, et
+// le dernier en filet si l'arrondi flottant passe juste au-dessus du total.
+function pickWeightedItem() {
+  const pool = [];
+  let total = 0;
+  for (const item of getItems()) {
+    const weight = dropWeight(item);
+    if (weight > 0) {
+      total += weight;
+      pool.push({ item, cumulative: total });
+    }
+  }
+  if (!total) return null;
+  const roll = Math.random() * total;
+  return (pool.find((entry) => roll < entry.cumulative) ?? pool[pool.length - 1]).item;
+}
+
+// Ce que tient un Pokémon qui vient d'apparaître, ou null. Tiré à l'apparition
+// et figé dans la ligne : ce qu'il porte lui appartient, ça ne se décide pas au
+// moment où quelqu'un l'attrape.
+export function rollHeldItem() {
+  const chance = Number(getPokemonConfig().spawn?.heldItemChance) || 0;
+  if (chance <= 0 || Math.random() >= chance) return null;
+  return pickWeightedItem()?.key ?? null;
+}
+
 // ====================== LECTURES ======================
 
 // L'inventaire, objets épuisés exclus. La ligne à zéro reste en base pour garder

@@ -279,6 +279,22 @@ function spendersField(spending) {
   return lines.join("\n");
 }
 
+// Ce que tenait le Pokémon, une fois l'affaire close. Avant, personne ne doit le
+// savoir : l'annonce ne le montre pas, sans quoi un objet rare ferait monter les
+// enchères sur un Pokémon commun. Après, tout le monde le voit — y compris quand
+// il s'enfuit avec, ce qui est la moitié du sel de l'affaire.
+function heldItemField(spawn, { fled = false } = {}) {
+  const item = getItem(spawn.held_item);
+  if (!item) return [];
+  return [
+    {
+      name: fled ? "Et il emporte" : "Il tenait",
+      value: `${item.emoji} **${item.label}**`,
+      inline: true,
+    },
+  ];
+}
+
 export function buildCaughtEmbed(spawn, species, winnerId, ballKey, spending) {
   const isShiny = Boolean(spawn.is_shiny);
   const ball = getPokemonConfig().capture.balls[ballKey];
@@ -293,6 +309,7 @@ export function buildCaughtEmbed(spawn, species, winnerId, ballKey, spending) {
     .setThumbnail(spriteUrl(species, isShiny))
     .addFields(
       { name: "Lancers", value: `${spawn.throw_count}`, inline: true },
+      ...heldItemField(spawn),
       { name: "💸 Ils ont payé pour rien", value: spendersField(spending), inline: false }
     )
     .setFooter({
@@ -312,6 +329,7 @@ export function buildFledEmbed(spawn, species, spending) {
     .setThumbnail(spriteUrl(species, isShiny))
     .addFields(
       { name: "Lancers", value: `${spawn.throw_count}`, inline: true },
+      ...heldItemField(spawn, { fled: true }),
       { name: "💸 Ils ont payé pour rien", value: spendersField(spending), inline: false }
     )
     .setFooter({

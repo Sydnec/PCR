@@ -15,6 +15,7 @@ import { handleException, log } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
 import { answerThrow, throwBall, trackPanel } from "./capture.js";
 import { getSpawn } from "./spawn.js";
+import { getBallItem, getItemCount } from "./items.js";
 import {
   claimShare,
   enterPark,
@@ -58,48 +59,67 @@ function askMasterBallConfirmation(interaction, spawnId, { panel = false } = {})
   // Un refus répond exactement comme un cooldown : même règle, même fonction.
   const refuse = (content) => answerThrow(interaction, spawnId, content, { panel });
 
-  getBalance(interaction.user.id, (err, balance) => {
-    if (err) {
-      handleException(err);
-      return refuse("❌ Erreur base de données.");
-    }
-    if (balance < ball.price) {
-      return refuse(
-        `❌ Une **${ball.label}** coûte **${ball.price}** points, tu en as **${balance}**.`
+  const item = getBallItem("master");
+  // Une Master Ball offerte se confirme aussi. Elle ne coûte rien, mais elle ne
+  // se retrouve pas : un mésclic reste irrattrapable, ce pour quoi cette
+  // confirmation existe.
+  getItemCount(interaction.user.id, item?.key ?? "", (err, held) => {
+    if (err) handleException("Lecture des Master Balls offertes :", err);
+    const gratuite = held > 0;
+
+    const suite = (balance) => {
+      if (!gratuite && balance < ball.price) {
+        return refuse(
+          `❌ Une **${ball.label}** coûte **${ball.price}** points, tu en as **${balance}**.`
+        );
+      }
+
+      const row = new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`poke_master_ok|${spawnId}`)
+          .setLabel(gratuite ? "Utiliser ma Master Ball" : `Confirmer (-${ball.price})`)
+          .setEmoji(ball.emoji)
+          .setStyle(ButtonStyle.Danger),
+        new ButtonBuilder()
+          // Le spawnId permet de restaurer le panneau à l'annulation plutôt que
+          // de laisser un message sans boutons.
+          .setCustomId(`poke_master_cancel|${spawnId}`)
+          .setLabel("Annuler")
+          .setStyle(ButtonStyle.Secondary)
       );
-    }
 
-    const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`poke_master_ok|${spawnId}`)
-        .setLabel(`Confirmer (-${ball.price})`)
-        .setEmoji(ball.emoji)
-        .setStyle(ButtonStyle.Danger),
-      new ButtonBuilder()
-        // Le spawnId permet de restaurer le panneau à l'annulation plutôt que
-        // de laisser un message sans boutons.
-        .setCustomId(`poke_master_cancel|${spawnId}`)
-        .setLabel("Annuler")
-        .setStyle(ButtonStyle.Secondary)
-    );
+      const payload = {
+        content: gratuite
+          ? `⚠️ Tu vas utiliser ta **${ball.label}** offerte : la capture est garantie, mais ` +
+            `elle est perdue si quelqu'un t'attrape le Pokémon avant.\n` +
+            `Il t'en reste **${held}**.`
+          : `⚠️ La **${ball.label}** garantit la capture mais coûte **${ball.price}** points, ` +
+            `et ils sont perdus si quelqu'un t'attrape le Pokémon avant.\n` +
+            `Ton solde : **${balance}** points.`,
+        components: [row],
+      };
 
-    const payload = {
-      content:
-        `⚠️ La **${ball.label}** garantit la capture mais coûte **${ball.price}** points, ` +
-        `et ils sont perdus si quelqu'un t'attrape le Pokémon avant.\n` +
-        `Ton solde : **${balance}** points.`,
-      components: [row],
+      (panel
+        ? interaction.update(payload)
+        : interaction.reply({ ...payload, flags: MessageFlags.Ephemeral })
+      )
+        // Depuis l'annonce, la confirmation est elle aussi un nouvel éphémère :
+        // elle remplace le panneau ouvert plutôt que de le laisser derrière elle.
+        // Le poke_master_ok qui suit réécrit ce message, la trace reste valide.
+        .then(() => trackPanel(interaction, spawnId, { replacing: !panel }))
+        .catch(() => {});
     };
 
-    (panel
-      ? interaction.update(payload)
-      : interaction.reply({ ...payload, flags: MessageFlags.Ephemeral })
-    )
-      // Depuis l'annonce, la confirmation est elle aussi un nouvel éphémère :
-      // elle remplace le panneau ouvert plutôt que de le laisser derrière elle.
-      // Le poke_master_ok qui suit réécrit ce message, la trace reste valide.
-      .then(() => trackPanel(interaction, spawnId, { replacing: !panel }))
-      .catch(() => {});
+    // Le solde ne sert qu'à celui qui va payer : inutile d'aller le lire pour
+    // annoncer une ball qui ne coûte rien.
+    if (gratuite) return suite(0);
+    getBalance(interaction.user.id, (err, balance) => {
+      if (err) {
+        handleException(err);
+        return refuse("❌ Erreur base de données.");
+      }
+      suite(balance);
+    });
   });
 }
 

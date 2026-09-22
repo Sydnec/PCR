@@ -1011,7 +1011,7 @@
     {
       "type": "feature",
       "name": "L'inventaire des dresseurs",
-      "description": "Les dresseurs ont maintenant un inventaire, consultable avec /inventaire : de quoi recevoir et garder des objets. Au catalogue : des balls offrant un lancer gratuit, un Ticket Safari, un Super Bonbon et une Pépite. Rien n'y tombe encore tout seul et seule la Pépite a son effet complet (elle se revend) — c'est la fondation des trésors à venir.",
+      "description": "Les dresseurs ont maintenant un inventaire, consultable avec /inventaire. Au catalogue : des balls offrant un lancer gratuit, un Super Bonbon, trois pierres d'évolution, un Ticket Safari et une Pépite. Le Super Bonbon et les pierres attendent encore leur effet, et ne tombent donc pas.",
       "announce": false,
       "author": "Sydnec",
       "commit": "pending",
@@ -1021,11 +1021,21 @@
     {
       "type": "feature",
       "name": "Revendre ce qu'on a en trop",
-      "description": "/revendre convertit tes doublons en points : 150 pour un commun, 400 pour un peu commun, 1 200 pour un rare, 6 000 pour un légendaire, et dix fois plus pour un shiny. Un exemplaire est toujours conservé, ton Pokédex ne peut pas y perdre une entrée. Les objets prévus pour ça se revendent aussi — la Pépite part à 1 000 points.",
+      "description": "/revendre convertit tes doublons en points : 170 pour un commun, 500 pour un peu commun, 1 800 pour un rare. Un exemplaire est toujours conservé, ton Pokédex ne peut pas y perdre une entrée — et les légendaires comme les shinies ne se bradent pas du tout. Les objets prévus pour ça se revendent aussi : la Pépite part à 1 000 points, les pierres à 500.",
       "announce": true,
       "author": "Sydnec",
       "commit": "pending",
       "timestamp": "2026-09-22T07:26:37.829781Z",
+      "branch": "claude/sleepy-cerf-hxgk8t"
+    },
+    {
+      "type": "feature",
+      "name": "Les Pokémon tiennent des objets",
+      "description": "Un Pokémon sur dix tient quelque chose, et celui qui l'attrape l'empoche — celui qui le laisse fuir le voit partir avec. On y trouve surtout des balls, qui offrent un lancer : cliquer sur Poké Ball quand tu en as une dans ton inventaire ne te coûte plus rien, elle part toute seule. Et tout au bout de la table, une Master Ball, à peu près une toutes les deux mille apparitions.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-22T08:01:47.208012Z",
       "branch": "claude/sleepy-cerf-hxgk8t"
     }
   ]

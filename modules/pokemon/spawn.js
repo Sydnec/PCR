@@ -8,6 +8,7 @@ import db from "../points-db.js";
 import { handleException, log } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
 import { getSpecies, pickWeightedSpecies, rarityOf } from "./data.js";
+import { rollHeldItem } from "./items.js";
 import {
   buildBallRow,
   buildCaughtEmbed,
@@ -211,11 +212,15 @@ function createSpawn(client, channel, species, isShiny, announcement, ping, prev
   const now = Date.now();
   const rarity = rarityOf(species);
   const fleesAt = Math.round(rollFleeDeadline(now, getPokemonConfig().spawn));
+  // Tiré ici, une fois, et figé dans la ligne : ce que porte ce Pokémon lui
+  // appartient. Celui qui s'enfuit part avec — on ne fouille pas les fuyards.
+  const heldItem = rollHeldItem();
 
   db.run(
-    `INSERT INTO pokemon_spawns (species_id, is_shiny, catch_rate, rarity, channel_id, spawned_at, flees_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [species.id, isShiny ? 1 : 0, species.catchRate, rarity, channel.id, now, fleesAt],
+    `INSERT INTO pokemon_spawns
+       (species_id, is_shiny, catch_rate, rarity, channel_id, spawned_at, flees_at, held_item)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [species.id, isShiny ? 1 : 0, species.catchRate, rarity, channel.id, now, fleesAt, heldItem],
     async function (err) {
       if (err) {
         handleException("Insertion du spawn :", err);
@@ -229,6 +234,7 @@ function createSpawn(client, channel, species, isShiny, announcement, ping, prev
         catch_rate: species.catchRate,
         rarity,
         throw_count: 0,
+        held_item: heldItem,
       };
 
       const shouldPing =

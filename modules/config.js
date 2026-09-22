@@ -46,6 +46,11 @@ const POKEMON = {
     legendaryWeight: 8,
     pingRarities: ["RARE", "LEGENDAIRE"],
     throwLogSize: 8,
+    // Un Pokémon sur dix tient quelque chose. C'est tiré à l'apparition et figé
+    // dans la ligne, comme le shiny et le taux de capture : ce que porte un
+    // Pokémon lui appartient, ça ne se retire pas au moment où on l'attrape.
+    // Celui qui s'enfuit part avec, ce qui est la moindre des choses.
+    heldItemChance: 0.1,
     embedRefreshMs: 2000,
   },
   capture: {
@@ -86,6 +91,13 @@ const POKEMON = {
   // `ball` fait pointer l'objet vers une ball de capture : il en emprunte le
   // libellé et l'icône, donc changer l'emoji d'une ball suffit, l'objet suit.
   // `sellValue` rend l'objet revendable, et rien d'autre ne le rend revendable.
+  // `dropWeight` le fait tomber des Pokémon, et rien d'autre : un objet dont
+  // l'effet n'est pas encore branché n'a pas de poids, donc personne ne peut se
+  // retrouver avec un objet qui ne fait rien. L'ordre des clés est celui de
+  // l'affichage, et les poids vont du plus commun au plus rare.
+  //
+  // Repère : avec 10 % de porteurs, le total des poids (~703) place la Master
+  // Ball autour d'une trouvaille tous les deux cents objets tombés.
   //
   // Ajouter un objet demande de toucher ici ET au code qui le consomme :
   // /admin config modifie une valeur existante, il n'invente pas de clé.
@@ -93,45 +105,73 @@ const POKEMON = {
     ball_poke: {
       ball: "poke",
       description: "Un lancer offert : tu la tiens déjà, elle ne te coûtera rien.",
+      dropWeight: 400,
     },
     ball_super: {
       ball: "super",
       description: "Un lancer offert : tu la tiens déjà, elle ne te coûtera rien.",
-    },
-    ball_hyper: {
-      ball: "hyper",
-      description: "Un lancer offert : tu la tiens déjà, elle ne te coûtera rien.",
-    },
-    ticket_safari: {
-      label: "Ticket Safari",
-      emoji: "\u{1F39F}\uFE0F",
-      description: "Une entrée pour le parc safari, sans passer par la caisse.",
+      dropWeight: 200,
     },
     super_bonbon: {
       label: "Super Bonbon",
       emoji: "\u{1F36C}",
-      description: "Une fusion offerte : elle consomme tes doublons, pas tes points.",
+      description: "Tient lieu d'un exemplaire manquant dans une fusion.",
+    },
+    ball_hyper: {
+      ball: "hyper",
+      description: "Un lancer offert : tu la tiens déjà, elle ne te coûtera rien.",
+      dropWeight: 80,
+    },
+    pierre_feu: {
+      label: "Pierre Feu",
+      emoji: "\u{1F525}",
+      description: "Fait évoluer un Évoli en Pyroli, sans un point dépensé.",
+      sellValue: 500,
+    },
+    pierre_foudre: {
+      label: "Pierre Foudre",
+      emoji: "\u26A1",
+      description: "Fait évoluer un Évoli en Voltali, sans un point dépensé.",
+      sellValue: 500,
+    },
+    pierre_eau: {
+      label: "Pierre Eau",
+      emoji: "\u{1F4A7}",
+      description: "Fait évoluer un Évoli en Aquali, sans un point dépensé.",
+      sellValue: 500,
     },
     pepite: {
       label: "Pépite",
       emoji: "\u{1F48E}",
       description: "Ça brille, et ça ne sert qu'à ça : se revendre.",
       sellValue: 1000,
+      dropWeight: 20,
+    },
+    ticket_safari: {
+      label: "Ticket Safari",
+      emoji: "\u{1F39F}\uFE0F",
+      description: "Une entrée pour le parc safari, sans passer par la caisse.",
+    },
+    ball_master: {
+      ball: "master",
+      description: "La capture garantie, offerte. Autant dire qu'elle ne se trouve pas.",
+      dropWeight: 3,
     },
   },
   // Revente d'un doublon, par rareté. C'est une consolation, pas un commerce :
   // attraper un commun à la Poké Ball coûte ~2 000 points en moyenne, le
-  // revendre en rend 150. Aucun tarif ne doit jamais dépasser le coût espéré
+  // revendre en rend 170. Aucun tarif ne doit jamais dépasser le coût espéré
   // d'une capture, sans quoi la chasse devient une imprimerie à points.
   //
   // Le barème suit la rareté affichée partout ailleurs (la pastille de couleur)
   // plutôt que le taux de capture : c'est le repère que les dresseurs ont déjà.
+  // Une rareté absente du barème ne se revend pas — c'est le cas des
+  // légendaires, qu'on ne monnaie pas.
   sell: {
-    byRarity: { COMMUN: 150, PEU_COMMUN: 400, RARE: 1200, LEGENDAIRE: 6000 },
-    // Un shiny est une entrée de Pokédex distincte, et bien plus rare qu'un
-    // stade 3 : sans ce facteur, revendre un shiny en double rapporterait le
-    // prix d'un commun.
-    shinyMultiplier: 10,
+    byRarity: { COMMUN: 170, PEU_COMMUN: 500, RARE: 1800 },
+    // 0 : un shiny ne se revend pas. C'est une entrée de Pokédex qu'on ne
+    // retrouve pas, et personne ne doit pouvoir la brader d'un clic.
+    shinyMultiplier: 0,
   },
   safari: {
     enabled: true,

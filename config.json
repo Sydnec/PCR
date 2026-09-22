@@ -12,6 +12,7 @@
 			"legendaryWeight":8,
 			"pingRarities":["RARE","LEGENDAIRE"],
 			"throwLogSize":8,
+			"heldItemChance":0.1,
 			"embedRefreshMs":2000
 		},
 		"capture":{
@@ -32,16 +33,20 @@
 		"trade":{"expiryHours":24},
 		"pokedex":{"pageSize":30},
 		"items":{
-			"ball_poke":{"ball":"poke","description":"Un lancer offert : tu la tiens déjà, elle ne te coûtera rien."},
-			"ball_super":{"ball":"super","description":"Un lancer offert : tu la tiens déjà, elle ne te coûtera rien."},
-			"ball_hyper":{"ball":"hyper","description":"Un lancer offert : tu la tiens déjà, elle ne te coûtera rien."},
+			"ball_poke":{"ball":"poke","description":"Un lancer offert : tu la tiens déjà, elle ne te coûtera rien.","dropWeight":400},
+			"ball_super":{"ball":"super","description":"Un lancer offert : tu la tiens déjà, elle ne te coûtera rien.","dropWeight":200},
+			"super_bonbon":{"label":"Super Bonbon","emoji":"🍬","description":"Tient lieu d'un exemplaire manquant dans une fusion."},
+			"ball_hyper":{"ball":"hyper","description":"Un lancer offert : tu la tiens déjà, elle ne te coûtera rien.","dropWeight":80},
+			"pierre_feu":{"label":"Pierre Feu","emoji":"🔥","description":"Fait évoluer un Évoli en Pyroli, sans un point dépensé.","sellValue":500},
+			"pierre_foudre":{"label":"Pierre Foudre","emoji":"⚡","description":"Fait évoluer un Évoli en Voltali, sans un point dépensé.","sellValue":500},
+			"pierre_eau":{"label":"Pierre Eau","emoji":"💧","description":"Fait évoluer un Évoli en Aquali, sans un point dépensé.","sellValue":500},
+			"pepite":{"label":"Pépite","emoji":"💎","description":"Ça brille, et ça ne sert qu'à ça : se revendre.","sellValue":1000,"dropWeight":20},
 			"ticket_safari":{"label":"Ticket Safari","emoji":"🎟️","description":"Une entrée pour le parc safari, sans passer par la caisse."},
-			"super_bonbon":{"label":"Super Bonbon","emoji":"🍬","description":"Une fusion offerte : elle consomme tes doublons, pas tes points."},
-			"pepite":{"label":"Pépite","emoji":"💎","description":"Ça brille, et ça ne sert qu'à ça : se revendre.","sellValue":1000}
+			"ball_master":{"ball":"master","description":"La capture garantie, offerte. Autant dire qu'elle ne se trouve pas.","dropWeight":3}
 		},
 		"sell":{
-			"byRarity":{"COMMUN":150,"PEU_COMMUN":400,"RARE":1200,"LEGENDAIRE":6000},
-			"shinyMultiplier":10
+			"byRarity":{"COMMUN":170,"PEU_COMMUN":500,"RARE":1800},
+			"shinyMultiplier":0
 		},
 		"safari":{
 			"enabled":true,

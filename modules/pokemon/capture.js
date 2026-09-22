@@ -15,6 +15,7 @@ import { addPoints, getBalance, spendPoints } from "../economy.js";
 import { handleException, log } from "../utils.js";
 import { getBall, getPokemonConfig } from "./config.js";
 import { creditSpecies } from "./collection.js";
+import { consumeItem, getBallItem, getItem, grantItem } from "./items.js";
 import { catchProbability, getSpecies } from "./data.js";
 import { buildBallRow, displayName } from "./embeds.js";
 import { finalizeCaughtSpawn, refreshSpawnEmbed } from "./spawn.js";
@@ -111,23 +112,56 @@ function logThrow(spawnId, userId, ballKey, cost, probability, result) {
   );
 }
 
-// Chemin de remboursement unique et journalisé. Le crédit est inconditionnel et
-// sûr : on ne rembourse qu'après un débit réussi, donc la ligne existe.
-function refundThrow(interaction, spawnId, ball, probability, view) {
-  const userId = interaction.user.id;
-  addPoints(userId, ball.price, (err) => {
-    if (err) handleException("Remboursement impossible :", err);
-    logThrow(spawnId, userId, ball.key, ball.price, probability, "VOID");
-    log(`Remboursement de ${ball.price} pts à ${userId} (spawn #${spawnId} déjà résolu)`);
-    interaction
-      .editReply(
-        view(
-          `💨 Trop tard, quelqu'un a été plus rapide ! Tes **${ball.price}** points ont été remboursés.`,
-          { done: true }
-        )
-      )
-      .catch(() => {});
+// Ce qu'a coûté un lancer, et de quoi le rendre. Une ball offerte passe AVANT
+// les points : c'est ce que le dresseur veut, un objet posé dans son sac ne doit
+// pas dormir pendant qu'on lui prend sa monnaie. Elle est consommée par le même
+// UPDATE gardé que tout le reste, donc deux clics simultanés n'en dépensent
+// jamais qu'une.
+//
+// Rend { item } pour une ball offerte, { points } pour un achat, ou null si le
+// solde ne suffit pas.
+function payThrow(userId, ball, cb) {
+  const item = getBallItem(ball.key);
+  const tryPoints = () =>
+    spendPoints(userId, ball.price, (err, debited) =>
+      cb(err, debited ? { points: ball.price } : null)
+    );
+
+  if (!item) return tryPoints();
+  consumeItem(userId, item.key, 1, { source: "lancer" }, (err, consumed) => {
+    // Une erreur de base n'autorise pas à faire payer : on la remonte plutôt que
+    // de basculer en silence sur le solde du dresseur.
+    if (err) return cb(err, null);
+    if (consumed) return cb(null, { item: item.key, label: item.label });
+    tryPoints();
   });
+}
+
+// Chemin de remboursement unique et journalisé. On ne rembourse qu'après un
+// paiement réussi, donc il y a toujours quelque chose à rendre — et on rend ce
+// qui a été pris : une ball offerte se rend en ball, jamais en points. La
+// convertir en monnaie ferait d'un Pokémon disputé une petite imprimerie.
+function refundThrow(interaction, spawnId, ball, probability, view, payment) {
+  const userId = interaction.user.id;
+  const gratuit = Boolean(payment?.item);
+  const rendu = gratuit
+    ? `Ta **${payment.label}** t'a été rendue.`
+    : `Tes **${ball.price}** points ont été remboursés.`;
+
+  const done = (err) => {
+    if (err) handleException("Remboursement impossible :", err);
+    logThrow(spawnId, userId, ball.key, gratuit ? 0 : ball.price, probability, "VOID");
+    log(
+      `Remboursement à ${userId} (spawn #${spawnId} déjà résolu) : ` +
+        (gratuit ? payment.label : `${ball.price} pts`)
+    );
+    interaction
+      .editReply(view(`💨 Trop tard, quelqu'un a été plus rapide ! ${rendu}`, { done: true }))
+      .catch(() => {});
+  };
+
+  if (gratuit) return grantItem(userId, payment.item, 1, { source: "lancer-annule" }, done);
+  addPoints(userId, ball.price, done);
 }
 
 // `panel` distingue les deux origines d'un clic : l'annonce publique, où l'on
@@ -190,14 +224,15 @@ export async function throwBall(interaction, spawnId, ballKey, { panel = false }
           config.capture.globalMultiplier
         );
 
-    // 1. Débit atomique : refusé sans rien prélever si le solde ne suffit pas.
-    spendPoints(userId, ball.price, (err, debited) => {
+    // 1. Paiement atomique : une ball offerte d'abord, le solde ensuite, et
+    // refusé sans rien prélever si ni l'un ni l'autre ne suffit.
+    payThrow(userId, ball, (err, payment) => {
       if (err) {
-        handleException("Débit du lancer :", err);
+        handleException("Paiement du lancer :", err);
         return interaction.editReply(view("❌ Erreur base de données.")).catch(() => {});
       }
 
-      if (!debited) {
+      if (!payment) {
         return getBalance(userId, (err, balance) => {
           interaction
             .editReply(
@@ -208,6 +243,14 @@ export async function throwBall(interaction, spawnId, ballKey, { panel = false }
             .catch(() => {});
         });
       }
+
+      // Ce que le lancer a réellement coûté : zéro quand la ball était offerte,
+      // ce qui garde honnête le classement des points brûlés.
+      const cost = payment.points ?? 0;
+      const gratuit = Boolean(payment.item);
+      const mention = gratuit
+        ? `${payment.label} offerte`
+        : `**-${ball.price}** points`;
 
       // 2. Tirage.
       const success = ball.guaranteed || Math.random() < probability;
@@ -222,18 +265,18 @@ export async function throwBall(interaction, spawnId, ballKey, { panel = false }
           function (err) {
             if (err) {
               handleException("Comptabilisation du raté :", err);
-              return refundThrow(interaction, spawnId, ball, probability, view);
+              return refundThrow(interaction, spawnId, ball, probability, view, payment);
             }
             if (this.changes === 0) {
-              return refundThrow(interaction, spawnId, ball, probability, view);
+              return refundThrow(interaction, spawnId, ball, probability, view, payment);
             }
 
-            logThrow(spawnId, userId, ball.key, ball.price, probability, "MISS");
+            logThrow(spawnId, userId, ball.key, cost, probability, "MISS");
             recordThrow({
               userId,
               speciesId: spawn.species_id,
               ball: ball.key,
-              cost: ball.price,
+              cost,
               probability,
               result: "MISS",
             });
@@ -241,7 +284,7 @@ export async function throwBall(interaction, spawnId, ballKey, { panel = false }
             interaction
               .editReply(
                 view(
-                  `❌ Raté ! **${displayName(species, spawn.is_shiny)}** s'est dégagé de ta ${ball.label}. (**-${ball.price}** points, ${(probability * 100).toFixed(1)} % de réussite)`
+                  `❌ Raté ! **${displayName(species, spawn.is_shiny)}** s'est dégagé de ta ${ball.label}. (${mention}, ${(probability * 100).toFixed(1)} % de réussite)`
                 )
               )
               .catch(() => {});
@@ -260,19 +303,19 @@ export async function throwBall(interaction, spawnId, ballKey, { panel = false }
         function (err) {
           if (err) {
             handleException("Réclamation du spawn :", err);
-            return refundThrow(interaction, spawnId, ball, probability, view);
+            return refundThrow(interaction, spawnId, ball, probability, view, payment);
           }
           if (this.changes === 0) {
             // Battu à la milliseconde près.
-            return refundThrow(interaction, spawnId, ball, probability, view);
+            return refundThrow(interaction, spawnId, ball, probability, view, payment);
           }
 
-          logThrow(spawnId, userId, ball.key, ball.price, probability, "CATCH");
+          logThrow(spawnId, userId, ball.key, cost, probability, "CATCH");
           recordThrow({
             userId,
             speciesId: spawn.species_id,
             ball: ball.key,
-            cost: ball.price,
+            cost,
             probability,
             result: "CATCH",
           });
@@ -287,14 +330,32 @@ export async function throwBall(interaction, spawnId, ballKey, { panel = false }
             log(
               `Capture : ${userId} attrape ${species.name}${spawn.is_shiny ? " ✨" : ""} (spawn #${spawnId}, ${ball.key})`
             );
-            interaction
-              .editReply(
-                view(
-                  `🎉 Bravo ! **${displayName(species, spawn.is_shiny)}** rejoint ton Pokédex ! (**-${ball.price}** points)`,
-                  { done: true }
+
+            // L'objet tenu suit le Pokémon dans le sac de celui qui l'attrape.
+            // Le crédit est au mieux : une capture réussie ne se défait pas
+            // parce qu'un objet n'a pas pu être rangé, et l'échec est bruyant
+            // dans les logs plutôt que silencieux pour le dresseur.
+            const held = getItem(spawn.held_item);
+            const annonce = (butin) =>
+              interaction
+                .editReply(
+                  view(
+                    `🎉 Bravo ! **${displayName(species, spawn.is_shiny)}** rejoint ton Pokédex ! (${mention})` +
+                      butin,
+                    { done: true }
+                  )
                 )
-              )
-              .catch(() => {});
+                .catch(() => {});
+
+            if (!held) return annonce("");
+            grantItem(userId, held.key, 1, { source: `capture:${spawnId}` }, (err) => {
+              if (err) {
+                handleException("Remise de l'objet tenu :", err);
+                return annonce("");
+              }
+              log(`Butin : ${userId} récupère ${held.label} (spawn #${spawnId})`);
+              annonce(`\n${held.emoji} Il tenait **${held.label}** !`);
+            });
           });
         }
       );

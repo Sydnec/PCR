@@ -69,27 +69,40 @@ que la capture réussisse ou non.
 
 ### 🎒 Objets
 
-Les dresseurs ont un inventaire. La plomberie est posée, mais **aucun objet ne tombe encore tout
-seul** : le jour où des trésors apparaîtront, ils n'auront qu'à appeler `grantItem`.
+**Un Pokémon sur dix tient quelque chose.** C'est tiré à l'apparition et figé dans sa ligne, comme le
+shiny et le taux de capture : ce qu'il porte lui appartient, ça ne se rejoue pas à chaque lancer.
+L'annonce n'en dit rien — sinon un objet rare ferait monter les enchères sur un Roucool — et tout le
+monde le découvre à la fin : celui qui l'attrape l'empoche, **celui qui le laisse fuir le voit
+partir avec**.
 
-- **Un objet est une clé et un compteur.** Ce qui lui donne un nom, une icône et une description vit
-  dans `pokemon.items` de la configuration — donc réglable à chaud, comme les balls. Mieux : une
-  entrée `ball: "poke"` lui fait *emprunter* le libellé et l'icône de la ball correspondante, si
-  bien que changer l'emoji d'une ball suffit et l'objet suit.
-- **L'effet vit ailleurs**, dans le code de la fonctionnalité qui consomme l'objet, et une clé sans
-  effet reste un objet de collection parfaitement valide. Catalogue de départ : une **Poké Ball**,
-  une **Super Ball** et une **Hyper Ball** (un lancer offert chacune), un **🎟️ Ticket Safari** (une
-  entrée), un **🍬 Super Bonbon** (le coût en points d'une fusion) et une **💎 Pépite**, qui ne sert
-  qu'à se revendre. *Ces effets restent à brancher ; seule la Pépite est complète.*
+- **Un objet est une clé et un compteur.** Nom, icône et description vivent dans `pokemon.items` —
+  réglables à chaud, comme les balls. Mieux : une entrée `ball: "poke"` lui fait *emprunter* le
+  libellé et l'icône de la ball correspondante, si bien que changer l'emoji d'une ball suffit.
+- **Trois attributs décident de tout** : `sellValue` le rend revendable, `dropWeight` le fait tomber,
+  et rien d'autre. Un objet dont l'effet n'est pas encore branché n'a pas de poids, **donc personne
+  ne peut se retrouver avec un objet qui ne fait rien**.
+- **La table de butin**, du plus commun au plus rare : Poké Ball (57 % des trouvailles), Super Ball
+  (28 %), Hyper Ball (11 %), 💎 Pépite (2,8 %) et, tout au bout, la **Master Ball** (0,4 %, soit une
+  toutes les ~2 300 apparitions). Le Super Bonbon, les pierres et le Ticket Safari rejoindront la
+  table quand leur effet sera branché.
+- **Les balls offertes partent d'elles-mêmes.** Cliquer sur *Poké Ball (120)* en ayant une Poké Ball
+  dans son inventaire ne coûte rien : l'objet passe avant le solde, parce qu'un objet posé dans un
+  sac ne doit pas dormir pendant qu'on prend la monnaie de son propriétaire. La Master Ball garde sa
+  confirmation — elle ne coûte rien mais ne se retrouve pas.
+- **Une ball offerte se rend en ball.** Battu à la milliseconde sur un Pokémon, on récupère l'objet,
+  jamais sa valeur en points : la convertir en monnaie ferait d'un Pokémon disputé une petite
+  imprimerie. Le lancer est alors journalisé à coût nul, ce qui garde honnête le classement des
+  points brûlés.
 - **Une seule écriture retire un objet**, et elle est gardée (`count >= ?`, puis `this.changes`) :
   deux clics simultanés sur le même ticket, un seul l'emporte. Le perdant reçoit « tu ne l'as plus »,
-  pas une erreur — ce n'est pas une panne.
-- **Tout mouvement est journalisé** dans `pokemon_item_log` avec sa provenance. Le compteur dit ce
-  qu'on a, le journal dit d'où ça vient : un objet consommé disparaît de l'inventaire et ne
-  laisserait sinon aucune trace, alors que c'est précisément ce qu'on voudra relire.
-- **La ligne survit à zéro**, comme dans le Pokédex et pour la même raison : `first_obtained_at`
-  raconte depuis quand le dresseur connaît l'objet, et ça ne se retrouve pas après coup. Toute
-  lecture filtre donc sur `count > 0`.
+  pas une erreur.
+- **Tout mouvement est journalisé** dans `pokemon_item_log` avec sa provenance (`lancer`,
+  `capture:42`, `vente`, `admin:…`). Le compteur dit ce qu'on a, le journal dit d'où ça vient.
+- **La ligne survit à zéro**, comme dans le Pokédex : `first_obtained_at` ne se retrouve pas après
+  coup. Toute lecture filtre donc sur `count > 0`.
+
+*Restent à brancher : le Super Bonbon (tenir lieu d'un exemplaire manquant dans une fusion) et les
+trois pierres (faire évoluer un Évoli sans dépenser un point).*
 
 ### 💱 Revente
 
@@ -100,11 +113,13 @@ ne se monnaie pas.
 - **L'entrée de Pokédex est intouchable.** On ne vend que des doublons : le `count >= quantité + 1`
   de l'UPDATE gardé le tient en une instruction, donc six ventes simultanées sur trois doublons en
   laissent passer exactement trois, et le dernier exemplaire ne bouge jamais.
-- **Le barème suit la rareté** (`pokemon.sell.byRarity`) — 150 / 400 / 1 200 / 6 000 points, ×10 pour
-  un shiny, qui est une entrée distincte et bien plus rare qu'un stade 3. C'est une consolation, pas
-  un commerce : attraper un commun à la Poké Ball coûte ~2 000 points en moyenne et le revendre en
-  rend 150. **Aucun tarif ne doit dépasser le coût espéré d'une capture**, sans quoi la chasse
-  devient une imprimerie à points.
+- **Le barème suit la rareté** (`pokemon.sell.byRarity`) : **170** points pour un commun, **500**
+  pour un peu commun, **1 800** pour un rare. C'est une consolation, pas un commerce : attraper un
+  commun à la Poké Ball coûte ~2 000 points en moyenne. **Aucun tarif ne doit dépasser le coût
+  espéré d'une capture**, sans quoi la chasse devient une imprimerie à points.
+- **Les légendaires et les shinies ne se revendent pas.** Les premiers n'ont pas de ligne au barème,
+  les seconds un multiplicateur nul : ce sont des entrées de Pokédex qu'on ne retrouve pas, et
+  personne ne doit pouvoir les brader d'un clic.
 - **On retire d'abord, on crédite ensuite**, et on rend ce qu'on a retiré si le crédit échoue.
   L'inverse paierait deux fois celui qui clique deux fois.
 - **Les ventes de Pokémon sont journalisées** dans `pokemon_sales` : une vente détruit des

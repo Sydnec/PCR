@@ -233,6 +233,15 @@ const db = new sqlite3.Database(dbPath, (err) => {
               if (err) handleException("Erreur création index pokemon_spawns_flees :", err);
             }
           );
+          // L'objet que tient le Pokémon, tiré à l'apparition comme le shiny et
+          // le taux de capture. Dans la ligne et pas ailleurs : ce qu'il porte
+          // ne doit pas changer entre le moment où il apparaît et celui où
+          // quelqu'un l'attrape, ni se rejouer à chaque lancer.
+          db.run("ALTER TABLE pokemon_spawns ADD COLUMN held_item TEXT", (err) => {
+            if (err && !err.message.includes("duplicate column")) {
+              handleException("Erreur lors de l'ajout de held_item :", err);
+            }
+          });
         });
       }
     );
