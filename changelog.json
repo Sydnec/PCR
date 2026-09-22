@@ -1142,7 +1142,7 @@
     {
       "type": "feature",
       "name": "Une loterie quotidienne",
-      "description": "/loterie offre un tirage par jour et par dresseur. Une fois sur deux il ne donne rien — c'est ce qui en fait un tirage — et le reste du temps il rend un lot : jusqu'à 5 Poké Balls, 3 Super Balls, 2 Hyper Balls ou 2 Super Bonbons, ou bien une pierre, une Pépite, un Ticket Safari, voire une Master Ball pour qui a beaucoup de chance. Les lots viennent de la même table que le butin des Pokémon, donc le même ordre de rareté vaut partout. La journée se remet à zéro à minuit UTC, et l'embed annonce l'heure exacte du prochain tirage.",
+      "description": "/loterie offre un tirage par jour et par dresseur. Sept fois sur dix il donne quelque chose, et un gain sur deux est une ou deux Poké Balls, ou une Super Ball : la quantité décroît, chaque exemplaire de plus étant deux fois moins probable que le précédent. Le reste se gagne à l'unité — un Super Bonbon, une pierre, une Pépite, un Ticket Safari, et une Master Ball tous les 615 jours environ. La journée se remet à zéro à minuit UTC, et l'embed annonce l'heure exacte du prochain tirage.",
       "announce": true,
       "author": "Sydnec",
       "commit": "pending",

@@ -24,9 +24,11 @@ const pourcent = (value, decimals = 2) =>
 const entier = (value) => value.toLocaleString("fr-FR").replace(/[\u202F\u00A0]/g, " ");
 
 // « une chance sur N », qui se lit mieux qu'un pourcentage à trois décimales
-// quand l'événement est rare.
+// quand l'événement est rare — et seulement là. Au-dessus d'une chance sur deux,
+// l'arrondi écrit « 1/1 », qui se lit « à tous les coups » et qui est faux : le
+// pourcentage de la colonne d'à côté dit déjà tout ce qu'il y a à dire.
 const surN = (probability) =>
-  probability > 0 ? `1/${entier(Math.round(1 / probability))}` : "—";
+  probability > 0 && probability <= 0.5 ? `1/${entier(Math.round(1 / probability))}` : "—";
 
 function renderTable(table) {
   const gate = table.gate?.chance ?? 1;

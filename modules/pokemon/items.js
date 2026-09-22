@@ -82,13 +82,32 @@ export function getBallItem(ballKey) {
 // un objet qui ne fait rien.
 export const itemDropWeight = (item) => Math.max(0, Number(item?.dropWeight) || 0);
 
+// Le poids d'un objet à la loterie. Il retombe sur `dropWeight` tant que le
+// catalogue n'en dit rien, donc seuls les objets réellement retouchés portent la
+// clé en plus.
+//
+// Les deux tables ont longtemps été la même, et c'était juste tant qu'elles
+// répondaient à la même question. Elles ont divergé le jour où la loterie a dû
+// donner quelque chose sept fois sur dix : ouvrir sa porte rendait du même coup
+// les lots rares plus fréquents, alors qu'un Pokémon sur quinze tient toujours un
+// objet. On dilue donc la loterie avec du poids de balls, et le butin ne bouge
+// pas d'un cheveu.
+export const itemLotteryWeight = (item) => {
+  const weight = Number(item?.lotteryWeight);
+  return Number.isFinite(weight) && weight >= 0 ? weight : itemDropWeight(item);
+};
+
 // Tirage pondéré, même forme que pickWeightedSpecies : un cumul, un tirage, et
 // le dernier en filet si l'arrondi flottant passe juste au-dessus du total.
-export function pickWeightedItem() {
+//
+// `weightOf` se passe explicitement, sans valeur par défaut : deux tables se
+// partagent ce tirage, et un appelant qui ne dit pas laquelle il veut est un
+// appelant qui n'y a pas pensé.
+export function pickWeightedItem(weightOf) {
   const pool = [];
   let total = 0;
   for (const item of getItems()) {
-    const weight = itemDropWeight(item);
+    const weight = weightOf(item);
     if (weight > 0) {
       total += weight;
       pool.push({ item, cumulative: total });
@@ -116,18 +135,13 @@ export function itemLot(item) {
   return { min, max: Math.max(min, borne(item?.lot?.max, min)) };
 }
 
-export function rollLot(item) {
-  const { min, max } = itemLot(item);
-  return min + Math.floor(Math.random() * (max - min + 1));
-}
-
 // Ce que tient un Pokémon qui vient d'apparaître, ou null. Tiré à l'apparition
 // et figé dans la ligne : ce qu'il porte lui appartient, ça ne se décide pas au
 // moment où quelqu'un l'attrape.
 export function rollHeldItem() {
   const chance = Number(getPokemonConfig().spawn?.heldItemChance) || 0;
   if (chance <= 0 || Math.random() >= chance) return null;
-  return pickWeightedItem()?.key ?? null;
+  return pickWeightedItem(itemDropWeight)?.key ?? null;
 }
 
 // ====================== LECTURES ======================

@@ -11,7 +11,7 @@
 // serait pire que pas de table du tout : elle ferait régler le jeu à côté.
 import { getPokemonConfig, getSafariConfig } from "./config.js";
 import { allSpecies, isLegendary, spawnWeight } from "./data.js";
-import { getItems, itemDropWeight, itemLot } from "./items.js";
+import { getItems, itemDropWeight, itemLot, itemLotteryWeight } from "./items.js";
 
 // Une ligne de table : un groupe de tirages qui partagent le même poids.
 // `count` vaut 1 pour un objet, et le nombre d'espèces pour un groupe de
@@ -109,22 +109,28 @@ export function describeDropPool() {
   });
 }
 
-// La loterie tire dans la même table que le butin — mêmes poids, même ordre de
-// rareté — et n'en change que deux choses : la porte d'entrée, et le fait qu'un
-// gain puisse venir par poignées. Les deux tableaux se lisent donc côte à côte,
-// et régler un `dropWeight` déplace les deux : c'est voulu, et c'est visible.
+// La loterie a ses propres poids depuis qu'elle donne quelque chose sept fois
+// sur dix : ouvrir sa porte aurait rendu les lots rares d'autant plus fréquents,
+// alors qu'un Pokémon sur quinze tient toujours un objet. Elle est diluée avec du
+// poids de balls, et le butin n'a pas bougé. Les deux tableaux se lisent côte à
+// côte : c'est là, et nulle part ailleurs, qu'on voit qu'ils ont divergé.
 export function describeLotteryPool() {
-  const chance = Number(getPokemonConfig().lottery?.winChance) || 0;
+  const lottery = getPokemonConfig().lottery ?? {};
+  const chance = Number(lottery.winChance) || 0;
+  const raw = Number(lottery.lotDecay);
+  // Annoncé en « N fois moins probable » : 0,5 se lit mal, « deux fois moins » se
+  // lit tout seul.
+  const decay = (Number.isFinite(raw) && raw > 0 ? 1 / raw : 1).toFixed(1).replace(".0", "").replace(".", ",");
   return table({
     key: "loterie",
     name: "Loterie quotidienne",
     subject: "objet",
-    note: "Le lot d'un tirage, un par dresseur et par jour. Mêmes poids que le butin.",
+    note: `Le lot d'un tirage, un par dresseur et par jour. Chaque exemplaire de plus est ${decay} fois moins probable.`,
     gate: { label: "des tirages donnent un lot", chance },
     lots: true,
     rows: getItems().map((item) => {
       const { min, max } = itemLot(item);
-      return { ...row(item.label, 1, itemDropWeight(item)), lot: min === max ? `${min}` : `${min}-${max}` };
+      return { ...row(item.label, 1, itemLotteryWeight(item)), lot: min === max ? `${min}` : `${min}-${max}` };
     }),
   });
 }

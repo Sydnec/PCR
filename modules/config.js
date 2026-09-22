@@ -105,6 +105,14 @@ const POKEMON = {
   // sans `lot` se gagne à l'unité, ce qui est le cas de tout ce qui ne se joue
   // pas par poignées : une pierre, une pépite, un ticket, une Master Ball.
   //
+  // `lotteryWeight` remplace `dropWeight` à la loterie, et seulement là. Les deux
+  // tables ont été la même jusqu'à ce que la loterie doive donner quelque chose
+  // sept fois sur dix : ouvrir sa porte rendait les lots rares d'autant plus
+  // fréquents, alors qu'un Pokémon sur quinze tient toujours un objet. Les balls
+  // y pèsent donc plus lourd (640 et 330 contre 400 et 200), ce qui ramène la
+  // Pépite et la Master Ball à la cadence qu'elles avaient à 50 % — une tous les
+  // 92 jours, une tous les 615 — sans toucher à ce que tiennent les Pokémon.
+  //
   // `evolution` le rend utilisable dans une fusion : `quantity` exemplaires de
   // l'objet tiennent lieu de `copies` exemplaires du Pokémon, `freePoints`
   // dispense du coût en points, et `from`/`target` l'enferment dans une lignée
@@ -120,12 +128,14 @@ const POKEMON = {
       ball: "poke",
       description: "Un lancer offert : tu la tiens déjà, elle ne te coûtera rien.",
       dropWeight: 400,
+      lotteryWeight: 640,
       lot: { min: 1, max: 5 },
     },
     ball_super: {
       ball: "super",
       description: "Un lancer offert : tu la tiens déjà, elle ne te coûtera rien.",
       dropWeight: 200,
+      lotteryWeight: 330,
       lot: { min: 1, max: 3 },
     },
     super_bonbon: {
@@ -210,12 +220,19 @@ const POKEMON = {
   // les voir diverger. Seule la porte d'entrée change : 7 % des Pokémon tiennent
   // un objet, la moitié des tirages en donnent un.
   //
-  // Repère à 50 % et aux poids actuels : ~284 points de valeur par jour et par
-  // dresseur, soit un dixième d'une journée de messages, et une Master Ball tous
-  // les 600 jours environ.
+  // `lotDecay` donne sa forme au lot : chaque exemplaire de plus est `lotDecay`
+  // fois moins probable que le précédent. À 1 le tirage est uniforme, et c'était
+  // son défaut d'origine — cinq Poké Balls tombaient aussi souvent qu'une seule.
+  // À 0,5, un lot sur deux est le plus petit possible, et le gros lot redevient
+  // un événement.
+  //
+  // Repère aux réglages actuels : ~267 points de valeur par jour et par dresseur,
+  // un dixième d'une journée de messages. Un gain sur deux est une ou deux Poké
+  // Balls, ou une Super Ball.
   lottery: {
     enabled: true,
-    winChance: 0.5,
+    winChance: 0.7,
+    lotDecay: 0.5,
   },
   safari: {
     enabled: true,

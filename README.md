@@ -102,8 +102,9 @@ noieraient la table.
 | Master Ball | **0,33 %** | la capture garantie, offerte | — |
 
 `dropWeight` est un **poids**, pas un pourcentage : la part d'un objet vaut son poids divisé par la
-somme de tous (921 aujourd'hui). `/admin poids` fait la conversion pour les quatre tables de tirage du
-jeu, cadence comprise — la Master Ball tombe une fois sur 4 386 apparitions.
+somme de tous (921 pour le butin). `/admin poids` fait la conversion pour les quatre tables de
+tirage du jeu, cadence comprise — la Master Ball tombe une fois sur 4 386 apparitions. La loterie
+tire dans sa propre table (`lotteryWeight`, voir plus bas) ; celle-ci ne décrit que le butin.
 
 **Une fois sur cinq, il le lâche en partant.** Capturé ou enfui, un Pokémon qui tenait quelque chose
 a 20 % de chances de le laisser par terre plutôt que de le céder à son vainqueur. Un message public
@@ -141,31 +142,51 @@ que de le faire disparaître.
 
 ### 🎰 Loterie
 
-`/loterie` offre **un tirage par dresseur et par jour**, et **une fois sur deux il ne donne rien**.
-C'est ce qui en fait un tirage : un cadeau certain ne serait qu'une allocation quotidienne. Le
-reste du temps il rend un lot, pris dans la **même table que le butin** ci-dessus — il n'y a qu'un
-ordre de rareté dans ce jeu, et en maintenir deux, c'est les voir diverger. Seule la porte d'entrée
-change : 7 % des apparitions d'un côté, la moitié des tirages de l'autre.
+`/loterie` offre **un tirage par dresseur et par jour**. Sept fois sur dix il donne quelque
+chose, et **un gain sur deux est une ou deux Poké Balls, ou une Super Ball** : le tirage doit se
+sentir généreux sans l'être, d'où beaucoup de petits lots et très peu de gros.
 
-Ce qui change aussi, c'est le **volume** : les objets courants se gagnent par poignées.
+**La quantité décroît géométriquement** : chaque exemplaire de plus est deux fois moins probable
+que le précédent (`lotDecay`). Le tirage était uniforme à l'origine, et c'était son défaut — cinq
+Poké Balls tombaient aussi souvent qu'une seule, si bien que le gros lot n'avait rien
+d'exceptionnel. À `lotDecay: 1` on retrouve exactement l'ancien comportement.
 
-| Lot | Quantité | Un tirage sur |
+| Résultat | Proba | Un jour sur |
 |---|---|---|
-| Poké Ball | 1 à 5 | 5 |
-| Super Ball | 1 à 3 | 9 |
-| 🍬 Super Bonbon | 1 à 2 | 15 |
-| Hyper Ball | 1 à 2 | 23 |
-| 🔥⚡💧 Pierres | 1 | 61 chacune |
-| 💎 Pépite | 1 | 92 |
-| 🎟️ Ticket Safari | 1 | 230 |
-| Master Ball | 1 | **614** |
+| **Rien** | 30,00 % | 3 |
+| 1× Poké Ball | 17,91 % | 6 |
+| 1× Super Ball | 10,22 % | 10 |
+| 2× Poké Ball | 8,96 % | 11 |
+| 2× Super Ball | 5,11 % | 20 |
+| 3× Poké Ball | 4,48 % | 22 |
+| 🍬 1× Super Bonbon | 4,34 % | 23 |
+| 1× Hyper Ball | 2,89 % | 35 |
+| 3× Super Ball | 2,56 % | 39 |
+| 4× Poké Ball | 2,24 % | 45 |
+| 🍬 2× Super Bonbon | 2,17 % | 46 |
+| 🔥⚡💧 Pierre | 1,63 % chacune | 61 |
+| 2× Hyper Ball | 1,45 % | 69 |
+| 5× Poké Ball | 1,12 % | 89 |
+| 💎 Pépite | 1,08 % | 92 |
+| 🎟️ Ticket Safari | 0,43 % | 231 |
+| **Master Ball** | **0,16 %** | **615** |
+
+Vérifié sur 400 000 tirages réels : écart maximal de **0,10 point** avec ce tableau.
+
+**La loterie a ses propres poids** (`lotteryWeight`, qui retombe sur `dropWeight` quand le
+catalogue n'en dit rien). Les deux tables ont été la même jusqu'à ce que la loterie doive donner
+quelque chose sept fois sur dix : ouvrir sa porte rendait du même coup les lots rares 1,4× plus
+fréquents, alors qu'un Pokémon sur quinze tient toujours un objet. Les balls y pèsent donc plus
+lourd — 640 et 330 contre 400 et 200, pour un total de 1 291 contre 921 — ce qui ramène la Pépite
+et la Master Ball à la cadence qu'elles avaient à 50 %, **sans toucher à ce que tiennent les
+Pokémon**. `/admin poids` affiche les deux tables côte à côte : c'est là, et nulle part ailleurs,
+qu'on voit qu'elles ont divergé.
 
 La fourchette d'un lot vit dans le catalogue (`lot: { min, max }`) : un objet sans `lot` se gagne à
-l'unité, ce qui évite d'écrire `1` à `1` sur les deux tiers des lignes. `/admin poids loterie`
-affiche la table complète, quantités comprises.
+l'unité, ce qui évite d'écrire `1` à `1` sur les deux tiers des lignes.
 
-À ces réglages, un tirage rapporte **~284 points de valeur par jour et par dresseur** — un dixième
-d'une journée de messages. C'est un rituel, pas un revenu.
+À ces réglages, un tirage rapporte **~267 points de valeur par jour et par dresseur** — un
+dixième d'une journée de messages. C'est un rituel, pas un revenu.
 
 - **La journée est UTC**, comme le classement des messages : deux découpages du mot « jour » dans
   le même bot seraient une source de bugs sans fin. L'embed annonce l'heure exacte du prochain

@@ -1,11 +1,14 @@
 // La loterie quotidienne : un tirage par dresseur et par jour.
 //
-// Une fois sur deux elle ne donne rien, et c'est l'essentiel du jeu — un cadeau
+// Trois fois sur dix elle ne donne rien, et c'est l'essentiel du jeu — un cadeau
 // certain n'est pas un tirage, c'est une allocation. Le reste du temps elle rend
-// un lot pris dans la MÊME table que le butin des Pokémon, `dropWeight` : il n'y
-// a qu'un ordre de rareté dans ce jeu, et en maintenir deux, c'est les voir
-// diverger. Seule la porte d'entrée change, 7 % des apparitions d'un côté, la
-// moitié des tirages de l'autre.
+// un lot, et sa forme tient en une phrase : beaucoup de petits, très peu de gros.
+// Un gain sur deux est une ou deux Poké Balls, ou une Super Ball.
+//
+// Deux tirages enchaînés y pourvoient : l'objet, pondéré par `lotteryWeight` (voir
+// items.js, qui dit pourquoi la loterie ne partage plus la table du butin), puis
+// la quantité, où chaque exemplaire de plus est `lotDecay` fois moins probable
+// que le précédent.
 //
 // Deux règles de sûreté, et ce sont les mêmes que partout ailleurs :
 // le tirage du jour se revendique par un UPDATE gardé dont on inspecte
@@ -15,7 +18,7 @@
 import db from "../points-db.js";
 import { handleException, log } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
-import { grantItem, pickWeightedItem, rollLot } from "./items.js";
+import { grantItem, itemLot, itemLotteryWeight, pickWeightedItem } from "./items.js";
 
 const SOURCE = "loterie";
 
@@ -78,13 +81,39 @@ function releaseDraw(userId, day, cb) {
   );
 }
 
+// Combien d'exemplaires sortent d'un lot. Le tirage était uniforme à l'origine,
+// et c'était son défaut : cinq Poké Balls tombaient aussi souvent qu'une seule,
+// si bien que le gros lot n'avait rien d'exceptionnel. Chaque exemplaire de plus
+// est désormais `lotDecay` fois moins probable que le précédent — à 0,5, deux
+// fois moins, une règle qu'on peut énoncer aux joueurs en une phrase.
+//
+// Même forme que les deux autres tirages pondérés du jeu : un cumul, un tirage,
+// et le dernier en filet si l'arrondi flottant passe juste au-dessus du total.
+// À 1, la décroissance disparaît et l'on retrouve exactement l'uniforme.
+export function rollLot(item) {
+  const { min, max } = itemLot(item);
+  if (max <= min) return min;
+
+  const raw = Number(getLotteryConfig().lotDecay);
+  const decay = Number.isFinite(raw) && raw > 0 ? raw : 1;
+  const cumulative = [];
+  let total = 0;
+  for (let quantity = min; quantity <= max; quantity++) {
+    total += Math.pow(decay, quantity - min);
+    cumulative.push(total);
+  }
+  const roll = Math.random() * total;
+  const index = cumulative.findIndex((bound) => roll < bound);
+  return min + (index === -1 ? cumulative.length - 1 : index);
+}
+
 // Le tirage, et lui seul : deux hasards enchaînés, la porte puis le lot. Sortir
 // l'aléatoire de la décision rend le reste testable, comme pour les objets au
 // sol. Renvoie null quand le dresseur repart les mains vides.
 export function rollLottery() {
   const chance = Number(getLotteryConfig().winChance);
   if (!(chance > 0) || Math.random() >= chance) return null;
-  const item = pickWeightedItem();
+  const item = pickWeightedItem(itemLotteryWeight);
   if (!item) return null;
   return { item, quantity: rollLot(item) };
 }
