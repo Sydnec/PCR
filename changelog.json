@@ -1,7 +1,34 @@
 {
-  "version": "1.13.2",
-  "lastUpdated": "2026-09-22T09:40:23.874Z",
+  "version": "1.13.3",
+  "lastUpdated": "2026-09-22T17:43:57.407Z",
   "releases": [
+    {
+      "version": "1.13.3",
+      "date": "2026-09-22",
+      "title": "Release 1.13.3",
+      "features": [
+        {
+          "type": "feature",
+          "name": "Les évolutions par échange évoluent enfin à l'échange",
+          "description": "Comme dans la première génération, Kadabra, Machopeur, Gravalanch et Spectrum évoluent en changeant de dresseur : c'est celui qui REÇOIT le Pokémon qui reçoit sa forme évoluée. Alakazam, Mackogneur, Grolem et Ectoplasma s'obtiennent donc désormais de deux façons : en fusionnant des doublons, ou en trouvant un partenaire d'échange. La proposition annonce la transformation avant le clic, et un shiny reste shiny en évoluant.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-22T16:15:21.995144Z",
+          "branch": "claude/sleepy-cerf-hxgk8t"
+        },
+        {
+          "type": "feature",
+          "name": "Une loterie quotidienne",
+          "description": "/loterie offre un tirage par jour et par dresseur. Sept fois sur dix il donne quelque chose, et un gain sur deux est une ou deux Poké Balls, ou une Super Ball : la quantité décroît, chaque exemplaire de plus étant deux fois moins probable que le précédent. Le reste se gagne à l'unité — un Super Bonbon, une pierre, une Pépite, un Ticket Safari, et une Master Ball tous les 615 jours environ. La journée se remet à zéro à minuit UTC, et l'embed annonce l'heure exacte du prochain tirage.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-22T16:45:58.628Z",
+          "branch": "claude/sleepy-cerf-hxgk8t"
+        }
+      ]
+    },
     {
       "version": "1.13.2",
       "date": "2026-09-22",
@@ -1128,26 +1155,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "feature",
-      "name": "Les évolutions par échange évoluent enfin à l'échange",
-      "description": "Comme dans la première génération, Kadabra, Machopeur, Gravalanch et Spectrum évoluent en changeant de dresseur : c'est celui qui REÇOIT le Pokémon qui reçoit sa forme évoluée. Alakazam, Mackogneur, Grolem et Ectoplasma s'obtiennent donc désormais de deux façons : en fusionnant des doublons, ou en trouvant un partenaire d'échange. La proposition annonce la transformation avant le clic, et un shiny reste shiny en évoluant.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-22T16:15:21.995144Z",
-      "branch": "claude/sleepy-cerf-hxgk8t"
-    },
-    {
-      "type": "feature",
-      "name": "Une loterie quotidienne",
-      "description": "/loterie offre un tirage par jour et par dresseur. Sept fois sur dix il donne quelque chose, et un gain sur deux est une ou deux Poké Balls, ou une Super Ball : la quantité décroît, chaque exemplaire de plus étant deux fois moins probable que le précédent. Le reste se gagne à l'unité — un Super Bonbon, une pierre, une Pépite, un Ticket Safari, et une Master Ball tous les 615 jours environ. La journée se remet à zéro à minuit UTC, et l'embed annonce l'heure exacte du prochain tirage.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-22T16:45:58.628Z",
-      "branch": "claude/sleepy-cerf-hxgk8t"
-    }
-  ]
+  "pending": []
 }
