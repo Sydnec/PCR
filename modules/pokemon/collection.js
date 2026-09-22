@@ -7,7 +7,7 @@ import db from "../points-db.js";
 import { addPoints, spendPoints } from "../economy.js";
 import { handleException } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
-import { evolutionTargets, getSpecies } from "./data.js";
+import { evolutionTargets, getSpecies, tradeEvolutionTarget } from "./data.js";
 import { consumeItem, getItem, grantItem } from "./items.js";
 import { recordFusion, recordTrade } from "./stats.js";
 
@@ -368,6 +368,18 @@ export function evolve(userId, speciesId, isShiny, chosenTargetId, helperKey, cb
 
 // ====================== ÉCHANGES ======================
 
+// Ce qu'un Pokémon devient en changeant de dresseur. Quatre espèces de la
+// première génération évoluent à l'échange, et c'est le dresseur qui REÇOIT qui
+// reçoit la forme évoluée — celui qui donne son Machopeur ne voit jamais le
+// Mackogneur. L'échange devient donc la seconde porte vers ces quatre-là, à
+// côté de la fusion : la moins chère, mais celle qui coûte un partenaire.
+//
+// Le calcul vit ici et pas dans acceptTrade parce qu'il sert deux fois, une
+// par Pokémon traversé, et qu'une règle de jeu écrite deux fois finit toujours
+// par ne plus l'être qu'une.
+const tradedForm = (speciesId) =>
+  tradeEvolutionTarget(getSpecies(speciesId))?.id ?? Number(speciesId);
+
 export function createTrade(trade, cb) {
   const now = Date.now();
   const expiresAt = now + getPokemonConfig().trade.expiryHours * 3600 * 1000;
@@ -476,22 +488,46 @@ export function acceptTrade(tradeId, cb) {
                   );
                 }
 
+                // Les deux crédits passent par tradedForm : un échange de
+                // Machopeur contre Machopeur fait deux Mackogneur, et c'est
+                // bien ce que fait le jeu d'origine.
+                const arrivals = [
+                  {
+                    userId: trade.to_user_id,
+                    from: trade.offer_species_id,
+                    to: tradedForm(trade.offer_species_id),
+                    isShiny: trade.offer_is_shiny,
+                  },
+                  {
+                    userId: trade.from_user_id,
+                    from: trade.request_species_id,
+                    to: tradedForm(trade.request_species_id),
+                    isShiny: trade.request_is_shiny,
+                  },
+                ];
+
                 creditSpecies(
-                  trade.to_user_id,
-                  trade.offer_species_id,
-                  trade.offer_is_shiny,
+                  arrivals[0].userId,
+                  arrivals[0].to,
+                  arrivals[0].isShiny,
                   (err) => {
                     if (err) return cb(err);
                     creditSpecies(
-                      trade.from_user_id,
-                      trade.request_species_id,
-                      trade.request_is_shiny,
+                      arrivals[1].userId,
+                      arrivals[1].to,
+                      arrivals[1].isShiny,
                       (err) => {
                         recordTrade({
                           fromUserId: trade.from_user_id,
                           toUserId: trade.to_user_id,
                         });
-                        cb(err, { ok: true, trade });
+                        // La fonction qui a appliqué les évolutions est la
+                        // seule à pouvoir dire lesquelles ont eu lieu.
+                        cb(err, {
+                          ok: true,
+                          trade,
+                          evolutions: arrivals.filter((a) => a.to !== a.from),
+                        });
                       }
                     );
                   }

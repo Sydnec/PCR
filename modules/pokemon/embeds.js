@@ -15,7 +15,7 @@ import {
   embedColor,
   evolutionChain,
   getSpecies,
-  isFusionOnly,
+  isEvolutionOnly,
   isSafariFinished,
   probabilitiesByBall,
   rarityOf,
@@ -24,6 +24,7 @@ import {
   safariCatchProbability,
   safariFleeChance,
   spriteUrl,
+  tradeEvolutionTarget,
 } from "./data.js";
 
 const formatPercent = (probability) => {
@@ -184,7 +185,7 @@ function chainLine(species, counts, { current = false, focusShiny = false } = {}
   return (
     `${current ? "\u25B8 " : ""}${has ? "\u2705" : "\u2754"} \`${dexNumber(species)}\` ` +
     `${current ? `__**${species.name}**__` : species.name}` +
-    `${isFusionOnly(species) ? " \u{1F512}" : ""}` +
+    `${isEvolutionOnly(species) ? " \u{1F512}" : ""}` +
     `${marks.length ? ` ${marks.join(" ")}` : ""}`
   );
 }
@@ -247,9 +248,9 @@ export function buildSpeciesInfoEmbed(
     });
   }
 
-  if (chain.some(isFusionOnly)) {
+  if (chain.some(isEvolutionOnly)) {
     embed.setFooter({
-      text: "\u{1F512} Introuvable à l'état sauvage : uniquement par fusion de doublons.",
+      text: "\u{1F512} Introuvable à l'état sauvage : par fusion de doublons, ou par échange.",
     });
   }
   return embed;
@@ -474,11 +475,12 @@ export function buildDexEmbed(targetUser, rows, page) {
 
   const slice = allSpecies().slice(page * pageSize, (page + 1) * pageSize);
   // Le cadenas des espèces qu'aucune apparition ne donnera jamais. Sans lui, un
-  // dresseur peut chasser des mois un Mackogneur qui n'apparaîtra pas : la seule
-  // façon de l'obtenir est de fusionner des Machopeur, et rien ne le disait.
-  const locked = slice.some(isFusionOnly);
+  // dresseur peut chasser des mois un Mackogneur qui n'apparaîtra pas : il
+  // s'obtient en fusionnant des Machopeur ou en s'en faisant échanger un, et
+  // rien ne le disait.
+  const locked = slice.some(isEvolutionOnly);
   const lines = slice.map((species) => {
-    const cadenas = isFusionOnly(species) ? " \u{1F512}" : "";
+    const cadenas = isEvolutionOnly(species) ? " \u{1F512}" : "";
     const entry = stats.owned.get(species.id);
     if (!entry || (entry.normal === 0 && entry.shiny === 0)) {
       // On affiche quand même le nom : les joueurs veulent savoir quoi chasser.
@@ -512,7 +514,7 @@ export function buildDexEmbed(targetUser, rows, page) {
     .setFooter({
       text:
         `Page ${page + 1}/${dexPageCount()}` +
-        (locked ? " · 🔒 ne s'obtient que par fusion" : ""),
+        (locked ? " · 🔒 ne s'obtient que par fusion ou par échange" : ""),
     });
 
   columns.forEach((value, index) => {
@@ -558,6 +560,32 @@ const TRADE_STATUS = {
   },
 };
 
+// Ce que l'échange va transformer, ou vient de transformer. La ligne se
+// recalcule à chaque rendu depuis les seules espèces de l'offre : l'embed reste
+// juste après un redémarrage du bot, là où un résultat mémorisé aurait disparu.
+//
+// Elle apparaît aussi AVANT l'acceptation : à la réflexion c'est là qu'elle sert
+// le plus, puisque personne ne devrait découvrir après coup que le Machopeur
+// qu'il vient de céder arrive chez l'autre en Mackogneur.
+function tradeEvolutionLines(trade, done) {
+  const lines = [];
+  const add = (speciesId, isShiny, receiverId) => {
+    const source = getSpecies(speciesId);
+    const target = tradeEvolutionTarget(source);
+    if (!target) return;
+    const from = displayName(source, isShiny);
+    const to = displayName(target, isShiny);
+    lines.push(
+      done
+        ? `**${from}** est devenu **${to}** chez <@${receiverId}>.`
+        : `**${from}** deviendra **${to}** chez <@${receiverId}>.`
+    );
+  };
+  add(trade.offer_species_id, trade.offer_is_shiny, trade.to_user_id);
+  add(trade.request_species_id, trade.request_is_shiny, trade.from_user_id);
+  return lines;
+}
+
 export function buildTradeEmbed(trade, status = "PENDING") {
   const style = TRADE_STATUS[status] ?? TRADE_STATUS.PENDING;
   const offered = getSpecies(trade.offer_species_id);
@@ -573,6 +601,20 @@ export function buildTradeEmbed(trade, status = "PENDING") {
     .setThumbnail(spriteUrl(offered, trade.offer_is_shiny));
 
   if (style.note) embed.addFields({ name: "Raison", value: style.note });
+
+  // Une offre refusée, annulée ou expirée n'a rien fait évoluer du tout : on ne
+  // promet une transformation que tant qu'elle peut encore arriver, et on ne la
+  // raconte au passé que si elle a eu lieu.
+  if (status === "PENDING" || status === "ACCEPTED") {
+    const lines = tradeEvolutionLines(trade, status === "ACCEPTED");
+    if (lines.length) {
+      embed.addFields({
+        name: "Évolution par échange",
+        value: lines.join("\n"),
+      });
+    }
+  }
+
   if (status === "PENDING") {
     embed.setFooter({ text: "Seul le destinataire peut accepter ou refuser." });
   }

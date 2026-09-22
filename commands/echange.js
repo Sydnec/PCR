@@ -7,7 +7,7 @@ import {
   getCollection,
   setTradeMessage,
 } from "../modules/pokemon/collection.js";
-import { getSpecies } from "../modules/pokemon/data.js";
+import { getSpecies, tradeEvolutionTarget } from "../modules/pokemon/data.js";
 import { buildTradeEmbed, buildTradeRow } from "../modules/pokemon/embeds.js";
 
 // Discord n'autorise pas de liste vide accompagnée d'un message : une
@@ -29,8 +29,15 @@ function respondWithOwned(interaction, userId, query, emptyLabel) {
       .map((row) => {
         const species = getSpecies(row.species_id);
         if (!species) return null;
+        // Les quatre évolutions par échange se déclarent ici plutôt que dans un
+        // message d'aide que personne ne lit : c'est l'instant exact où on
+        // choisit ce qu'on donne. Le filtre portant sur le libellé, taper
+        // « mackogneur » remonte le Machopeur qui y mène.
+        const evolved = tradeEvolutionTarget(species);
         return {
-          name: `${row.is_shiny ? "✨ " : ""}${species.name} (×${row.count})`,
+          name:
+            `${row.is_shiny ? "✨ " : ""}${species.name} (×${row.count})` +
+            (evolved ? ` — évolue en ${evolved.name}` : ""),
           value: encodeEntry(row.species_id, row.is_shiny),
         };
       })

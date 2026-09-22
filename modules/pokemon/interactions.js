@@ -352,7 +352,13 @@ function handleTradeButton(interaction, action, tradeId) {
       if (!result.ok) {
         return finishTrade(interaction, trade, "FAILED", `❌ ${result.reason}`);
       }
-      log(`Échange #${tradeId} accepté entre ${trade.from_user_id} et ${trade.to_user_id}`);
+      const evolutions = (result.evolutions ?? [])
+        .map((e) => `${getSpecies(e.from)?.name} → ${getSpecies(e.to)?.name}`)
+        .join(", ");
+      log(
+        `Échange #${tradeId} accepté entre ${trade.from_user_id} et ${trade.to_user_id}` +
+          (evolutions ? ` (${evolutions})` : "")
+      );
       finishTrade(interaction, trade, "ACCEPTED");
     });
   });

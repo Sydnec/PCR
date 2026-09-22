@@ -1128,5 +1128,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "feature",
+      "name": "Les évolutions par échange évoluent enfin à l'échange",
+      "description": "Comme dans la première génération, Kadabra, Machopeur, Gravalanch et Spectrum évoluent en changeant de dresseur : c'est celui qui REÇOIT le Pokémon qui reçoit sa forme évoluée. Alakazam, Mackogneur, Grolem et Ectoplasma s'obtiennent donc désormais de deux façons : en fusionnant des doublons, ou en trouvant un partenaire d'échange. La proposition annonce la transformation avant le clic, et un shiny reste shiny en évoluant.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-22T16:15:21.995144Z",
+      "branch": "claude/sleepy-cerf-hxgk8t"
+    }
+  ]
 }

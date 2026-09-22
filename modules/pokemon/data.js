@@ -66,8 +66,9 @@ export function embedColor(species, isShiny) {
 
 // Poids d'apparition d'une espèce.
 // Les évolutions par échange ne se trouvent jamais à l'état sauvage : elles
-// s'obtiennent uniquement par fusion de doublons, ce qui donne de la valeur
-// aux doublons de leur pré-évolution.
+// s'obtiennent en fusionnant des doublons, ou en faisant changer de dresseur
+// leur pré-évolution. Les deux routes donnent de la valeur à cette
+// pré-évolution, qui reste le seul maillon qu'on croise dans la nature.
 export function spawnWeight(species, spawnConfig) {
   if (species.tradeEvolution) return 0;
   if (isLegendary(species)) return spawnConfig.legendaryWeight;
@@ -75,13 +76,15 @@ export function spawnWeight(species, spawnConfig) {
 }
 
 // Une espèce qu'aucun tirage ne peut faire apparaître : poids nul dans le pool
-// sauvage ET dans celui du parc. Il ne reste alors que la fusion pour l'obtenir.
+// sauvage ET dans celui du parc. Il ne reste alors qu'une évolution pour
+// l'obtenir : une fusion de doublons, ou un échange pour les quatre qui
+// évoluent en changeant de dresseur.
 //
 // La question se pose sur les DEUX pools et pas seulement sur tradeEvolution :
 // mettre `weightsByStage.3` à zéro enfermerait tous les stades 3 derrière une
 // fusion sans que rien ne le dise, et un stade absent du pool sauvage reste
 // trouvable si le parc, lui, le tire. C'est donc calculé, jamais recopié.
-export function isFusionOnly(species) {
+export function isEvolutionOnly(species) {
   return (
     spawnWeight(species, getPokemonConfig().spawn) <= 0 &&
     spawnWeight(species, getSafariConfig()) <= 0
@@ -208,6 +211,17 @@ export function searchByName(query, limit = 25) {
 
 export const evolutionTargets = (species) =>
   species.evolvesInto.map(getSpecies).filter(Boolean);
+
+// La cible d'une évolution par échange, s'il y en a une. Quatre Pokémon de la
+// première génération évoluent en changeant de dresseur : Kadabra, Machopeur,
+// Gravalanch et Spectrum. Le dataset pose le marqueur sur la CIBLE, parce que
+// c'est elle qu'on exclut des apparitions — la source se déduit donc en
+// regardant ses évolutions, et jamais par une liste d'identifiants écrite à la
+// main qui divergerait à la première régénération du JSON.
+export function tradeEvolutionTarget(species) {
+  if (!species) return null;
+  return evolutionTargets(species).find((target) => target.tradeEvolution) ?? null;
+}
 
 // La lignée complète d'une espèce, de la forme de base aux évolutions les plus
 // avancées, dans l'ordre des stades. On remonte par evolvesFrom puis on
