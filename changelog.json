@@ -1,7 +1,44 @@
 {
-  "version": "1.13.0",
-  "lastUpdated": "2026-09-22T08:41:20.180Z",
+  "version": "1.13.1",
+  "lastUpdated": "2026-09-22T09:22:25.056Z",
   "releases": [
+    {
+      "version": "1.13.1",
+      "date": "2026-09-22",
+      "title": "Release 1.13.1",
+      "features": [
+        {
+          "type": "enhancement",
+          "name": "Les poids de tirage se lisent en clair",
+          "description": "/admin poids convertit les tables de tirage pondéré du jeu en probabilités réelles : quelle espèce apparaît, laquelle on croise au parc, quel objet tombe et à quelle cadence. Un poids n'est pas un pourcentage, et régler à l'aveugle un nombre dont on ignore le total n'a jamais marché.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-22T09:00:12.188695Z",
+          "branch": "claude/sleepy-cerf-hxgk8t"
+        },
+        {
+          "type": "fix",
+          "name": "Le message de revente s'affichait avec des astérisques",
+          "description": "La confirmation d'une revente imbriquait deux paires de ** autour du nom, ce qui laissait les astérisques en clair dans le message au lieu de le mettre en gras.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-22T09:00:12.188695Z",
+          "branch": "claude/sleepy-cerf-hxgk8t"
+        },
+        {
+          "type": "fix",
+          "name": "Une Master Ball offerte ne peut plus se payer en points",
+          "description": "La confirmation annonçait « ta Master Ball offerte » sans montrer de prix ; si l'objet disparaissait entre l'ouverture de la fenêtre et le clic, le lancer se rabattait sur ton solde et prélevait 22 500 points en silence. Il refuse désormais et te le dit. Au passage, une fusion qui échoue à la toute dernière étape rend enfin les doublons, l'objet et les points au lieu de tout garder, et un Pokémon qui s'enfuit n'annonce plus qu'il « emporte » un objet qui gît dans le salon.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-22T09:00:12.188695Z",
+          "branch": "claude/sleepy-cerf-hxgk8t"
+        }
+      ]
+    },
     {
       "version": "1.13.0",
       "date": "2026-09-22",
@@ -1074,36 +1111,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "enhancement",
-      "name": "Les poids de tirage se lisent en clair",
-      "description": "/admin poids convertit les tables de tirage pondéré du jeu en probabilités réelles : quelle espèce apparaît, laquelle on croise au parc, quel objet tombe et à quelle cadence. Un poids n'est pas un pourcentage, et régler à l'aveugle un nombre dont on ignore le total n'a jamais marché.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-22T09:00:12.188695Z",
-      "branch": "claude/sleepy-cerf-hxgk8t"
-    },
-    {
-      "type": "fix",
-      "name": "Le message de revente s'affichait avec des astérisques",
-      "description": "La confirmation d'une revente imbriquait deux paires de ** autour du nom, ce qui laissait les astérisques en clair dans le message au lieu de le mettre en gras.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-22T09:00:12.188695Z",
-      "branch": "claude/sleepy-cerf-hxgk8t"
-    },
-    {
-      "type": "fix",
-      "name": "Une Master Ball offerte ne peut plus se payer en points",
-      "description": "La confirmation annonçait « ta Master Ball offerte » sans montrer de prix ; si l'objet disparaissait entre l'ouverture de la fenêtre et le clic, le lancer se rabattait sur ton solde et prélevait 22 500 points en silence. Il refuse désormais et te le dit. Au passage, une fusion qui échoue à la toute dernière étape rend enfin les doublons, l'objet et les points au lieu de tout garder, et un Pokémon qui s'enfuit n'annonce plus qu'il « emporte » un objet qui gît dans le salon.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-22T09:00:12.188695Z",
-      "branch": "claude/sleepy-cerf-hxgk8t"
-    }
-  ]
+  "pending": []
 }
