@@ -43,6 +43,11 @@ que la capture réussisse ou non.
   avec confirmation obligatoire). Les probabilités suivent la formule officielle de la génération 3,
   à partir du taux de capture réel de chaque espèce.
 - **Shiny** (~1/500) comptant comme une entrée de Pokédex distincte.
+- **🔒 Espèces hors pool** : celles dont le poids d'apparition est nul dans le pool sauvage **et**
+  dans celui du parc ne peuvent s'obtenir que par fusion. Le Pokédex et les fiches les marquent d'un
+  cadenas, sans quoi on peut chasser des mois un Mackogneur qui n'apparaîtra pas. Le marqueur est
+  *calculé* à partir des mêmes poids que les tirages, jamais recopié : mettre `weightsByStage.3` à
+  zéro verrouille les seize stades 3 et le cadenas suit.
 - **Bouton « ℹ️ Infos du Pokémon »** sur chaque apparition : un message Discord étant identique
   pour tous ses lecteurs, ce bouton ouvre à chacun en privé la fiche de l'espèce — type, rareté,
   chances à la Poké Ball, et toute la lignée évolutive avec ce qu'il en possède déjà — suivie de
@@ -53,7 +58,8 @@ que la capture réussisse ou non.
   ligne est la *description* de l'embed et non son titre : Discord n'y rendrait ni les emoji du
   serveur ni les mentions.
 - **Commandes** :
-  - `/pokedex [membre]` : collection, doublons, shinies et progression. Réponse privée.
+  - `/pokedex [membre]` : collection, doublons, shinies et progression. Réponse privée. Un 🔒 marque
+    les espèces qu'aucune apparition ne donnera jamais — elles ne s'obtiennent que par fusion.
   - `/pokeclassement` : classement des dresseurs par espèces distinctes.
   - `/pokeinfo <pokemon>` : la même fiche que le bouton des apparitions — type, rareté,
     difficulté, et la lignée évolutive stade par stade avec ce que le dresseur en a déjà.

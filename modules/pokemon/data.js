@@ -6,7 +6,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { getPokemonConfig } from "./config.js";
+import { getPokemonConfig, getSafariConfig } from "./config.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -72,6 +72,20 @@ export function spawnWeight(species, spawnConfig) {
   if (species.tradeEvolution) return 0;
   if (isLegendary(species)) return spawnConfig.legendaryWeight;
   return spawnConfig.weightsByStage[species.stage] ?? 0;
+}
+
+// Une espèce qu'aucun tirage ne peut faire apparaître : poids nul dans le pool
+// sauvage ET dans celui du parc. Il ne reste alors que la fusion pour l'obtenir.
+//
+// La question se pose sur les DEUX pools et pas seulement sur tradeEvolution :
+// mettre `weightsByStage.3` à zéro enfermerait tous les stades 3 derrière une
+// fusion sans que rien ne le dise, et un stade absent du pool sauvage reste
+// trouvable si le parc, lui, le tire. C'est donc calculé, jamais recopié.
+export function isFusionOnly(species) {
+  return (
+    spawnWeight(species, getPokemonConfig().spawn) <= 0 &&
+    spawnWeight(species, getSafariConfig()) <= 0
+  );
 }
 
 export function pickWeightedSpecies(spawnConfig) {

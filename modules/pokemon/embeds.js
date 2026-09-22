@@ -15,6 +15,7 @@ import {
   embedColor,
   evolutionChain,
   getSpecies,
+  isFusionOnly,
   isSafariFinished,
   probabilitiesByBall,
   rarityOf,
@@ -183,7 +184,7 @@ function chainLine(species, counts, { current = false, focusShiny = false } = {}
   return (
     `${current ? "\u25B8 " : ""}${has ? "\u2705" : "\u2754"} \`${dexNumber(species)}\` ` +
     `${current ? `__**${species.name}**__` : species.name}` +
-    `${species.tradeEvolution ? " \u{1F512}" : ""}` +
+    `${isFusionOnly(species) ? " \u{1F512}" : ""}` +
     `${marks.length ? ` ${marks.join(" ")}` : ""}`
   );
 }
@@ -246,7 +247,7 @@ export function buildSpeciesInfoEmbed(
     });
   }
 
-  if (chain.some((link) => link.tradeEvolution)) {
+  if (chain.some(isFusionOnly)) {
     embed.setFooter({
       text: "\u{1F512} Introuvable à l'état sauvage : uniquement par fusion de doublons.",
     });
@@ -472,15 +473,23 @@ export function buildDexEmbed(targetUser, rows, page) {
   const filled = Math.round(percent / 10);
 
   const slice = allSpecies().slice(page * pageSize, (page + 1) * pageSize);
+  // Le cadenas des espèces qu'aucune apparition ne donnera jamais. Sans lui, un
+  // dresseur peut chasser des mois un Mackogneur qui n'apparaîtra pas : la seule
+  // façon de l'obtenir est de fusionner des Machopeur, et rien ne le disait.
+  const locked = slice.some(isFusionOnly);
   const lines = slice.map((species) => {
+    const cadenas = isFusionOnly(species) ? " \u{1F512}" : "";
     const entry = stats.owned.get(species.id);
     if (!entry || (entry.normal === 0 && entry.shiny === 0)) {
       // On affiche quand même le nom : les joueurs veulent savoir quoi chasser.
-      return `\`#${String(species.id).padStart(3, "0")}\` ❔ ${species.name}`;
+      return `\`#${String(species.id).padStart(3, "0")}\` ❔ ${species.name}${cadenas}`;
     }
     const quantity = entry.normal > 1 ? ` ×${entry.normal}` : "";
     const shiny = entry.shiny > 0 ? ` ✨${entry.shiny > 1 ? entry.shiny : ""}` : "";
-    return `\`#${String(species.id).padStart(3, "0")}\` ✅ **${species.name}**${quantity}${shiny}`;
+    return (
+      `\`#${String(species.id).padStart(3, "0")}\` ✅ **${species.name}**${cadenas}` +
+      `${quantity}${shiny}`
+    );
   });
 
   // Trois colonnes façon Pokédex, chacune bien en deçà des 1024 caractères.
@@ -498,7 +507,13 @@ export function buildDexEmbed(targetUser, rows, page) {
         `**${stats.species}**/${total} espèces (${percent} %) · ✨ **${stats.shinies}** · ` +
         `**${stats.total}** captures au total`
     )
-    .setFooter({ text: `Page ${page + 1}/${dexPageCount()}` });
+    // La légende ne s'affiche que sur les pages qui en portent un : elle n'a rien
+    // à expliquer sur les quatre cinquièmes du Pokédex.
+    .setFooter({
+      text:
+        `Page ${page + 1}/${dexPageCount()}` +
+        (locked ? " · 🔒 ne s'obtient que par fusion" : ""),
+    });
 
   columns.forEach((value, index) => {
     embed.addFields({ name: index === 0 ? "​" : "​", value, inline: true });
