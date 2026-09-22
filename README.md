@@ -67,10 +67,13 @@ que la capture réussisse ou non.
   - `/evolution <pokemon>` : fait évoluer un Pokémon en sacrifiant des doublons. Les lignées à
     embranchement (Évoli) peuvent évoluer au hasard, ou vers une cible choisie pour plus cher. La
     commande ne propose que les chemins réellement praticables, objets d'évolution compris.
-  - `/echange <membre> <je_donne> <je_recois>` : échange entre dresseurs. **Kadabra, Machopeur,
-    Gravalanch et Spectrum évoluent en changeant de dresseur**, comme en première génération : c'est
-    celui qui *reçoit* le Pokémon qui reçoit sa forme évoluée. La proposition l'annonce avant le
-    clic, et un shiny reste shiny en évoluant.
+  - `/echange <membre> <je_donne> <je_recois>` : échange entre dresseurs. **Seuls les doublons
+    s'échangent** : contrairement aux jeux, avoir capturé un Pokémon ne suffit pas à le garder au
+    Pokédex, il faut le posséder. Le premier exemplaire de chaque entrée — un shiny compte à part —
+    reste donc verrouillé dans la collection, et l'autocomplétion ne propose que ce qu'on a en trop.
+    **Kadabra, Machopeur, Gravalanch et Spectrum évoluent en changeant de dresseur**, comme en
+    première génération : c'est celui qui *reçoit* le Pokémon qui reçoit sa forme évoluée. La
+    proposition l'annonce avant le clic, et un shiny reste shiny en évoluant.
   - `/safari` : paie l'entrée du parc safari (voir ci-dessous). Réponse privée.
   - `/inventaire [membre]` : les objets qu'un dresseur a en poche (voir *Objets* ci-dessous).
   - `/loterie` : un tirage par jour et par dresseur (voir *Loterie* ci-dessous). Réponse privée.
