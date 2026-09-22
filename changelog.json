@@ -1,7 +1,74 @@
 {
-  "version": "1.12.4",
-  "lastUpdated": "2026-09-21T09:30:58.145Z",
+  "version": "1.13.0",
+  "lastUpdated": "2026-09-22T08:41:20.180Z",
   "releases": [
+    {
+      "version": "1.13.0",
+      "date": "2026-09-22",
+      "title": "Release 1.13.0",
+      "features": [
+        {
+          "type": "feature",
+          "name": "L'inventaire des dresseurs",
+          "description": "Les dresseurs ont maintenant un inventaire, consultable avec /inventaire. Au catalogue : des balls offrant un lancer gratuit, des Super Bonbons, trois pierres d'évolution, un Ticket Safari et des Pépites — tous trouvables sur les Pokémon que tu attrapes.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-22T07:26:37.829781Z",
+          "branch": "claude/sleepy-cerf-hxgk8t"
+        },
+        {
+          "type": "feature",
+          "name": "Revendre ce qu'on a en trop",
+          "description": "/revendre convertit tes doublons en points : 250 pour un commun, 600 pour un peu commun, 1 500 pour un rare. Un exemplaire est toujours conservé, ton Pokédex ne peut pas y perdre une entrée — et les légendaires comme les shinies ne se bradent pas du tout. Les objets prévus pour ça se revendent aussi : la Pépite part à 2 000 points, les pierres à 500, les bonbons à 300.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-22T07:26:37.829781Z",
+          "branch": "claude/sleepy-cerf-hxgk8t"
+        },
+        {
+          "type": "feature",
+          "name": "Les Pokémon tiennent des objets",
+          "description": "Un Pokémon sur quinze tient quelque chose. Des balls surtout, qui offrent un lancer : cliquer sur Poké Ball quand tu en as une ne te coûte plus rien, elle part toute seule. Puis des Super Bonbons, des pierres, un Ticket Safari qui t'ouvre le parc sans payer, et tout au bout une Master Ball, à peu près une toutes les trois mille apparitions.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-22T08:01:47.208012Z",
+          "branch": "claude/sleepy-cerf-hxgk8t"
+        },
+        {
+          "type": "feature",
+          "name": "Les objets qui font évoluer",
+          "description": "Trois Super Bonbons tiennent lieu d'un exemplaire manquant : avec deux Pikachu et trois bonbons, tu obtiens un Pikachu et un Raichu. Les Pierres Feu, Foudre et Eau font mieux pour Évoli — un exemplaire de moins ET pas un point à payer — et chacune impose sa forme, ce qui en fait le seul moyen de choisir son Évoli sans payer le supplément. /evolution ne te propose que les chemins que tu peux réellement emprunter.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-22T08:21:22.840989Z",
+          "branch": "claude/sleepy-cerf-hxgk8t"
+        },
+        {
+          "type": "feature",
+          "name": "Les objets qui tombent par terre",
+          "description": "Une fois sur cinq, un Pokémon qui tenait un objet le lâche en partant au lieu de le céder à celui qui l'attrape — et il le lâche aussi quand il s'enfuit. L'objet reste par terre avec un bouton « Ramasser », au plus rapide : c'est la seule récompense qui ne demande pas d'avoir gagné la course, et la seule chose qu'une apparition perdue peut encore donner.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-22T08:38:54.814366Z",
+          "branch": "claude/sleepy-cerf-hxgk8t"
+        },
+        {
+          "type": "enhancement",
+          "name": "Les annonces de capture parlent en balls",
+          "description": "« Ils ont payé pour rien » devient « Participants », et chacun y apparaît avec les balls qu'il a lancées plutôt qu'avec un total en points. Le journal des lancers affiche lui aussi les balls par leur icône, et la capture s'annonce désormais par la ball qui l'a emportée, vainqueur nommé dans la même ligne.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-22T08:38:54.814411Z",
+          "branch": "claude/sleepy-cerf-hxgk8t"
+        }
+      ]
+    },
     {
       "version": "1.12.4",
       "date": "2026-09-21",
@@ -1007,66 +1074,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "feature",
-      "name": "L'inventaire des dresseurs",
-      "description": "Les dresseurs ont maintenant un inventaire, consultable avec /inventaire. Au catalogue : des balls offrant un lancer gratuit, des Super Bonbons, trois pierres d'évolution, un Ticket Safari et des Pépites — tous trouvables sur les Pokémon que tu attrapes.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-22T07:26:37.829781Z",
-      "branch": "claude/sleepy-cerf-hxgk8t"
-    },
-    {
-      "type": "feature",
-      "name": "Revendre ce qu'on a en trop",
-      "description": "/revendre convertit tes doublons en points : 250 pour un commun, 600 pour un peu commun, 1 500 pour un rare. Un exemplaire est toujours conservé, ton Pokédex ne peut pas y perdre une entrée — et les légendaires comme les shinies ne se bradent pas du tout. Les objets prévus pour ça se revendent aussi : la Pépite part à 2 000 points, les pierres à 500, les bonbons à 300.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-22T07:26:37.829781Z",
-      "branch": "claude/sleepy-cerf-hxgk8t"
-    },
-    {
-      "type": "feature",
-      "name": "Les Pokémon tiennent des objets",
-      "description": "Un Pokémon sur quinze tient quelque chose. Des balls surtout, qui offrent un lancer : cliquer sur Poké Ball quand tu en as une ne te coûte plus rien, elle part toute seule. Puis des Super Bonbons, des pierres, un Ticket Safari qui t'ouvre le parc sans payer, et tout au bout une Master Ball, à peu près une toutes les trois mille apparitions.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-22T08:01:47.208012Z",
-      "branch": "claude/sleepy-cerf-hxgk8t"
-    },
-    {
-      "type": "feature",
-      "name": "Les objets qui font évoluer",
-      "description": "Trois Super Bonbons tiennent lieu d'un exemplaire manquant : avec deux Pikachu et trois bonbons, tu obtiens un Pikachu et un Raichu. Les Pierres Feu, Foudre et Eau font mieux pour Évoli — un exemplaire de moins ET pas un point à payer — et chacune impose sa forme, ce qui en fait le seul moyen de choisir son Évoli sans payer le supplément. /evolution ne te propose que les chemins que tu peux réellement emprunter.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-22T08:21:22.840989Z",
-      "branch": "claude/sleepy-cerf-hxgk8t"
-    },
-    {
-      "type": "feature",
-      "name": "Les objets qui tombent par terre",
-      "description": "Une fois sur cinq, un Pokémon qui tenait un objet le lâche en partant au lieu de le céder à celui qui l'attrape — et il le lâche aussi quand il s'enfuit. L'objet reste par terre avec un bouton « Ramasser », au plus rapide : c'est la seule récompense qui ne demande pas d'avoir gagné la course, et la seule chose qu'une apparition perdue peut encore donner.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-22T08:38:54.814366Z",
-      "branch": "claude/sleepy-cerf-hxgk8t"
-    },
-    {
-      "type": "enhancement",
-      "name": "Les annonces de capture parlent en balls",
-      "description": "« Ils ont payé pour rien » devient « Participants », et chacun y apparaît avec les balls qu'il a lancées plutôt qu'avec un total en points. Le journal des lancers affiche lui aussi les balls par leur icône, et la capture s'annonce désormais par la ball qui l'a emportée, vainqueur nommé dans la même ligne.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-22T08:38:54.814411Z",
-      "branch": "claude/sleepy-cerf-hxgk8t"
-    }
-  ]
+  "pending": []
 }
