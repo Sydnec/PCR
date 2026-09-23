@@ -1481,5 +1481,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "fix",
+      "name": "Lancers Discord aussi rapides que sur le site",
+      "description": "Sur Discord, une ball part dès le clic : face à un lancer du site, c'est désormais le premier arrivé qui l'emporte.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-23T19:30:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    }
+  ]
 }
