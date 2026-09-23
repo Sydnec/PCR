@@ -117,7 +117,7 @@ ou par un groupe `{ "speciesId": 25, "isShiny": false, "sex": "F" }` — les deu
 | Route | Corps | Réponse |
 |---|---|---|
 | `POST /api/me/sell` | Pokémon, `quantity` pour un groupe | `{ sold, unit, points }` |
-| `POST /api/me/evolve` | Pokémon, `targetId?`, `helper?` | `{ pokemon, duplicatesSpent, pointsSpent, helper }` |
+| `POST /api/me/evolve` | Pokémon, `targetId?`, `helper?` (clé d'un objet, ou `metamorph`) | `{ pokemon, duplicatesSpent, dittosSpent, pointsSpent, helper }` |
 | `POST /api/me/eggs` | `{ parent1, parent2 }` | `{ egg }` |
 | `POST /api/spawn/throw` | `{ spawnId, ball, requireItem? }` | `{ status, message, final, remaining, pokemon }` |
 | `POST /api/drops/:id/claim` | `{}` | `{ item }` — `409` si quelqu'un a été plus rapide |

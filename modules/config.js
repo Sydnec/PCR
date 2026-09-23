@@ -121,6 +121,9 @@ const POKEMON = {
     2: { duplicates: 5, points: 500 },
     3: { duplicates: 10, points: 2000 },
     branchChoicePoints: 1000,
+    // Métamorph, joker des fusions : autant de Métamorph de la même variante
+    // tiennent lieu d'un exemplaire manquant.
+    dittosPerCopy: 1,
   },
   trade: { expiryHours: 24 },
   // Les œufs, seule porte vers les bébés. Un couple de parents — un mâle et une
@@ -527,6 +530,8 @@ const BOUNDS = {
   "pokemon.pc.maxBoxes": { min: 1, max: 200 },
   "pokemon.pc.boxNameLength": { min: 1, max: 40 },
   "pokemon.pc.nicknameLength": { min: 1, max: 24 },
+  // À 0, Métamorph comblerait une fusion sans être consommé.
+  "pokemon.evolution.dittosPerCopy": { min: 1 },
   // À 0, chaque onglet ouvert relirait l'apparition en boucle.
   "web.spawnRefreshSeconds": { min: 2, max: 60 },
   "web.accessDenialCacheSeconds": { min: 0, max: 3600 },

@@ -7,12 +7,14 @@ import {
 } from "discord.js";
 import { handleException } from "../../modules/utils.js";
 import {
+  DITTO_HELPER,
   describeEvolution,
+  dittoFill,
   getIndividuals,
   groupIndividuals,
   resolveSelector,
 } from "../../modules/pokemon/collection.js";
-import { embedColor, getSpecies, spriteUrl } from "../../modules/pokemon/data.js";
+import { dittoSpecies, embedColor, getSpecies, spriteUrl } from "../../modules/pokemon/data.js";
 import { getInventory, getItem } from "../../modules/pokemon/items.js";
 import {
   displayName,
@@ -52,6 +54,17 @@ const canPay = (plan, stock) =>
   stock.total >= plan.required &&
   (plan.duplicates > 0 ? stock.spare >= 1 : stock.count >= 1);
 
+// Métamorph en renfort, ou null : seulement quand les doublons ne suffisent
+// pas, que l'espèce a de quoi évoluer tout en gardant son entrée, et qu'il reste
+// un Métamorph après la fusion. `dittoFill` dit combien il en faut — la même
+// fonction qu'evolve, qui tranche à la fin.
+function dittoPath(plan, stock) {
+  if (plan.error || canPay(plan, stock) || stock.spare < 1) return null;
+  const fill = dittoFill(plan, stock.total);
+  if (!fill.dittos || stock.dittos < fill.dittos + 1) return null;
+  return fill;
+}
+
 // Toutes les façons de faire évoluer ce groupe, aides comprises. Chacune porte
 // son propre plan : une pierre ne coûte pas ce que coûte un bonbon, et le
 // nombre d'exemplaires requis change avec elle.
@@ -69,12 +82,26 @@ function evolutionPaths(speciesId, stock, helpers) {
       paths.push({ plan, helper });
     }
   }
+  const fill = dittoPath(base, stock);
+  if (fill) paths.push({ plan: base, helper: null, ditto: fill });
   return paths;
 }
 
+// Les Métamorph du dresseur par variante, comptés une fois pour tous les
+// groupes : un shiny ne comble qu'un shiny.
+function dittoCounts(rows) {
+  const metamorph = dittoSpecies();
+  const counts = { normal: 0, shiny: 0 };
+  for (const row of metamorph ? rows : []) {
+    if (row.species_id === metamorph.id) counts[row.is_shiny ? "shiny" : "normal"] += 1;
+  }
+  return counts;
+}
+
 // Le stock d'un groupe : l'entrée entière et, dedans, le groupe du sexe choisi
-// — ou le seul individu désigné par son identifiant.
-function stockOf(rows, speciesId, isShiny, sex, pokemonId = null) {
+// — ou le seul individu désigné par son identifiant —, plus les Métamorph de
+// la même variante, qui peuvent combler ce qui manque.
+function stockOf(rows, dittos, speciesId, isShiny, sex, pokemonId = null) {
   const entry = rows.filter(
     (row) => row.species_id === speciesId && Boolean(row.is_shiny) === Boolean(isShiny)
   );
@@ -85,6 +112,7 @@ function stockOf(rows, speciesId, isShiny, sex, pokemonId = null) {
     total: entry.length,
     count: group.length,
     spare: Math.min(group.length, Math.max(0, entry.length - 1)),
+    dittos: dittos[isShiny ? "shiny" : "normal"],
   };
 }
 
@@ -100,8 +128,9 @@ function listEvolvable(userId, cb) {
       if (err) return cb(err, [], []);
       const evolvable = [];
       const incomplete = [];
+      const dittos = dittoCounts(rows);
       for (const group of groupIndividuals(rows, { bySex: true })) {
-        const stock = stockOf(rows, group.speciesId, group.isShiny, group.sex);
+        const stock = stockOf(rows, dittos, group.speciesId, group.isShiny, group.sex);
         const paths = evolutionPaths(group.speciesId, stock, helpers);
         if (paths.length) {
           evolvable.push({ ...group, stock, paths, plan: paths[0].plan });
@@ -238,7 +267,8 @@ export default {
         // écran avec un exemplaire de moins que le minimum.
         getIndividuals(interaction.user.id, (err, individuals) => {
         if (err) handleException("Lecture de la collection pour /pk evolution :", err);
-        const stock = stockOf(err ? [] : individuals, speciesId, isShiny, sex, pokemonId);
+        const lus = err ? [] : individuals;
+        const stock = stockOf(lus, dittoCounts(lus), speciesId, isShiny, sex, pokemonId);
         const owned = stock.total;
 
         const species = plan.species;
@@ -336,15 +366,65 @@ export default {
           });
         }
 
+        // Métamorph, dans sa propre rangée : il ne remplace que des
+        // exemplaires, donc le choix de la forme reste possible avec lui,
+        // contrairement à une pierre qui impose la sienne.
+        const fill = dittoPath(plan, stock);
+        if (fill) {
+          const metamorph = dittoSpecies();
+          const nom = `${metamorph.name}${isShiny ? " shiny" : ""}`;
+          const joker = new ActionRowBuilder();
+          const bouton = (mode, label) =>
+            new ButtonBuilder()
+              .setCustomId(`poke_evo|${speciesId}|${suffix}|${mode}|${DITTO_HELPER}`)
+              .setLabel(label)
+              .setStyle(ButtonStyle.Secondary);
+          if (plan.branching) {
+            joker.addComponents(
+              bouton("random", `${fill.dittos}× ${metamorph.name} · hasard (${plan.points} pts)`),
+              bouton(
+                "choose",
+                `${fill.dittos}× ${metamorph.name} · choisir ` +
+                  `(${describeEvolution(speciesId, plan.targets[0].id).points} pts)`
+              )
+            );
+          } else {
+            joker.addComponents(
+              bouton("random", `${fill.dittos}× ${metamorph.name} (${plan.points} pts)`)
+            );
+          }
+          rows.push(joker);
+          embed.addFields({
+            name: metamorph.name,
+            value:
+              `**${fill.dittos}** ${nom} ${fill.dittos > 1 ? "tiennent" : "tient"} lieu ` +
+              `de **${fill.copies}** exemplaire` +
+              `${fill.copies > 1 ? "s" : ""} manquant${fill.copies > 1 ? "s" : ""}. ` +
+              `Tu en as **${stock.dittos}**, un reste toujours.`,
+            inline: false,
+          });
+        }
+
         // Aucun chemin : on le dit avec le chiffre qui manque, plutôt que
         // d'afficher un embed orné de boutons qui refuseraient tous.
+        //
+        // Métamorph n'est cité que s'il pourrait servir : il faut deux
+        // exemplaires de l'espèce, celui qui évolue et celui qui garde l'entrée.
+        // Ses chiffres sont ceux de dittoFill, comme pour le bouton.
         if (!rows.length) {
+          const metamorph = dittoSpecies();
+          const joker = metamorph && stock.spare >= 1 ? dittoFill(plan, stock.total) : null;
           return interaction
             .editReply({
               content:
                 `❌ Il te faut **${plan.required}** exemplaires de **${species.name}**` +
                 `${isShiny ? " ✨" : ""} pour cette fusion, tu en as **${owned}**.\n` +
-                `Trois 🍬 Super Bonbons peuvent tenir lieu d'un exemplaire manquant.`,
+                `Trois 🍬 Super Bonbons peuvent tenir lieu d'un exemplaire manquant.` +
+                (joker?.dittos
+                  ? `\nOu **${joker.dittos + 1}** ${metamorph.name}${isShiny ? " shiny" : ""} ` +
+                    `(${joker.dittos} consommé${joker.dittos > 1 ? "s" : ""} + 1 conservé) ` +
+                    `pour combler ce qui manque, tu en as **${stock.dittos}**.`
+                  : ""),
             })
             .catch(() => {});
         }

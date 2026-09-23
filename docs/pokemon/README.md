@@ -29,6 +29,11 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
   de l'individu qui évolue ; il le garde, avec sa ball. Les lignées à embranchement (Évoli) peuvent
   évoluer au hasard, ou vers une cible choisie pour plus cher. La commande ne propose que les
   chemins réellement praticables, objets d'évolution compris.
+  **Métamorph sert de joker** : quand il manque des exemplaires, un bouton propose de les
+  remplacer par des Métamorph de la même variante (un shiny pour un shiny), un par exemplaire
+  (`pokemon.evolution.dittosPerCopy`). Les vrais doublons partent d'abord, celui qui évolue et
+  celui qui garde l'entrée restent de vrais exemplaires, et il reste toujours un Métamorph. Il
+  n'est jamais pris sans qu'on le demande, et le choix de la forme (Évoli) reste possible avec lui.
 - `/pk echange <membre> <je_donne> <je_recois>` : échange entre dresseurs, par espèce, sexe et
   fertilité. **Seuls les doublons s'échangent** : contrairement aux jeux, avoir capturé un Pokémon
   ne suffit pas à le garder au Pokédex, il faut le posséder. Il en reste toujours au moins un de
