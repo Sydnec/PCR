@@ -13,6 +13,7 @@
 //   (session.js), en cookie HttpOnly et SameSite=Lax ;
 // - seuls les membres du serveur (GUILD_ID) qui portent le rôle par défaut
 //   (DEFAULT_ROLE_ID) entrent, et c'est revérifié à chaque requête ;
+// - l'administration du site (routes `admin`) n'est ouverte qu'à SYDNEC_USER_ID ;
 // - une écriture exige un corps JSON et, s'il est fourni, un en-tête Origin égal
 //   à WEB_BASE_URL : un formulaire d'un autre site ne peut produire ni l'un ni
 //   l'autre ;
@@ -44,6 +45,12 @@ let listening = false;
 export const siteUrl = () => (listening ? baseUrl() : null);
 const secureCookies = () => baseUrl().startsWith("https://");
 const clearSession = () => serializeCookie(SESSION_COOKIE, "", { maxAgeSeconds: 0, secure: secureCookies() });
+
+// L'administrateur du site : SYDNEC_USER_ID, et lui seul. Recalculé à chaque
+// requête plutôt que gravé dans le jeton : changer la variable prend effet
+// aussitôt. Sans elle, personne.
+const isSiteAdmin = (userId) =>
+  Boolean(process.env.SYDNEC_USER_ID) && userId === process.env.SYDNEC_USER_ID;
 
 // Les chemins déclarés dans api.js (« /api/users/:userId/box ») deviennent des
 // expressions régulières une fois pour toutes, avec leurs paramètres nommés.
@@ -244,7 +251,9 @@ async function handle(req, res, bot) {
   }
 
   const session = verifyToken(parseCookies(req.headers.cookie)[SESSION_COOKIE]);
-  const user = session ? { id: session.id, username: session.username, avatar: session.avatar } : null;
+  const user = session
+    ? { id: session.id, username: session.username, avatar: session.avatar, admin: isSiteAdmin(session.id) }
+    : null;
   if (route.auth && !user) throw new HttpError(401, "Connexion requise.");
   // La session dit qui l'on est, pas qu'on a encore le droit d'entrer : un
   // membre parti ou privé du rôle perd l'accès tout de suite, sans attendre
@@ -262,6 +271,7 @@ async function handle(req, res, bot) {
       return send(res, 401, { error: "Tu n'as plus accès au site." }, { "Set-Cookie": clearSession() });
     }
   }
+  if (route.admin && !user?.admin) throw new HttpError(403, "Réservé à l'administrateur du site.");
 
   let body = {};
   if (route.write) {

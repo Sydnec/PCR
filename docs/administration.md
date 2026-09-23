@@ -30,7 +30,7 @@
     d'un total qui bouge à chaque ligne ajoutée, et la table se construit avec les **mêmes**
     fonctions que les tirages : elle ne peut pas diverger de ce qu'elle décrit.
   - `/admin config-voir [cle]` : valeur courante face à la valeur par défaut. Sans clé, le fichier
-    entier.
+    entier. Le [site](site.md#administration) offre les deux en arbre, pour `SYDNEC_USER_ID`.
   - `/admin potcommun [simulation]` : déclenche un pot commun hors calendrier, ou simule le
     prochain sans toucher aux soldes. L'échéance hebdomadaire n'en est pas décalée.
   - `/admin purge [lien] [nombre]` : suppression de messages en masse.

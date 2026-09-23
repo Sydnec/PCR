@@ -1458,6 +1458,16 @@
       "commit": "pending",
       "timestamp": "2026-09-23T18:00:00.000Z",
       "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "feature",
+      "name": "Administration de la configuration sur le site",
+      "description": "Un onglet Admin, réservé à l'administrateur, affiche la configuration du bot en arbre et permet de la modifier.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-23T19:00:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
     }
   ]
 }

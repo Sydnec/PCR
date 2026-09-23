@@ -71,7 +71,8 @@ import {
   getSpawnPause,
   recentThrows,
 } from "../pokemon/spawn.js";
-import { getConfig } from "../config.js";
+import { configOverrideStatus, configTree, getConfig, writeConfigValue } from "../config.js";
+import { log } from "../utils.js";
 
 // Les fonctions du jeu sont à callbacks ; les routes, en promesses.
 const promise = (fn) =>
@@ -852,6 +853,48 @@ export const routes = [
       ]);
       const result = await promise((cb) => layEgg(ctx.user.id, first, second, cb));
       return outcome(result, ({ egg }) => ({ egg: eggJson(egg) }));
+    },
+  },
+
+  // ---------------------- Administration ----------------------
+
+  // La configuration du bot en arbre, pour SYDNEC_USER_ID seulement (garde
+  // `admin` de server.js). `status` signale une surcharge illisible, comme
+  // /admin config-voir.
+  {
+    method: "GET",
+    path: "/api/admin/config",
+    auth: true,
+    admin: true,
+    handler: async () => ({ status: configOverrideStatus(), tree: configTree() }),
+  },
+
+  // Modifier un réglage : writeConfigValue, comme /admin config, avec les mêmes
+  // refus. `value` est la saisie brute (une liste : séparée par des virgules).
+  {
+    method: "POST",
+    path: "/api/admin/config",
+    auth: true,
+    write: true,
+    admin: true,
+    handler: async (ctx) => {
+      const { path, value } = ctx.body;
+      if (typeof path !== "string" || !["string", "number", "boolean"].includes(typeof value)) {
+        throw new HttpError(400, "Réglage invalide.");
+      }
+      // /admin config exige une valeur ; vide, un nombre deviendrait 0.
+      if (String(value).trim() === "") throw new HttpError(400, "Valeur vide.");
+      const result = writeConfigValue(path, value);
+      if (!result.ok) {
+        // Une écriture qui bute sur une surcharge illisible en nomme la cause.
+        const statut = configOverrideStatus();
+        throw new HttpError(409, statut.ok ? result.reason : `${result.reason}\n${statut.reason}`);
+      }
+      log(
+        `Web : config par ${ctx.user.username} : ${result.path} ` +
+          `${JSON.stringify(result.before)} → ${JSON.stringify(result.after)}`
+      );
+      return { path: result.path, before: result.before, after: result.after };
     },
   },
 ];

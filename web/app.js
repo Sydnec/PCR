@@ -11,6 +11,7 @@ import * as boite from "./views/boite.js";
 import * as pokedex from "./views/pokedex.js";
 import * as sac from "./views/sac.js";
 import * as oeuf from "./views/oeuf.js";
+import * as admin from "./views/admin.js";
 
 // L'accueil est la capture : c'est là que le jeu se passe en direct. Le parc
 // safari s'ouvre depuis elle, sans onglet à lui.
@@ -22,6 +23,7 @@ const ROUTES = {
   "/pokedex": pokedex,
   "/sac": sac,
   "/oeuf": oeuf,
+  "/admin": admin,
 };
 
 // Les raisons qu'un échec de connexion laisse dans l'adresse (?connexion=…).
@@ -85,6 +87,8 @@ async function logout() {
 function renderAccount() {
   const account = document.getElementById("account");
   document.getElementById("nav").hidden = !ctx.me;
+  // Le lien n'est qu'un confort : l'API refuse l'administration à tout autre.
+  document.getElementById("nav-admin").hidden = !ctx.me?.user.admin;
   if (!ctx.me) return account.replaceChildren();
   const { user, balance, balls } = ctx.me;
   account.replaceChildren(

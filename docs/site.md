@@ -68,6 +68,15 @@ Un Pokémon garde sa place et son surnom quand il évolue. Reçu en échange, il
 prend la première case libre ; une capture ou une éclosion aussi. Le Pokédex ouvre la boîte sur
 une espèce (`/boite?species=25`) et en surligne les exemplaires.
 
+## Administration
+
+Pour `SYDNEC_USER_ID` seulement, un onglet **Admin** montre la configuration du bot en arbre : les
+branches se déplient, chaque réglage montre sa valeur courante et, s'il en a changé, sa valeur par
+défaut. Un filtre cherche dans les chemins (`shiny`, `price`…), et « Modifiés seulement » ne garde
+que ce qui s'écarte des défauts. Un réglage s'enregistre par le même chemin que `/admin config`,
+avec les mêmes refus (type, bornes, clé inconnue), et s'applique aussitôt. L'API vérifie
+l'identifiant à chaque requête : le lien masqué n'est qu'un confort.
+
 ## Fonctionnement
 
 - Des fichiers statiques dans `web/`, sans compilation ni dépendance : `git pull` le met à jour en
