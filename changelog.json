@@ -1,7 +1,24 @@
 {
-  "version": "1.14.8",
-  "lastUpdated": "2026-09-23T15:11:59.108Z",
+  "version": "1.14.9",
+  "lastUpdated": "2026-09-23T16:49:24.346Z",
   "releases": [
+    {
+      "version": "1.14.9",
+      "date": "2026-09-23",
+      "title": "Release 1.14.9",
+      "features": [
+        {
+          "type": "fix",
+          "name": "Lancers Discord aussi rapides que sur le site",
+          "description": "Sur Discord, une ball part dès le clic : face à un lancer du site, c'est désormais le premier arrivé qui l'emporte.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-23T19:30:00.000Z",
+          "branch": "claude/adoring-darwin-4o541o"
+        }
+      ]
+    },
     {
       "version": "1.14.8",
       "date": "2026-09-23",
@@ -1481,16 +1498,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "fix",
-      "name": "Lancers Discord aussi rapides que sur le site",
-      "description": "Sur Discord, une ball part dès le clic : face à un lancer du site, c'est désormais le premier arrivé qui l'emporte.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-23T19:30:00.000Z",
-      "branch": "claude/adoring-darwin-4o541o"
-    }
-  ]
+  "pending": []
 }
