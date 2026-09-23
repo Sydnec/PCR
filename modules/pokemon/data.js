@@ -65,7 +65,7 @@ export const isAvailable = (species, generation = activeGeneration()) =>
 
 // Métamorph, retrouvé par son identifiant de PokéAPI plutôt que par un numéro
 // écrit ici : le dataset est la seule source. Il remplace un parent d'œuf et
-// comble les exemplaires manquants d'une fusion.
+// comble les sacrifices qui manquent à une évolution.
 export const isDitto = (species) => species?.slug === "ditto";
 
 // Les espèces jouables, dans l'ordre du Pokédex. C'est la porte de tout ce qui

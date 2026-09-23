@@ -20,8 +20,8 @@ en donne le lien, en réponse privée (ou dit que le site n'est pas en ligne, ou
 
 Le site ne fait rien que Discord ne fasse pas : tout reste faisable avec `/pk`, sauf le rangement
 du PC (places, noms des boîtes, surnoms), réservé au site parce qu'il ne change rien au jeu. Il ne
-gère pas encore les échanges, la loterie ni les objets d'aide aux fusions (bonbons, pierres), qui
-se font sur Discord.
+gère pas encore les échanges, la loterie ni les aides aux évolutions (bonbons, pierres, Métamorph),
+qui se font sur Discord.
 
 ## Capture
 

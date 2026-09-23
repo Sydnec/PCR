@@ -29,7 +29,7 @@ const ORIGINS = {
   safari: "Capturé au parc safari",
   echange: "Reçu en échange",
   oeuf: "Éclos d'un œuf",
-  evolution: "Né d'une fusion",
+  evolution: "Obtenu par évolution",
   migration: "Arrivé avant le suivi des balls",
 };
 
@@ -599,10 +599,10 @@ function evolveAction(ctx, item, species, done) {
         `/api/species/${species.id}/evolution${targetId ? `?targetId=${targetId}` : ""}`
       );
       const into = plan.target ? ctx.species.get(plan.target)?.name : "une forme tirée au hasard";
-      const others = plan.duplicates - 1;
+      const others = plan.sacrifices;
       cost.textContent =
-        `Devient ${into}. Il faut ${plan.required} ${species.name}${item.shiny ? " shiny" : ""} : ` +
-        `celui-ci évolue, ${others > 0 ? `${others} autre${others > 1 ? "s partent" : " part"}, ` : ""}` +
+        `Devient ${into}. Il faut ${plan.required} ${species.name}, shiny ou non : ` +
+        `celui-ci évolue, ${others > 0 ? `${others} autre${others > 1 ? "s sont sacrifiés" : " est sacrifié"}, ` : ""}` +
         `et un reste. Coût : ${fmt(plan.points)} pts.`;
       button.disabled = false;
     } catch (error) {

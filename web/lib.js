@@ -146,13 +146,18 @@ export function pokemonName(species, shiny = false, sex = null, nickname = null)
 
 export const dexNumber = (species) => `n° ${String(species.id).padStart(3, "0")}`;
 
-// « Est-ce que je l'ai déjà ? » La variante qui compte est celle qu'on a sous
-// les yeux : un shiny est une entrée de Pokédex à part.
+// « Est-ce que je l'ai déjà ? » D'abord la variante qu'on a sous les yeux, puis
+// l'espèce : une entrée de Pokédex est une espèce, donc un normal qu'on a déjà
+// en shiny n'est pas nouveau, alors qu'un premier shiny se signale toujours.
 export function ownedMark(owned, shiny = false) {
   const count = shiny ? owned.shiny : owned.normal;
-  return count
-    ? h("span", { class: "owned" }, icon("check"), ` Déjà dans ta boîte (×${fmt(count)})`)
-    : h("span", { class: "pill-new" }, shiny ? "Nouveau shiny" : "Nouveau");
+  if (count) {
+    return h("span", { class: "owned" }, icon("check"), ` Déjà dans ta boîte (×${fmt(count)})`);
+  }
+  if (!shiny && owned.shiny) {
+    return h("span", { class: "owned" }, icon("check"), " Déjà dans ta boîte (en shiny)");
+  }
+  return h("span", { class: "pill-new" }, shiny ? "Nouveau shiny" : "Nouveau");
 }
 
 // Comment on obtient une espèce qu'on ne croise pas dans la nature : les mêmes
@@ -166,7 +171,7 @@ export function obtentionMark(obtention) {
   return entry ? icon(entry[0], { label: entry[1] }) : null;
 }
 export const OBTENTION_LEGENDS = {
-  evolution: "🔒 Introuvable à l'état sauvage : par fusion de doublons, ou par échange.",
+  evolution: "🔒 Introuvable à l'état sauvage : par évolution, ou par échange.",
   egg: "🥚 Ne sort que d'un œuf : /pk oeuf pondre, avec un couple de parents.",
 };
 

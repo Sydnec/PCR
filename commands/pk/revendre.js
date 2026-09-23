@@ -1,19 +1,11 @@
 import { MessageFlags } from "discord.js";
 import { handleException } from "../../modules/utils.js";
 import { getPokemonConfig } from "../../modules/pokemon/config.js";
-import {
-  getIndividuals,
-  groupIndividuals,
-  resolveSelector,
-} from "../../modules/pokemon/collection.js";
+import { getIndividuals, resolveIndividual } from "../../modules/pokemon/collection.js";
 import { getSpecies } from "../../modules/pokemon/data.js";
 import { getInventory, getItem, itemSellValue } from "../../modules/pokemon/items.js";
 import { pokemonSellValue, sellItem, sellPokemon } from "../../modules/pokemon/sell.js";
-import {
-  displayName,
-  individualChoices,
-  wantsIndividual,
-} from "../../modules/pokemon/embeds.js";
+import { displayName, individualChoices } from "../../modules/pokemon/embeds.js";
 
 // Revendre ce qu'on a en trop. Deux sous-commandes parce que ce sont deux
 // marchandises, mais un seul verbe : le dresseur n'a pas à savoir que les
@@ -26,21 +18,36 @@ const HINT_VALUE = "—";
 
 const points = (value) => value.toLocaleString("fr-FR");
 
-// Les doublons revendables, par espèce et par sexe : tout sauf l'individu
-// qu'on garde de chaque entrée, puisque celui-là ne se vend jamais.
-function listSellablePokemon(userId, cb) {
+// Un individu qui se revend : son espèce et sa variante ont un prix.
+const sellable = (row) => pokemonSellValue(getSpecies(row.species_id), row.is_shiny) > 0;
+
+// Les espèces dont on a des Pokémon à revendre : tout sauf un individu de
+// chaque espèce, shiny ou non, puisque le dernier ne se vend jamais. Le prix
+// affiché est celui d'un normal — ce que vend la commande sans individu —, ou
+// celui d'un shiny quand il n'y a que des shiny à vendre.
+function listSellableSpecies(userId, cb) {
   getIndividuals(userId, (err, rows) => {
     if (err) return cb(err, []);
-    const sellable = [];
-    for (const group of groupIndividuals(rows, { bySex: true })) {
-      const species = getSpecies(group.speciesId);
-      if (!species || group.spare < 1) continue;
-      const unit = pokemonSellValue(species, group.isShiny);
-      if (unit > 0) sellable.push({ ...group, species, unit });
+    const bySpecies = new Map();
+    for (const row of rows) {
+      const entry = bySpecies.get(row.species_id) ?? { total: 0, sellable: 0, normals: 0 };
+      entry.total++;
+      if (sellable(row)) {
+        entry.sellable++;
+        if (!row.is_shiny) entry.normals++;
+      }
+      bySpecies.set(row.species_id, entry);
+    }
+    const list = [];
+    for (const [speciesId, { total, sellable: count, normals }] of bySpecies) {
+      const species = getSpecies(speciesId);
+      const spare = Math.min(count, total - 1);
+      if (!species || spare < 1) continue;
+      list.push({ species, spare, unit: pokemonSellValue(species, normals === 0) });
     }
     // Les plus chers d'abord : c'est ce qu'on cherche en ouvrant la liste.
-    sellable.sort((a, b) => b.unit * b.spare - a.unit * a.spare);
-    cb(null, sellable);
+    list.sort((a, b) => b.unit * b.spare - a.unit * a.spare);
+    cb(null, list);
   });
 }
 
@@ -75,18 +82,25 @@ export default {
       .addSubcommand((sub) =>
         sub
           .setName("pokemon")
-          .setDescription("Revend des doublons — un exemplaire est toujours conservé")
+          .setDescription("Revend des Pokémon — un de chaque espèce est toujours conservé")
           .addStringOption((option) =>
             option
-              .setName("pokemon")
-              .setDescription("Le doublon à revendre (ou #numéro d'un Pokémon précis)")
+              .setName("espece")
+              .setDescription("L'espèce à revendre")
               .setRequired(true)
+              .setAutocomplete(true)
+          )
+          .addStringOption((option) =>
+            option
+              .setName("individu")
+              .setDescription("Un Pokémon précis — sans lui, les normaux les moins précieux partent")
+              .setRequired(false)
               .setAutocomplete(true)
           )
           .addIntegerOption((option) =>
             option
               .setName("quantite")
-              .setDescription("Combien en revendre (1 par défaut)")
+              .setDescription("Combien en revendre, sans individu précis (1 par défaut)")
               .setRequired(false)
               .setMinValue(1)
           )
@@ -132,23 +146,29 @@ export default {
       });
     }
 
-    // « #123 » : un individu précis, pourvu qu'il se revende et ne soit pas le
-    // dernier de son espèce.
-    if (wantsIndividual(query)) {
+    // Second temps : un individu de l'espèce choisie, pourvu qu'il se revende
+    // et ne soit pas le dernier de son espèce.
+    if (interaction.options.getFocused(true).name === "individu") {
+      const species = getSpecies(Number(interaction.options.get("espece")?.value));
+      if (!species) {
+        return interaction
+          .respond([{ name: "⚠️ Choisis d'abord l'espèce dans l'option « espece »", value: HINT_VALUE }])
+          .catch(() => {});
+      }
       return getIndividuals(interaction.user.id, (err, rows) => {
         if (err) return interaction.respond([]).catch(() => {});
         respond(
           interaction,
           individualChoices(
-            rows,
+            rows.filter((row) => row.species_id === species.id),
             query,
-            (row) => !row.last && pokemonSellValue(getSpecies(row.species_id), row.is_shiny) > 0
+            (row) => !row.last && sellable(row)
           )
         );
       });
     }
 
-    listSellablePokemon(interaction.user.id, (err, rows) => {
+    listSellableSpecies(interaction.user.id, (err, rows) => {
       if (err) {
         handleException("Autocomplétion de revente :", err);
         return interaction.respond([]).catch(() => {});
@@ -159,10 +179,8 @@ export default {
           .map((row) => ({
             // Le nombre de doublons ET le prix unitaire : ce sont les deux
             // chiffres dont on a besoin pour choisir la quantité juste après.
-            name:
-              `${displayName(row.species, row.isShiny, row.sex)} — ` +
-              `${row.spare} en trop, ${points(row.unit)} pts pièce`,
-            value: row.key,
+            name: `${row.species.name} — ${row.spare} en trop, ${points(row.unit)} pts pièce`,
+            value: String(row.species.id),
           }))
           .filter((choice) => choice.name.toLowerCase().includes(query))
       );
@@ -180,9 +198,10 @@ export default {
 
       const quantity = interaction.options.getInteger("quantite") ?? 1;
       const isItem = interaction.options.getSubcommand() === "objet";
-      const raw = interaction.options.getString(isItem ? "objet" : "pokemon");
+      const raw = interaction.options.getString(isItem ? "objet" : "espece");
+      const individual = isItem ? null : interaction.options.getString("individu");
 
-      if (raw === HINT_VALUE) {
+      if (raw === HINT_VALUE || individual === HINT_VALUE) {
         return interaction.reply({
           content: "❌ Choisis une proposition dans la liste d'autocomplétion.",
           flags: MessageFlags.Ephemeral,
@@ -217,14 +236,20 @@ export default {
 
       if (isItem) return sellItem(interaction.user.id, raw, quantity, done);
 
-      resolveSelector(interaction.user.id, raw, (err, selector) => {
-        if (err) return done(err);
-        if (selector.error) return done(null, { ok: false, reason: selector.error });
-        if (!getSpecies(selector.speciesId)) {
+      // Sans individu précis, les normaux de l'espèce, les moins précieux
+      // d'abord : un shiny se choisit, il ne part jamais dans le lot.
+      if (!individual) {
+        const species = getSpecies(Number(raw));
+        if (!species) {
           return interaction
             .editReply({ content: "❌ Choisis une proposition dans la liste d'autocomplétion." })
             .catch(() => {});
         }
+        return sellPokemon(interaction.user.id, { speciesId: species.id, isShiny: false }, quantity, done);
+      }
+      resolveIndividual(interaction.user.id, raw, individual, (err, selector) => {
+        if (err) return done(err);
+        if (selector.error) return done(null, { ok: false, reason: selector.error });
         sellPokemon(interaction.user.id, selector, quantity, done);
       });
     } catch (error) {

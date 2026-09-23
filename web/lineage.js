@@ -10,9 +10,10 @@ import { OBTENTION_LEGENDS, api, fmt, h, obtentionMark, richText } from "./lib.j
 export const loadLineage = (speciesId) =>
   api(`/api/me/lineage/${speciesId}`).then((data) => data.lineage);
 
-// `shiny` : la variante regardée. Sur un shiny, « je l'ai » veut dire « je l'ai
-// en shiny », un shiny étant une entrée de Pokédex à part ; les deux compteurs
-// restent affichés. `currentId` : le maillon consulté, mis en avant.
+// `shiny` : la variante regardée. Une entrée de Pokédex est une espèce, shiny
+// ou non : « je l'ai » veut dire qu'on en a un — sauf sur un shiny, où il veut
+// dire « je l'ai en shiny », puisqu'un premier shiny se signale. Les deux
+// compteurs restent affichés. `currentId` : le maillon consulté, mis en avant.
 export function lineageView(ctx, lineage, { currentId = null, shiny = false } = {}) {
   const stages = new Map();
   for (const link of lineage) {
@@ -51,7 +52,7 @@ export function lineageView(ctx, lineage, { currentId = null, shiny = false } = 
 
 function linkView(link, { current, shiny }) {
   const { normal, shiny: shinies } = link.owned;
-  const has = shiny ? shinies > 0 : normal > 0;
+  const has = shiny ? shinies > 0 : normal + shinies > 0;
   const counts = [
     normal ? `×${fmt(normal)}` : null,
     shinies ? [icon("sparkle", { label: "Shiny" }), `×${fmt(shinies)}`] : null,

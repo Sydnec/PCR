@@ -9,27 +9,26 @@ import { handleException } from "../../modules/utils.js";
 import {
   DITTO_HELPER,
   describeEvolution,
-  dittoFill,
+  evolutionShortage,
   getIndividuals,
-  groupIndividuals,
-  resolveSelector,
+  resolveIndividual,
+  sacrificeFill,
 } from "../../modules/pokemon/collection.js";
 import { dittoSpecies, embedColor, getSpecies, spriteUrl } from "../../modules/pokemon/data.js";
-import { getInventory, getItem } from "../../modules/pokemon/items.js";
-import {
-  displayName,
-  individualChoices,
-  wantsIndividual,
-} from "../../modules/pokemon/embeds.js";
+import { getInventory, getItem, getItems } from "../../modules/pokemon/items.js";
+import { displayName, individualChoices } from "../../modules/pokemon/embeds.js";
 
 // Discord n'autorise pas de liste vide accompagnée d'un message : une
 // proposition inerte est le seul moyen d'expliquer pourquoi il n'y a rien à
-// choisir. Sa valeur ne correspond à aucune espèce, donc execute() la refuse.
-const HINT_VALUE = "0:0";
+// choisir. Sa valeur ne désigne ni une espèce ni un individu, donc execute()
+// la refuse.
+const HINT_VALUE = "—";
+const hint = (interaction, name) =>
+  interaction.respond([{ name, value: HINT_VALUE }]).catch(() => {});
 
 // Les objets d'évolution que ce dresseur a en assez grand nombre pour s'en
 // servir. Trois bonbons ou rien : deux ne remplacent pas deux tiers d'un
-// Pikachu.
+// sacrifice.
 function usableHelpers(userId, cb) {
   getInventory(userId, (err, rows) => {
     if (err) return cb(err, []);
@@ -44,30 +43,25 @@ function usableHelpers(userId, cb) {
   });
 }
 
-// Ce qu'un groupe (espèce, variante, sexe) permet de payer. L'entrée entière
-// fournit les doublons, quel que soit leur sexe ; le groupe fournit l'individu
-// qui évolue. Le seul interdit est d'emmener le dernier de l'entrée, et
-// `required` compte déjà l'exemplaire qui reste.
-// `stock` : { total, count, spare } — l'entrée, puis le groupe.
-const canPay = (plan, stock) =>
-  !plan.error &&
-  stock.total >= plan.required &&
-  (plan.duplicates > 0 ? stock.spare >= 1 : stock.count >= 1);
+// Ce qu'une espèce permet de payer. `stock.total` compte ses individus, shiny
+// compris et celui qui évolue compris : une entrée de Pokédex est une espèce,
+// et `required` compte déjà celui qui reste.
+const canPay = (plan, stock) => !plan.error && stock.total >= plan.required;
 
-// Métamorph en renfort, ou null : seulement quand les doublons ne suffisent
+// Métamorph en renfort, ou null : seulement quand les exemplaires ne suffisent
 // pas, que l'espèce a de quoi évoluer tout en gardant son entrée, et qu'il reste
-// un Métamorph après la fusion. `dittoFill` dit combien il en faut — la même
-// fonction qu'evolve, qui tranche à la fin.
+// un Métamorph après l'évolution. `sacrificeFill` dit combien il en faut — la
+// même fonction qu'evolve, qui tranche à la fin.
 function dittoPath(plan, stock) {
-  if (plan.error || canPay(plan, stock) || stock.spare < 1) return null;
-  const fill = dittoFill(plan, stock.total);
+  if (plan.error || canPay(plan, stock) || stock.total < 2) return null;
+  const fill = sacrificeFill(plan, stock.total);
   if (!fill.dittos || stock.dittos < fill.dittos + 1) return null;
   return fill;
 }
 
-// Toutes les façons de faire évoluer ce groupe, aides comprises. Chacune porte
-// son propre plan : une pierre ne coûte pas ce que coûte un bonbon, et le
-// nombre d'exemplaires requis change avec elle.
+// Toutes les façons de faire évoluer cette espèce, aides comprises. Chacune
+// porte son propre plan : une pierre ne coûte pas ce que coûte un bonbon, et le
+// nombre de sacrifices change avec elle.
 function evolutionPaths(speciesId, stock, helpers) {
   const paths = [];
   const base = describeEvolution(speciesId);
@@ -76,7 +70,7 @@ function evolutionPaths(speciesId, stock, helpers) {
   for (const helper of helpers) {
     const plan = describeEvolution(speciesId, null, helper.key);
     // Une aide qui ne change rien à ce qui manque n'a pas à encombrer l'écran :
-    // on ne la propose que si elle rend la fusion possible, ou moins chère.
+    // on ne la propose que si elle rend l'évolution possible, ou moins chère.
     if (!canPay(plan, stock)) continue;
     if (!paths.length || plan.points < base.points || plan.required < base.required) {
       paths.push({ plan, helper });
@@ -87,61 +81,48 @@ function evolutionPaths(speciesId, stock, helpers) {
   return paths;
 }
 
-// Les Métamorph du dresseur par variante, comptés une fois pour tous les
-// groupes : un shiny ne comble qu'un shiny.
-function dittoCounts(rows) {
+// Les Métamorph du dresseur, toutes variantes : ils ne servent de sacrifice que
+// pour les autres espèces, et se comptent une fois pour toute la liste.
+function dittoCount(rows) {
   const metamorph = dittoSpecies();
-  const counts = { normal: 0, shiny: 0 };
-  for (const row of metamorph ? rows : []) {
-    if (row.species_id === metamorph.id) counts[row.is_shiny ? "shiny" : "normal"] += 1;
-  }
-  return counts;
+  return metamorph ? rows.filter((row) => row.species_id === metamorph.id).length : 0;
 }
 
-// Le stock d'un groupe : l'entrée entière et, dedans, le groupe du sexe choisi
-// — ou le seul individu désigné par son identifiant —, plus les Métamorph de
-// la même variante, qui peuvent combler ce qui manque.
-function stockOf(rows, dittos, speciesId, isShiny, sex, pokemonId = null) {
-  const entry = rows.filter(
-    (row) => row.species_id === speciesId && Boolean(row.is_shiny) === Boolean(isShiny)
-  );
-  const group = entry.filter((row) =>
-    pokemonId ? row.id === pokemonId : !sex || row.sex === sex
-  );
-  return {
-    total: entry.length,
-    count: group.length,
-    spare: Math.min(group.length, Math.max(0, entry.length - 1)),
-    dittos: dittos[isShiny ? "shiny" : "normal"],
-  };
-}
+// Le stock d'une espèce : ses individus, shiny compris, et les Métamorph qui
+// peuvent combler les sacrifices qui manquent.
+const stockOf = (rows, speciesId, dittos) => ({
+  total: rows.filter((row) => row.species_id === speciesId).length,
+  dittos,
+});
 
-// Groupes (espèce, variante, sexe) que ce dresseur possède : ceux qu'il peut
-// faire évoluer — par ses propres moyens ou avec un objet — et les entrées qui
-// pourraient évoluer mais dont il manque des exemplaires. Le second lot sert à
-// expliquer une liste vide au lieu de la laisser muette : c'est exactement ce
-// qui faisait croire à une commande cassée.
+// Espèces que ce dresseur possède : celles qu'il peut faire évoluer — par ses
+// propres moyens ou avec un objet — et celles qui pourraient évoluer mais dont
+// il manque des exemplaires. Le second lot sert à expliquer une liste vide au
+// lieu de la laisser muette : c'est exactement ce qui faisait croire à une
+// commande cassée.
 function listEvolvable(userId, cb) {
   usableHelpers(userId, (err, helpers) => {
     if (err) return cb(err, [], []);
     getIndividuals(userId, (err, rows) => {
       if (err) return cb(err, [], []);
+      const counts = new Map();
+      for (const row of rows) {
+        const entry = counts.get(row.species_id) ?? { count: 0, shiny: 0 };
+        entry.count++;
+        if (row.is_shiny) entry.shiny++;
+        counts.set(row.species_id, entry);
+      }
+      const dittos = dittoCount(rows);
       const evolvable = [];
       const incomplete = [];
-      const dittos = dittoCounts(rows);
-      for (const group of groupIndividuals(rows, { bySex: true })) {
-        const stock = stockOf(rows, dittos, group.speciesId, group.isShiny, group.sex);
-        const paths = evolutionPaths(group.speciesId, stock, helpers);
+      for (const [speciesId, { count, shiny }] of counts) {
+        const paths = evolutionPaths(speciesId, { total: count, dittos }, helpers);
         if (paths.length) {
-          evolvable.push({ ...group, stock, paths, plan: paths[0].plan });
-        }
-      }
-      for (const entry of groupIndividuals(rows)) {
-        if (evolvable.some((g) => g.speciesId === entry.speciesId && g.isShiny === entry.isShiny)) {
+          evolvable.push({ speciesId, count, shiny });
           continue;
         }
-        const plan = describeEvolution(entry.speciesId);
-        if (!plan.error) incomplete.push({ ...entry, plan });
+        const plan = describeEvolution(speciesId);
+        if (!plan.error) incomplete.push({ speciesId, count, plan });
       }
       // Les plus proches du seuil d'abord : ce sont les plus utiles à afficher.
       incomplete.sort((a, b) => b.count - a.count);
@@ -150,106 +131,115 @@ function listEvolvable(userId, cb) {
   });
 }
 
+// Les objets qui remplacent des sacrifices sur toutes les espèces, tels que le
+// catalogue les décrit : le refus dit ce qui comblerait le manque.
+function helpersHint() {
+  return getItems()
+    .filter((item) => item.evolution && !item.evolution.from)
+    .map((item) => {
+      const { quantity = 1, copies = 1 } = item.evolution;
+      return (
+        `${quantity}× ${item.emoji} ${item.label} ${quantity > 1 ? "tiennent" : "tient"} lieu ` +
+        `${copies > 1 ? `de ${copies} sacrifices` : "d'un sacrifice"}.`
+      );
+    })
+    .join("\n");
+}
+
 export default {
   describe: (sub) =>
     sub
       .setName("evolution")
-      .setDescription("Fait évoluer un Pokémon en sacrifiant des doublons")
+      .setDescription("Fait évoluer un de tes Pokémon en sacrifiant d'autres exemplaires")
       .addStringOption((option) =>
         option
-          .setName("pokemon")
-          .setDescription("Le Pokémon à faire évoluer (ou #numéro d'un Pokémon précis)")
+          .setName("espece")
+          .setDescription("L'espèce à faire évoluer")
+          .setRequired(true)
+          .setAutocomplete(true)
+      )
+      .addStringOption((option) =>
+        option
+          .setName("individu")
+          .setDescription("Le Pokémon précis qui évolue : il garde son sexe, sa ball, sa fertilité")
           .setRequired(true)
           .setAutocomplete(true)
       ),
 
   async autocomplete(interaction) {
-    const query = interaction.options.getFocused().toLowerCase();
-    // « #123 » : un individu précis, qui peut évoluer et n'est pas le dernier de
-    // son espèce. Les chiffres du coût se vérifient ensuite, sur l'écran de fusion.
-    if (wantsIndividual(query)) {
+    const focused = interaction.options.getFocused(true);
+    const query = String(focused.value ?? "").toLowerCase();
+
+    // Deuxième temps : l'individu, parmi ceux de l'espèce choisie. Les autres
+    // options sont lisibles pendant l'autocomplétion.
+    if (focused.name === "individu") {
+      const species = getSpecies(Number(interaction.options.get("espece")?.value));
+      if (!species) return hint(interaction, "⚠️ Choisis d'abord l'espèce dans l'option « espece »");
       return getIndividuals(interaction.user.id, (err, rows) => {
         if (err) return interaction.respond([]).catch(() => {});
         const choices = individualChoices(
-          rows,
+          rows.filter((row) => row.species_id === species.id),
           query,
-          (row) => !row.last && !describeEvolution(row.species_id).error
+          (row) => !row.last
         );
-        interaction
-          .respond(
-            choices.length
-              ? choices
-              : [{ name: "Aucun Pokémon de ce numéro ne peut évoluer", value: HINT_VALUE }]
-          )
-          .catch(() => {});
+        if (!choices.length) {
+          return hint(interaction, `Aucun ${species.name} ne peut évoluer : il en reste toujours un`);
+        }
+        interaction.respond(choices).catch(() => {});
       });
     }
-    listEvolvable(interaction.user.id, async (err, entries, incomplete) => {
+
+    listEvolvable(interaction.user.id, (err, entries, incomplete) => {
       if (err) {
         handleException("Autocomplétion d'évolution :", err);
         return interaction.respond([]).catch(() => {});
       }
-      const label = (entry) => displayName(getSpecies(entry.speciesId), entry.isShiny, entry.sex);
-
-      // Le sexe choisi est celui de l'individu qui évolue : il le garde.
       const choices = entries
         .map((entry) => ({
-          name: `${label(entry)} (×${entry.count}, ${entry.stock.total} au total)`,
-          value: entry.key,
+          name:
+            `${getSpecies(entry.speciesId).name} (×${entry.count}` +
+            `${entry.shiny ? `, dont ${entry.shiny} ✨` : ""})`,
+          value: String(entry.speciesId),
         }))
         .filter((choice) => choice.name.toLowerCase().includes(query))
         .slice(0, 25);
-
-      if (choices.length > 0) {
-        return interaction.respond(choices).catch(() => {});
-      }
+      if (choices.length) return interaction.respond(choices).catch(() => {});
 
       // Rien à proposer : on dit ce qui manque, espèce par espèce.
       const hints = incomplete
         .map((entry) => ({
-          name: `⚠️ ${label(entry)} : ${entry.plan.required} exemplaires requis, tu en as ${entry.count}`,
+          name:
+            `⚠️ ${entry.plan.species.name} : ${entry.plan.required} exemplaires requis, ` +
+            `tu en as ${entry.count}`,
           value: HINT_VALUE,
         }))
         .filter((choice) => choice.name.toLowerCase().includes(query))
         .slice(0, 25);
-
-      await interaction
-        .respond(
-          hints.length
-            ? hints
-            : [
-                {
-                  name: "Aucun Pokémon de ta collection ne peut évoluer",
-                  value: HINT_VALUE,
-                },
-              ]
-        )
-        .catch(() => {});
+      if (hints.length) return interaction.respond(hints).catch(() => {});
+      hint(interaction, "Aucun Pokémon de ta collection ne peut évoluer");
     });
   },
 
   async execute(interaction) {
     try {
+      // Les deux valeurs se revalident : tapées à la main ou périmées, elles
+      // peuvent désigner un Pokémon parti, ou d'une autre espèce.
       const selector = await new Promise((resolve, reject) =>
-        resolveSelector(interaction.user.id, interaction.options.getString("pokemon"), (err, s) =>
-          err ? reject(err) : resolve(s)
+        resolveIndividual(
+          interaction.user.id,
+          interaction.options.getString("espece"),
+          interaction.options.getString("individu"),
+          (err, s) => (err ? reject(err) : resolve(s))
         )
       );
       if (selector.error) {
-        return interaction.reply({ content: `\u274C ${selector.error}`, flags: MessageFlags.Ephemeral });
+        return interaction.reply({ content: `❌ ${selector.error}`, flags: MessageFlags.Ephemeral });
       }
       const { speciesId, isShiny, sex, pokemonId } = selector;
-      if (!getSpecies(speciesId)) {
-        return interaction.reply({
-          content:
-            "\u274C Choisis une proposition dans la liste d'autocomplétion.",
-          flags: MessageFlags.Ephemeral,
-        });
-      }
       const plan = describeEvolution(speciesId);
       if (plan.error) {
         return interaction.reply({
-          content: `\u274C ${plan.error}`,
+          content: `❌ ${plan.error}`,
           flags: MessageFlags.Ephemeral,
         });
       }
@@ -262,174 +252,173 @@ export default {
           helpers = [];
         }
         // Ce que le dresseur possède vraiment décide des boutons affichés : une
-        // fusion qu'il ne peut pas payer n'a pas à lui être proposée, et c'est
-        // d'autant plus vrai depuis que les objets le font entrer dans cet
-        // écran avec un exemplaire de moins que le minimum.
+        // évolution qu'il ne peut pas payer n'a pas à lui être proposée.
         getIndividuals(interaction.user.id, (err, individuals) => {
-        if (err) handleException("Lecture de la collection pour /pk evolution :", err);
-        const lus = err ? [] : individuals;
-        const stock = stockOf(lus, dittoCounts(lus), speciesId, isShiny, sex, pokemonId);
-        const owned = stock.total;
+          if (err) handleException("Lecture de la collection pour /pk evolution :", err);
+          const lus = err ? [] : individuals;
+          const stock = stockOf(lus, speciesId, dittoCount(lus));
 
-        const species = plan.species;
-        // Variante et sexe voyagent ensemble dans le deuxième segment du
-        // customId : « 1F » pour une femelle shiny, « 0 » pour n'importe quel
-        // sexe — le format d'avant, que les anciens boutons portent encore —,
-        // ou « #123 » pour un individu précis.
-        const suffix = pokemonId ? `#${pokemonId}` : `${isShiny ? 1 : 0}${sex ?? ""}`;
-        const embed = new EmbedBuilder()
-          .setTitle(
-            `Évolution de ${pokemonId ? `#${pokemonId} ` : ""}${displayName(species, isShiny, sex)}`
-          )
-          .setColor(embedColor(species, isShiny))
-          .setThumbnail(spriteUrl(species, isShiny))
-          .setDescription(
-            plan.branching
-              ? `**${species.name}** peut évoluer en ${plan.targets
-                  .map((target) => `**${target.name}**`)
-                  .join(", ")}.\n\n` +
+          const species = plan.species;
+          // Le deuxième segment du customId désigne l'individu qui évolue.
+          const suffix = `#${pokemonId}`;
+          const embed = new EmbedBuilder()
+            .setTitle(`Évolution de #${pokemonId} ${displayName(species, isShiny, sex)}`)
+            .setColor(embedColor(species, isShiny))
+            .setThumbnail(spriteUrl(species, isShiny))
+            .setDescription(
+              (plan.branching
+                ? `**${species.name}** peut évoluer en ${plan.targets
+                    .map((target) => `**${target.name}**`)
+                    .join(", ")}.\n\n` +
                   `Tu peux laisser le hasard décider, ou payer plus cher pour choisir.`
-              : `**${species.name}** peut évoluer en **${plan.targets[0].name}**.`
-          );
+                : `**${species.name}** peut évoluer en **${plan.targets[0].name}**.`) +
+                `\nIl garde son sexe, sa ball et sa fertilité${isShiny ? ", et reste shiny" : ""}.`
+            );
 
-        // Le coût de la fusion ordinaire n'a sa place que si elle est
-        // proposée : au-dessus d'un unique bouton « Pierre Feu → Pyroli
-        // (gratuit) », annoncer « 2 doublons et 2000 points » se contredit.
-        if (canPay(plan, stock)) {
-          embed.addFields({
-            name: "Coût",
-            value:
-              `**${plan.duplicates}** doublons consommés (il t'en faut **${plan.required}** au total, ` +
-              `un exemplaire est toujours conservé) et **${plan.points}** points`,
-            inline: false,
-          });
-        }
+          // Le coût de l'évolution ordinaire n'a sa place que si elle est
+          // proposée : au-dessus d'un unique bouton « Pierre Feu → Pyroli
+          // (gratuit) », annoncer « 1 sacrifice et 2000 points » se contredit.
+          if (canPay(plan, stock)) {
+            const sacrifices = plan.sacrifices;
+            embed.addFields({
+              name: "Coût",
+              value:
+                (sacrifices > 0
+                  ? `**${sacrifices}** ${species.name} sacrifié${sacrifices > 1 ? "s" : ""}, ` +
+                    `shiny ou non — les normaux partent d'abord —`
+                  : "Aucun sacrifice") +
+                ` et **${plan.points}** points. Il t'en faut **${plan.required}** en tout : ` +
+                `celui qui évolue, ses sacrifices et un qui reste.`,
+              inline: false,
+            });
+          }
 
-        const rows = [];
-        const normale = new ActionRowBuilder();
-        if (!canPay(plan, stock)) {
-          // Rien du tout : ni les exemplaires, ni de quoi les remplacer.
-        } else if (plan.branching) {
-          normale.addComponents(
-            new ButtonBuilder()
-              .setCustomId(`poke_evo|${speciesId}|${suffix}|random`)
-              .setLabel(`Évolution aléatoire (${plan.points} pts)`)
-              .setEmoji("\u{1F3B2}")
-              .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-              .setCustomId(`poke_evo|${speciesId}|${suffix}|choose`)
-              .setLabel(
-                `Choisir l'évolution (${describeEvolution(speciesId, plan.targets[0].id).points} pts)`
-              )
-              .setEmoji("\u{1F3AF}")
-              .setStyle(ButtonStyle.Secondary)
-          );
-        } else {
-          normale.addComponents(
-            new ButtonBuilder()
-              .setCustomId(`poke_evo|${speciesId}|${suffix}|random`)
-              .setLabel(`Faire évoluer (${plan.points} pts)`)
-              .setEmoji("\u2728")
-              .setStyle(ButtonStyle.Success)
-          );
-        }
-        if (normale.components.length) rows.push(normale);
-
-        // Un bouton par objet utilisable, dans une rangée à part : ce sont des
-        // chemins moins chers, pas des variantes du premier. Discord en accepte
-        // cinq par rangée, et le catalogue n'en propose pas davantage.
-        const aides = new ActionRowBuilder();
-        const lignes = [];
-        for (const helper of helpers.slice(0, 5)) {
-          const aide = describeEvolution(speciesId, null, helper.key);
-          if (!canPay(aide, stock)) continue;
-          const cible = aide.target ? ` → ${aide.target.name}` : "";
-          const prix = aide.points > 0 ? `${aide.points} pts` : "gratuit";
-          aides.addComponents(
-            new ButtonBuilder()
-              .setCustomId(`poke_evo|${speciesId}|${suffix}|random|${helper.key}`)
-              .setLabel(`${helper.label}${cible} (${prix})`)
-              .setEmoji(helper.emoji)
-              .setStyle(ButtonStyle.Secondary)
-          );
-          lignes.push(
-            `${helper.emoji} **${helper.evolution.quantity}× ${helper.label}**` +
-              `${cible} — ${aide.required} exemplaire${aide.required > 1 ? "s" : ""} requis, ${prix}`
-          );
-        }
-        if (aides.components.length) {
-          rows.push(aides);
-          embed.addFields({
-            name: "Tes objets",
-            value: lignes.join("\n"),
-            inline: false,
-          });
-        }
-
-        // Métamorph, dans sa propre rangée : il ne remplace que des
-        // exemplaires, donc le choix de la forme reste possible avec lui,
-        // contrairement à une pierre qui impose la sienne.
-        const fill = dittoPath(plan, stock);
-        if (fill) {
-          const metamorph = dittoSpecies();
-          const nom = `${metamorph.name}${isShiny ? " shiny" : ""}`;
-          const joker = new ActionRowBuilder();
-          const bouton = (mode, label) =>
-            new ButtonBuilder()
-              .setCustomId(`poke_evo|${speciesId}|${suffix}|${mode}|${DITTO_HELPER}`)
-              .setLabel(label)
-              .setStyle(ButtonStyle.Secondary);
-          if (plan.branching) {
-            joker.addComponents(
-              bouton("random", `${fill.dittos}× ${metamorph.name} · hasard (${plan.points} pts)`),
-              bouton(
-                "choose",
-                `${fill.dittos}× ${metamorph.name} · choisir ` +
-                  `(${describeEvolution(speciesId, plan.targets[0].id).points} pts)`
-              )
+          const rows = [];
+          const normale = new ActionRowBuilder();
+          if (!canPay(plan, stock)) {
+            // Rien du tout : ni les exemplaires, ni de quoi les remplacer.
+          } else if (plan.branching) {
+            normale.addComponents(
+              new ButtonBuilder()
+                .setCustomId(`poke_evo|${speciesId}|${suffix}|random`)
+                .setLabel(`Évolution aléatoire (${plan.points} pts)`)
+                .setEmoji("\u{1F3B2}")
+                .setStyle(ButtonStyle.Primary),
+              new ButtonBuilder()
+                .setCustomId(`poke_evo|${speciesId}|${suffix}|choose`)
+                .setLabel(
+                  `Choisir l'évolution (${describeEvolution(speciesId, plan.targets[0].id).points} pts)`
+                )
+                .setEmoji("\u{1F3AF}")
+                .setStyle(ButtonStyle.Secondary)
             );
           } else {
-            joker.addComponents(
-              bouton("random", `${fill.dittos}× ${metamorph.name} (${plan.points} pts)`)
+            normale.addComponents(
+              new ButtonBuilder()
+                .setCustomId(`poke_evo|${speciesId}|${suffix}|random`)
+                .setLabel(`Faire évoluer (${plan.points} pts)`)
+                .setEmoji("✨")
+                .setStyle(ButtonStyle.Success)
             );
           }
-          rows.push(joker);
-          embed.addFields({
-            name: metamorph.name,
-            value:
-              `**${fill.dittos}** ${nom} ${fill.dittos > 1 ? "tiennent" : "tient"} lieu ` +
-              `de **${fill.copies}** exemplaire` +
-              `${fill.copies > 1 ? "s" : ""} manquant${fill.copies > 1 ? "s" : ""}. ` +
-              `Tu en as **${stock.dittos}**, un reste toujours.`,
-            inline: false,
-          });
-        }
+          if (normale.components.length) rows.push(normale);
 
-        // Aucun chemin : on le dit avec le chiffre qui manque, plutôt que
-        // d'afficher un embed orné de boutons qui refuseraient tous.
-        //
-        // Métamorph n'est cité que s'il pourrait servir : il faut deux
-        // exemplaires de l'espèce, celui qui évolue et celui qui garde l'entrée.
-        // Ses chiffres sont ceux de dittoFill, comme pour le bouton.
-        if (!rows.length) {
-          const metamorph = dittoSpecies();
-          const joker = metamorph && stock.spare >= 1 ? dittoFill(plan, stock.total) : null;
-          return interaction
-            .editReply({
-              content:
-                `❌ Il te faut **${plan.required}** exemplaires de **${species.name}**` +
-                `${isShiny ? " ✨" : ""} pour cette fusion, tu en as **${owned}**.\n` +
-                `Trois 🍬 Super Bonbons peuvent tenir lieu d'un exemplaire manquant.` +
-                (joker?.dittos
-                  ? `\nOu **${joker.dittos + 1}** ${metamorph.name}${isShiny ? " shiny" : ""} ` +
-                    `(${joker.dittos} consommé${joker.dittos > 1 ? "s" : ""} + 1 conservé) ` +
-                    `pour combler ce qui manque, tu en as **${stock.dittos}**.`
-                  : ""),
-            })
-            .catch(() => {});
-        }
+          // Un bouton par objet utilisable, dans une rangée à part : ce sont des
+          // chemins moins chers, pas des variantes du premier. Discord en
+          // accepte cinq par rangée, et le catalogue n'en propose pas davantage.
+          const aides = new ActionRowBuilder();
+          const lignes = [];
+          for (const helper of helpers.slice(0, 5)) {
+            const aide = describeEvolution(speciesId, null, helper.key);
+            if (!canPay(aide, stock)) continue;
+            const cible = aide.target ? ` → ${aide.target.name}` : "";
+            const prix = aide.points > 0 ? `${aide.points} pts` : "gratuit";
+            aides.addComponents(
+              new ButtonBuilder()
+                .setCustomId(`poke_evo|${speciesId}|${suffix}|random|${helper.key}`)
+                .setLabel(`${helper.label}${cible} (${prix})`)
+                .setEmoji(helper.emoji)
+                .setStyle(ButtonStyle.Secondary)
+            );
+            lignes.push(
+              `${helper.emoji} **${helper.evolution.quantity}× ${helper.label}**` +
+                `${cible} — ${aide.required} exemplaire${aide.required > 1 ? "s" : ""} requis, ${prix}`
+            );
+          }
+          if (aides.components.length) {
+            rows.push(aides);
+            embed.addFields({
+              name: "Tes objets",
+              value: lignes.join("\n"),
+              inline: false,
+            });
+          }
 
-        interaction.editReply({ embeds: [embed], components: rows }).catch(() => {});
+          // Métamorph, dans sa propre rangée : il ne remplace que des
+          // sacrifices, donc le choix de la forme reste possible avec lui,
+          // contrairement à une pierre qui impose la sienne.
+          const fill = dittoPath(plan, stock);
+          if (fill) {
+            const metamorph = dittoSpecies();
+            const joker = new ActionRowBuilder();
+            const bouton = (mode, label) =>
+              new ButtonBuilder()
+                .setCustomId(`poke_evo|${speciesId}|${suffix}|${mode}|${DITTO_HELPER}`)
+                .setLabel(label)
+                .setStyle(ButtonStyle.Secondary);
+            if (plan.branching) {
+              joker.addComponents(
+                bouton("random", `${fill.dittos}× ${metamorph.name} · hasard (${plan.points} pts)`),
+                bouton(
+                  "choose",
+                  `${fill.dittos}× ${metamorph.name} · choisir ` +
+                    `(${describeEvolution(speciesId, plan.targets[0].id).points} pts)`
+                )
+              );
+            } else {
+              joker.addComponents(
+                bouton("random", `${fill.dittos}× ${metamorph.name} (${plan.points} pts)`)
+              );
+            }
+            rows.push(joker);
+            embed.addFields({
+              name: metamorph.name,
+              value:
+                `**${fill.dittos}** ${metamorph.name} ${fill.dittos > 1 ? "tiennent" : "tient"} ` +
+                `lieu de **${fill.missing}** sacrifice${fill.missing > 1 ? "s" : ""} ` +
+                `manquant${fill.missing > 1 ? "s" : ""}, shiny ou non — les normaux partent ` +
+                `d'abord. Tu en as **${stock.dittos}**, un reste toujours.`,
+              inline: false,
+            });
+          }
+
+          // Aucun chemin : on le dit avec le chiffre qui manque, plutôt que
+          // d'afficher un embed orné de boutons qui refuseraient tous.
+          //
+          // Métamorph n'est cité que s'il pourrait servir : il faut deux
+          // exemplaires de l'espèce, celui qui évolue et celui qui reste. Ses
+          // chiffres sont ceux de sacrificeFill, comme pour le bouton.
+          if (!rows.length) {
+            const metamorph = dittoSpecies();
+            const joker = metamorph && stock.total >= 2 ? sacrificeFill(plan, stock.total) : null;
+            return interaction
+              .editReply({
+                content: [
+                  `❌ ${evolutionShortage(plan, err ? null : stock.total)}`,
+                  helpersHint(),
+                  joker?.dittos
+                    ? `Ou **${joker.dittos + 1}** ${metamorph.name} ` +
+                      `(${joker.dittos} sacrifié${joker.dittos > 1 ? "s" : ""} + 1 qui reste), ` +
+                      `tu en as **${stock.dittos}**.`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join("\n"),
+              })
+              .catch(() => {});
+          }
+
+          interaction.editReply({ embeds: [embed], components: rows }).catch(() => {});
         });
       });
     } catch (error) {

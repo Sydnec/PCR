@@ -21,10 +21,10 @@ d'une espèce.
 ## Le numéro
 
 Chaque Pokémon a un **numéro** (`#123`), affiché en tête de sa ligne dans `/pk boite`. Il ne
-change jamais, même quand le Pokémon évolue ou change de dresseur. Taper `#123` dans une commande
-qui désigne un Pokémon — `/pk echange`, `/pk oeuf pondre`, `/pk revendre pokemon`, `/pk evolution`
-— vise ce Pokémon précis plutôt qu'un groupe ; l'autocomplétion propose les numéros dès qu'on tape
-`#`.
+change jamais, même quand le Pokémon évolue ou change de dresseur. `/pk evolution`, `/pk echange`
+et `/pk revendre pokemon` demandent l'espèce, puis l'individu parmi les siens, désigné par son
+numéro. `/pk oeuf pondre` accepte un groupe ou `#123` ; l'autocomplétion propose les numéros dès
+qu'on tape `#`.
 
 Sur le [site](../site.md#boîte-pc), chacun range aussi ses Pokémon dans les boîtes de son PC et
 peut leur donner un surnom. C'est du rangement : ni la place ni le surnom ne changent quoi que ce
@@ -33,21 +33,24 @@ soit au jeu, et Discord continue d'afficher le nom de l'espèce.
 ## Toujours au moins un
 
 Avoir capturé un Pokémon ne suffit pas à le garder au Pokédex, il faut le posséder. Il reste donc
-**toujours au moins un individu de chaque entrée** (espèce + variante, un shiny comptant à part).
-Aucun n'est réservé pour autant : n'importe lequel peut partir, même le plus ancien, tant qu'il
-n'est pas le dernier. Le dernier est marqué 📌 dans `/pk boite`.
+**toujours au moins un individu de chaque espèce**, shiny ou non : une entrée de Pokédex est une
+espèce. Aucun n'est réservé pour autant : n'importe lequel peut partir, même le plus ancien, tant
+qu'il n'est pas le dernier. Avec un Salamèche et un Salamèche shiny, l'un ou l'autre peut partir ;
+le dernier est marqué 📌 dans `/pk boite`.
 
 ## Qui part quand on cède
 
-On choisit un **groupe** — espèce, variante et sexe, plus la fertilité pour un échange — et le bot
-choisit l'individu : les **stériles d'abord**, puis **les plus récents**. On cède ce qui vaut le
-moins. Pour céder un individu précis, on donne son numéro.
+Quand le bot choisit lui-même, il cède ce qui vaut le moins : les **normaux avant les shiny**, puis
+les **stériles**, puis **les plus récents**.
 
-- **Revente** : par espèce et sexe (`Pikachu ♀`).
-- **Fusion** : le sexe choisi est celui de l'individu qui **évolue** ; il garde son sexe, sa ball et
-  sa fertilité. Les autres doublons consommés, de n'importe quel sexe, disparaissent.
-- **Échange** : par espèce, sexe et fertilité (`Pikachu ♀ (fertile)`) — qui reçoit une femelle
-  fertile doit pouvoir compter dessus. L'individu change de dresseur sans cesser d'être lui-même.
+- **Revente** : un individu précis, ou `quantite` normaux de l'espèce choisis par le bot. Un shiny
+  se choisit, il ne part jamais dans le lot.
+- **Évolution** : on choisit l'individu qui **évolue** ; il reste lui-même — numéro, ball, sexe,
+  fertilité, shiny. Les **sacrifices**, de n'importe quel sexe et de n'importe quelle variante, sont
+  choisis par le bot et disparaissent.
+- **Échange** : un individu précis de chaque côté, fertilité comprise — qui reçoit une femelle
+  fertile doit pouvoir compter dessus : si elle pond entre-temps, l'échange échoue. L'individu
+  change de dresseur sans cesser d'être lui-même.
 
 ## Migration
 

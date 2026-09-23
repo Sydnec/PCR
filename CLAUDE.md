@@ -49,10 +49,12 @@ d'écrire et en reprendre le style : en cas de doute, c'est le code existant qui
 - **Opérations en plusieurs étapes** : retirer avant de créditer, et compenser en cascade si une
   étape échoue. Rien ne doit se perdre, rien ne doit se créer.
 - **Invariants du jeu** : un Pokémon est un individu de `pokemon_owned` (sexe — NULL pour une
-  espèce asexuée —, ball, fertilité, date d'arrivée), désigné par son identifiant (`#123`). Il
-  reste toujours au moins un individu de chaque entrée du Pokédex (un shiny compte à part), mais
-  aucun n'est réservé : n'importe lequel peut partir s'il n'est pas le dernier. Quand on cède par
-  groupe, les stériles partent d'abord, puis les plus récents. Côté objets, une ligne tombée à zéro
+  espèce asexuée —, ball, fertilité, date d'arrivée), désigné par son identifiant (`#123`). Une
+  entrée du Pokédex est une espèce, shiny ou non : il reste toujours au moins un individu de chaque
+  espèce, mais aucun n'est réservé : n'importe lequel peut partir s'il n'est pas le dernier. Quand
+  le bot choisit, les normaux partent avant les shiny, puis les stériles, puis les plus récents.
+  Une évolution fait évoluer un individu précis, qui reste lui-même ; les autres sont des
+  sacrifices. Côté objets, une ligne tombée à zéro
   reste en base, donc toute lecture filtre `count > 0`.
 - **Commandes** : celles du jeu Pokémon vivent sous `/pk` (un fichier par sous-commande dans
   `commands/pk/`), celles d'administration sous `/admin`.

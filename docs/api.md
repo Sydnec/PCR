@@ -51,7 +51,7 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
 | `GET /api/species` | `{ generation, species: [...] }` — espèces des générations ouvertes |
 | `GET /api/species/:id` | fiche + `chain` (lignée) |
 | `GET /api/catalogue` | `{ balls, items, types }` — clés, noms et emoji (`<:nom:id>` pour ceux du serveur), couleur de chaque type |
-| `GET /api/species/:id/evolution?targetId&helper` | coût d'une fusion : `{ targets, duplicates, required, points, helper }` |
+| `GET /api/species/:id/evolution?targetId&helper` | coût d'une évolution : `{ targets, sacrifices, required, points, helper }` — `required` compte celui qui évolue et celui qui reste, shiny ou non |
 | `GET /api/users/:userId/pokedex` 🔒 | `{ dexSize, entries: [{ speciesId, shiny, count, firstCaughtAt }] }` |
 | `GET /api/users/:userId/box` 🔒 | `{ total, page, pages, pageSize, items }` |
 | `GET /api/users/:userId/inventory` 🔒 | `{ items: [{ key, label, emoji, description, count }] }` |
@@ -71,7 +71,7 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
   "nickname": null }
 ```
 
-`last` : dernier de son entrée, il ne peut pas partir. Une espèce porte `obtention` (`wild`,
+`last` : dernier de son espèce (shiny compris), il ne peut pas partir. Une espèce porte `obtention` (`wild`,
 `evolution` ou `egg`), `femaleShare` (`null` si asexuée), `breeder` (parent possible d'un œuf),
 `sellValue` / `sellValueShiny` (prix de revente, 0 si invendable), ses évolutions, ses
 illustrations (`sprite`, `spriteShiny`) et ses petites images (`icon`, `iconShiny`).
@@ -117,7 +117,7 @@ ou par un groupe `{ "speciesId": 25, "isShiny": false, "sex": "F" }` — les deu
 | Route | Corps | Réponse |
 |---|---|---|
 | `POST /api/me/sell` | Pokémon, `quantity` pour un groupe | `{ sold, unit, points }` |
-| `POST /api/me/evolve` | Pokémon, `targetId?`, `helper?` (clé d'un objet, ou `metamorph`) | `{ pokemon, duplicatesSpent, dittosSpent, pointsSpent, helper }` |
+| `POST /api/me/evolve` | Pokémon (celui qui évolue), `targetId?`, `helper?` (clé d'un objet, ou `metamorph`) | `{ pokemon, sacrificesSpent, dittosSpent, pointsSpent, helper }` — `pokemon` est le même individu, sous sa nouvelle forme |
 | `POST /api/me/eggs` | `{ parent1, parent2 }` | `{ egg }` |
 | `POST /api/spawn/throw` | `{ spawnId, ball, requireItem? }` | `{ status, message, final, remaining, pokemon }` |
 | `POST /api/drops/:id/claim` | `{}` | `{ item }` — `409` si quelqu'un a été plus rapide |

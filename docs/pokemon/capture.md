@@ -26,13 +26,14 @@
 - **4 balls** : Poké Ball (×1), Super Ball (×2), Hyper Ball (×4) et Master Ball (capture garantie,
   avec confirmation obligatoire). Les probabilités suivent la formule officielle de la génération 3,
   à partir du taux de capture réel de chaque espèce.
-- **Shiny** (~1/500) comptant comme une entrée de Pokédex distincte.
+- **Shiny** (~1/500) : une variante de l'espèce, pas une entrée de Pokédex à part. Le Pokédex dit
+  combien on en a.
 - **Le sexe se voit dès l'apparition** : l'annonce le montre (« Un Pikachu ♀ sauvage apparaît ! »),
   et c'est celui qu'aura l'individu capturé. Même chose pour les rencontres du parc safari.
 - **Chaque capture est un individu** : son sexe est tiré selon l'espèce, et la ball qui l'a emporté
   reste attachée à lui (voir [Individus](individus.md)).
 - **🔒 Espèces hors pool** : celles dont le poids d'apparition est nul dans le pool sauvage **et**
-  dans celui du parc ne peuvent s'obtenir que par fusion. Le Pokédex et les fiches les marquent d'un
+  dans celui du parc ne peuvent s'obtenir que par évolution. Le Pokédex et les fiches les marquent d'un
   cadenas, sans quoi on peut chasser des mois un Mackogneur qui n'apparaîtra pas. Le marqueur est
   *calculé* à partir des mêmes poids que les tirages, jamais recopié : mettre `weightsByStage.3` à
   zéro verrouille les seize stades 3 et le cadenas suit.

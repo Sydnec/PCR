@@ -21,8 +21,8 @@ visite. C'est le seul contenu Pokémon où les actions ne coûtent rien.
     rentable — deux appâts font passer un stade 3 de 2,2 à 3,9 captures pour 25 actions — mais ce
     n'est plus gratuit.
   - 🏃 **Essayer de fuir** — passer au Pokémon suivant, avec 10 % de chances d'échouer.
-- **« Il te manque ? »** : chaque rencontre affiche si le dresseur possède déjà l'espèce — et la
-  variante shiny compte à part. Le message étant privé, l'information tient dans l'embed, là où les
+- **« Il te manque ? »** : chaque rencontre affiche si le dresseur possède déjà l'espèce, shiny ou
+  non — et signale un premier shiny. Le message étant privé, l'information tient dans l'embed, là où les
   apparitions publiques ont besoin d'un bouton pour répondre à chacun séparément.
 - **Raretés compensées** : stade 2 ×1,5, stade 3 (les *rares*) ×2,4, légendaires ×3, shiny 1/250 au
   lieu de 1/500. En 1ʳᵉ génération, les rares passent de 2,7 % à 5,4 % du pool et les légendaires de
