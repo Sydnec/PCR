@@ -321,9 +321,13 @@ export function restoreDuplicates(rows, cb = () => {}) {
     if (err) return cb(err);
     const row = list.shift();
     if (!row) return cb(null);
+    // La place dans la boîte PC et le surnom reviennent avec lui : un Pokémon
+    // qui évolue, ou qu'une compensation remet en place, reste où son
+    // dresseur l'avait rangé, sous le nom qu'il lui avait donné.
     db.run(
-      `INSERT INTO pokemon_owned (id, user_id, species_id, is_shiny, sex, ball, origin, sterile, obtained_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO pokemon_owned
+         (id, user_id, species_id, is_shiny, sex, ball, origin, sterile, obtained_at, pc_pos, nickname)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         row.id,
         row.user_id,
@@ -334,6 +338,8 @@ export function restoreDuplicates(rows, cb = () => {}) {
         row.origin,
         row.sterile,
         row.obtained_at,
+        row.pc_pos ?? null,
+        row.nickname ?? null,
       ],
       next
     );
@@ -785,6 +791,10 @@ export function acceptTrade(tradeId, cb) {
                 sex: sexAfterEvolution(species, row.sex),
                 origin: "echange",
                 obtained_at: now,
+                // Sa place était celle du PC de l'autre : chez son nouveau
+                // dresseur, il prend la première libre. Son surnom le suit,
+                // comme dans les jeux.
+                pc_pos: null,
               };
             };
             const arrivals = [arrive(mine, trade.to_user_id), arrive(theirs, trade.from_user_id)];

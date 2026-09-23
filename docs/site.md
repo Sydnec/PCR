@@ -7,15 +7,17 @@ se connecter avec son compte Discord ; seuls les membres du serveur entrent.
 
 | Page | Contenu |
 |---|---|
-| **Capture** (accueil) | Le Pokémon qui apparaît dans le salon Discord, en direct, avec son sexe et ses balls juste en dessous : rareté, types et difficulté en couleur, chances par ball, ton solde et tes balls en poche, et sa lignée avec ce que tu en possèdes (la fiche du bouton « Infos du Pokémon »). Une ball hors de portée est grisée, sauf si tu en as en poche. Le journal des lancers est sur le côté. On lui **lance ses balls** comme depuis Discord, et on **ramasse** ce qu'un Pokémon laisse tomber. |
-| **Boîte** | Chaque Pokémon avec son numéro, filtrable par espèce, sexe, fertilité et shiny. Sa fiche montre sa provenance, sa lignée et ce qu'il vaut, et permet de le **revendre** ou de le **faire évoluer**. |
+| **Capture** (accueil) | Le Pokémon qui apparaît dans le salon Discord, en direct, avec son sexe et ses balls juste en dessous : rareté, types et difficulté en couleur, chances par ball, ton solde et tes balls en poche, et sa lignée avec ce que tu en possèdes (la fiche du bouton « Infos du Pokémon »). Une ball hors de portée est grisée, sauf si tu en as en poche. Le journal des lancers est sur le côté. On lui **lance ses balls** comme depuis Discord, et on **ramasse** ce qu'un Pokémon laisse tomber. En haut, le bouton du **parc safari**. |
+| **Parc safari** | La visite du parc, ouverte depuis la Capture : la rencontre, ses chances et le risque qu'elle détale, et les trois actions de Discord (Safari Ball, appât, fuite). Tes prises s'affichent sur le côté, et le bilan à la fin. |
+| **Boîte** | Ton PC : des boîtes de cases où tu ranges tes Pokémon comme tu veux. Une case ne montre que le sprite ; un clic ouvre la fiche (provenance, place, lignée, valeur), d'où l'on **surnomme**, **déplace**, **revend** ou **fait évoluer** le Pokémon. |
 | **Pokédex** | Toutes les espèces des générations ouvertes, celles qu'on possède en couleur. La fiche d'une espèce montre sa lignée et ce que tu en possèdes. |
 | **Sac** | Le solde et les objets. |
 | **Œuf** | L'œuf qui couve, ou le formulaire pour en **pondre** un. |
 
-Le site ne fait rien que Discord ne fasse pas : tout reste faisable avec `/pk`. Il ne gère pas
-encore les échanges, la loterie, le safari ni les objets d'aide aux fusions (bonbons, pierres),
-qui se font sur Discord.
+Le site ne fait rien que Discord ne fasse pas : tout reste faisable avec `/pk`, sauf le rangement
+du PC (places, noms des boîtes, surnoms), réservé au site parce qu'il ne change rien au jeu. Il ne
+gère pas encore les échanges, la loterie ni les objets d'aide aux fusions (bonbons, pierres), qui
+se font sur Discord.
 
 ## Capture
 
@@ -27,6 +29,39 @@ comme d'habitude. La Master Ball demande une confirmation, comme sur Discord.
 
 La page relit l'apparition toutes les `web.spawnRefreshSeconds` (5 par défaut), seulement quand
 elle est ouverte et visible. Les apparitions naissent toujours de l'activité du salon Discord.
+
+## Parc safari
+
+Le bouton en haut de la Capture fait ce que fait `/pk safari` :
+
+- une visite en cours se **reprend** ;
+- un parc ouvert (l'événement public, ou un parc qui t'est réservé) s'**entre gratuitement**,
+  comme avec le bouton de son message ;
+- sinon, il propose d'**acheter une entrée**, après confirmation : avec un Ticket Safari s'il y en
+  a un dans le sac, sinon avec des points. Il est grisé quand le solde ne suffit pas, ou pendant
+  le délai entre deux entrées achetées.
+
+La visite est **la même** que sur Discord : une visite commencée sur le site se reprend avec
+`/pk safari`, et inversement. Chaque action passe par le même chemin que les boutons, avec le même
+jeton : un double clic ne joue qu'une fois, et une action déjà jouée ailleurs est refusée. Le
+partage du bilan dans un salon reste sur Discord.
+
+## Boîte PC
+
+Des boîtes de `pokemon.pc.slotsPerBox` cases (30), sur `columns` colonnes (6). Il y en a au moins
+`minBoxes` (8), et toujours une vide après la dernière occupée, jusqu'à `maxBoxes` (60).
+
+- **Ranger** : glisser un Pokémon sur une case, ou choisir « Déplacer » dans sa fiche puis
+  toucher la case voulue (au doigt, le glisser-déposer n'existe pas). Sur une case occupée, les
+  deux échangent leur place. Glisser sur une flèche change de boîte.
+- **Nommer une boîte** : un clic sur son nom (`boxNameLength` caractères, 20) ; vide, elle reprend
+  son nom par défaut.
+- **Surnommer un Pokémon** depuis sa fiche (`nicknameLength` caractères, 12) ; vide, il reprend le
+  nom de son espèce.
+
+Un Pokémon garde sa place et son surnom quand il évolue. Reçu en échange, il garde son surnom et
+prend la première case libre ; une capture ou une éclosion aussi. Le Pokédex ouvre la boîte sur
+une espèce (`/boite?species=25`) et en surligne les exemplaires.
 
 ## Fonctionnement
 

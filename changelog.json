@@ -1391,5 +1391,36 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "feature",
+      "name": "Parc safari sur le site",
+      "description": "Depuis l'onglet Capture, un bouton permet de reprendre sa visite, d'entrer dans un parc ouvert ou d'acheter une entrée, puis de jouer sa visite sur le site.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-23T15:00:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "feature",
+      "name": "Boîte PC sur le site",
+      "description": "La boîte du site devient un PC : on y range ses Pokémon comme on veut, on nomme ses boîtes et on donne des surnoms.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-23T15:00:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "fix",
+      "name": "Safari Ball à la bonne taille",
+      "description": "Sur le site, la Safari Ball et les images d'objets ont désormais la taille des autres balls.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-23T15:00:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    }
+  ]
 }

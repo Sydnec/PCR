@@ -59,6 +59,14 @@ export const dateTimeFr = (ms) =>
     minute: "2-digit",
   });
 
+// Des chances, affichées comme sur les annonces Discord.
+export function percent(probability) {
+  const value = probability * 100;
+  if (value >= 10) return `${Math.round(value)} %`;
+  if (value >= 1) return `${value.toFixed(1).replace(".", ",")} %`;
+  return `${value.toFixed(2).replace(".", ",")} %`;
+}
+
 // Recherche insensible aux accents et à la casse, comme l'autocomplétion du
 // bot : « evoli » trouve « Évoli ».
 export const normalize = (text) =>
@@ -119,10 +127,10 @@ export function sexMark(sex) {
 }
 
 // Le nom d'un Pokémon, avec son sexe et son éclat. Nidoran porte déjà le sien
-// dans son nom : on ne le répète pas.
-export function pokemonName(species, shiny = false, sex = null) {
-  const name = species?.name ?? "?";
-  const carries = name.includes("♂") || name.includes("♀");
+// dans son nom : on ne le répète pas, sauf sous un surnom, qui le cache.
+export function pokemonName(species, shiny = false, sex = null, nickname = null) {
+  const name = nickname || (species?.name ?? "?");
+  const carries = !nickname && (name.includes("♂") || name.includes("♀"));
   const sexNode = carries ? null : sexMark(sex);
   return h(
     "span",
@@ -131,6 +139,17 @@ export function pokemonName(species, shiny = false, sex = null) {
     sexNode ? [" ", sexNode] : null,
     shiny ? [" ", icon("sparkle", { label: "Shiny" })] : null
   );
+}
+
+export const dexNumber = (species) => `n° ${String(species.id).padStart(3, "0")}`;
+
+// « Est-ce que je l'ai déjà ? » La variante qui compte est celle qu'on a sous
+// les yeux : un shiny est une entrée de Pokédex à part.
+export function ownedMark(owned, shiny = false) {
+  const count = shiny ? owned.shiny : owned.normal;
+  return count
+    ? h("span", { class: "owned" }, icon("check"), ` Déjà dans ta boîte (×${fmt(count)})`)
+    : h("span", { class: "pill-new" }, shiny ? "Nouveau shiny" : "Nouveau");
 }
 
 // Comment on obtient une espèce qu'on ne croise pas dans la nature : les mêmes
@@ -193,6 +212,19 @@ export function richText(text) {
       }
     });
   return nodes;
+}
+
+// La réponse d'une action du jeu : la phrase du message Discord, son emoji
+// d'ouverture remplacé par une icône qui dit l'issue.
+export function outcomePanel(text, iconName, className) {
+  return h(
+    "p",
+    { class: `throw-panel ${className}`, role: "status" },
+    icon(iconName ?? "warning"),
+    // Un seul bloc de texte : le panneau est une rangée flex, et chaque morceau
+    // (gras, emoji) y deviendrait sinon une colonne.
+    h("span", {}, richText(text.replace(/^\p{Extended_Pictographic}\uFE0F?\s*/u, "")))
+  );
 }
 
 export function toast(message, kind = "info") {

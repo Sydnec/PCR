@@ -114,7 +114,7 @@ function readBody(req) {
 // script, et le perdre au redémarrage ne coûte rien.
 const writes = new Map();
 function allowWrite(userId) {
-  const limit = Math.max(1, Number(webConfig()?.writesPerMinute) || 30);
+  const limit = Math.max(1, Number(webConfig()?.writesPerMinute) || 60);
   const now = Date.now();
   const recent = (writes.get(userId) ?? []).filter((at) => now - at < 60_000);
   if (recent.length >= limit) return false;

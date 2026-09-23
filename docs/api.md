@@ -20,7 +20,7 @@ La mise en ligne pas à pas est dans [site.md](site.md#mise-en-ligne). Les varia
 - `DISCORD_CLIENT_SECRET` — avec `CLIENT_ID` et `GUILD_ID`, déjà présents ;
 - `WEB_SESSION_SECRET` — au moins 32 caractères aléatoires. Le changer déconnecte tout le monde.
 
-Réglages à chaud (`/admin config`) : `web.sessionHours` (168), `web.writesPerMinute` (30),
+Réglages à chaud (`/admin config`) : `web.sessionHours` (168), `web.writesPerMinute` (60),
 `web.spawnRefreshSeconds` (5, de 2 à 60).
 
 ## Connexion
@@ -52,14 +52,17 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
 | `GET /api/users/:userId/inventory` 🔒 | `{ items: [{ key, label, emoji, description, count }] }` |
 | `GET /api/me/egg` 🔒 | `{ egg }` ou `{ egg: null }` |
 | `GET /api/me/lineage/:speciesId` 🔒 | `{ lineage }` — la lignée et ce que le dresseur possède de chaque maillon |
-| `GET /api/spawn` 🔒 | `{ refreshSeconds, cooldownSeconds, pausedUntil, spawn, last, drops }` — l'apparition du salon |
+| `GET /api/spawn` 🔒 | `{ refreshSeconds, cooldownSeconds, pausedUntil, safari, spawn, last, drops }` — l'apparition du salon |
+| `GET /api/safari` 🔒 | `{ offer, visit }` — ce que le dresseur peut faire du parc, et sa visite en cours (`null` sinon) |
+| `GET /api/me/pc` 🔒 | `{ slotsPerBox, columns, maxBoxes, boxNameLength, nicknameLength, boxes, pokemon }` — la boîte PC |
 
 `/box` accepte `page` (à partir de 0), `pageSize` (1 à 200, 50 par défaut), `species`, `sex`
 (`M`, `F` ou `none`), `fertile` et `shiny` (`true`/`false`). Un individu :
 
 ```json
 { "id": 123, "speciesId": 25, "shiny": false, "sex": "F", "ball": "hyper",
-  "origin": "capture", "fertile": true, "last": false, "obtainedAt": 1758600000000 }
+  "origin": "capture", "fertile": true, "last": false, "obtainedAt": 1758600000000,
+  "nickname": null }
 ```
 
 `last` : dernier de son entrée, il ne peut pas partir. Une espèce porte `obtention` (`wild`,
@@ -78,6 +81,21 @@ lancers (`throws`, avec le pseudo et l'avatar du serveur). L'objet tenu reste
 secret. `last` est le dernier Pokémon parti (`CAUGHT` ou `FLED`), `drops` les objets au sol, et
 `pausedUntil` la fin d'un parc safari qui suspend les apparitions.
 
+`safari` (et `offer` de `/api/safari`) : `{ enabled, session, freePark, price, actions, tickets,
+retryAt, canBuy, blocked }`. `session` est la visite en cours (`{ id, actionsLeft }`), `freePark`
+un parc où entrer gratuitement (`{ id, expiresAt, reserved }`). `canBuy` dit si l'achat d'une
+entrée passerait ; sinon `blocked` vaut `balance` (solde insuffisant) ou `cooldown` (délai entre
+deux achats, jusqu'à `retryAt`). Un Ticket Safari lève les deux.
+
+Une visite : `{ id, token, actionsLeft, actionsTotal, expiresAt, finished, catches, ball,
+encounter }`. `encounter` (`null` une fois la visite finie) porte l'espèce, `shiny`, `sex`, la
+rareté, `probability`, `bait` (appâts avalés), `baitFactor`, `baitCapped` (un appât de plus ne
+servirait à rien), `fleeRisk` et `owned`. `token` se renvoie avec chaque action.
+
+Dans la boîte PC, `boxes` liste `{ box, name, custom, defaultName }` et chaque Pokémon est un
+individu avec sa case, `pos` (boîte = `pos / slotsPerBox`). Un Pokémon sans place reçoit la
+première libre à la lecture.
+
 ## Actions 🔒
 
 Corps en JSON (`Content-Type: application/json`). Un Pokémon se désigne par `{ "pokemonId": 123 }`
@@ -90,12 +108,22 @@ ou par un groupe `{ "speciesId": 25, "isShiny": false, "sex": "F" }` — les deu
 | `POST /api/me/eggs` | `{ parent1, parent2 }` | `{ egg }` |
 | `POST /api/spawn/throw` | `{ spawnId, ball, requireItem? }` | `{ status, message, final, remaining, pokemon }` |
 | `POST /api/drops/:id/claim` | `{}` | `{ item }` — `409` si quelqu'un a été plus rapide |
+| `POST /api/safari/enter` | `{ parkId }` | `{ resumed, visit }` — entrée gratuite dans un parc ouvert |
+| `POST /api/safari/buy` | `{}` | `{ resumed, ticket, visit }` — entrée payante, au ticket d'abord |
+| `POST /api/safari/action` | `{ sessionId, token, action }` | `{ outcome, message, visit }` — `action` : `BALL`, `BAIT` ou `FLEE` |
+| `POST /api/me/pc/move` | `{ pokemonId, pos }` | la boîte PC relue — l'occupant de la case prend l'ancienne place |
+| `POST /api/me/pc/boxes/:box/name` | `{ name }` | `{ name, custom }` — vide : nom par défaut |
+| `POST /api/me/pokemon/:id/nickname` | `{ nickname }` | `{ nickname }` — vide : plus de surnom |
 
 Un lancer répond toujours `200` : un raté ou un « trop tard » sont des issues du jeu, pas des
 erreurs. `status` vaut `miss`, `catch`, `void` (battu, remboursé), `gone`, `cooldown`,
 `insufficient`, `no-item`, `unknown-ball` ou `error`. `message` est la phrase du panneau Discord,
 et `final` dit qu'il n'y a plus rien à relancer. `requireItem` interdit de payer en points : c'est
 la promesse d'une Master Ball annoncée offerte.
+
+Une action du parc avec un jeton périmé (déjà jouée, ici ou sur Discord) répond `409` sans rien
+consommer. `outcome` vaut `CATCH`, `MISS`, `MISS_FLED`, `BAIT`, `BAIT_FLED`, `FLED` ou
+`FLEE_FAILED`, et `message` est la phrase de l'éphémère Discord.
 
 ## Erreurs
 

@@ -92,6 +92,7 @@ export async function runMigrations() {
   );
   await migrateCollection();
   await migrateGenderless();
+  await migratePc();
 }
 
 // ---------------------- 1. Individus ----------------------
@@ -200,5 +201,29 @@ async function migrateGenderless() {
       ids
     );
     log(`Migration des espèces asexuées : ${cleared.changes} Pokémon sans sexe désormais.`);
+  });
+}
+
+// ---------------------- 3. Boîte PC ----------------------
+
+// La place de chaque Pokémon dans la boîte PC du site et son surnom, plus le
+// nom des boîtes. Après la reconstruction de la table : celle-ci ne recopie que
+// les colonnes qu'elle connaît, et aurait effacé celles-ci.
+async function migratePc() {
+  await once("boite-pc", async () => {
+    for (const column of ["pc_pos INTEGER", "nickname TEXT"]) {
+      await run(`ALTER TABLE pokemon_owned ADD COLUMN ${column}`).catch((error) => {
+        if (!/duplicate column/i.test(error.message)) throw error;
+      });
+    }
+    await run(
+      `CREATE TABLE IF NOT EXISTS pokemon_pc_boxes (
+        user_id TEXT NOT NULL,
+        box INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        PRIMARY KEY (user_id, box)
+      )`
+    );
+    log("Boîte PC : place, surnom et noms de boîtes prêts.");
   });
 }

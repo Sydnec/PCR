@@ -126,7 +126,8 @@ h3 {
   color: var(--warning);
 }
 
-.icon-pin {
+.icon-pin,
+.icon-berry {
   color: var(--accent);
 }
 
@@ -137,9 +138,12 @@ h3 {
   object-fit: contain;
 }
 
-/* Les images d'objets de PokéAPI sont du pixel art. */
+/* Les images d'objets de PokéAPI sont du pixel art, centré dans une marge
+   transparente de 6 px sur 30 : sans agrandissement, une Safari Ball paraît
+   bien plus petite que les balls dessinées en emoji du serveur. */
 .item-img {
   image-rendering: pixelated;
+  transform: scale(1.6);
 }
 
 /* ---------- En-tête ---------- */
@@ -278,7 +282,8 @@ h3 {
 }
 
 select,
-input[type="search"] {
+input[type="search"],
+input[type="text"] {
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -464,10 +469,6 @@ input[type="search"] {
   background: var(--surface-2);
 }
 
-.card-shiny .card-name {
-  color: var(--shiny);
-}
-
 .sprite {
   width: 96px;
   height: 96px;
@@ -523,13 +524,6 @@ input[type="search"] {
 
 .sex-F {
   color: var(--female);
-}
-
-.pager {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
 }
 
 .segmented {
@@ -635,8 +629,11 @@ input[type="search"] {
   margin: 0;
 }
 
+/* minmax(0, …) : sans lui, la largeur naturelle d'un champ élargit la colonne
+   au-delà de la fenêtre sur un téléphone. */
 .actions {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   padding-top: 16px;
   border-top: 1px solid var(--border);
@@ -651,6 +648,17 @@ input[type="search"] {
 
 .action p {
   margin: 0;
+}
+
+.inline-form {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.inline-form input {
+  flex: 1;
+  min-width: 0;
 }
 
 /* ---------- Lignée (Capture, boîte, Pokédex) ---------- */
@@ -1011,6 +1019,212 @@ input[type="search"] {
   font-weight: 600;
 }
 
+/* ---------- Parc safari ---------- */
+
+/* Le bouton du parc, en haut de la Capture : une ligne, pas un encart. */
+.safari-offer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.safari-offer-text {
+  flex: 1 1 220px;
+}
+
+.safari-intro {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 640px;
+}
+
+.safari-intro p {
+  margin: 0;
+}
+
+.safari-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  max-width: 560px;
+}
+
+/* L'appât et la fuite ont une icône à la taille des balls. */
+.safari-actions .ball-icon > .icon {
+  width: 30px;
+  height: 30px;
+  padding: 3px;
+}
+
+.safari-catches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.safari-catches .sprite {
+  width: 56px;
+  height: 56px;
+}
+
+.safari-recap h2 {
+  font-size: 1.35rem;
+}
+
+/* ---------- Boîte PC ---------- */
+
+.pc {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 620px;
+  margin: 0 auto;
+}
+
+.pc-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.pc-arrow {
+  padding: 6px;
+}
+
+.pc-arrow .icon {
+  width: 1.4em;
+  height: 1.4em;
+}
+
+.pc-name,
+.pc-name-form {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.pc-name {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.pc-name:hover {
+  background: var(--surface-2);
+}
+
+.pc-name span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pc-name .icon {
+  width: 0.8em;
+  height: 0.8em;
+  color: var(--muted);
+}
+
+.pc-name-form {
+  display: flex;
+  gap: 6px;
+}
+
+.pc-name-form input {
+  flex: 1;
+  min-width: 0;
+}
+
+.pc-jump {
+  max-width: 34%;
+}
+
+.pc-banner {
+  align-items: center;
+}
+
+.pc-banner > span {
+  flex: 1;
+}
+
+/* Des cases à plat, comme les boîtes des jeux : seul le sprite y figure. */
+.pc-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--columns, 6), minmax(0, 1fr));
+  gap: 4px;
+}
+
+.pc-slot {
+  display: grid;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.pc-mon,
+.pc-empty {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Les sprites ont une large marge transparente : agrandis, ils remplissent la
+   case sans la déborder. */
+.pc-mon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  transform: scale(1.2);
+}
+
+.pc-mon:hover,
+.pc-choosing .pc-slot:hover,
+.pc-over {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.pc-dragging .pc-mon {
+  cursor: grabbing;
+}
+
+/* Les Pokémon de l'espèce cherchée depuis le Pokédex. */
+.pc-match {
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface-2));
+}
+
+/* Celui qu'on déplace : il attend qu'on lui choisisse une case. */
+.pc-moving {
+  opacity: 0.4;
+}
+
+.pc-stash {
+  display: none;
+}
+
+.pc-summary {
+  margin: 0;
+  text-align: center;
+}
+
 /* ---------- Sac ---------- */
 
 .balance {
@@ -1219,6 +1433,28 @@ input[type="search"] {
 
   .balls {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Trois actions de front, l'icône au-dessus du texte. */
+  .safari-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .safari-actions .ball {
+    flex-direction: column;
+    gap: 4px;
+    text-align: center;
+  }
+
+  .safari-actions .ball-text {
+    align-items: center;
+    max-width: 100%;
+  }
+
+  .pc-jump {
+    order: 4;
+    flex-basis: 100%;
+    max-width: none;
   }
 
   .lineage-link {

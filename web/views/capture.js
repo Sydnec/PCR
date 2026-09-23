@@ -6,20 +6,26 @@
 //
 // Le Pokémon au centre, ses balls juste en dessous, puis ce que donnerait le
 // bouton « Infos du Pokémon » sur Discord : ce qu'on en possède, son solde et
-// ses balls en poche, sa lignée. Le journal des lancers vit sur le côté.
+// ses balls en poche, sa lignée. Le journal des lancers vit sur le côté, et le
+// parc safari s'ouvre d'un bouton au-dessus.
 import { icon } from "../icons.js";
 import { lineageView } from "../lineage.js";
-import { api, colorChip, fmt, h, itemIcon, pokemonName, richText, toast } from "../lib.js";
-
-// Les chances affichées comme sur l'annonce Discord.
-function percent(probability) {
-  const value = probability * 100;
-  if (value >= 10) return `${Math.round(value)} %`;
-  if (value >= 1) return `${value.toFixed(1).replace(".", ",")} %`;
-  return `${value.toFixed(2).replace(".", ",")} %`;
-}
-
-const dexNumber = (species) => `n° ${String(species.id).padStart(3, "0")}`;
+import {
+  api,
+  colorChip,
+  dateTimeFr,
+  dexNumber,
+  fmt,
+  h,
+  itemIcon,
+  outcomePanel,
+  ownedMark,
+  percent,
+  pokemonName,
+  richText,
+  toast,
+} from "../lib.js";
+import { safariOffer } from "../safari-offer.js";
 
 // L'icône qui ouvre la réponse d'un lancer, à la place de l'emoji du message.
 const PANEL_ICONS = {
@@ -33,9 +39,11 @@ const PANEL_ICONS = {
 export async function render(ctx) {
   let state = await api("/api/spawn");
   let signature = JSON.stringify(state);
-  // Ce qui n'appartient qu'à cet onglet : la Master Ball en attente de
-  // confirmation, la réponse du dernier lancer, et la fin du cooldown affiché.
+  // Ce qui n'appartient qu'à cet onglet : la Master Ball ou l'entrée du parc en
+  // attente de confirmation, la réponse du dernier lancer, et la fin du
+  // cooldown affiché.
   let confirming = null;
+  let buyingSafari = false;
   let panel = null;
   let throwing = false;
   let coolUntil = 0;
@@ -48,15 +56,14 @@ export async function render(ctx) {
   const draw = () =>
     body.replaceChildren(
       ...[
-        state.pausedUntil
-          ? h(
-              "p",
-              { class: "notice" },
-              icon("tent"),
-              " Le parc safari est ouvert : les apparitions reprennent à sa fermeture. ",
-              "Il se visite sur Discord avec /pk safari."
-            )
-          : null,
+        safariOffer(ctx, state.safari, {
+          onEnter: () => ctx.navigate("/safari"),
+          redraw: draw,
+          confirming: buyingSafari,
+          setConfirming: (value) => {
+            buyingSafari = value;
+          },
+        }),
         h(
           "div",
           { class: "capture-layout" },
@@ -151,7 +158,13 @@ export async function render(ctx) {
         pokemonName(species, false, spawn.sex),
         spawn.shiny ? " shiny apparaît !" : " sauvage apparaît !"
       ),
-      h("p", { class: "spawn-meta muted" }, dexNumber(species), " · ", ownedLine(spawn)),
+      h(
+        "p",
+        { class: "spawn-meta muted" },
+        dexNumber(species),
+        " · ",
+        ownedMark(spawn.owned, spawn.shiny)
+      ),
       wallet(),
       balls(spawn),
       confirming ? confirmation(spawn) : null,
@@ -162,16 +175,6 @@ export async function render(ctx) {
     const glow = ctx.types[species.types[0]];
     if (glow) view.style.setProperty("--glow", glow);
     return view;
-  }
-
-  // « Est-ce que je l'ai déjà ? » La variante qui compte est celle qu'on a sous
-  // les yeux : un shiny est une entrée de Pokédex à part.
-  function ownedLine(spawn) {
-    const { normal, shiny } = spawn.owned;
-    const count = spawn.shiny ? shiny : normal;
-    return count
-      ? h("span", { class: "owned" }, icon("check"), ` Déjà dans ta boîte (×${fmt(count)})`)
-      : h("span", { class: "pill-new" }, spawn.shiny ? "Nouveau shiny" : "Nouveau");
   }
 
   // Le solde et les balls en poche : les deux questions qu'on se pose avant de
@@ -292,17 +295,8 @@ export async function render(ctx) {
     );
   }
 
-  // La réponse du lancer : la phrase du panneau Discord, son emoji d'ouverture
-  // remplacé par une icône qui dit l'issue.
   const throwPanel = () =>
-    h(
-      "p",
-      { class: `throw-panel throw-${panel.status}`, role: "status" },
-      icon(PANEL_ICONS[panel.status] ?? "warning"),
-      // Un seul bloc de texte : le panneau est une rangée flex, et chaque
-      // morceau (gras, emoji) y deviendrait sinon une colonne.
-      h("span", {}, richText(panel.text.replace(/^\p{Extended_Pictographic}\uFE0F?\s*/u, "")))
-    );
+    outcomePanel(panel.text, PANEL_ICONS[panel.status], `throw-${panel.status}`);
 
   // ---------------------- Entre deux apparitions ----------------------
 
@@ -340,12 +334,20 @@ export async function render(ctx) {
             )
           )
         : null,
-      h(
-        "p",
-        { class: "muted" },
-        "Aucun Pokémon dans les parages. Le prochain apparaîtra avec l'activité du salon ",
-        "Discord, et cette page le montrera dès son arrivée."
-      ),
+      // Le parc ouvert suspend les apparitions : l'attente a alors une fin connue.
+      state.pausedUntil
+        ? h(
+            "p",
+            { class: "muted" },
+            "Aucun Pokémon dans les parages : le parc safari est ouvert, et les apparitions ",
+            `reprennent à sa fermeture, ${dateTimeFr(state.pausedUntil)}.`
+          )
+        : h(
+            "p",
+            { class: "muted" },
+            "Aucun Pokémon dans les parages. Le prochain apparaîtra avec l'activité du salon ",
+            "Discord, et cette page le montrera dès son arrivée."
+          ),
       wallet()
     );
   }

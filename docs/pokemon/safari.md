@@ -44,3 +44,6 @@ visite. C'est le seul contenu Pokémon où les actions ne coûtent rien.
   échoue rend le droit de réessayer.
 - Tout l'état vit en base : les boutons répondent encore après un redémarrage du bot, et un
   double-clic ne peut pas jouer deux fois la même action.
+- **Sur le site** aussi, depuis l'onglet Capture : reprendre sa visite, entrer dans un parc ouvert
+  ou acheter une entrée, puis jouer. C'est la même visite, qui se reprend d'un côté à l'autre (voir
+  [le site](../site.md#parc-safari)).
