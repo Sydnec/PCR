@@ -419,14 +419,30 @@ export async function throwBall(
   const refusal = startThrow(userId, ballKey);
   if (refusal) return answerThrow(interaction, spawnId, throwMessage(refusal), { panel });
 
-  if (panel) await interaction.deferUpdate();
-  else await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  // L'acquittement et le tirage partent ensemble. Attendre l'accusé de Discord
+  // avant de tirer ajoutait un aller-retour à son API que le site n'a pas : dans
+  // une course au même Pokémon, le clic Discord partait perdant de quelques
+  // centaines de millisecondes. Si l'acquittement échoue (délai de Discord
+  // dépassé), le lancer est joué quand même : l'annonce publique le montre, seul
+  // l'éphémère manque — comme un lancer du site dont la réponse se perd.
+  const acknowledged = (
+    panel ? interaction.deferUpdate() : interaction.deferReply({ flags: MessageFlags.Ephemeral })
+  ).then(
+    () => {
+      // Le nouveau panneau existe déjà (le defer l'a rendu visible) : on peut
+      // retirer le précédent sans jamais laisser le joueur sans rien sous les yeux.
+      trackPanel(interaction, spawnId, { replacing: !panel });
+      return true;
+    },
+    (error) => {
+      handleException("Acquittement d'un lancer :", error);
+      return false;
+    }
+  );
 
-  // Le nouveau panneau existe déjà (le defer l'a rendu visible) : on peut retirer
-  // le précédent sans jamais laisser le joueur sans rien sous les yeux.
-  trackPanel(interaction, spawnId, { replacing: !panel });
-
-  resolveThrow(interaction.client, userId, spawnId, ballKey, { requireItem }, (err, outcome) => {
+  resolveThrow(interaction.client, userId, spawnId, ballKey, { requireItem }, async (err, outcome) => {
+    // La réponse attend l'acquittement : sans lui, Discord refuserait editReply.
+    if (!(await acknowledged)) return;
     // Un seul point de sortie décide de la forme de la réponse : les boutons
     // disparaissent quand il n'y a plus rien à relancer.
     interaction
