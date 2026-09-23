@@ -14,6 +14,7 @@
 import db from "../points-db.js";
 import { addPoints, getBalance, spendPoints } from "../economy.js";
 import { handleException, log } from "../utils.js";
+import { pseudo } from "../pseudo.js";
 import { getPokemonConfig, getSafariConfig } from "./config.js";
 import {
   getSpecies,
@@ -308,8 +309,11 @@ function startSession(userId, { park = null, entryCost = 0 }, cb) {
         getSession(this.lastID, (err, session) => {
           if (err) return cb(err);
           recordSafariEntry({ userId, cost: entryCost });
-          log(
-            `Parc safari : ${userId} entre (session #${session.id}, parc ${parkId ?? "—"}, ${entryCost} pts)`
+          pseudo(userId).then((name) =>
+            log(
+              `Parc safari : ${name} entre (session #${session.id}, parc ${parkId ?? "—"}, ` +
+                `${entryCost} pts)`
+            )
           );
           withOwned({ ok: true, session }, cb);
         });
@@ -391,7 +395,7 @@ export function startPaidSession(userId, cb) {
           });
           return err ? cb(err) : cb(null, { ...result, ticketRendu: true });
         }
-        log(`Parc safari : ${userId} entre avec un ${ticket.label}`);
+        pseudo(userId).then((name) => log(`Parc safari : ${name} entre avec un ${ticket.label}`));
         cb(null, { ...result, ticket });
       });
     });
@@ -440,7 +444,9 @@ export function startPaidSession(userId, cb) {
               if (refundErr) {
                 handleException("Remboursement de l'entrée du parc safari :", refundErr);
               }
-              log(`Remboursement de ${price} pts à ${userId} (entrée du parc impossible)`);
+              pseudo(userId).then((name) =>
+                log(`Remboursement de ${price} pts à ${name} (entrée du parc impossible)`)
+              );
             });
             return err ? cb(err) : cb(null, { ...result, refunded: price });
           }
@@ -631,8 +637,11 @@ function resolveAction({ session, species, action, config }, cb) {
   creditSpecies(session.user_id, species.id, isShiny, options, (err) => {
     if (err) return cb(err);
     recordSafariCatch({ userId: session.user_id, species, isShiny });
-    log(
-      `Parc safari : ${session.user_id} attrape ${species.name}${isShiny ? " ✨" : ""} (session #${session.id})`
+    pseudo(session.user_id).then((name) =>
+      log(
+        `Parc safari : ${name} attrape ${species.name}${isShiny ? " ✨" : ""} ` +
+          `(session #${session.id})`
+      )
     );
 
     db.run(

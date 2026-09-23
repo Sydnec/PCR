@@ -1,4 +1,5 @@
 import { handleException, log } from '../../modules/utils.js';
+import { pseudo } from '../../modules/pseudo.js';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -24,12 +25,14 @@ async function execute(member) {
 
         if (inviteUsed) {
             log(
-                `${member.user.tag} a rejoint avec l'invitation ${inviteUsed.code}` +
-                    (inviteUsed.inviter ? ` de ${inviteUsed.inviter.tag}` : '')
+                `${member.displayName} a rejoint avec l'invitation ${inviteUsed.code}` +
+                    (inviteUsed.inviter
+                        ? ` de ${await pseudo(inviteUsed.inviter.id)}`
+                        : '')
             );
         } else {
             log(
-                `${member.user.tag} a rejoint sans invitation identifiable : rôle par défaut`
+                `${member.displayName} a rejoint sans invitation identifiable : rôle par défaut`
             );
         }
 

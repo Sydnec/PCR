@@ -6,8 +6,9 @@ Toujours en français, et concises : juste de quoi comprendre ce qui a été fai
 
 ## Livraison d'une feature ou d'un correctif
 
-Le mainteneur ne fait que `git pull && pcr release <fix|minor|major>` sur `main`. Une livraison
-n'est donc terminée que lorsqu'elle est **mergée dans `main`** :
+Le mainteneur ne fait que `git pull && pcr release <fix|minor|major>` sur `main`. Les changements
+s'accumulent sur la branche de travail, poussés au fil de l'eau ; ils ne partent vers `main` que
+quand le mainteneur dit **« là, on release »** :
 
 1. Développer sur la branche de travail, commits en français au format conventionnel
    (`feat(pokemon): …`, `fix(pokemon): …`), avec un corps qui explique le pourquoi.
@@ -22,7 +23,8 @@ n'est donc terminée que lorsqu'elle est **mergée dans `main`** :
 3. Mettre à jour la doc si le comportement visible change : la page concernée dans `docs/`, et le
    résumé du `README.md` s'il ne dit plus vrai. Le README reste un sommaire : le détail va dans
    `docs/`.
-4. Ouvrir la PR vers `main`, attendre la CI verte, puis la merger (merge commit).
+4. Pousser la branche de travail. **Pas de PR sans « là, on release »** : alors seulement, ouvrir
+   la PR vers `main`, attendre la CI verte, puis la merger (merge commit).
 
 Ne jamais toucher à la version (`package.json`, `changelog.json` → `version` / `releases`) : c'est
 le rôle de `pcr release`.

@@ -1,4 +1,5 @@
 import { log } from "../../modules/utils.js";
+import { pseudoOf } from "../../modules/pseudo.js";
 import {
   buildRedistributionEmbed,
   getNextRedistributionAt,
@@ -49,7 +50,7 @@ export default {
       });
     }
 
-    log(`/admin potcommun par ${interaction.user.username} : ${result.plan.pot} points`);
+    log(`/admin potcommun par ${pseudoOf(interaction)} : ${result.plan.pot} points`);
     await interaction.editReply({
       content:
         `✅ Pot commun déclenché, sans un mot aux joueurs.` +

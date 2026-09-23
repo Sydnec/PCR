@@ -12,6 +12,7 @@ import {
 } from "discord.js";
 import { buildBalanceEmbed, getBalance } from "../economy.js";
 import { handleException, log } from "../utils.js";
+import { pseudoOf, pseudos } from "../pseudo.js";
 import { getPokemonConfig } from "./config.js";
 import { answerThrow, throwBall, trackPanel } from "./capture.js";
 import { getSpawn } from "./spawn.js";
@@ -210,7 +211,7 @@ function handleDropClaim(interaction, dropId) {
       return ephemeral(interaction, "💨 Trop tard, quelqu'un a été plus rapide !");
     }
 
-    log(`Ramassage : ${interaction.user.username} prend ${claimed.item.label}`);
+    log(`Ramassage : ${pseudoOf(interaction)} prend ${claimed.item.label}`);
     interaction
       .update({
         embeds: [buildDropEmbed(claimed.item, { claimedBy: interaction.user.id })],
@@ -349,7 +350,7 @@ function runEvolution(
     ].filter(Boolean);
 
     log(
-      `Évolution : ${interaction.user.id} fait évoluer #${result.evolved.id} ${source.name} en ` +
+      `Évolution : ${pseudoOf(interaction)} fait évoluer #${result.evolved.id} ${source.name} en ` +
         `${result.target.name} (${sacrifices} sacrifiés, ${result.plan.points} pts` +
         `${metamorphs ? `, ${metamorphs}× Métamorph` : ""}` +
         `${aide ? `, ${aide.quantity}× ${aide.item.label}` : ""})`
@@ -460,9 +461,8 @@ function handleTradeButton(interaction, action, tradeId) {
       const evolutions = (result.evolutions ?? [])
         .map((e) => `${getSpecies(e.from)?.name} → ${getSpecies(e.to)?.name}`)
         .join(", ");
-      log(
-        `Échange #${tradeId} accepté entre ${trade.from_user_id} et ${trade.to_user_id}` +
-          (evolutions ? ` (${evolutions})` : "")
+      pseudos(trade.from_user_id, trade.to_user_id).then(([from, to]) =>
+        log(`Échange #${tradeId} accepté entre ${from} et ${to}` + (evolutions ? ` (${evolutions})` : ""))
       );
       finishTrade(interaction, trade, "ACCEPTED");
     });
@@ -606,7 +606,7 @@ function handleSafariShare(interaction, sessionId) {
         return dire(`❌ Je n'ai pas pu publier dans ${channel}. Tu peux réessayer.`);
       }
 
-      log(`Partage de bilan safari #${result.session.id} par ${interaction.user.username}`);
+      log(`Partage de bilan safari #${result.session.id} par ${pseudoOf(interaction)}`);
       // On ne réécrit QUE les composants : omettre `embeds` l'exclut du corps
       // envoyé à Discord, qui laisse donc l'embed en place — la ligne de
       // résultat du dernier lancer reste sous les yeux du dresseur.

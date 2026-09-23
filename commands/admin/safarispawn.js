@@ -1,4 +1,5 @@
 import { log } from "../../modules/utils.js";
+import { pseudo, pseudoOf } from "../../modules/pseudo.js";
 import { openPark } from "../../modules/pokemon/safari.js";
 
 // Ouverture manuelle d'un parc safari, pour organiser un événement ou dédommager
@@ -48,8 +49,8 @@ export default {
     }
 
     log(
-      `/admin safarispawn par ${interaction.user.username} : parc #${result.parkId}` +
-        `${target ? ` réservé à ${target.username}` : " public"}`
+      `/admin safarispawn par ${pseudoOf(interaction)} : parc #${result.parkId}` +
+        `${target ? ` réservé à ${await pseudo(target.id)}` : " public"}`
     );
     await interaction
       .editReply({

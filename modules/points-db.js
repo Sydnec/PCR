@@ -23,17 +23,6 @@ const db = new sqlite3.Database(dbPath, (err) => {
       )`,
       (err) => {
         if (err) handleException("Erreur création table points :", err);
-        else {
-            // Migration (add columns if not exists for old DBs)
-            const addColumn = (colName, colType) => {
-                db.run(`ALTER TABLE points ADD COLUMN ${colName} ${colType}`, () => {
-                    // Ignore duplicate column error
-                });
-            }
-            addColumn("last_message_at", "INTEGER DEFAULT 0");
-            addColumn("messages_today_count", "INTEGER DEFAULT 0");
-            addColumn("last_reset_date", "TEXT");
-        }
       }
     );
 
@@ -47,6 +36,11 @@ const db = new sqlite3.Database(dbPath, (err) => {
     // 0 signifie « jamais planifié » : le premier tick pose l'échéance sans
     // rien redistribuer, sinon une installation neuve prélèverait tout le monde
     // dès sa première heure.
+    //
+    // `redistribution_since` est un bail d'exécution : il empêche deux pots de
+    // tourner en même temps, ce que l'échéance seule ne garantit pas puisque
+    // /admin potcommun la contourne. Sa péremption évite qu'un arrêt en plein
+    // pot ne bloque tous les suivants.
     db.run(
       `CREATE TABLE IF NOT EXISTS economy_state (
         id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -55,21 +49,9 @@ const db = new sqlite3.Database(dbPath, (err) => {
       )`,
       (err) => {
         if (err) return handleException("Erreur création table economy_state :", err);
-        // Bail d'exécution : empêche deux pots de tourner en même temps, ce que
-        // l'échéance seule ne garantit pas puisque /admin potcommun la
-        // contourne. Sa péremption évite qu'un arrêt en plein pot ne bloque
-        // tous les suivants.
-        db.run(
-          "ALTER TABLE economy_state ADD COLUMN redistribution_since INTEGER NOT NULL DEFAULT 0",
-          (err) => {
-            if (err && !err.message.includes("duplicate column")) {
-              handleException("Erreur lors de l'ajout de redistribution_since :", err);
-            }
-            db.run("INSERT OR IGNORE INTO economy_state (id) VALUES (1)", (err) => {
-              if (err) handleException("Erreur initialisation economy_state :", err);
-            });
-          }
-        );
+        db.run("INSERT OR IGNORE INTO economy_state (id) VALUES (1)", (err) => {
+          if (err) handleException("Erreur initialisation economy_state :", err);
+        });
       }
     );
 
@@ -88,15 +70,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
         failures INTEGER NOT NULL DEFAULT 0
       )`,
       (err) => {
-        if (err) return handleException("Erreur création table points_redistributions :", err);
-        db.run(
-          "ALTER TABLE points_redistributions ADD COLUMN failures INTEGER NOT NULL DEFAULT 0",
-          (err) => {
-            if (err && !err.message.includes("duplicate column")) {
-              handleException("Erreur lors de l'ajout de failures :", err);
-            }
-          }
-        );
+        if (err) handleException("Erreur création table points_redistributions :", err);
       }
     );
 
@@ -112,10 +86,6 @@ const db = new sqlite3.Database(dbPath, (err) => {
       )`,
       (err) => {
         if (err) handleException("Erreur création table bets :", err);
-        else {
-             // Migration for type
-             db.run(`ALTER TABLE bets ADD COLUMN is_estimation INTEGER DEFAULT 0`, () => {});
-        }
       }
     );
 
@@ -146,10 +116,6 @@ const db = new sqlite3.Database(dbPath, (err) => {
       )`,
       (err) => {
         if (err) handleException("Erreur création table bet_participations :", err);
-        else {
-             // Migration for prediction_value
-             db.run(`ALTER TABLE bet_participations ADD COLUMN prediction_value INTEGER`, () => {});
-        }
       }
     );
 
@@ -160,6 +126,10 @@ const db = new sqlite3.Database(dbPath, (err) => {
 
     // État global du système. Une seule ligne, qui sert de point de
     // sérialisation au déclenchement des spawns (cf. pokemon/spawn.js).
+    // `spawn_paused_until` : la pause des apparitions pendant un parc safari.
+    // Elle vit ici plutôt que dans pokemon_safari_parks pour tenir dans
+    // l'UPDATE gardé qui revendique un spawn : une garde de plus, aucune
+    // requête supplémentaire, aucune course.
     db.run(
       `CREATE TABLE IF NOT EXISTS pokemon_state (
         id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -171,25 +141,21 @@ const db = new sqlite3.Database(dbPath, (err) => {
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_state :", err);
-        // Pause des apparitions pendant un parc safari. Vit ici plutôt que dans
-        // pokemon_safari_parks pour tenir dans l'UPDATE gardé qui revendique un
-        // spawn : une garde de plus, aucune requête supplémentaire, aucune course.
-        db.run(
-          "ALTER TABLE pokemon_state ADD COLUMN spawn_paused_until INTEGER NOT NULL DEFAULT 0",
-          (err) => {
-            if (err && !err.message.includes("duplicate column")) {
-              handleException("Erreur lors de l'ajout de spawn_paused_until :", err);
-            }
-            db.run("INSERT OR IGNORE INTO pokemon_state (id) VALUES (1)", (err) => {
-              if (err) handleException("Erreur initialisation pokemon_state :", err);
-            });
-          }
-        );
+        db.run("INSERT OR IGNORE INTO pokemon_state (id) VALUES (1)", (err) => {
+          if (err) handleException("Erreur initialisation pokemon_state :", err);
+        });
       }
     );
 
     // Spawns. catch_rate est figé à l'apparition : régénérer le dataset ou
     // changer la config ne doit jamais modifier les chances d'un spawn en cours.
+    // - `flees_at` : l'échéance de fuite autonome, tirée au sort à la création.
+    // - `held_item` : l'objet que tient le Pokémon, tiré à l'apparition comme le
+    //   shiny et le taux de capture. Dans la ligne et pas ailleurs : ce qu'il
+    //   porte ne doit pas changer entre le moment où il apparaît et celui où
+    //   quelqu'un l'attrape, ni se rejouer à chaque lancer.
+    // - `sex` : tiré à l'apparition pour que l'annonce le montre — et c'est
+    //   celui qu'aura l'individu capturé. NULL pour une espèce asexuée.
     db.run(
       `CREATE TABLE IF NOT EXISTS pokemon_spawns (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -205,7 +171,10 @@ const db = new sqlite3.Database(dbPath, (err) => {
         caught_by TEXT,
         caught_at INTEGER,
         caught_ball TEXT,
-        ended_at INTEGER
+        ended_at INTEGER,
+        flees_at INTEGER,
+        held_item TEXT,
+        sex TEXT
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_spawns :", err);
@@ -217,41 +186,12 @@ const db = new sqlite3.Database(dbPath, (err) => {
             if (err) handleException("Erreur création index pokemon_spawn_active :", err);
           }
         );
-        // Échéance de fuite autonome, tirée au sort à la création du spawn.
-        // Migration pour les bases antérieures : l'erreur « duplicate column »
-        // signifie simplement que la colonne est déjà là.
-        // L'index doit être créé DANS le callback de l'ALTER : sqlite3
-        // n'ordonne pas deux db.run successifs, et l'index référencerait une
-        // colonne qui n'existe pas encore.
-        db.run("ALTER TABLE pokemon_spawns ADD COLUMN flees_at INTEGER", (err) => {
-          if (err && !err.message.includes("duplicate column")) {
-            handleException("Erreur lors de l'ajout de flees_at :", err);
+        db.run(
+          "CREATE INDEX IF NOT EXISTS idx_pokemon_spawns_flees ON pokemon_spawns(status, flees_at)",
+          (err) => {
+            if (err) handleException("Erreur création index pokemon_spawns_flees :", err);
           }
-          db.run(
-            "CREATE INDEX IF NOT EXISTS idx_pokemon_spawns_flees ON pokemon_spawns(status, flees_at)",
-            (err) => {
-              if (err) handleException("Erreur création index pokemon_spawns_flees :", err);
-            }
-          );
-          // L'objet que tient le Pokémon, tiré à l'apparition comme le shiny et
-          // le taux de capture. Dans la ligne et pas ailleurs : ce qu'il porte
-          // ne doit pas changer entre le moment où il apparaît et celui où
-          // quelqu'un l'attrape, ni se rejouer à chaque lancer.
-          db.run("ALTER TABLE pokemon_spawns ADD COLUMN held_item TEXT", (err) => {
-            if (err && !err.message.includes("duplicate column")) {
-              handleException("Erreur lors de l'ajout de held_item :", err);
-            }
-          });
-          // Le sexe du Pokémon apparu, tiré à l'apparition pour que l'annonce
-          // le montre — et c'est celui qu'aura l'individu capturé. NULL pour
-          // une espèce asexuée, et pour les apparitions d'avant la colonne,
-          // dont le sexe se tire à la capture comme autrefois.
-          db.run("ALTER TABLE pokemon_spawns ADD COLUMN sex TEXT", (err) => {
-            if (err && !err.message.includes("duplicate column")) {
-              handleException("Erreur lors de l'ajout du sexe des apparitions :", err);
-            }
-          });
-        });
+        );
       }
     );
 
@@ -279,38 +219,12 @@ const db = new sqlite3.Database(dbPath, (err) => {
       }
     );
 
-    // Ancienne collection : un compteur par espèce. Elle n'est plus ni lue ni
-    // écrite par le jeu — pokemon_owned l'a remplacée — et ne sert qu'une fois,
-    // de source à la migration vers les individus. Gardée telle quelle : c'est
-    // la sauvegarde de ce que chacun possédait avant la migration.
-    db.run(
-      `CREATE TABLE IF NOT EXISTS pokemon_collection (
-        user_id TEXT NOT NULL,
-        species_id INTEGER NOT NULL,
-        is_shiny INTEGER NOT NULL DEFAULT 0,
-        count INTEGER NOT NULL DEFAULT 0,
-        first_caught_at INTEGER,
-        last_caught_at INTEGER,
-        PRIMARY KEY (user_id, species_id, is_shiny)
-      )`,
-      (err) => {
-        if (err) return handleException("Erreur création table pokemon_collection :", err);
-        db.run(
-          "CREATE INDEX IF NOT EXISTS idx_pokemon_collection_user ON pokemon_collection(user_id)",
-          (err) => {
-            if (err) handleException("Erreur création index pokemon_collection_user :", err);
-          }
-        );
-      }
-    );
-
     // Les Pokémon eux-mêmes, un par ligne. Un compteur par espèce ne savait pas
     // dire qu'un Pikachu est une femelle, qu'il a été pris à l'Hyper Ball, ni
     // qu'il a déjà pondu : tout ce qui distingue deux individus vit ici.
     //
     // - `sex` : M, F, ou NULL pour une espèce asexuée des jeux (Magnéti,
-    //   Métamorph, les légendaires…). La définition doit rester identique à
-    //   celle que reconstruit migration.js.
+    //   Métamorph, les légendaires…).
     // - `ball` : la ball de capture (clé de la config, ou « safari »), NULL
     //   quand il n'y en a pas eu — éclos d'un œuf — ou qu'on ne la sait plus.
     // - `origin` : comment le dresseur actuel l'a obtenu (capture, safari,
@@ -319,6 +233,10 @@ const db = new sqlite3.Database(dbPath, (err) => {
     // - `obtained_at` : depuis quand ce dresseur le possède. Aucune revente,
     //   évolution ni échange ne peut prendre le dernier individu d'une espèce,
     //   shiny ou non : il en reste toujours au moins un.
+    // - `pc_pos`, `nickname` : sa case dans la boîte PC du site et son surnom.
+    //   Du rangement, qui ne change rien au jeu (pokemon/pc.js).
+    // - `locked` : verrouillé, il ne part jamais — ni revente, ni échange, ni
+    //   sacrifice (lockedByDefault, /pk verrou).
     db.run(
       `CREATE TABLE IF NOT EXISTS pokemon_owned (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -329,7 +247,10 @@ const db = new sqlite3.Database(dbPath, (err) => {
         ball TEXT,
         origin TEXT NOT NULL,
         sterile INTEGER NOT NULL DEFAULT 0,
-        obtained_at INTEGER NOT NULL
+        obtained_at INTEGER NOT NULL,
+        pc_pos INTEGER,
+        nickname TEXT,
+        locked INTEGER NOT NULL DEFAULT 0
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_owned :", err);
@@ -338,20 +259,31 @@ const db = new sqlite3.Database(dbPath, (err) => {
              ON pokemon_owned(user_id, species_id, is_shiny)`,
           (err) => {
             if (err) handleException("Erreur création index pokemon_owned_entry :", err);
-            // Les migrations partent d'ici, une fois la table là. Import
-            // dynamique : elles ont besoin de cette base, qui ne peut pas les
-            // importer en tête sans cycle.
-            import("./pokemon/migration.js")
-              .then(({ runMigrations }) => runMigrations())
-              .catch((error) => handleException("Migration de la collection :", error));
           }
         );
+      }
+    );
+
+    // Les noms que les dresseurs donnent aux boîtes de leur PC, sur le site. Une
+    // boîte sans ligne garde son nom par défaut.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_pc_boxes (
+        user_id TEXT NOT NULL,
+        box INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        PRIMARY KEY (user_id, box)
+      )`,
+      (err) => {
+        if (err) handleException("Erreur création table pokemon_pc_boxes :", err);
       }
     );
 
     // Œufs. Un seul en couvaison par dresseur, garanti en base comme la session
     // de safari. Le seuil de messages et l'échéance sont figés à la ponte :
     // retoucher la configuration ne doit pas changer la règle d'un œuf déjà pondu.
+    // `shiny_parents` : combien de parents étaient shiny à la ponte ; chacun
+    // multiplie les chances de shiny du bébé, même s'il est parti avant
+    // l'éclosion.
     db.run(
       `CREATE TABLE IF NOT EXISTS pokemon_eggs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -367,20 +299,11 @@ const db = new sqlite3.Database(dbPath, (err) => {
         laid_at INTEGER NOT NULL,
         hatch_at INTEGER NOT NULL,
         hatched_at INTEGER,
-        pokemon_id INTEGER
+        pokemon_id INTEGER,
+        shiny_parents INTEGER NOT NULL DEFAULT 0
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_eggs :", err);
-        // Combien de parents étaient shiny à la ponte : chacun multiplie les
-        // chances de shiny du bébé, même s'il est parti avant l'éclosion.
-        db.run(
-          "ALTER TABLE pokemon_eggs ADD COLUMN shiny_parents INTEGER NOT NULL DEFAULT 0",
-          (err) => {
-            if (err && !err.message.includes("duplicate column")) {
-              handleException("Erreur lors de l'ajout de shiny_parents :", err);
-            }
-          }
-        );
         db.run(
           `CREATE UNIQUE INDEX IF NOT EXISTS idx_pokemon_eggs_incubating
              ON pokemon_eggs(user_id) WHERE status = 'INCUBATING'`,
@@ -393,6 +316,9 @@ const db = new sqlite3.Database(dbPath, (err) => {
 
     // Offres d'échange. expires_at permet une expiration paresseuse dans le
     // WHERE de l'acceptation : aucun cron n'est nécessaire à la correction.
+    // Chaque côté désigne un individu précis (`*_pokemon_id`), avec son
+    // espèce, sa variante, son sexe et sa fertilité, qui doivent être encore
+    // les siens à l'acceptation.
     db.run(
       `CREATE TABLE IF NOT EXISTS pokemon_trades (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -407,29 +333,16 @@ const db = new sqlite3.Database(dbPath, (err) => {
         expires_at INTEGER NOT NULL,
         resolved_at INTEGER,
         channel_id TEXT,
-        message_id TEXT
+        message_id TEXT,
+        offer_sex TEXT,
+        offer_fertile INTEGER,
+        request_sex TEXT,
+        request_fertile INTEGER,
+        offer_pokemon_id INTEGER,
+        request_pokemon_id INTEGER
       )`,
       (err) => {
-        if (err) return handleException("Erreur création table pokemon_trades :", err);
-        // Chaque côté désigne un groupe d'individus : espèce, variante, sexe et
-        // fertilité. NULL — les offres d'avant les individus — veut dire
-        // « n'importe lequel ».
-        // Ou un individu précis, désigné par son identifiant (#123).
-        const columns = [
-          "offer_sex TEXT",
-          "offer_fertile INTEGER",
-          "request_sex TEXT",
-          "request_fertile INTEGER",
-          "offer_pokemon_id INTEGER",
-          "request_pokemon_id INTEGER",
-        ];
-        for (const column of columns) {
-          db.run(`ALTER TABLE pokemon_trades ADD COLUMN ${column}`, (err) => {
-            if (err && !err.message.includes("duplicate column")) {
-              handleException(`Erreur lors de l'ajout de ${column} :`, err);
-            }
-          });
-        }
+        if (err) handleException("Erreur création table pokemon_trades :", err);
       }
     );
 
@@ -458,10 +371,9 @@ const db = new sqlite3.Database(dbPath, (err) => {
     // c'est le catalogue, dans la configuration, qui lui donne un nom, une icône
     // et un sens — et le code qui lui donne un effet, s'il en a un.
     //
-    // La ligne survit à count = 0, comme dans pokemon_collection et pour la même
-    // raison : first_obtained_at raconte depuis quand le dresseur connaît
-    // l'objet, et ça ne se retrouve pas après coup. TOUTE lecture filtre donc
-    // sur count > 0.
+    // La ligne survit à count = 0 : first_obtained_at raconte depuis quand le
+    // dresseur connaît l'objet, et ça ne se retrouve pas après coup. TOUTE
+    // lecture filtre donc sur count > 0.
     db.run(
       `CREATE TABLE IF NOT EXISTS pokemon_inventory (
         user_id TEXT NOT NULL,
@@ -617,6 +529,10 @@ const db = new sqlite3.Database(dbPath, (err) => {
     // mémoire, donc les boutons répondent encore après un redémarrage.
     // encounter_catch_rate est figé à la rencontre, pour la même raison que sur
     // pokemon_spawns — régénérer le dataset ne doit pas changer une partie en cours.
+    // Le sexe de la rencontre, comme celui d'une apparition, est tiré quand elle
+    // arrive, montré, puis donné à l'individu capturé. `shared_at` verrouille le
+    // partage du bilan, une seule fois par visite : un UPDATE gardé dessus, comme
+    // partout ailleurs ici, plutôt que de compter sur la disparition du bouton.
     db.run(
       `CREATE TABLE IF NOT EXISTS pokemon_safari_sessions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -637,54 +553,38 @@ const db = new sqlite3.Database(dbPath, (err) => {
         encounter_is_shiny INTEGER NOT NULL DEFAULT 0,
         encounter_catch_rate INTEGER,
         encounter_bait INTEGER NOT NULL DEFAULT 0,
+        encounter_sex TEXT,
         shared_at INTEGER
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_safari_sessions :", err);
-        // Partage du bilan : une seule fois par visite. La colonne sert de
-        // verrou — un UPDATE gardé dessus, comme partout ailleurs ici — plutôt
-        // que de compter sur la disparition du bouton côté client.
-        //
-        // La suite est DANS le callback, comme les autres migrations de ce
-        // fichier : sqlite3 n'ordonne pas deux db.run successifs, et rien de ce
-        // qui touche à la nouvelle colonne ne doit partir avant qu'elle existe.
-        // Le sexe de la rencontre, comme celui d'une apparition : tiré quand
-        // elle arrive, montré, puis donné à l'individu capturé.
-        db.run("ALTER TABLE pokemon_safari_sessions ADD COLUMN encounter_sex TEXT", (err) => {
-          if (err && !err.message.includes("duplicate column")) {
-            handleException("Erreur lors de l'ajout du sexe des rencontres :", err);
-          }
-        });
-        db.run("ALTER TABLE pokemon_safari_sessions ADD COLUMN shared_at INTEGER", (err) => {
-          if (err && !err.message.includes("duplicate column")) {
-            handleException("Erreur lors de l'ajout de shared_at :", err);
-          }
-          // Une seule session à la fois par dresseur, garanti en base.
-          db.run(
-            `CREATE UNIQUE INDEX IF NOT EXISTS idx_pokemon_safari_session_active
-               ON pokemon_safari_sessions(user_id) WHERE status = 'ACTIVE'`,
-            (err) => {
-              if (err) {
-                return handleException(
-                  "Erreur création index pokemon_safari_session_active :",
-                  err
-                );
-              }
-              // Une entrée gratuite par dresseur et par parc. park_id NULL (entrée
-              // payante) échappe à l'index : SQLite traite chaque NULL comme distinct,
-              // donc les /pk safari successifs restent possibles.
-              db.run(
-                `CREATE UNIQUE INDEX IF NOT EXISTS idx_pokemon_safari_session_park
-                   ON pokemon_safari_sessions(park_id, user_id) WHERE park_id IS NOT NULL`,
-                (err) => {
-                  if (err) {
-                    handleException("Erreur création index pokemon_safari_session_park :", err);
-                  }
-                }
+        // Une seule session à la fois par dresseur, garanti en base. Les index
+        // se créent l'un après l'autre : sqlite3 n'ordonne pas deux db.run
+        // successifs.
+        db.run(
+          `CREATE UNIQUE INDEX IF NOT EXISTS idx_pokemon_safari_session_active
+             ON pokemon_safari_sessions(user_id) WHERE status = 'ACTIVE'`,
+          (err) => {
+            if (err) {
+              return handleException(
+                "Erreur création index pokemon_safari_session_active :",
+                err
               );
             }
-          );
-        });
+            // Une entrée gratuite par dresseur et par parc. park_id NULL (entrée
+            // payante) échappe à l'index : SQLite traite chaque NULL comme distinct,
+            // donc les /pk safari successifs restent possibles.
+            db.run(
+              `CREATE UNIQUE INDEX IF NOT EXISTS idx_pokemon_safari_session_park
+                 ON pokemon_safari_sessions(park_id, user_id) WHERE park_id IS NOT NULL`,
+              (err) => {
+                if (err) {
+                  handleException("Erreur création index pokemon_safari_session_park :", err);
+                }
+              }
+            );
+          }
+        );
       }
     );
 

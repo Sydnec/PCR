@@ -11,6 +11,7 @@
 import { EmbedBuilder } from "discord.js";
 import db from "./points-db.js";
 import { handleException } from "./utils.js";
+import { pseudo } from "./pseudo.js";
 
 // Débite cost points si le solde le permet.
 // Rappelle cb(err, true) si le débit a eu lieu, cb(err, false) sinon.
@@ -144,7 +145,7 @@ async function applyMovementsNow(movements) {
       const err = await new Promise((resolve) => addPoints(userId, amount, resolve));
       if (err) {
         failures++;
-        handleException(`Mouvement de ${amount} points impossible pour ${userId} :`, err);
+        handleException(`Mouvement de ${amount} points impossible pour ${await pseudo(userId)} :`, err);
       }
     }
   } finally {

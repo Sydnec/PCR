@@ -17,6 +17,7 @@
 // perd sa journée à cause d'une panne de base.
 import db from "../points-db.js";
 import { handleException, log } from "../utils.js";
+import { pseudo } from "../pseudo.js";
 import { getPokemonConfig } from "./config.js";
 import { grantItem, itemLot, itemLotteryWeight, pickWeightedItem } from "./items.js";
 
@@ -143,7 +144,7 @@ export function play(userId, cb) {
 
     const prize = rollLottery();
     if (!prize) {
-      log(`Loterie : ${userId} repart les mains vides`);
+      pseudo(userId).then((name) => log(`Loterie : ${name} repart les mains vides`));
       return cb(null, { ok: true, prize: null, nextAt });
     }
 
@@ -159,7 +160,9 @@ export function play(userId, cb) {
           if (err) handleException("Comptage d'un gain de loterie :", err);
         }
       );
-      log(`Loterie : ${userId} gagne ${prize.quantity}× ${prize.item.label}`);
+      pseudo(userId).then((name) =>
+        log(`Loterie : ${name} gagne ${prize.quantity}× ${prize.item.label}`)
+      );
       cb(null, { ok: true, prize, nextAt });
     });
   });

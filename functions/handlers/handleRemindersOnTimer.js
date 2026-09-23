@@ -2,6 +2,7 @@
 import { EmbedBuilder } from 'discord.js';
 import { handleException } from '../../modules/utils.js';
 import db from '../../modules/db.js';
+import { pseudo } from '../../modules/pseudo.js';
 
 export default (bot) => {
     // Créer la table reminders si elle n'existe pas
@@ -51,9 +52,9 @@ export default (bot) => {
             console.log(`⏰ ${reminders.length} rappel(s) à envoyer...`);
             
             // Log des rappels à traiter
-            reminders.forEach(r => {
-                console.log(`  - Rappel #${r.id} pour user ${r.user_id}: "${r.message.substring(0, 30)}..."`);
-            });
+            for (const r of reminders) {
+                console.log(`  - Rappel #${r.id} pour ${await pseudo(r.user_id)} : "${r.message.substring(0, 30)}..."`);
+            }
 
             // Envoyer chaque rappel
             for (const reminder of reminders) {
@@ -61,7 +62,7 @@ export default (bot) => {
                     // Récupérer l'utilisateur
                     const user = await bot.users.fetch(reminder.user_id).catch(() => null);
                     if (!user) {
-                        console.warn(`⚠️ Utilisateur ${reminder.user_id} introuvable pour rappel #${reminder.id}`);
+                        console.warn(`⚠️ Utilisateur ${await pseudo(reminder.user_id)} introuvable pour rappel #${reminder.id}`);
                         await markReminderAsSent(reminder.id);
                         continue;
                     }
@@ -89,7 +90,7 @@ export default (bot) => {
 
                     // Envoyer le DM
                     await user.send({ embeds: [embed] });
-                    console.log(`✅ Rappel #${reminder.id} envoyé à ${user.tag}`);
+                    console.log(`✅ Rappel #${reminder.id} envoyé à ${await pseudo(user.id)}`);
 
                     // Marquer comme envoyé
                     await markReminderAsSent(reminder.id);

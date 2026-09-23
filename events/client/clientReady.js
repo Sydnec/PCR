@@ -4,10 +4,15 @@ import db from '../../modules/db.js';
 import { rehydratePokemon } from '../../modules/pokemon/spawn.js';
 import { sweepSafari } from '../../modules/pokemon/safari.js';
 import { startWebServer } from '../../modules/web/server.js';
+import { setPseudoClient } from '../../modules/pseudo.js';
 
 const name = 'clientReady';
 const once = true;
 async function execute(bot) {
+    // Les journaux nomment les membres par leur pseudo : le client leur sert à
+    // le retrouver.
+    setPseudoClient(bot);
+
     // Nettoyage des entrées vocales orphelines en BDD
     db.all('SELECT user_id FROM voice_time', async (err, rows) => {
         if (err) {
@@ -52,19 +57,12 @@ async function execute(bot) {
     // le bot prêt : c'est lui qui vérifie qu'un visiteur est membre du serveur.
     startWebServer(bot);
 
-    // Remplir la BDD avec les événements passés avant le 29/08/2025 à 00:28
-    import('../../modules/db.js').then(mod => {
-        if (mod.remonterLeTemps) {
-            mod.remonterLeTemps(bot);
-        }
-    });
-
     // Vérifier et annoncer les nouvelles releases (après un délai pour s'assurer que le bot est prêt)
     setTimeout(async () => {
         await checkAndAnnounceNewRelease(bot);
     }, 5000);
 
-    log(`Bonjour, je suis ${bot.user.tag} et j'ai bien démarré !`);
+    log(`Bonjour, je suis ${bot.user.displayName} et j'ai bien démarré !`);
 }
 
 export { name, once, execute };

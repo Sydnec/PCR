@@ -1,4 +1,5 @@
 import { log } from '../../modules/utils.js';
+import { pseudo } from '../../modules/pseudo.js';
 
 const name = 'inviteCreate';
 const once = false;
@@ -14,7 +15,7 @@ async function execute(invite) {
 
     log(
         `Nouvelle invitation ${invite.code}` +
-            (invite.inviter ? ` créée par ${invite.inviter.tag}` : '')
+            (invite.inviter ? ` créée par ${await pseudo(invite.inviter.id)}` : '')
     );
 }
 

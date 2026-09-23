@@ -62,10 +62,3 @@ les **stériles**, puis **les plus récents** — et jamais un verrouillé.
   échoue. L'individu change de dresseur sans cesser d'être lui-même : numéro, shiny, ball,
   fertilité, sexe et surnom le suivent. Il arrive avec la date de l'échange, à la première case
   libre du PC, et verrouillé s'il est shiny ou légendaire.
-
-## Migration
-
-Au premier démarrage, chaque compteur de l'ancienne collection devient autant d'individus. Le sexe
-est tiré comme pour une capture (aucun pour une espèce asexuée) ; la ball est retrouvée dans l'historique des captures (apparitions
-et parc), du plus ancien au plus récent. Ce que l'historique n'explique pas — évolutions, échanges —
-reste marqué « ball inconnue ». L'ancienne table est conservée telle quelle, en sauvegarde.

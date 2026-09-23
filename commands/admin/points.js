@@ -1,4 +1,5 @@
 import { addPoints, applyMovements, getBalance } from "../../modules/economy.js";
+import { pseudo, pseudoOf } from "../../modules/pseudo.js";
 import { resolveTarget } from "../../modules/members.js";
 import { log } from "../../modules/utils.js";
 
@@ -43,7 +44,7 @@ export default {
       );
       const done = members.length - failures;
       log(
-        `/admin points par ${interaction.user.username} : ${signed(amount)} à ${done} membre(s) du rôle ${role.name}`
+        `/admin points par ${pseudoOf(interaction)} : ${signed(amount)} à ${done} membre(s) du rôle ${role.name}`
       );
       return interaction
         .editReply({
@@ -66,7 +67,7 @@ export default {
 
     const after = before + amount;
     log(
-      `/admin points par ${interaction.user.username} : ${signed(amount)} à ${user.username} (solde ${before} → ${after})`
+      `/admin points par ${pseudoOf(interaction)} : ${signed(amount)} à ${await pseudo(user.id)} (solde ${before} → ${after})`
     );
     await interaction
       .editReply({

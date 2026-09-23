@@ -1,4 +1,5 @@
 import { log } from "../../modules/utils.js";
+import { pseudoOf } from "../../modules/pseudo.js";
 import {
   configChoices,
   configOverrideStatus,
@@ -44,7 +45,7 @@ export default {
     }
 
     log(
-      `/admin config par ${interaction.user.username} : ${result.path} ${JSON.stringify(result.before)} → ${JSON.stringify(result.after)}`
+      `/admin config par ${pseudoOf(interaction)} : ${result.path} ${JSON.stringify(result.before)} → ${JSON.stringify(result.after)}`
     );
     await interaction
       .editReply({

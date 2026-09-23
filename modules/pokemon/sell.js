@@ -12,6 +12,7 @@
 import { addPoints } from "../economy.js";
 import db from "../points-db.js";
 import { handleException, log } from "../utils.js";
+import { pseudo } from "../pseudo.js";
 import { getPokemonConfig } from "./config.js";
 import { getSpecies, rarityOf, sexSymbol } from "./data.js";
 import {
@@ -120,8 +121,8 @@ export function sellPokemon(userId, { speciesId, isShiny, sex = null, pokemonId 
       }
 
       journal(userId, speciesId, isShiny, quantity, points);
-      log(
-        `Revente : ${userId} vend ${quantity}× ${name} pour ${points} pts`
+      pseudo(userId).then((seller) =>
+        log(`Revente : ${seller} vend ${quantity}× ${name} pour ${points} pts`)
       );
       cb(null, { ok: true, species, isShiny, sex, quantity, unit, points });
     });
@@ -162,7 +163,9 @@ export function sellItem(userId, key, quantity, cb) {
         return cb(err);
       }
 
-      log(`Revente : ${userId} vend ${quantity}× ${item.label} pour ${points} pts`);
+      pseudo(userId).then((seller) =>
+        log(`Revente : ${seller} vend ${quantity}× ${item.label} pour ${points} pts`)
+      );
       cb(null, { ok: true, item, quantity, unit, points });
     });
   });
