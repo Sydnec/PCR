@@ -1,5 +1,6 @@
-// Migration unique : de la collection à compteurs vers les individus.
+// Migrations des Pokémon, jouées une fois chacune, dans l'ordre, au démarrage.
 //
+// 1. De la collection à compteurs vers les individus.
 // L'ancienne table disait « trois Pikachu » ; pokemon_owned veut trois lignes,
 // chacune avec son sexe, sa ball et sa date. Le sexe se tire selon la
 // proportion de l'espèce, comme pour une capture. La ball se retrouve dans
@@ -9,14 +10,17 @@
 // là. Ce que l'historique n'explique pas (évolutions, échanges, exemplaires
 // revendus entre-temps) reste sans ball, marqué `migration`.
 //
-// Une seule fois, et tout ou rien : la revendication vit dans la même
-// transaction que les insertions. Une erreur annule l'ensemble, revendication
+// 2. Les espèces asexuées des jeux perdent le sexe que la première version
+//    leur tirait à pile ou face : la colonne devient facultative — SQLite ne
+//    sait pas retoucher un CHECK, d'où la reconstruction de la table — et les
+//    Magnéti, Métamorph et légendaires déjà là repassent à NULL.
+//
+// Chacune une seule fois, et tout ou rien : la revendication vit dans la même
+// transaction que le travail. Une erreur annule l'ensemble, revendication
 // comprise, et le démarrage suivant recommence de zéro.
 import db from "../points-db.js";
 import { handleException, log } from "../utils.js";
-import { getSpecies, rollSex } from "./data.js";
-
-const NAME = "collection-vers-individus";
+import { allSpeciesData, getSpecies, isGenderless, rollSex } from "./data.js";
 
 const all = (sql, params = []) =>
   new Promise((resolve, reject) =>
@@ -57,15 +61,45 @@ async function captureHistory() {
   return history;
 }
 
-export async function migrateCollection() {
+const applied = async (name) =>
+  (await all("SELECT 1 FROM pokemon_migrations WHERE name = ?", [name])).length > 0;
+
+// Joue `work` dans une transaction qui commence par revendiquer la migration.
+async function once(name, work) {
+  await run("BEGIN IMMEDIATE");
+  try {
+    const claimed = await run(
+      "INSERT OR IGNORE INTO pokemon_migrations (name, applied_at) VALUES (?, ?)",
+      [name, Date.now()]
+    );
+    if (claimed.changes === 0) return await run("COMMIT");
+    await work();
+    await run("COMMIT");
+  } catch (error) {
+    await run("ROLLBACK").catch((rollbackError) =>
+      handleException(`Annulation de la migration ${name} :`, rollbackError)
+    );
+    throw error;
+  }
+}
+
+export async function runMigrations() {
   await run(
     `CREATE TABLE IF NOT EXISTS pokemon_migrations (
       name TEXT PRIMARY KEY,
       applied_at INTEGER NOT NULL
     )`
   );
-  const done = await all("SELECT 1 FROM pokemon_migrations WHERE name = ?", [NAME]);
-  if (done.length) return;
+  await migrateCollection();
+  await migrateGenderless();
+}
+
+// ---------------------- 1. Individus ----------------------
+
+const NAME = "collection-vers-individus";
+
+async function migrateCollection() {
+  if (await applied(NAME)) return;
 
   let rows;
   let history;
@@ -83,17 +117,7 @@ export async function migrateCollection() {
     throw error;
   }
 
-  await run("BEGIN IMMEDIATE");
-  try {
-    const claimed = await run(
-      "INSERT OR IGNORE INTO pokemon_migrations (name, applied_at) VALUES (?, ?)",
-      [NAME, Date.now()]
-    );
-    if (claimed.changes === 0) {
-      await run("COMMIT");
-      return;
-    }
-
+  await once(NAME, async () => {
     let total = 0;
     let withBall = 0;
     for (const row of rows) {
@@ -123,16 +147,58 @@ export async function migrateCollection() {
         if (capture?.ball) withBall++;
       }
     }
-
-    await run("COMMIT");
     log(
       `Migration de la collection : ${total} Pokémon individualisés depuis ${rows.length} ` +
         `entrée(s), ${withBall} avec leur ball retrouvée.`
     );
-  } catch (error) {
-    await run("ROLLBACK").catch((rollbackError) =>
-      handleException("Annulation de la migration :", rollbackError)
+  });
+}
+
+// ---------------------- 2. Espèces asexuées ----------------------
+
+const GENDERLESS = "especes-asexuees-sans-sexe";
+
+// Même définition que dans points-db.js : c'est elle que prend la table
+// reconstruite, et une base neuve doit finir identique à une base migrée.
+const OWNED_COLUMNS = `
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  species_id INTEGER NOT NULL,
+  is_shiny INTEGER NOT NULL DEFAULT 0,
+  sex TEXT CHECK (sex IN ('M', 'F')),
+  ball TEXT,
+  origin TEXT NOT NULL,
+  sterile INTEGER NOT NULL DEFAULT 0,
+  obtained_at INTEGER NOT NULL`;
+const COLUMN_NAMES = "id, user_id, species_id, is_shiny, sex, ball, origin, sterile, obtained_at";
+
+async function migrateGenderless() {
+  if (await applied(GENDERLESS)) return;
+  const [table] = await all(
+    "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'pokemon_owned'"
+  );
+  const ids = allSpeciesData().filter(isGenderless).map((species) => species.id);
+
+  await once(GENDERLESS, async () => {
+    // Une base créée avec la définition actuelle n'a rien à reconstruire.
+    if (/sex\s+TEXT\s+NOT\s+NULL/i.test(table?.sql ?? "")) {
+      await run(`CREATE TABLE pokemon_owned_rebuilt (${OWNED_COLUMNS})`);
+      await run(
+        `INSERT INTO pokemon_owned_rebuilt (${COLUMN_NAMES})
+         SELECT ${COLUMN_NAMES} FROM pokemon_owned`
+      );
+      await run("DROP TABLE pokemon_owned");
+      await run("ALTER TABLE pokemon_owned_rebuilt RENAME TO pokemon_owned");
+      await run(
+        `CREATE INDEX IF NOT EXISTS idx_pokemon_owned_entry
+           ON pokemon_owned(user_id, species_id, is_shiny)`
+      );
+    }
+    const cleared = await run(
+      `UPDATE pokemon_owned SET sex = NULL
+        WHERE sex IS NOT NULL AND species_id IN (${ids.map(() => "?").join(", ")})`,
+      ids
     );
-    throw error;
-  }
+    log(`Migration des espèces asexuées : ${cleared.changes} Pokémon sans sexe désormais.`);
+  });
 }

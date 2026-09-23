@@ -72,6 +72,11 @@ export function allSpecies() {
 }
 export const dexSize = () => allSpecies().length;
 
+// Toutes les espèces du fichier, générations fermées comprises. Réservé à ce qui
+// doit traiter les données sans égard au jeu en cours — une migration, par
+// exemple ; tout ce que voient les joueurs passe par allSpecies.
+export const allSpeciesData = () => dataset.species;
+
 // Lecture brute, sans filtre de génération : une entrée de collection garde son
 // espèce même si l'on referme sa génération, et doit pouvoir s'afficher. Ce qui
 // vient d'une saisie de joueur passe par getAvailableSpecies.
@@ -93,15 +98,31 @@ export const SEXES = {
 
 export const sexSymbol = (sex) => SEXES[sex]?.symbol ?? "";
 
+// Les espèces asexuées des jeux (`genderRate` à -1 : Magnéti, Stari, Porygon,
+// Métamorph, les légendaires…) n'ont pas de sexe ici non plus.
+export const isGenderless = (species) => Number(species?.genderRate) === -1;
+
 // Le sexe d'un nouvel individu, tiré selon la proportion des jeux :
-// `genderRate` est la part de femelles en huitièmes. Les espèces asexuées des
-// jeux (-1 : Magnéti, les légendaires, Métamorph…) reçoivent quand même un
-// sexe, à pile ou face : tout Pokémon en a un ici, et c'est ce qui permet à
-// Métamorph de tenir le rôle du père comme de la mère.
+// `genderRate` est la part de femelles en huitièmes. NULL pour une espèce
+// asexuée.
 export function rollSex(species) {
+  if (isGenderless(species)) return null;
   const rate = Number(species?.genderRate);
   const femaleShare = rate >= 0 && rate <= 8 ? rate / 8 : 0.5;
   return Math.random() < femaleShare ? "F" : "M";
+}
+
+// Le sexe d'un individu qui change d'espèce, en évoluant ou en étant échangé :
+// il garde le sien, sauf si la nouvelle espèce n'en a pas, n'en admet qu'un,
+// ou s'il n'en avait pas. Aucune lignée des deux premières générations ne
+// change de règle en chemin, mais rien ne doit pouvoir produire un Magnéton
+// femelle si une génération future en amenait une.
+export function sexAfterEvolution(target, sex) {
+  if (isGenderless(target)) return null;
+  const rate = Number(target.genderRate);
+  if (rate === 0) return "M";
+  if (rate === 8) return "F";
+  return sex ?? rollSex(target);
 }
 
 export function rarityOf(species) {

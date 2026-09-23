@@ -1,10 +1,12 @@
 // Les œufs : la seule porte vers les bébés, qui n'apparaissent jamais.
 //
-// Un couple — un mâle et une femelle d'une famille qui a un bébé — pond un œuf.
-// Métamorph peut tenir le rôle de l'un des deux parents, à condition d'avoir le
-// sexe du rôle : un Métamorph mâle remplace le père, une femelle la mère. C'est
-// ce qui rend possibles les familles d'un seul sexe, Kicklee et Tygnon (tous
-// mâles) comme Lippoutou (toutes femelles).
+// Seules les familles qui ont un bébé pondent, et l'œuf donne toujours ce bébé :
+// Pikachu et Raichu donnent Pichu, un Bulbizarre ne pond rien. Un couple, c'est
+// un mâle et une femelle de la famille — ou un parent de la famille, de
+// n'importe quel sexe, et un Métamorph, qui n'en a pas. Métamorph remplace l'un
+// des deux parents, jamais les deux. C'est lui qui rend possibles les familles
+// d'un seul sexe, Kicklee et Tygnon (tous mâles) comme Lippoutou (toutes
+// femelles).
 //
 // Trois règles tiennent l'économie :
 // - les parents ne sont pas consommés, mais chacun ne pond qu'une fois dans sa
@@ -59,27 +61,52 @@ export function babyOf(species) {
 export const canBreed = (species) => isDitto(species) || Boolean(babyOf(species));
 
 // L'œuf qu'un couple pondrait, ou la raison pour laquelle il n'en pondra pas.
-export function describeEgg(father, mother) {
-  if (!father || !mother) return { error: "Parent inconnu." };
-  if (isDitto(father) && isDitto(mother)) {
+// Chaque parent est { species, sex }. Rend aussi les rôles : `father` et
+// `mother` désignent le mâle et la femelle, Métamorph prenant celui qui reste.
+export function describeEgg(first, second) {
+  if (!first?.species || !second?.species) return { error: "Parent inconnu." };
+  const dittos = [first, second].filter((parent) => isDitto(parent.species));
+  if (dittos.length === 2) {
     return { error: "Deux Métamorph ne pondent rien : il faut un parent de la famille du bébé." };
   }
-  const fatherBaby = isDitto(father) ? null : babyOf(father);
-  const motherBaby = isDitto(mother) ? null : babyOf(mother);
-  if (!isDitto(father) && !fatherBaby) {
-    return { error: `**${father.name}** n'a pas de bébé : il ne peut pas pondre.` };
+  for (const parent of [first, second]) {
+    if (!isDitto(parent.species) && !babyOf(parent.species)) {
+      const babies = babyFamilies().map((family) => family.baby.name);
+      return {
+        error:
+          `**${parent.species.name}** n'a pas de bébé, il ne pond pas.` +
+          (babies.length
+            ? ` Seules les familles de ${babies.join(", ")} pondent.`
+            : " Aucun bébé n'existe encore : les œufs arrivent avec la génération 2."),
+      };
+    }
   }
-  if (!isDitto(mother) && !motherBaby) {
-    return { error: `**${mother.name}** n'a pas de bébé : elle ne peut pas pondre.` };
-  }
-  if (fatherBaby && motherBaby && fatherBaby.id !== motherBaby.id) {
+
+  if (dittos.length === 1) {
+    const partner = isDitto(first.species) ? second : first;
+    const ditto = dittos[0];
+    const partnerIsMother = partner.sex === "F";
     return {
-      error:
-        `**${father.name}** et **${mother.name}** ne sont pas de la même famille. ` +
-        `Métamorph peut remplacer l'un des deux.`,
+      baby: babyOf(partner.species),
+      father: partnerIsMother ? ditto : partner,
+      mother: partnerIsMother ? partner : ditto,
     };
   }
-  return { baby: fatherBaby ?? motherBaby };
+
+  const father = [first, second].find((parent) => parent.sex === "M");
+  const mother = [first, second].find((parent) => parent.sex === "F");
+  if (!father || !mother) {
+    return { error: "Il faut un mâle et une femelle — ou un Métamorph à la place de l'un des deux." };
+  }
+  const baby = babyOf(father.species);
+  if (baby.id !== babyOf(mother.species).id) {
+    return {
+      error:
+        `**${father.species.name}** et **${mother.species.name}** ne sont pas de la même ` +
+        `famille. Métamorph peut remplacer l'un des deux.`,
+    };
+  }
+  return { baby, father, mother };
 }
 
 export function getIncubatingEgg(userId, cb) {
@@ -93,16 +120,17 @@ export function getIncubatingEgg(userId, cb) {
 // Rend un parent stérile, et c'est ce geste qui le revendique : un UPDATE gardé
 // sur `sterile = 0`, dont RETURNING dit s'il a eu lieu. Deux pontes simultanées
 // ne peuvent donc pas se servir du même individu. On prend le plus récent des
-// individus fertiles du groupe.
+// individus fertiles du groupe. `sex IS ?` et non `=` : un Métamorph n'a pas de
+// sexe, et NULL = NULL n'est jamais vrai en SQL.
 function claimParent(userId, { speciesId, isShiny, sex }, cb) {
   db.get(
     `UPDATE pokemon_owned SET sterile = 1
       WHERE sterile = 0 AND id = (
         SELECT id FROM pokemon_owned
-         WHERE user_id = ? AND species_id = ? AND is_shiny = ? AND sex = ? AND sterile = 0
+         WHERE user_id = ? AND species_id = ? AND is_shiny = ? AND sex IS ? AND sterile = 0
          ORDER BY obtained_at DESC, id DESC LIMIT 1)
       RETURNING id`,
-    [userId, speciesId, isShiny ? 1 : 0, sex],
+    [userId, speciesId, isShiny ? 1 : 0, sex ?? null],
     (err, row) => cb(err, row?.id ?? null)
   );
 }
@@ -118,18 +146,25 @@ const releaseParents = (ids, cb = () => {}) =>
     }
   );
 
-// Pond un œuf. `father` et `mother` sont des groupes { speciesId, isShiny } ; le
-// sexe est celui du rôle. Enchaînement ordonné avec compensation, comme une
-// fusion : le père, puis la mère, puis l'œuf — et chaque étape rend ce que les
-// précédentes ont pris si elle échoue.
-export function layEgg(userId, father, mother, cb) {
+// Pond un œuf. Les deux parents sont des groupes { speciesId, isShiny, sex },
+// dans n'importe quel ordre : describeEgg distribue les rôles. Enchaînement
+// ordonné avec compensation, comme une fusion : le père, puis la mère, puis
+// l'œuf — et chaque étape rend ce que les précédentes ont pris si elle échoue.
+export function layEgg(userId, firstGroup, secondGroup, cb) {
   const config = getPokemonConfig().eggs;
   if (!config?.enabled) return cb(null, { ok: false, reason: "Les œufs sont désactivés." });
 
-  const fatherSpecies = getAvailableSpecies(father.speciesId);
-  const motherSpecies = getAvailableSpecies(mother.speciesId);
-  const plan = describeEgg(fatherSpecies, motherSpecies);
+  const parent = (group) => ({
+    group,
+    species: getAvailableSpecies(group.speciesId),
+    sex: group.sex ?? null,
+  });
+  const plan = describeEgg(parent(firstGroup), parent(secondGroup));
   if (plan.error) return cb(null, { ok: false, reason: plan.error });
+  const father = plan.father.group;
+  const mother = plan.mother.group;
+  const fatherSpecies = plan.father.species;
+  const motherSpecies = plan.mother.species;
 
   getIncubatingEgg(userId, (err, current) => {
     if (err) return cb(err);
@@ -148,14 +183,14 @@ export function layEgg(userId, father, mother, cb) {
           `Pokémon ne pond qu'une fois dans sa vie.`,
       });
 
-    claimParent(userId, { ...father, sex: "M" }, (err, fatherId) => {
+    claimParent(userId, father, (err, fatherId) => {
       if (err) return cb(err);
-      if (!fatherId) return noFertile(fatherSpecies, "M");
+      if (!fatherId) return noFertile(fatherSpecies, father.sex);
 
-      claimParent(userId, { ...mother, sex: "F" }, (err, motherId) => {
+      claimParent(userId, mother, (err, motherId) => {
         if (err || !motherId) {
           return releaseParents([fatherId], () =>
-            err ? cb(err) : noFertile(motherSpecies, "F")
+            err ? cb(err) : noFertile(motherSpecies, mother.sex)
           );
         }
 
@@ -194,7 +229,7 @@ export function layEgg(userId, father, mother, cb) {
             }
             log(
               `Œuf : ${userId} obtient un œuf de ${plan.baby.name} ` +
-                `(${fatherSpecies.name} ♂ × ${motherSpecies.name} ♀)`
+                `(${fatherSpecies.name} × ${motherSpecies.name})`
             );
             getIncubatingEgg(userId, (err, egg) =>
               cb(err, { ok: true, egg: egg ?? { id: this.lastID, species_id: plan.baby.id } })
@@ -310,17 +345,24 @@ export function hatchDueEggs(client) {
 }
 
 // L'état d'un œuf en couvaison, pour /oeuf voir et la confirmation de ponte.
+// Les colonnes father_* et mother_* tiennent les rôles de mâle et de femelle ;
+// un Métamorph y occupe celui qui restait, sans symbole puisqu'il n'a pas de
+// sexe.
 export function buildEggEmbed(egg) {
   const baby = getSpecies(egg.species_id);
-  const father = getSpecies(egg.father_species_id);
-  const mother = getSpecies(egg.mother_species_id);
+  const parentName = (id, sex) => {
+    const species = getSpecies(id);
+    if (!species) return "?";
+    return displayName(species, false, isDitto(species) ? null : sex);
+  };
   const left = Math.max(0, egg.hatch_messages - egg.messages);
   return new EmbedBuilder()
     .setTitle("🥚 Ton œuf")
     .setColor(0xf5e6c8)
     .setDescription(
-      `Un œuf de **${baby?.name ?? "?"}**, pondu par **${father?.name ?? "?"} ♂** et ` +
-        `**${mother?.name ?? "?"} ♀**.\n\n` +
+      `Un œuf de **${baby?.name ?? "?"}**, pondu par ` +
+        `**${parentName(egg.father_species_id, "M")}** et ` +
+        `**${parentName(egg.mother_species_id, "F")}**.\n\n` +
         `Il éclora <t:${Math.floor(egg.hatch_at / 1000)}:R>, ou dans **${left}** ` +
         `message${left > 1 ? "s" : ""} de ta part — au premier des deux.`
     );

@@ -1223,7 +1223,7 @@
     {
       "type": "feature",
       "name": "Chaque Pokémon a son sexe et sa ball",
-      "description": "Tes Pokémon sont désormais des individus : chacun a un sexe et garde la ball qui l'a capturé. /boite les montre un par un.",
+      "description": "Tes Pokémon sont désormais des individus : chacun a un sexe (sauf les espèces asexuées) et garde la ball qui l'a capturé. /boite les montre un par un.",
       "announce": true,
       "author": "Sydnec",
       "commit": "pending",
@@ -1233,7 +1233,7 @@
     {
       "type": "feature",
       "name": "Les œufs",
-      "description": "Dès l'ouverture de la 2ᵉ génération, /oeuf fait pondre un mâle et une femelle (ou un Métamorph) pour obtenir un bébé. L'œuf éclot en 5 jours ou 200 messages, et chaque parent ne pond qu'une fois.",
+      "description": "Dès l'ouverture de la 2ᵉ génération, /oeuf fait pondre un mâle et une femelle d'une famille à bébé — ou l'un des deux et un Métamorph — pour obtenir ce bébé. L'œuf éclot en 5 jours ou 200 messages, et chaque parent ne pond qu'une fois.",
       "announce": true,
       "author": "Sydnec",
       "commit": "pending",

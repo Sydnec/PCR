@@ -20,8 +20,8 @@ que la capture réussisse ou non.
   par échange —, un 🥚 celles qui ne sortent que d'un œuf.
 - `/boite [pokemon] [membre]` : les Pokémon un par un — sexe, ball, date, fertilité, et 📌
   l'exemplaire gardé (voir [Individus](individus.md)).
-- `/oeuf pondre <male> <femelle>` / `/oeuf voir` : faire pondre un couple, suivre l'œuf (voir
-  [Œufs](oeufs.md)).
+- `/oeuf pondre <parent1> <parent2>` / `/oeuf voir` : faire pondre un couple d'une famille à bébé,
+  suivre l'œuf (voir [Œufs](oeufs.md)).
 - `/pokeclassement` : classement des dresseurs par espèces distinctes.
 - `/pokeinfo <pokemon>` : la même fiche que le bouton des apparitions — type, rareté,
   difficulté, et la lignée évolutive stade par stade avec ce que le dresseur en a déjà.
