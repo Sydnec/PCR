@@ -273,9 +273,12 @@ async function handle(req, res, bot) {
     return send(res, allowed ? 405 : 404, { error: allowed ? "Méthode non autorisée." : "Introuvable." });
   }
 
-  const session = verifyToken(readCookie(req.headers.cookie, SESSION_COOKIE), "session");
+  const session = verifyToken(readCookie(req.headers.cookie, SESSION_COOKIE), "session", {
+    legacy: true,
+  });
   // Un identifiant Discord, et rien d'autre : sans lui, guild.members.fetch()
-  // irait chercher la liste entière des membres.
+  // irait chercher la liste entière des membres. C'est aussi ce qui écarte un
+  // ancien jeton d'état, que `legacy` laisse passer la signature.
   const user = SNOWFLAKE.test(String(session?.id))
     ? { id: session.id, username: session.username, avatar: session.avatar, admin: isSiteAdmin(session.id) }
     : null;

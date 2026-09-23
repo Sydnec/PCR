@@ -33,7 +33,14 @@ export function signToken(data, ttlMs, use) {
 // un autre usage. La comparaison de signatures se fait à temps constant : une
 // comparaison ordinaire s'arrête au premier caractère différent, et ce délai
 // se mesure.
-export function verifyToken(token, use) {
+//
+// `legacy` accepte aussi un jeton d'avant l'ajout de l'usage, qui n'en porte
+// pas : les sessions ouvertes avant cette mise à jour restent valables jusqu'à
+// leur échéance, au lieu de déconnecter tout le monde. À l'appelant de vérifier
+// que c'est bien une session (server.js exige un identifiant Discord, qu'un
+// ancien jeton d'état n'a pas). À retirer quand plus aucune ne peut être
+// valable : web.sessionHours (7 jours) après la mise en ligne.
+export function verifyToken(token, use, { legacy = false } = {}) {
   if (typeof token !== "string" || !token.includes(".")) return null;
   const [payload, sig] = token.split(".");
   const expected = Buffer.from(signature(payload));
@@ -41,7 +48,8 @@ export function verifyToken(token, use) {
   if (given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) return null;
   try {
     const data = JSON.parse(decode(payload));
-    return data.use === use && Number(data.exp) > Date.now() ? data : null;
+    const matches = data.use === use || (legacy && data.use === undefined);
+    return matches && Number(data.exp) > Date.now() ? data : null;
   } catch {
     return null;
   }
