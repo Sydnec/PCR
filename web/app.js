@@ -5,12 +5,21 @@
 // joueur, qu'on affiche tel quel. Tout ce qui se fait ici reste faisable sur
 // Discord avec /pk.
 import { api, avatarUrl, emoji, errorBox, fmt, h } from "./lib.js";
+import * as capture from "./views/capture.js";
 import * as boite from "./views/boite.js";
 import * as pokedex from "./views/pokedex.js";
 import * as sac from "./views/sac.js";
 import * as oeuf from "./views/oeuf.js";
 
-const ROUTES = { "/": boite, "/boite": boite, "/pokedex": pokedex, "/sac": sac, "/oeuf": oeuf };
+// L'accueil est la capture : c'est là que le jeu se passe en direct.
+const ROUTES = {
+  "/": capture,
+  "/capture": capture,
+  "/boite": boite,
+  "/pokedex": pokedex,
+  "/sac": sac,
+  "/oeuf": oeuf,
+};
 
 // Les raisons qu'un échec de connexion laisse dans l'adresse (?connexion=…).
 const LOGIN_ERRORS = {
@@ -81,7 +90,7 @@ function loginView() {
   // L'erreur a été lue : on la retire de l'adresse, pour qu'un rechargement ne
   // la répète pas.
   if (params.has("connexion")) history.replaceState(null, "", location.pathname);
-  const back = location.pathname === "/" ? "/boite" : location.pathname;
+  const back = location.pathname === "/" ? "/capture" : location.pathname;
   return h(
     "section",
     { class: "hero" },
@@ -102,7 +111,7 @@ function loginView() {
 }
 
 function highlightNav() {
-  const current = location.pathname === "/" ? "/boite" : location.pathname;
+  const current = location.pathname === "/" ? "/capture" : location.pathname;
   for (const link of document.querySelectorAll("#nav a")) {
     link.classList.toggle("active", link.getAttribute("href") === current);
   }
@@ -111,8 +120,19 @@ function highlightNav() {
 // Un rendu lent ne doit pas écraser celui d'une page ouverte entre-temps.
 let renderId = 0;
 
+// Ce qu'une page doit arrêter en la quittant (la capture relit l'apparition à
+// intervalle régulier). Chaque rendu reçoit son propre `onLeave` ; ctx reste son
+// prototype, donc `ctx.me` y est toujours à jour.
+let leaving = [];
+const leave = (callbacks) => callbacks.splice(0).forEach((callback) => callback());
+
 async function render() {
   const id = ++renderId;
+  leave(leaving);
+  const callbacks = [];
+  leaving = callbacks;
+  const viewCtx = Object.create(ctx);
+  viewCtx.onLeave = (callback) => callbacks.push(callback);
   highlightNav();
   if (!ctx.me) return app.replaceChildren(loginView());
   const view = ROUTES[location.pathname];
@@ -122,15 +142,19 @@ async function render() {
         "section",
         { class: "empty" },
         h("h1", {}, "Page introuvable"),
-        h("a", { href: "/boite", "data-link": true }, "Retour à la boîte")
+        h("a", { href: "/capture", "data-link": true }, "Retour à l'accueil")
       )
     );
   }
   app.replaceChildren(h("p", { class: "loading" }, "Chargement…"));
   try {
-    const content = await view.render(ctx);
+    const content = await view.render(viewCtx);
     if (id === renderId) app.replaceChildren(content);
+    // Une autre page s'est ouverte pendant ce rendu : il n'est pas affiché, et
+    // ce qu'il a lancé s'arrête aussitôt.
+    else leave(callbacks);
   } catch (error) {
+    leave(callbacks);
     if (id !== renderId) return;
     if (error.status === 401) {
       ctx.me = null;

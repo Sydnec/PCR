@@ -7,6 +7,7 @@ se connecter avec son compte Discord ; seuls les membres du serveur entrent.
 
 | Page | Contenu |
 |---|---|
+| **Capture** (accueil) | Le Pokémon qui apparaît dans le salon Discord, en direct : ses chances par ball, ce que tu en as déjà, le journal des lancers. On lui **lance ses balls** comme depuis Discord, et on **ramasse** ce qu'un Pokémon laisse tomber. |
 | **Boîte** | Chaque Pokémon avec son numéro, filtrable par espèce, sexe, fertilité et shiny. Sa fiche permet de le **revendre** ou de le **faire évoluer**. |
 | **Pokédex** | Toutes les espèces des générations ouvertes, celles qu'on possède en couleur. La fiche d'une espèce montre sa lignée. |
 | **Sac** | Le solde et les objets. |
@@ -15,6 +16,17 @@ se connecter avec son compte Discord ; seuls les membres du serveur entrent.
 Le site ne fait rien que Discord ne fasse pas : tout reste faisable avec `/pk`. Il ne gère pas
 encore les échanges, la loterie, le safari ni les objets d'aide aux fusions (bonbons, pierres),
 qui se font sur Discord.
+
+## Capture
+
+C'est **la même apparition** que dans le salon, et la même course : un lancer du site passe par
+le même chemin que les boutons Discord. Même prix, balls offertes utilisées d'abord, même
+cooldown (alterner Discord et le site ne fait pas lancer plus vite), et un seul vainqueur quelle
+que soit la porte. L'annonce du salon suit : le journal des lancers et la capture s'y affichent
+comme d'habitude. La Master Ball demande une confirmation, comme sur Discord.
+
+La page relit l'apparition toutes les `web.spawnRefreshSeconds` (5 par défaut), seulement quand
+elle est ouverte et visible. Les apparitions naissent toujours de l'activité du salon Discord.
 
 ## Fonctionnement
 

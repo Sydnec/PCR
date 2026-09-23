@@ -29,7 +29,7 @@ Toutes ses commandes vivent sous `/pk`. → **[Documentation du jeu](docs/pokemo
 - [Loterie](docs/pokemon/loterie.md) — un tirage par jour et par dresseur.
 - [Revente](docs/pokemon/revente.md) — doublons et objets contre des points.
 - [Parc Safari](docs/pokemon/safari.md) — l'événement où les actions ne coûtent rien.
-- [Site web](docs/site.md) — boîte, Pokédex, sac et œuf dans le navigateur, et son [API](docs/api.md).
+- [Site web](docs/site.md) — capture en direct, boîte, Pokédex, sac et œuf dans le navigateur, et son [API](docs/api.md).
 
 ### 💰 Économie & Pot commun
 

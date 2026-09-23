@@ -15,11 +15,13 @@ import {
   evolve,
   describeEvolution,
 } from "../pokemon/collection.js";
+import { isFinalThrow, resolveThrow, startThrow, throwMessage } from "../pokemon/capture.js";
 import {
   RARITIES,
   activeGeneration,
   allSpecies,
   dexSize,
+  difficultyLabel,
   evolutionChain,
   evolutionTargets,
   getAvailableSpecies,
@@ -29,13 +31,29 @@ import {
   isEvolutionOnly,
   isGenderless,
   isLegendary,
+  probabilitiesByBall,
   rarityOf,
   spriteUrl,
 } from "../pokemon/data.js";
-import { getBalls, getSafariConfig } from "../pokemon/config.js";
+import { getBalls, getPokemonConfig, getSafariConfig } from "../pokemon/config.js";
+import { announceDropClaim, claimDrop, getOpenDrops } from "../pokemon/drops.js";
 import { babyFamilies, canBreed, getIncubatingEgg, layEgg } from "../pokemon/eggs.js";
-import { getBallStock, getInventory, getItem, getItems, sortByCatalogue } from "../pokemon/items.js";
+import {
+  getBallItem,
+  getBallStock,
+  getInventory,
+  getItem,
+  getItems,
+  sortByCatalogue,
+} from "../pokemon/items.js";
 import { pokemonSellValue, sellPokemon } from "../pokemon/sell.js";
+import {
+  getActiveSpawn,
+  getLastEndedSpawn,
+  getSpawnPause,
+  recentThrows,
+} from "../pokemon/spawn.js";
+import { getConfig } from "../config.js";
 
 // Les fonctions du jeu sont à callbacks ; les routes, en promesses.
 const promise = (fn) =>
@@ -161,6 +179,64 @@ async function resolveOwn(userId, body, label) {
 function outcome(result, data) {
   if (!result?.ok) throw new HttpError(409, result?.reason ?? "Action refusée.");
   return data(result);
+}
+
+// Un dresseur tel que le serveur le montre : son pseudo sur le serveur et son
+// avatar, comme une mention sur Discord. Le bot les a en cache, donc relire le
+// journal toutes les quelques secondes ne coûte aucun appel à Discord. Un
+// dresseur parti du serveur garde son identifiant, sans nom.
+async function trainerOf(bot, userId) {
+  try {
+    const guild = await bot.guilds.fetch(process.env.GUILD_ID);
+    const member = await guild.members.fetch(userId);
+    return { id: userId, name: member.displayName, avatar: member.displayAvatarURL({ size: 64 }) };
+  } catch {
+    return { id: userId, name: null, avatar: null };
+  }
+}
+
+// Une apparition, avec ce qu'en voit chaque dresseur : les chances de chaque
+// ball, calculées comme sur l'annonce Discord, et ce qu'il en a déjà. L'objet
+// tenu reste secret jusqu'à la fin, comme sur Discord.
+async function spawnJson(ctx, spawn) {
+  const config = getPokemonConfig();
+  const [throws, inventory, collection] = await Promise.all([
+    promise((cb) => recentThrows(spawn.id, config.spawn.throwLogSize, cb)),
+    promise((cb) => getInventory(ctx.user.id, cb)),
+    promise((cb) => getCollection(ctx.user.id, cb)),
+  ]);
+  const stock = new Map(inventory.map((row) => [row.item_key, row.count]));
+  const owned = (shiny) =>
+    collection.find((row) => row.species_id === spawn.species_id && Boolean(row.is_shiny) === shiny)
+      ?.count ?? 0;
+  return {
+    id: spawn.id,
+    speciesId: spawn.species_id,
+    shiny: Boolean(spawn.is_shiny),
+    rarity: spawn.rarity,
+    rarityLabel: RARITIES[spawn.rarity]?.label ?? null,
+    difficulty: difficultyLabel(spawn.catch_rate),
+    throwCount: spawn.throw_count,
+    spawnedAt: spawn.spawned_at,
+    owned: { normal: owned(false), shiny: owned(true) },
+    balls: probabilitiesByBall(spawn.catch_rate).map((ball) => ({
+      key: ball.key,
+      label: ball.label,
+      emoji: ball.emoji,
+      price: ball.price,
+      probability: ball.probability,
+      guaranteed: Boolean(ball.guaranteed),
+      // Les balls offertes partent avant les points, comme sur Discord.
+      free: stock.get(getBallItem(ball.key)?.key) ?? 0,
+    })),
+    throws: await Promise.all(
+      throws.map(async (row) => ({
+        trainer: await trainerOf(ctx.bot, row.user_id),
+        ball: row.ball,
+        result: row.result,
+      }))
+    ),
+  };
 }
 
 // ---------------------- Routes ----------------------
@@ -329,7 +405,99 @@ export const routes = [
     },
   },
 
+  // L'apparition en cours — la même que dans le salon Discord —, ou à défaut la
+  // dernière partie, et les objets qui attendent au sol. L'onglet Capture la
+  // relit toutes les `refreshSeconds`.
+  {
+    method: "GET",
+    path: "/api/spawn",
+    auth: true,
+    handler: async (ctx) => {
+      const [active, last, pausedUntil, drops] = await Promise.all([
+        promise((cb) => getActiveSpawn((err, row) => cb(err, row ?? null))),
+        promise((cb) => getLastEndedSpawn(cb)),
+        promise((cb) => getSpawnPause(cb)),
+        promise((cb) => getOpenDrops(cb)),
+      ]);
+      return {
+        refreshSeconds: Math.max(1, Number(getConfig().web?.spawnRefreshSeconds) || 5),
+        cooldownSeconds: getPokemonConfig().capture.throwCooldownSeconds,
+        pausedUntil: pausedUntil > Date.now() ? pausedUntil : null,
+        spawn: active ? await spawnJson(ctx, active) : null,
+        last: last
+          ? {
+              id: last.id,
+              speciesId: last.species_id,
+              shiny: Boolean(last.is_shiny),
+              status: last.status,
+              caughtBy: last.caught_by ? await trainerOf(ctx.bot, last.caught_by) : null,
+              ball: last.caught_ball,
+              endedAt: last.ended_at,
+            }
+          : null,
+        drops: drops.map((drop) => {
+          const item = getItem(drop.item_key);
+          return {
+            id: drop.id,
+            itemKey: drop.item_key,
+            label: item?.label ?? drop.item_key,
+            emoji: item?.emoji ?? null,
+            droppedAt: drop.dropped_at,
+          };
+        }),
+      };
+    },
+  },
+
   // ---------------------- Actions ----------------------
+
+  // Un lancer, par le même chemin que les boutons Discord : même cooldown, même
+  // paiement, même course. Toujours 200 : un raté ou un « trop tard » sont des
+  // issues du jeu, pas des erreurs, et `status` dit laquelle. La Master Ball se
+  // confirme côté site, comme sur Discord ; `requireItem` porte la même
+  // promesse : une ball annoncée offerte ne se paie jamais en points.
+  {
+    method: "POST",
+    path: "/api/spawn/throw",
+    auth: true,
+    write: true,
+    handler: async (ctx) => {
+      const spawnId = Number(ctx.body.spawnId);
+      if (!Number.isInteger(spawnId) || spawnId <= 0) throw new HttpError(400, "spawnId invalide.");
+      if (typeof ctx.body.ball !== "string") throw new HttpError(400, "ball manquante.");
+      const requireItem = ctx.body.requireItem === true;
+
+      const outcome =
+        startThrow(ctx.user.id, ctx.body.ball) ??
+        (await promise((cb) =>
+          resolveThrow(ctx.bot, ctx.user.id, spawnId, ctx.body.ball, { requireItem }, cb)
+        ));
+      return {
+        status: outcome.status,
+        message: throwMessage(outcome),
+        final: isFinalThrow(outcome),
+        remaining: outcome.remaining ?? null,
+        pokemon: outcome.caught ? { id: outcome.caught.id, sex: outcome.caught.sex } : null,
+      };
+    },
+  },
+
+  // Ramasser un objet au sol : la même course que le bouton du salon, dont le
+  // message est mis à jour pour que personne n'y clique dans le vide.
+  {
+    method: "POST",
+    path: "/api/drops/:dropId/claim",
+    auth: true,
+    write: true,
+    handler: async (ctx) => {
+      const dropId = Number(ctx.params.dropId);
+      if (!Number.isInteger(dropId) || dropId <= 0) throw new HttpError(400, "Objet invalide.");
+      const claimed = await promise((cb) => claimDrop(ctx.user.id, dropId, cb));
+      if (!claimed) throw new HttpError(409, "💨 Trop tard, quelqu'un a été plus rapide !");
+      announceDropClaim(ctx.bot, claimed.drop, claimed.item, ctx.user.id);
+      return { item: { key: claimed.item.key, label: claimed.item.label, emoji: claimed.item.emoji } };
+    },
+  },
 
   {
     method: "POST",

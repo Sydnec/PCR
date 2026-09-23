@@ -561,6 +561,208 @@ input[type="search"] {
   font-weight: 600;
 }
 
+/* ---------- Capture ---------- */
+
+.capture {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.spawn {
+  display: grid;
+  grid-template-columns: minmax(200px, 300px) 1fr;
+  align-items: center;
+  gap: 24px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.spawn-shiny {
+  border-color: var(--shiny);
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--shiny) 14%, var(--surface)),
+    var(--surface) 55%
+  );
+}
+
+.spawn-art {
+  width: 100%;
+  max-width: 300px;
+  aspect-ratio: 1;
+  object-fit: contain;
+}
+
+.spawn-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.spawn-side p {
+  margin: 0;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.balls {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.ball {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.ball:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.ball:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ball .emoji {
+  width: 32px;
+  height: 32px;
+  font-size: 1.6rem;
+  line-height: 32px;
+}
+
+.ball-master {
+  border-color: var(--danger);
+}
+
+.ball-label {
+  font-weight: 600;
+}
+
+.ball-meta {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.confirm p {
+  margin: 0;
+}
+
+.confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.throw-panel {
+  padding: 10px 14px;
+  border-left: 4px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.throw-catch {
+  border-left-color: var(--shiny);
+}
+
+.throw-miss,
+.throw-error,
+.throw-insufficient,
+.throw-no-item {
+  border-left-color: var(--danger);
+}
+
+.spawn-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  border: 1px dashed var(--border);
+  border-radius: 16px;
+}
+
+.spawn-empty p {
+  margin: 0;
+}
+
+.last-spawn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.journal,
+.drops {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.journal h3,
+.drops h3 {
+  margin: 0;
+}
+
+.throws {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.throws li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.throws .avatar {
+  width: 22px;
+  height: 22px;
+}
+
+.drop {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.drop-text {
+  flex: 1;
+}
+
 /* ---------- Sac ---------- */
 
 .balance {
@@ -702,6 +904,10 @@ input[type="search"] {
     overflow-x: auto;
   }
 
+  .nav a {
+    padding: 6px 9px;
+  }
+
   .chip-ball,
   .username {
     display: none;
@@ -726,5 +932,23 @@ input[type="search"] {
   .sprite {
     width: 80px;
     height: 80px;
+  }
+
+  .spawn {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    padding: 16px;
+  }
+
+  .spawn-art {
+    max-width: 220px;
+  }
+
+  .spawn-side {
+    width: 100%;
+  }
+
+  .balls {
+    grid-template-columns: repeat(2, 1fr);
   }
 }

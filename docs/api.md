@@ -20,7 +20,8 @@ La mise en ligne pas à pas est dans [site.md](site.md#mise-en-ligne). Les varia
 - `DISCORD_CLIENT_SECRET` — avec `CLIENT_ID` et `GUILD_ID`, déjà présents ;
 - `WEB_SESSION_SECRET` — au moins 32 caractères aléatoires. Le changer déconnecte tout le monde.
 
-Réglages à chaud (`/admin config`) : `web.sessionHours` (168), `web.writesPerMinute` (30).
+Réglages à chaud (`/admin config`) : `web.sessionHours` (168), `web.writesPerMinute` (30),
+`web.spawnRefreshSeconds` (5, de 2 à 60).
 
 ## Connexion
 
@@ -50,6 +51,7 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
 | `GET /api/users/:userId/box` 🔒 | `{ total, page, pages, pageSize, items }` |
 | `GET /api/users/:userId/inventory` 🔒 | `{ items: [{ key, label, emoji, description, count }] }` |
 | `GET /api/me/egg` 🔒 | `{ egg }` ou `{ egg: null }` |
+| `GET /api/spawn` 🔒 | `{ refreshSeconds, cooldownSeconds, pausedUntil, spawn, last, drops }` — l'apparition du salon |
 
 `/box` accepte `page` (à partir de 0), `pageSize` (1 à 200, 50 par défaut), `species`, `sex`
 (`M`, `F` ou `none`), `fertile` et `shiny` (`true`/`false`). Un individu :
@@ -64,6 +66,12 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
 `sellValue` / `sellValueShiny` (prix de revente, 0 si invendable), ses évolutions, ses
 illustrations (`sprite`, `spriteShiny`) et ses petites images (`icon`, `iconShiny`).
 
+`spawn` vaut `null` sans apparition ; sinon il porte l'espèce, la rareté, la difficulté, ce que
+le dresseur en a déjà (`owned`), les balls (`price`, `probability`, `free` = balls offertes) et le
+journal des derniers lancers (`throws`, avec le pseudo et l'avatar du serveur). L'objet tenu reste
+secret. `last` est le dernier Pokémon parti (`CAUGHT` ou `FLED`), `drops` les objets au sol, et
+`pausedUntil` la fin d'un parc safari qui suspend les apparitions.
+
 ## Actions 🔒
 
 Corps en JSON (`Content-Type: application/json`). Un Pokémon se désigne par `{ "pokemonId": 123 }`
@@ -74,6 +82,14 @@ ou par un groupe `{ "speciesId": 25, "isShiny": false, "sex": "F" }` — les deu
 | `POST /api/me/sell` | Pokémon, `quantity` pour un groupe | `{ sold, unit, points }` |
 | `POST /api/me/evolve` | Pokémon, `targetId?`, `helper?` | `{ pokemon, duplicatesSpent, pointsSpent, helper }` |
 | `POST /api/me/eggs` | `{ parent1, parent2 }` | `{ egg }` |
+| `POST /api/spawn/throw` | `{ spawnId, ball, requireItem? }` | `{ status, message, final, remaining, pokemon }` |
+| `POST /api/drops/:id/claim` | `{}` | `{ item }` — `409` si quelqu'un a été plus rapide |
+
+Un lancer répond toujours `200` : un raté ou un « trop tard » sont des issues du jeu, pas des
+erreurs. `status` vaut `miss`, `catch`, `void` (battu, remboursé), `gone`, `cooldown`,
+`insufficient`, `no-item`, `unknown-ball` ou `error`. `message` est la phrase du panneau Discord,
+et `final` dit qu'il n'y a plus rien à relancer. `requireItem` interdit de payer en points : c'est
+la promesse d'une Master Ball annoncée offerte.
 
 ## Erreurs
 

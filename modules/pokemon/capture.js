@@ -151,12 +151,8 @@ function payThrow(userId, ball, { requireItem = false } = {}, cb) {
 // paiement réussi, donc il y a toujours quelque chose à rendre — et on rend ce
 // qui a été pris : une ball offerte se rend en ball, jamais en points. La
 // convertir en monnaie ferait d'un Pokémon disputé une petite imprimerie.
-function refundThrow(interaction, spawnId, ball, probability, view, payment) {
-  const userId = interaction.user.id;
+function refundThrow(userId, spawnId, ball, probability, payment, cb) {
   const gratuit = Boolean(payment?.item);
-  const rendu = gratuit
-    ? `Ta **${payment.label}** t'a été rendue.`
-    : `Tes **${ball.price}** points ont été remboursés.`;
 
   const done = (err) => {
     if (err) handleException("Remboursement impossible :", err);
@@ -165,118 +161,76 @@ function refundThrow(interaction, spawnId, ball, probability, view, payment) {
       `Remboursement à ${userId} (spawn #${spawnId} déjà résolu) : ` +
         (gratuit ? payment.label : `${ball.price} pts`)
     );
-    interaction
-      .editReply(view(`💨 Trop tard, quelqu'un a été plus rapide ! ${rendu}`, { done: true }))
-      .catch(() => {});
+    cb(null, { status: "void", ball, payment });
   };
 
   if (gratuit) return grantItem(userId, payment.item, 1, { source: "lancer-annule" }, done);
   addPoints(userId, ball.price, done);
 }
 
-// `panel` distingue les deux origines d'un clic : l'annonce publique, où l'on
-// ouvre un éphémère, et le panneau de relance, où l'on réécrit celui d'où vient
-// le clic. Sans ça, dix lancers laissaient dix messages empilés.
-export async function throwBall(
-  interaction,
-  spawnId,
-  ballKey,
-  { panel = false, requireItem = false } = {}
-) {
+// ====================== LE LANCER ======================
+//
+// Discord et le site lancent par le même chemin : startThrow puis resolveThrow,
+// et throwMessage pour dire ce qui s'est passé. Rien ici ne connaît une
+// interaction ni une requête HTTP — seulement un dresseur, un spawn et une ball.
+// Le client Discord ne sert qu'à mettre à jour l'annonce publique, que le
+// lancer vienne du salon ou du site.
+
+// Premier temps, synchrone : la ball existe-t-elle, et le dresseur a-t-il fini
+// d'attendre ? Rend null quand le lancer peut partir — le cooldown est alors
+// consommé —, ou le refus. À part parce que Discord doit répondre à ces refus
+// AVANT de différer sa réponse. Le cooldown est le même pour les deux portes :
+// alterner Discord et le site ne fait pas lancer plus vite.
+export function startThrow(userId, ballKey) {
+  if (!getBall(ballKey)) return { status: "unknown-ball" };
+  const cooldownMs = getPokemonConfig().capture.throwCooldownSeconds * 1000;
+  const remaining = tryConsumeCooldown(userId, cooldownMs);
+  return remaining > 0 ? { status: "cooldown", remaining } : null;
+}
+
+// Second temps : paiement, tirage, réclamation, crédit. Rend toujours une
+// issue — { status, … } — et jamais d'erreur : une panne de base est
+// journalisée ici et devient l'issue « error », qu'il reste à afficher.
+export function resolveThrow(client, userId, spawnId, ballKey, { requireItem = false } = {}, cb) {
   const config = getPokemonConfig();
   const ball = getBall(ballKey);
-  const userId = interaction.user.id;
-
-  // Un lancer a dix issues ; ce point de sortie unique décide une fois pour
-  // toutes de la forme de la réponse, aucune branche n'a à s'en soucier.
-  // `done` retire les boutons quand il n'y a plus rien à relancer.
-  const view = (content, { done = false } = {}) => ({
-    content,
-    components: done ? [] : [buildBallRow(spawnId, { panel: true })],
-  });
-
-  if (!ball) return answerThrow(interaction, spawnId, "❌ Ball inconnue.", { panel });
-
-  const remaining = tryConsumeCooldown(userId, config.capture.throwCooldownSeconds * 1000);
-  if (remaining > 0) {
-    return answerThrow(
-      interaction,
-      spawnId,
-      `⏳ Doucement ! Attends encore **${remaining}s** avant de relancer.`,
-      { panel }
-    );
-  }
-
-  if (panel) await interaction.deferUpdate();
-  else await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-
-  // Le nouveau panneau existe déjà (le defer l'a rendu visible) : on peut retirer
-  // le précédent sans jamais laisser le joueur sans rien sous les yeux.
-  trackPanel(interaction, spawnId, { replacing: !panel });
+  if (!ball) return cb(null, { status: "unknown-ball" });
 
   db.get("SELECT * FROM pokemon_spawns WHERE id = ?", [spawnId], (err, spawn) => {
     if (err) {
       handleException("Lecture du spawn :", err);
-      return interaction.editReply(view("❌ Erreur base de données.")).catch(() => {});
+      return cb(null, { status: "error" });
     }
     // Sortie anticipée AVANT tout débit : un Pokémon déjà parti ne coûte rien.
-    if (!spawn || spawn.status !== "ACTIVE") {
-      return interaction
-        .editReply(view("💨 Ce Pokémon n'est plus là !", { done: true }))
-        .catch(() => {});
-    }
+    if (!spawn || spawn.status !== "ACTIVE") return cb(null, { status: "gone" });
 
     const species = getSpecies(spawn.species_id);
-    if (!species) {
-      return interaction.editReply(view("❌ Espèce inconnue.", { done: true })).catch(() => {});
-    }
+    if (!species) return cb(null, { status: "unknown-species" });
 
     const probability = ball.guaranteed
       ? 1
-      : catchProbability(
-          spawn.catch_rate,
-          ball.multiplier,
-          config.capture.globalMultiplier
-        );
+      : catchProbability(spawn.catch_rate, ball.multiplier, config.capture.globalMultiplier);
 
     // 1. Paiement atomique : une ball offerte d'abord, le solde ensuite, et
     // refusé sans rien prélever si ni l'un ni l'autre ne suffit.
     payThrow(userId, ball, { requireItem }, (err, payment) => {
       if (err) {
         handleException("Paiement du lancer :", err);
-        return interaction.editReply(view("❌ Erreur base de données.")).catch(() => {});
+        return cb(null, { status: "error" });
       }
 
       if (!payment) {
         // Promis gratuit, et l'objet n'y est plus : on le dit, on ne débite pas.
-        if (requireItem) {
-          return interaction
-            .editReply(
-              view(
-                `❌ Tu n'as plus de **${ball.label}** dans ton inventaire. ` +
-                  `Rien n'a été débité.`
-              )
-            )
-            .catch(() => {});
-        }
-        return getBalance(userId, (err, balance) => {
-          interaction
-            .editReply(
-              view(
-                `❌ Solde insuffisant : une **${ball.label}** coûte **${ball.price}** points, tu en as **${balance}**.`
-              )
-            )
-            .catch(() => {});
-        });
+        if (requireItem) return cb(null, { status: "no-item", ball });
+        return getBalance(userId, (err, balance) =>
+          cb(null, { status: "insufficient", ball, balance })
+        );
       }
 
       // Ce que le lancer a réellement coûté : zéro quand la ball était offerte,
       // ce qui garde honnête le classement des points brûlés.
       const cost = payment.points ?? 0;
-      const gratuit = Boolean(payment.item);
-      const mention = gratuit
-        ? `${payment.label} offerte`
-        : `**-${ball.price}** points`;
+      const refund = () => refundThrow(userId, spawnId, ball, probability, payment, cb);
 
       // 2. Tirage.
       const success = ball.guaranteed || Math.random() < probability;
@@ -291,11 +245,9 @@ export async function throwBall(
           function (err) {
             if (err) {
               handleException("Comptabilisation du raté :", err);
-              return refundThrow(interaction, spawnId, ball, probability, view, payment);
+              return refund();
             }
-            if (this.changes === 0) {
-              return refundThrow(interaction, spawnId, ball, probability, view, payment);
-            }
+            if (this.changes === 0) return refund();
 
             logThrow(spawnId, userId, ball.key, cost, probability, "MISS");
             recordThrow({
@@ -306,14 +258,8 @@ export async function throwBall(
               probability,
               result: "MISS",
             });
-            refreshSpawnEmbed(interaction.client, spawnId);
-            interaction
-              .editReply(
-                view(
-                  `❌ Raté ! **${displayName(species, spawn.is_shiny)}** s'est dégagé de ta ${ball.label}. (${mention}, ${(probability * 100).toFixed(1)} % de réussite)`
-                )
-              )
-              .catch(() => {});
+            refreshSpawnEmbed(client, spawnId);
+            cb(null, { status: "miss", ball, payment, species, spawn, probability });
           }
         );
       }
@@ -329,12 +275,10 @@ export async function throwBall(
         function (err) {
           if (err) {
             handleException("Réclamation du spawn :", err);
-            return refundThrow(interaction, spawnId, ball, probability, view, payment);
+            return refund();
           }
-          if (this.changes === 0) {
-            // Battu à la milliseconde près.
-            return refundThrow(interaction, spawnId, ball, probability, view, payment);
-          }
+          // Battu à la milliseconde près.
+          if (this.changes === 0) return refund();
 
           logThrow(spawnId, userId, ball.key, cost, probability, "CATCH");
           recordThrow({
@@ -350,11 +294,11 @@ export async function throwBall(
             ball: ball.label,
             probability,
           });
-          // La ball qui l'a emporté reste attachée à l'individu, pour de bon.
+          // La ball qui l'a emportée reste attachée à l'individu, pour de bon.
           const options = { ball: ball.key, origin: "capture" };
           creditSpecies(userId, spawn.species_id, spawn.is_shiny, options, (err, caught) => {
             if (err) handleException("Crédit de la collection :", err);
-            finalizeCaughtSpawn(interaction.client, spawnId, userId, ball.key);
+            finalizeCaughtSpawn(client, spawnId, userId, ball.key);
             log(
               `Capture : ${userId} attrape ${species.name}${spawn.is_shiny ? " ✨" : ""} (spawn #${spawnId}, ${ball.key})`
             );
@@ -364,41 +308,131 @@ export async function throwBall(
             // parce qu'un objet n'a pas pu être rangé, et l'échec est bruyant
             // dans les logs plutôt que silencieux pour le dresseur.
             const held = getItem(spawn.held_item);
-            const annonce = (butin) =>
-              interaction
-                .editReply(
-                  view(
-                    `🎉 Bravo ! **${displayName(species, spawn.is_shiny, caught?.sex)}** rejoint ton ` +
-                      `Pokédex ! (${mention})` +
-                      butin,
-                    { done: true }
-                  )
-                )
-                .catch(() => {});
+            const caughtOutcome = (heldOutcome) =>
+              cb(null, {
+                status: "catch",
+                ball,
+                payment,
+                species,
+                spawn,
+                probability,
+                caught,
+                held: heldOutcome,
+              });
 
-            if (!held) return annonce("");
+            if (!held) return caughtOutcome(null);
 
             // Il le lâche parfois au lieu de le céder : l'objet tombe alors au
             // sol, et c'est une seconde course — ouverte à tous, celui qui vient
             // de gagner la première y compris.
             if (leavesItemBehind()) {
-              dropItem(interaction.client, { spawn, itemKey: held.key });
-              return annonce(
-                `\n${held.emoji} Il tenait **${held.label}**... et l'a lâché en partant !`
-              );
+              dropItem(client, { spawn, itemKey: held.key });
+              return caughtOutcome({ item: held, dropped: true });
             }
 
             grantItem(userId, held.key, 1, { source: `capture:${spawnId}` }, (err) => {
               if (err) {
                 handleException("Remise de l'objet tenu :", err);
-                return annonce("");
+                return caughtOutcome(null);
               }
               log(`Butin : ${userId} récupère ${held.label} (spawn #${spawnId})`);
-              annonce(`\n${held.emoji} Il tenait **${held.label}** !`);
+              caughtOutcome({ item: held, dropped: false });
             });
           });
         }
       );
     });
+  });
+}
+
+// Les issues qui terminent le panneau : il n'y a plus rien à relancer.
+const FINAL = new Set(["gone", "unknown-species", "void", "catch"]);
+export const isFinalThrow = (outcome) => FINAL.has(outcome.status);
+
+// Ce qu'un lancer a donné, en toutes lettres. La seule rédaction de ces
+// messages : le panneau Discord et le site affichent la même phrase.
+export function throwMessage(outcome) {
+  const { ball, payment } = outcome;
+  // Ce que le lancer a coûté, dit comme le dresseur l'a vécu.
+  const mention = payment?.item ? `${payment.label} offerte` : `**-${ball?.price}** points`;
+
+  switch (outcome.status) {
+    case "unknown-ball":
+      return "❌ Ball inconnue.";
+    case "cooldown":
+      return `⏳ Doucement ! Attends encore **${outcome.remaining}s** avant de relancer.`;
+    case "gone":
+      return "💨 Ce Pokémon n'est plus là !";
+    case "unknown-species":
+      return "❌ Espèce inconnue.";
+    case "no-item":
+      return `❌ Tu n'as plus de **${ball.label}** dans ton inventaire. Rien n'a été débité.`;
+    case "insufficient":
+      return (
+        `❌ Solde insuffisant : une **${ball.label}** coûte **${ball.price}** points, ` +
+        `tu en as **${outcome.balance}**.`
+      );
+    case "void":
+      return (
+        "💨 Trop tard, quelqu'un a été plus rapide ! " +
+        (payment?.item
+          ? `Ta **${payment.label}** t'a été rendue.`
+          : `Tes **${ball.price}** points ont été remboursés.`)
+      );
+    case "miss":
+      return (
+        `❌ Raté ! **${displayName(outcome.species, outcome.spawn.is_shiny)}** s'est dégagé de ` +
+        `ta ${ball.label}. (${mention}, ${(outcome.probability * 100).toFixed(1)} % de réussite)`
+      );
+    case "catch": {
+      const { item, dropped } = outcome.held ?? {};
+      const butin = !item
+        ? ""
+        : dropped
+          ? `\n${item.emoji} Il tenait **${item.label}**... et l'a lâché en partant !`
+          : `\n${item.emoji} Il tenait **${item.label}** !`;
+      return (
+        `🎉 Bravo ! **${displayName(outcome.species, outcome.spawn.is_shiny, outcome.caught?.sex)}** ` +
+        `rejoint ton Pokédex ! (${mention})` +
+        butin
+      );
+    }
+    default:
+      return "❌ Erreur base de données.";
+  }
+}
+
+// ====================== CÔTÉ DISCORD ======================
+
+// `panel` distingue les deux origines d'un clic : l'annonce publique, où l'on
+// ouvre un éphémère, et le panneau de relance, où l'on réécrit celui d'où vient
+// le clic. Sans ça, dix lancers laissaient dix messages empilés.
+export async function throwBall(
+  interaction,
+  spawnId,
+  ballKey,
+  { panel = false, requireItem = false } = {}
+) {
+  const userId = interaction.user.id;
+
+  const refusal = startThrow(userId, ballKey);
+  if (refusal) return answerThrow(interaction, spawnId, throwMessage(refusal), { panel });
+
+  if (panel) await interaction.deferUpdate();
+  else await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+  // Le nouveau panneau existe déjà (le defer l'a rendu visible) : on peut retirer
+  // le précédent sans jamais laisser le joueur sans rien sous les yeux.
+  trackPanel(interaction, spawnId, { replacing: !panel });
+
+  resolveThrow(interaction.client, userId, spawnId, ballKey, { requireItem }, (err, outcome) => {
+    // Un seul point de sortie décide de la forme de la réponse : les boutons
+    // disparaissent quand il n'y a plus rien à relancer.
+    interaction
+      .editReply({
+        content: throwMessage(outcome),
+        components: isFinalThrow(outcome) ? [] : [buildBallRow(spawnId, { panel: true })],
+      })
+      .catch(() => {});
   });
 }
