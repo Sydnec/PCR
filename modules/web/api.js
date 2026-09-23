@@ -29,17 +29,32 @@ import {
   getSpecies,
   iconUrl,
   isEggOnly,
+  isSafariFinished,
   itemImageUrl,
   isEvolutionOnly,
   isGenderless,
   isLegendary,
   probabilitiesByBall,
   rarityOf,
+  safariBaitCapped,
+  safariBaitFactor,
+  safariCatchProbability,
+  safariFleeChance,
   spriteUrl,
   typeColors,
 } from "../pokemon/data.js";
 import { getBalls, getPokemonConfig, getSafariConfig } from "../pokemon/config.js";
 import { announceDropClaim, claimDrop, getOpenDrops } from "../pokemon/drops.js";
+import { safariOutcomeLine } from "../pokemon/embeds.js";
+import { getPc, movePokemon, renameBox, renamePokemon } from "../pokemon/pc.js";
+import {
+  enterPark,
+  getEntryOffer,
+  getSessionCatches,
+  playAction,
+  refreshParkMessage,
+  startPaidSession,
+} from "../pokemon/safari.js";
 import { babyFamilies, canBreed, getIncubatingEgg, layEgg } from "../pokemon/eggs.js";
 import {
   getBallItem,
@@ -117,6 +132,7 @@ function individualJson(row) {
     fertile: !row.sterile,
     last: Boolean(row.last),
     obtainedAt: row.obtained_at,
+    nickname: row.nickname ?? null,
   };
 }
 
@@ -268,6 +284,88 @@ async function spawnJson(ctx, spawn) {
         result: row.result,
       }))
     ),
+  };
+}
+
+// ---------------------- Parc safari ----------------------
+
+// Une visite du parc telle que le site l'affiche : la rencontre (chances, appât,
+// risque de fuite, calculés par les mêmes fonctions que l'embed Discord) et ce
+// qui a déjà été capturé. `token` est le jeton anti-double-clic de playAction.
+async function visitJson(session, owned) {
+  const config = getSafariConfig();
+  const finished = isSafariFinished(session);
+  const species = finished ? null : getSpecies(session.encounter_species_id);
+  const catches = await promise((cb) => getSessionCatches(session.id, cb));
+  const bait = session.encounter_bait;
+  return {
+    id: session.id,
+    token: session.actions_left,
+    actionsLeft: session.actions_left,
+    actionsTotal: config.actionsPerSession,
+    expiresAt: session.expires_at,
+    finished,
+    catches: catches.map((row) => ({ speciesId: row.species_id, shiny: Boolean(row.is_shiny) })),
+    ball: withImage(config.ball),
+    encounter: species
+      ? {
+          speciesId: species.id,
+          shiny: Boolean(session.encounter_is_shiny),
+          sex: session.encounter_sex ?? null,
+          rarity: rarityOf(species),
+          rarityLabel: RARITIES[rarityOf(species)].label,
+          probability: safariCatchProbability(session.encounter_catch_rate, bait, config),
+          bait,
+          baitFactor: safariBaitFactor(bait, config),
+          baitCapped: safariBaitCapped(bait, config),
+          fleeRisk: safariFleeChance(bait, config),
+          owned: owned ?? null,
+        }
+      : null,
+  };
+}
+
+// Ce que le dresseur peut faire du parc, pour le bouton de l'onglet Capture :
+// reprendre sa visite, entrer dans un parc ouvert, ou acheter une entrée — le
+// bouton d'achat grisé quand getEntryOffer annonce un refus.
+async function safariState(ctx) {
+  const offer = await promise((cb) => getEntryOffer(ctx.user.id, cb));
+  const json = {
+    enabled: offer.enabled,
+    session: offer.ongoing
+      ? { id: offer.ongoing.session.id, actionsLeft: offer.ongoing.session.actions_left }
+      : null,
+    freePark: offer.freePark
+      ? {
+          id: offer.freePark.id,
+          expiresAt: offer.freePark.expires_at,
+          reserved: Boolean(offer.freePark.reserved_for),
+        }
+      : null,
+    price: offer.price,
+    actions: offer.actions,
+    tickets: offer.tickets,
+    retryAt: offer.retryAt,
+    canBuy: !offer.blocked,
+    blocked: offer.blocked,
+  };
+  return { json, ongoing: offer.ongoing };
+}
+
+const SAFARI_ACTIONS = new Set(["BALL", "BAIT", "FLEE"]);
+
+// La boîte PC telle que le site la dessine : ses boîtes, et la place de chacun
+// des Pokémon du dresseur.
+async function pcJson(userId) {
+  const pc = await promise((cb) => getPc(userId, cb));
+  return {
+    slotsPerBox: pc.config.slotsPerBox,
+    columns: pc.config.columns,
+    maxBoxes: pc.config.maxBoxes,
+    boxNameLength: pc.config.boxNameLength,
+    nicknameLength: pc.config.nicknameLength,
+    boxes: pc.boxes,
+    pokemon: pc.layout.map(({ row, pos }) => ({ ...individualJson(row), pos })),
   };
 }
 
@@ -472,6 +570,7 @@ export const routes = [
         refreshSeconds: Math.max(1, Number(getConfig().web?.spawnRefreshSeconds) || 5),
         cooldownSeconds: getPokemonConfig().capture.throwCooldownSeconds,
         pausedUntil: pausedUntil > Date.now() ? pausedUntil : null,
+        safari: (await safariState(ctx)).json,
         spawn: active ? await spawnJson(ctx, active) : null,
         last: last
           ? {
@@ -500,7 +599,149 @@ export const routes = [
     },
   },
 
+  // La visite en cours du dresseur, s'il en a une, et ce qu'il peut faire du
+  // parc sinon.
+  {
+    method: "GET",
+    path: "/api/safari",
+    auth: true,
+    handler: async (ctx) => {
+      const { json, ongoing } = await safariState(ctx);
+      return {
+        offer: json,
+        visit: ongoing ? await visitJson(ongoing.session, ongoing.owned) : null,
+      };
+    },
+  },
+
+  // La boîte PC : les boîtes du dresseur et la place de chacun de ses Pokémon.
+  {
+    method: "GET",
+    path: "/api/me/pc",
+    auth: true,
+    handler: (ctx) => pcJson(ctx.user.id),
+  },
+
   // ---------------------- Actions ----------------------
+
+  // Entrer dans un parc ouvert, gratuitement : le bouton du message de parc.
+  {
+    method: "POST",
+    path: "/api/safari/enter",
+    auth: true,
+    write: true,
+    handler: async (ctx) => {
+      const parkId = Number(ctx.body.parkId);
+      if (!Number.isInteger(parkId) || parkId <= 0) throw new HttpError(400, "parkId invalide.");
+      const result = await promise((cb) => enterPark(ctx.user.id, parkId, cb));
+      if (!result.ok) throw new HttpError(409, result.reason);
+      // Une reprise n'est pas une entrée : le compteur du parc n'a pas bougé.
+      if (!result.resumed) refreshParkMessage(ctx.bot, parkId);
+      return {
+        resumed: Boolean(result.resumed),
+        visit: await visitJson(result.session, result.owned),
+      };
+    },
+  },
+
+  // Acheter une entrée : /pk safari. Un Ticket Safari passe avant les points.
+  {
+    method: "POST",
+    path: "/api/safari/buy",
+    auth: true,
+    write: true,
+    handler: async (ctx) => {
+      const result = await promise((cb) => startPaidSession(ctx.user.id, cb));
+      if (!result.ok) {
+        const rendu = result.refunded
+          ? ` Tes **${result.refunded}** points t'ont été rendus.`
+          : result.ticketRendu
+            ? " Ton **Ticket Safari** t'a été rendu."
+            : "";
+        throw new HttpError(409, `${result.reason}${rendu}`);
+      }
+      return {
+        resumed: Boolean(result.resumed),
+        ticket: result.ticket?.label ?? null,
+        visit: await visitJson(result.session, result.owned),
+      };
+    },
+  },
+
+  // Une action de la visite : lancer, appâter, fuir. Le jeton est le nombre
+  // d'actions restantes, comme dans les boutons Discord.
+  {
+    method: "POST",
+    path: "/api/safari/action",
+    auth: true,
+    write: true,
+    handler: async (ctx) => {
+      const sessionId = Number(ctx.body.sessionId);
+      const token = Number(ctx.body.token);
+      const action = String(ctx.body.action ?? "");
+      if (!Number.isInteger(sessionId) || !Number.isInteger(token) || !SAFARI_ACTIONS.has(action)) {
+        throw new HttpError(400, "Action invalide.");
+      }
+      const result = await promise((cb) =>
+        playAction(ctx.user.id, sessionId, String(token), action, cb)
+      );
+      if (!result.ok) throw new HttpError(409, result.reason);
+      return {
+        outcome: result.outcome,
+        message: safariOutcomeLine(result, getSafariConfig()),
+        visit: await visitJson(result.session, result.owned),
+      };
+    },
+  },
+
+  // Ranger un Pokémon à une case de la boîte PC ; l'occupant prend sa place. La
+  // réponse est la boîte PC relue : une boîte vide a pu s'ajouter au bout.
+  {
+    method: "POST",
+    path: "/api/me/pc/move",
+    auth: true,
+    write: true,
+    handler: async (ctx) => {
+      const pokemonId = Number(ctx.body.pokemonId);
+      const pos = Number(ctx.body.pos);
+      if (!Number.isInteger(pokemonId) || !Number.isInteger(pos)) {
+        throw new HttpError(400, "Déplacement invalide.");
+      }
+      const result = await promise((cb) => movePokemon(ctx.user.id, pokemonId, pos, cb));
+      if (!result.ok) throw new HttpError(409, result.reason);
+      return pcJson(ctx.user.id);
+    },
+  },
+
+  // Nommer une boîte ; un nom vide lui rend son nom par défaut.
+  {
+    method: "POST",
+    path: "/api/me/pc/boxes/:box/name",
+    auth: true,
+    write: true,
+    handler: async (ctx) => {
+      const result = await promise((cb) =>
+        renameBox(ctx.user.id, Number(ctx.params.box), ctx.body.name, cb)
+      );
+      if (!result.ok) throw new HttpError(409, result.reason);
+      return { name: result.name, custom: result.custom };
+    },
+  },
+
+  // Donner un surnom à un Pokémon ; vide, il le perd.
+  {
+    method: "POST",
+    path: "/api/me/pokemon/:pokemonId/nickname",
+    auth: true,
+    write: true,
+    handler: async (ctx) => {
+      const result = await promise((cb) =>
+        renamePokemon(ctx.user.id, Number(ctx.params.pokemonId), ctx.body.nickname, cb)
+      );
+      if (!result.ok) throw new HttpError(409, result.reason);
+      return { nickname: result.nickname };
+    },
+  },
 
   // Un lancer, par le même chemin que les boutons Discord : même cooldown, même
   // paiement, même course. Toujours 200 : un raté ou un « trop tard » sont des

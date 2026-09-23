@@ -26,6 +26,10 @@ qui désigne un Pokémon — `/pk echange`, `/pk oeuf pondre`, `/pk revendre pok
 — vise ce Pokémon précis plutôt qu'un groupe ; l'autocomplétion propose les numéros dès qu'on tape
 `#`.
 
+Sur le [site](../site.md#boîte-pc), chacun range aussi ses Pokémon dans les boîtes de son PC et
+peut leur donner un surnom. C'est du rangement : ni la place ni le surnom ne changent quoi que ce
+soit au jeu, et Discord continue d'afficher le nom de l'espèce.
+
 ## Toujours au moins un
 
 Avoir capturé un Pokémon ne suffit pas à le garder au Pokédex, il faut le posséder. Il reste donc

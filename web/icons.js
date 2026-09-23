@@ -45,6 +45,14 @@ const PATHS = {
     ],
   ],
   tent: [["path", { d: "M3 20 12 4l9 16M12 4v16M8.5 20 12 13l3.5 7M2 20h20" }]],
+  berry: [
+    ["circle", { cx: 12, cy: 14, r: 7 }],
+    ["path", { d: "M12 7c0-2.2 1.6-4 4-4" }],
+  ],
+  chevronLeft: [["path", { d: "M15 18 9 12l6-6" }]],
+  chevronRight: [["path", { d: "M9 18l6-6-6-6" }]],
+  move: [["path", { d: "M12 3v18M3 12h18M8 7l4-4 4 4M8 17l4 4 4-4M7 8l-4 4 4 4M17 8l4 4-4 4" }]],
+  pencil: [["path", { d: "M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" }]],
 };
 
 const SVG = "http://www.w3.org/2000/svg";
@@ -95,4 +103,6 @@ export const EMOJI_ICONS = {
   "💨": "wind",
   "🎉": "star",
   "🏕️": "tent",
+  "🍎": "berry",
+  "🏃": "wind",
 };

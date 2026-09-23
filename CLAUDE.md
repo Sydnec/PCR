@@ -57,7 +57,9 @@ d'écrire et en reprendre le style : en cas de doute, c'est le code existant qui
 - **Commandes** : celles du jeu Pokémon vivent sous `/pk` (un fichier par sous-commande dans
   `commands/pk/`), celles d'administration sous `/admin`.
 - **API web** (`modules/web/`) : aucune règle de jeu, seulement des appels aux mêmes fonctions que
-  les commandes. Tout ce qui se fait sur le site doit rester faisable depuis Discord.
+  les commandes. Tout ce qui se fait sur le site doit rester faisable depuis Discord, sauf le
+  rangement du PC (`modules/pokemon/pc.js` : places, noms de boîtes, surnoms), qui ne change rien
+  au jeu.
 - **Site** (`web/`) : fichiers statiques sans compilation ni dépendance, servis par le bot. Il
   affiche ce que renvoie l'API et lui confie chaque action, sans recalculer de règle. Le DOM se
   construit avec `h()` (`web/lib.js`), jamais avec `innerHTML`. Rien en ligne : la politique de

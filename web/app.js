@@ -1,4 +1,4 @@
-// Le site PokéPCR : une page, quatre vues, et l'API du bot derrière.
+// Le site PokéPCR : une page, une vue par onglet, et l'API du bot derrière.
 //
 // Aucune règle de jeu ici : le site affiche ce que l'API renvoie et lui confie
 // chaque action. Ce qu'elle refuse revient avec un message déjà rédigé pour le
@@ -6,15 +6,18 @@
 // Discord avec /pk.
 import { api, avatarUrl, errorBox, fmt, h, itemIcon, registerItemImages } from "./lib.js";
 import * as capture from "./views/capture.js";
+import * as safari from "./views/safari.js";
 import * as boite from "./views/boite.js";
 import * as pokedex from "./views/pokedex.js";
 import * as sac from "./views/sac.js";
 import * as oeuf from "./views/oeuf.js";
 
-// L'accueil est la capture : c'est là que le jeu se passe en direct.
+// L'accueil est la capture : c'est là que le jeu se passe en direct. Le parc
+// safari s'ouvre depuis elle, sans onglet à lui.
 const ROUTES = {
   "/": capture,
   "/capture": capture,
+  "/safari": safari,
   "/boite": boite,
   "/pokedex": pokedex,
   "/sac": sac,
@@ -107,8 +110,11 @@ function loginView() {
   );
 }
 
+// L'onglet allumé : celui de la page, ou celui d'où elle s'ouvre.
+const NAV_PARENTS = { "/": "/capture", "/safari": "/capture" };
+
 function highlightNav() {
-  const current = location.pathname === "/" ? "/capture" : location.pathname;
+  const current = NAV_PARENTS[location.pathname] ?? location.pathname;
   for (const link of document.querySelectorAll("#nav a")) {
     link.classList.toggle("active", link.getAttribute("href") === current);
   }

@@ -920,7 +920,8 @@ export function buildParkRow(parkId, { disabled = false } = {}) {
 // Le récit de la dernière action, en tête de l'embed de rencontre. C'est la
 // seule trace qu'en garde le joueur : le message est unique et réécrit à chaque
 // clic, il n'y a pas de fil de discussion où relire ce qui s'est passé.
-function safariOutcomeLine(result, config) {
+// Exportée : le site raconte l'action avec la même phrase.
+export function safariOutcomeLine(result, config) {
   const name = displayName(result.species, result.isShiny, result.sex);
   switch (result.outcome) {
     case "CATCH":

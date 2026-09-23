@@ -24,7 +24,7 @@ import {
   safariFleeChance,
 } from "./data.js";
 import { creditSpecies, getOwnedVariants } from "./collection.js";
-import { consumeItem, getItem, grantItem } from "./items.js";
+import { consumeItem, getItem, getItemCount, grantItem } from "./items.js";
 import { resolveChannel } from "./spawn.js";
 import { recordSafariCatch, recordSafariEntry } from "./stats.js";
 import { buildParkEmbed, buildParkRow } from "./embeds.js";
@@ -363,8 +363,6 @@ const TICKET = "ticket_safari";
 export function startPaidSession(userId, cb) {
   const config = getSafariConfig();
   const price = Math.max(0, Math.round(config.entryPrice));
-  const now = Date.now();
-  const cooldownMs = config.entryCooldownHours * HOUR;
 
   // Une visite en cours se rouvre plutôt que de se refuser, et avant tout débit :
   // payer pour récupérer la partie qu'on avait déjà serait le pire des deux
@@ -400,63 +398,120 @@ export function startPaidSession(userId, cb) {
   });
 
   function payer() {
-    db.get(
-      `SELECT MAX(started_at) AS last_paid FROM pokemon_safari_sessions
-        WHERE user_id = ? AND entry_cost > 0`,
-      [userId],
-      (err, row) => {
-        if (err) return cb(err);
+    paidEntryRetryAt(userId, (err, retryAt) => {
+      if (err) return cb(err);
 
-        // Le refus prévisible passe avant le débit : l'index unique rattraperait
-        // le cas, mais au prix d'un aller-retour débit/remboursement que le
-        // joueur verrait passer sur son solde.
-        const lastAt = row?.last_paid ?? 0;
-        if (lastAt && now - lastAt < cooldownMs) {
-          return cb(null, {
-            ok: false,
-            code: "COOLDOWN",
-            retryAt: lastAt + cooldownMs,
-            reason: "Tu as déjà payé une entrée récemment.",
-          });
-        }
-
-        // Débit atomique, comme pour un lancer de ball : refusé sans rien
-        // prélever si le solde ne suffit pas.
-        spendPoints(userId, price, (err, debited) => {
-          if (err) return cb(err);
-          if (!debited) {
-            return getBalance(userId, (err, balance) =>
-              cb(err, {
-                ok: false,
-                code: "BALANCE",
-                reason:
-                  `L'entrée du parc safari coûte **${price}** points, tu en as **${balance}**.`,
-              })
-            );
-          }
-
-          startSession(userId, { entryCost: price }, (err, result) => {
-            // Filet de sécurité pour les courses que la garde ci-dessus ne peut
-            // pas couvrir. Chemin de remboursement unique et journalisé : on ne
-            // rembourse qu'après un débit réussi, donc la ligne existe. Une
-            // session rendue par la résolution de course n'est pas celle qu'on
-            // vient de payer — elle existait déjà — donc les points repartent
-            // aussi.
-            if (err || !result.ok || result.resumed) {
-              addPoints(userId, price, (refundErr) => {
-                if (refundErr) {
-                  handleException("Remboursement de l'entrée du parc safari :", refundErr);
-                }
-                log(`Remboursement de ${price} pts à ${userId} (entrée du parc impossible)`);
-              });
-              return err ? cb(err) : cb(null, { ...result, refunded: price });
-            }
-            cb(null, result);
-          });
+      // Le refus prévisible passe avant le débit : l'index unique rattraperait
+      // le cas, mais au prix d'un aller-retour débit/remboursement que le
+      // joueur verrait passer sur son solde.
+      if (retryAt) {
+        return cb(null, {
+          ok: false,
+          code: "COOLDOWN",
+          retryAt,
+          reason: "Tu as déjà payé une entrée récemment.",
         });
       }
-    );
+
+      // Débit atomique, comme pour un lancer de ball : refusé sans rien
+      // prélever si le solde ne suffit pas.
+      spendPoints(userId, price, (err, debited) => {
+        if (err) return cb(err);
+        if (!debited) {
+          return getBalance(userId, (err, balance) =>
+            cb(err, {
+              ok: false,
+              code: "BALANCE",
+              reason:
+                `L'entrée du parc safari coûte **${price}** points, tu en as **${balance}**.`,
+            })
+          );
+        }
+
+        startSession(userId, { entryCost: price }, (err, result) => {
+          // Filet de sécurité pour les courses que la garde ci-dessus ne peut
+          // pas couvrir. Chemin de remboursement unique et journalisé : on ne
+          // rembourse qu'après un débit réussi, donc la ligne existe. Une
+          // session rendue par la résolution de course n'est pas celle qu'on
+          // vient de payer — elle existait déjà — donc les points repartent
+          // aussi.
+          if (err || !result.ok || result.resumed) {
+            addPoints(userId, price, (refundErr) => {
+              if (refundErr) {
+                handleException("Remboursement de l'entrée du parc safari :", refundErr);
+              }
+              log(`Remboursement de ${price} pts à ${userId} (entrée du parc impossible)`);
+            });
+            return err ? cb(err) : cb(null, { ...result, refunded: price });
+          }
+          cb(null, result);
+        });
+      });
+    });
   }
+}
+
+// Jusqu'à quand une nouvelle entrée payante est refusée, ou null si elle est
+// possible : le délai entre deux entrées achetées. La même règle pour /pk safari
+// et pour le site, qui grise son bouton d'après elle.
+function paidEntryRetryAt(userId, cb) {
+  const cooldownMs = getSafariConfig().entryCooldownHours * HOUR;
+  db.get(
+    `SELECT MAX(started_at) AS last_paid FROM pokemon_safari_sessions
+      WHERE user_id = ? AND entry_cost > 0`,
+    [userId],
+    (err, row) => {
+      if (err) return cb(err);
+      const lastAt = row?.last_paid ?? 0;
+      cb(null, lastAt && Date.now() - lastAt < cooldownMs ? lastAt + cooldownMs : null);
+    }
+  );
+}
+
+// Ce qu'un dresseur peut faire du parc en ce moment, dans l'ordre où
+// /pk safari le décide : reprendre sa visite, entrer gratuitement dans un parc
+// ouvert, ou acheter une entrée — avec un Ticket Safari s'il en a un, sinon des
+// points, hors délai entre deux achats.
+//
+// `blocked` annonce le refus que startPaidSession opposerait à un achat, pour
+// que le site grise son bouton : `cooldown` ou `balance`, et jamais avec un
+// ticket, qui passe outre les deux. startPaidSession garde le dernier mot.
+export function getEntryOffer(userId, cb) {
+  const config = getSafariConfig();
+  const price = Math.max(0, Math.round(config.entryPrice));
+  resumeSession(userId, (err, ongoing) => {
+    if (err) return cb(err);
+    findFreeParkFor(userId, (err, freePark) => {
+      if (err) return cb(err);
+      paidEntryRetryAt(userId, (err, retryAt) => {
+        if (err) return cb(err);
+        getItemCount(userId, TICKET, (err, count) => {
+          if (err) return cb(err);
+          getBalance(userId, (err, balance) => {
+            if (err) return cb(err);
+            const tickets = getItem(TICKET) ? count : 0;
+            const blocked = tickets
+              ? null
+              : retryAt
+                ? "cooldown"
+                : balance < price
+                  ? "balance"
+                  : null;
+            cb(null, {
+              enabled: Boolean(getPokemonConfig().enabled && config.enabled),
+              ongoing,
+              freePark,
+              price,
+              actions: config.actionsPerSession,
+              retryAt,
+              tickets,
+              blocked,
+            });
+          });
+        });
+      });
+    });
+  });
 }
 
 // ====================== ACTIONS ======================

@@ -134,6 +134,18 @@ const POKEMON = {
   },
   pokedex: { pageSize: 30 },
   box: { pageSize: 15 },
+  // La boîte PC du site : des boîtes de `slotsPerBox` places, sur `columns`
+  // colonnes, qu'on nomme et où l'on range ses Pokémon comme on veut. Il y en a
+  // toujours au moins `minBoxes`, et une vide après la dernière occupée pour
+  // pouvoir y déménager, jusqu'à `maxBoxes`.
+  pc: {
+    slotsPerBox: 30,
+    columns: 6,
+    minBoxes: 8,
+    maxBoxes: 60,
+    boxNameLength: 20,
+    nicknameLength: 12,
+  },
   // Catalogue des objets. L'inventaire ne stocke qu'une clé et un compteur :
   // c'est ici que la clé prend un nom et une icône, réglables à chaud comme ceux
   // des balls. L'effet, lui, vit dans le code de la fonctionnalité qui consomme
@@ -332,8 +344,9 @@ export const DEFAULTS = {
   web: {
     // Durée d'une session avant qu'il faille se reconnecter par Discord.
     sessionHours: 168,
-    // Garde-fou contre une boucle ou un script, par dresseur.
-    writesPerMinute: 30,
+    // Garde-fou contre une boucle ou un script, par dresseur. Le parc safari et
+    // le rangement du PC enchaînent les clics : de quoi jouer vite, pas plus.
+    writesPerMinute: 60,
     // Cadence à laquelle l'onglet Capture relit l'apparition en cours : assez
     // vif pour suivre une course, assez lent pour ne pas marteler le serveur à
     // chaque onglet ouvert.
@@ -502,6 +515,14 @@ const BOUNDS = {
   // Pokédex au nombre de pages infini et vide.
   "pokemon.pokedex.pageSize": { min: 1 },
   "pokemon.box.pageSize": { min: 1, max: 25 },
+  // Changer la taille d'une boîte redistribue les places : on la borne à ce
+  // qu'une grille affiche lisiblement.
+  "pokemon.pc.slotsPerBox": { min: 6, max: 60 },
+  "pokemon.pc.columns": { min: 1, max: 10 },
+  "pokemon.pc.minBoxes": { min: 1, max: 200 },
+  "pokemon.pc.maxBoxes": { min: 1, max: 200 },
+  "pokemon.pc.boxNameLength": { min: 1, max: 40 },
+  "pokemon.pc.nicknameLength": { min: 1, max: 24 },
   // À 0, chaque onglet ouvert relirait l'apparition en boucle.
   "web.spawnRefreshSeconds": { min: 2, max: 60 },
   // Math.floor(Math.random() * odds) === 0 : à 0, tout devient shiny.
