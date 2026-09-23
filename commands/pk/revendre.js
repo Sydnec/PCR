@@ -26,20 +26,21 @@ const points = (value) => value.toLocaleString("fr-FR");
 const sellable = (row) => pokemonSellValue(getSpecies(row.species_id), row.is_shiny) > 0;
 
 // Les espèces dont on a des Pokémon à revendre : tout sauf un individu de
-// chaque espèce, shiny ou non, puisque le dernier ne se vend jamais. `spare`
-// compte ce que vend la commande sans individu — des normaux seulement — et
-// `shinies` les shiny revendables, qui se choisissent un par un.
+// chaque espèce, shiny ou non, puisque le dernier ne se vend jamais, et rien
+// de verrouillé. `spare` compte ce que vend la commande sans individu — des
+// normaux seulement — et `shinies` les shiny revendables, qui se choisissent un
+// par un.
 function listSellableSpecies(userId, cb) {
   getIndividuals(userId, (err, rows) => {
     if (err) return cb(err, []);
     const list = [];
-    for (const [speciesId, { total, normal, shiny }] of countBySpecies(rows)) {
+    for (const [speciesId, { total, free, freeNormal }] of countBySpecies(rows)) {
       const species = getSpecies(speciesId);
       if (!species || total < 2) continue;
       const unit = pokemonSellValue(species, false);
       const shinyUnit = pokemonSellValue(species, true);
-      const spare = unit > 0 ? Math.min(normal, total - 1) : 0;
-      const shinies = shinyUnit > 0 ? shiny : 0;
+      const spare = unit > 0 ? Math.min(freeNormal, total - 1) : 0;
+      const shinies = shinyUnit > 0 ? free - freeNormal : 0;
       if (spare > 0 || shinies > 0) list.push({ species, spare, unit, shinies, shinyUnit });
     }
     // Les plus chers d'abord : c'est ce qu'on cherche en ouvrant la liste.
@@ -143,8 +144,8 @@ export default {
       });
     }
 
-    // Second temps : un individu de l'espèce choisie, pourvu qu'il se revende
-    // et ne soit pas le dernier de son espèce.
+    // Second temps : un individu de l'espèce choisie, pourvu qu'il se revende,
+    // ne soit pas verrouillé ni le dernier de son espèce.
     if (interaction.options.getFocused(true).name === "individu") {
       const species = getSpecies(Number(interaction.options.get("espece")?.value));
       if (!species) {
@@ -160,7 +161,7 @@ export default {
           individualChoices(
             rows.filter((row) => row.species_id === species.id),
             query,
-            (row) => !row.last && sellable(row)
+            (row) => !row.last && !row.locked && sellable(row)
           )
         );
       });

@@ -25,6 +25,7 @@ const PATHS = {
     ["path", { d: "M8 11V7a4 4 0 0 1 8 0v4" }],
   ],
   egg: [["path", { d: "M12 3C8.5 3 5.5 9 5.5 13.5a6.5 6.5 0 0 0 13 0C18.5 9 15.5 3 12 3z" }]],
+  shield: [["path", { d: "M12 3l7 3v5c0 4.6-3 8.2-7 10-4-1.8-7-5.4-7-10V6z" }]],
   warning: [
     [
       "path",
@@ -95,6 +96,8 @@ export const EMOJI_ICONS = {
   "❔": "question",
   "✨": "sparkle",
   "🔒": "lock",
+  "🛡️": "shield",
+  "🛡": "shield",
   "🥚": "egg",
   "⚠️": "warning",
   "⚠": "warning",

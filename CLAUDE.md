@@ -54,7 +54,8 @@ d'écrire et en reprendre le style : en cas de doute, c'est le code existant qui
   espèce, mais aucun n'est réservé : n'importe lequel peut partir s'il n'est pas le dernier. Quand
   le bot choisit, les normaux partent avant les shiny, puis les stériles, puis les plus récents.
   Une évolution fait évoluer un individu précis, qui reste lui-même ; les autres sont des
-  sacrifices. Côté objets, une ligne tombée à zéro
+  sacrifices. Un individu verrouillé (`locked`) ne part jamais — ni revente, ni échange, ni
+  sacrifice — mais évolue après confirmation. Côté objets, une ligne tombée à zéro
   reste en base, donc toute lecture filtre `count > 0`.
 - **Commandes** : celles du jeu Pokémon vivent sous `/pk` (un fichier par sous-commande dans
   `commands/pk/`), celles d'administration sous `/admin`.

@@ -14,7 +14,12 @@ import db from "../points-db.js";
 import { handleException, log } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
 import { getSpecies, rarityOf, sexSymbol } from "./data.js";
-import { countGroup, reserveDuplicates, restoreDuplicates } from "./collection.js";
+import {
+  countGroup,
+  getIndividual,
+  reserveDuplicates,
+  restoreDuplicates,
+} from "./collection.js";
 import { consumeItem, getItem, grantItem, itemSellValue } from "./items.js";
 
 // Ce que vaut un exemplaire. Un tarif absent vaut zéro, donc invendable : mieux
@@ -48,8 +53,8 @@ function journal(userId, speciesId, isShiny, quantity, points) {
 
 // `sex` restreint la vente à un sexe, NULL à n'importe lequel. Parmi les
 // candidats, reserveDuplicates prend les stériles puis les plus récents : on
-// revend ce qui vaut le moins, et jamais le dernier d'une espèce. `pokemonId`
-// désigne un individu précis, qui se vend seul.
+// revend ce qui vaut le moins, jamais le dernier d'une espèce ni un verrouillé.
+// `pokemonId` désigne un individu précis, qui se vend seul.
 export function sellPokemon(userId, { speciesId, isShiny, sex = null, pokemonId = null }, quantity, cb) {
   const species = getSpecies(speciesId);
   if (!species) return cb(null, { ok: false, reason: "Espèce inconnue." });
@@ -71,23 +76,30 @@ export function sellPokemon(userId, { speciesId, isShiny, sex = null, pokemonId 
   reserveDuplicates(userId, { speciesId, isShiny, sex, pokemonId }, quantity, (err, reserved) => {
     if (err) return cb(err);
     if (!reserved.length && pokemonId) {
-      return cb(null, {
-        ok: false,
-        reason:
-          `Le Pokémon #${pokemonId} ne peut pas être revendu : c'est ton dernier de son ` +
-          `espèce, ou il n'est plus à toi.`,
-      });
+      // Relu pour dire la vraie raison : un verrou se lève, un dernier reste.
+      return getIndividual(pokemonId, (err, row) =>
+        cb(err, {
+          ok: false,
+          reason:
+            row?.user_id === userId && row.locked
+              ? `Le Pokémon #${pokemonId} est verrouillé 🛡️ : déverrouille-le avec ` +
+                `/pk verrou pour le revendre.`
+              : `Le Pokémon #${pokemonId} ne peut pas être revendu : c'est ton dernier de ` +
+                `son espèce, ou il n'est plus à toi.`,
+        })
+      );
     }
     if (!reserved.length) {
       // Le refus est le même quelle qu'en soit la cause — pas assez
       // d'exemplaires, ou juste celui qu'on garde — donc on relit pour le dire
       // avec les bons chiffres plutôt qu'avec une formule passe-partout.
-      return countGroup(userId, { speciesId, isShiny, sex }, (err, { owned, spare }) =>
+      return countGroup(userId, { speciesId, isShiny, sex }, (err, { owned, locked, spare }) =>
         cb(err, {
           ok: false,
           reason:
-            `Tu as **${owned}** ${name}, dont **${spare}** revendable${spare > 1 ? "s" : ""} : ` +
-            `impossible d'en revendre **${quantity}**. Il reste toujours au moins un ` +
+            `Tu as **${owned}** ${name}, dont **${spare}** revendable${spare > 1 ? "s" : ""}` +
+            (locked ? ` et **${locked}** verrouillé${locked > 1 ? "s" : ""} 🛡️` : "") +
+            ` : impossible d'en revendre **${quantity}**. Il reste toujours au moins un ` +
             `exemplaire de chaque Pokémon.`,
         })
       );

@@ -12,6 +12,7 @@ import {
   dittoSpecies,
   evolutionTargets,
   getSpecies,
+  isLegendary,
   rollSex,
   sexAfterEvolution,
   tradeEvolutionTarget,
@@ -136,29 +137,43 @@ export function resolveIndividual(ownerId, speciesValue, value, cb) {
   resolveSelector(ownerId, encodeIndividual(parseIndividual(value)), (err, selector) => {
     if (err || selector.error) return cb(err, selector);
     if (selector.speciesId !== species.id) {
-      return cb(null, { error: `Le Pokémon #${selector.pokemonId} n'est pas un ${species.name}.` });
+      return cb(null, {
+        error: `Le Pokémon #${selector.pokemonId} n'est pas un ${species.name}.`,
+      });
     }
     cb(null, selector);
   });
 }
 
-// Les individus comptés par espèce : `total`, dont `normal` et `shiny`. Une
-// entrée de Pokédex est une espèce, et ce qu'elle peut céder se lit ici : tout
-// sauf un.
+// Les individus comptés par espèce : `total`, dont `normal` et `shiny`, et
+// `free` / `freeNormal` ceux qui ne sont pas verrouillés — les seuls qui
+// peuvent partir. Une entrée de Pokédex est une espèce, et ce qu'elle peut
+// céder se lit ici : tout sauf un, et jamais un verrouillé.
 export function countBySpecies(rows) {
   const counts = new Map();
   for (const row of rows) {
-    const entry = counts.get(row.species_id) ?? { total: 0, normal: 0, shiny: 0 };
+    const entry = counts.get(row.species_id) ?? {
+      total: 0,
+      normal: 0,
+      shiny: 0,
+      free: 0,
+      freeNormal: 0,
+    };
     entry.total++;
     entry[row.is_shiny ? "shiny" : "normal"]++;
+    if (!row.locked) {
+      entry.free++;
+      if (!row.is_shiny) entry.freeNormal++;
+    }
     counts.set(row.species_id, entry);
   }
   return counts;
 }
 
 // Regroupe des individus par espèce et variante, et au besoin par sexe et
-// fertilité. `spare` compte ceux qu'on peut céder : tous ceux du groupe, dans
-// la limite de ce que l'espèce peut perdre en gardant un exemplaire. Les
+// fertilité. `spare` compte ceux qu'on peut céder : ceux du groupe qui ne sont
+// pas verrouillés, dans la limite de ce que l'espèce peut perdre en gardant un
+// exemplaire. Les
 // groupes d'une même espèce — shiny compris — partagent cette marge : c'est un
 // plafond, que la réservation revérifie de toute façon.
 export function groupIndividuals(rows, { bySex = false, byFertility = false } = {}) {
@@ -176,30 +191,35 @@ export function groupIndividuals(rows, { bySex = false, byFertility = false } = 
         fertile,
         count: 0,
         spare: 0,
+        free: 0,
         fertileCount: 0,
       });
     }
     const group = groups.get(key);
     group.count++;
+    if (!row.locked) group.free++;
     if (!row.sterile) group.fertileCount++;
   }
   const bySpecies = countBySpecies(rows);
   for (const group of groups.values()) {
-    group.spare = Math.min(group.count, bySpecies.get(group.speciesId).total - 1);
+    group.spare = Math.min(group.free, bySpecies.get(group.speciesId).total - 1);
   }
   return [...groups.values()];
 }
 
-// Combien un dresseur possède d'individus d'un groupe, et combien il peut en
-// céder. Sert aux refus, pour les dire avec les bons chiffres.
+// Combien un dresseur possède d'individus d'un groupe, combien sont
+// verrouillés, et combien il peut en céder. Sert aux refus, pour les dire avec
+// les bons chiffres.
 export function countGroup(userId, group, cb) {
   getIndividuals(userId, (err, rows) => {
-    if (err) return cb(err, { owned: 0, spare: 0 });
+    if (err) return cb(err, { owned: 0, locked: 0, spare: 0 });
     const matching = rows.filter((row) => matchesGroup(row, group));
+    const free = matching.filter((row) => !row.locked).length;
     const total = countBySpecies(rows).get(Number(group.speciesId))?.total ?? 0;
     cb(null, {
       owned: matching.length,
-      spare: Math.min(matching.length, Math.max(0, total - 1)),
+      locked: matching.length - free,
+      spare: Math.min(free, Math.max(0, total - 1)),
     });
   });
 }
@@ -214,14 +234,14 @@ const matchesGroup = (row, { speciesId, isShiny, sex = null, fertile = null, pok
   (!sex || row.sex === sex) &&
   (fertile === null || fertile === undefined || Boolean(row.sterile) === !fertile);
 
-// `isShiny` null : toute l'espèce, shiny compris.
-export function getOwned(userId, speciesId, isShiny, cb) {
-  const shiny = anyVariant(isShiny) ? null : isShiny ? 1 : 0;
+// Les individus d'une espèce, shiny compris : `total`, et `free` ceux qui ne
+// sont pas verrouillés. De quoi dimensionner des sacrifices.
+export function countSpecies(userId, speciesId, cb) {
   db.get(
-    `SELECT COUNT(*) AS count FROM pokemon_owned
-      WHERE user_id = ? AND species_id = ? AND (? IS NULL OR is_shiny = ?)`,
-    [userId, speciesId, shiny, shiny],
-    (err, row) => cb(err, row ? row.count : 0)
+    `SELECT COUNT(*) AS total, COALESCE(SUM(locked = 0), 0) AS free FROM pokemon_owned
+      WHERE user_id = ? AND species_id = ?`,
+    [userId, speciesId],
+    (err, row) => cb(err, { total: row?.total ?? 0, free: row?.free ?? 0 })
   );
 }
 
@@ -277,20 +297,55 @@ export function getLeaderboard(limit, cb) {
 
 // ====================== ÉCRITURES ======================
 
-// Chemin unique de crédit de la collection : capture sauvage, parc safari,
-// éclosion et évolution sans individu à transformer passent tous par ici. Le
-// sexe se tire selon l'espèce sauf s'il est imposé ; la ball est celle de la
-// capture, NULL quand il n'y en a pas eu. Rend l'individu créé { id, sex }.
+// Verrouillé d'office en arrivant dans une boîte — capture, parc, œuf,
+// échange : un shiny, un légendaire, selon pokemon.lockByDefault. Le dresseur
+// en décide ensuite avec /pk verrou. Un Pokémon verrouillé ne part jamais : ni
+// revente, ni échange, ni sacrifice.
+export function lockedByDefault(speciesId, isShiny) {
+  const config = getPokemonConfig().lockByDefault ?? {};
+  const species = getSpecies(speciesId);
+  return Boolean(
+    (isShiny && config.shiny) || (species && isLegendary(species) && config.legendary)
+  );
+}
+
+// Chemin unique de crédit de la collection : capture sauvage, parc safari et
+// éclosion passent tous par ici. Le sexe se tire selon l'espèce sauf s'il est
+// imposé ; la ball est celle de la capture, NULL quand il n'y en a pas eu.
+// Rend l'individu créé { id, sex }.
 export function creditSpecies(userId, speciesId, isShiny, options, cb) {
   const { ball = null, origin, sex = null, obtainedAt = Date.now() } = options;
   const chosenSex = sex ?? rollSex(getSpecies(speciesId));
   db.run(
-    `INSERT INTO pokemon_owned (user_id, species_id, is_shiny, sex, ball, origin, sterile, obtained_at)
-     VALUES (?, ?, ?, ?, ?, ?, 0, ?)`,
-    [userId, speciesId, isShiny ? 1 : 0, chosenSex, ball, origin, obtainedAt],
+    `INSERT INTO pokemon_owned
+       (user_id, species_id, is_shiny, sex, ball, origin, sterile, obtained_at, locked)
+     VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+    [
+      userId,
+      speciesId,
+      isShiny ? 1 : 0,
+      chosenSex,
+      ball,
+      origin,
+      obtainedAt,
+      lockedByDefault(speciesId, isShiny) ? 1 : 0,
+    ],
     function (err) {
       if (err) return cb(err, null);
       cb(null, { id: this.lastID, sex: chosenSex });
+    }
+  );
+}
+
+// Verrouille ou déverrouille un Pokémon, de son propriétaire seulement : la
+// garde est dans le WHERE, et `this.changes` dit s'il était bien à lui. Le
+// verrou ne change rien d'autre : le Pokémon reste où il est, tel qu'il est.
+export function setLock(userId, pokemonId, locked, cb) {
+  db.run(
+    "UPDATE pokemon_owned SET locked = ? WHERE id = ? AND user_id = ?",
+    [locked ? 1 : 0, Number(pokemonId), userId],
+    function (err) {
+      cb(err, this ? this.changes === 1 : false);
     }
   );
 }
@@ -309,7 +364,9 @@ export function creditSpecies(userId, speciesId, isShiny, options, cb) {
 // Parmi les candidats, on prend d'abord ce qui vaut le moins — les normaux
 // avant les shiny, puis les stériles, puis les plus récents : un individu
 // encore capable de pondre ne part qu'en dernier. Une variante absente du
-// groupe veut dire « shiny ou non ».
+// groupe veut dire « shiny ou non ». Un verrouillé n'est jamais candidat, sauf
+// avec `withLocked` : l'individu qui évolue ne quitte pas la boîte, il revient
+// sous sa nouvelle forme.
 //
 // Une seule instruction, qui compte et retire d'un même geste : deux retraits
 // simultanés ne peuvent pas passer à deux sur le même individu, et c'est tout
@@ -320,8 +377,16 @@ export function reserveDuplicates(userId, group, quantity, cb) {
   if (!Number.isInteger(quantity) || quantity <= 0) {
     return cb(new Error(`Quantité invalide : ${quantity}`), []);
   }
-  const { speciesId, isShiny, sex = null, fertile = null, pokemonId = null } = group;
+  const {
+    speciesId,
+    isShiny,
+    sex = null,
+    fertile = null,
+    pokemonId = null,
+    withLocked = false,
+  } = group;
   const filter = `o.user_id = $user AND o.species_id = $species
+    AND ($withLocked OR o.locked = 0)
     AND ($shiny IS NULL OR o.is_shiny = $shiny)
     AND ($id IS NULL OR o.id = $id)
     AND ($sex IS NULL OR o.sex = $sex)
@@ -343,6 +408,7 @@ export function reserveDuplicates(userId, group, quantity, cb) {
       $id: pokemonId ? Number(pokemonId) : null,
       $sex: sex,
       $sterile: fertile === null || fertile === undefined ? null : fertile ? 0 : 1,
+      $withLocked: withLocked ? 1 : 0,
       $quantity: quantity,
     },
     (err, rows) => cb(err, rows || [])
@@ -359,13 +425,15 @@ export function restoreDuplicates(rows, cb = () => {}) {
     if (err) return cb(err);
     const row = list.shift();
     if (!row) return cb(null);
-    // La place dans la boîte PC et le surnom reviennent avec lui : un Pokémon
-    // qui évolue, ou qu'une compensation remet en place, reste où son
-    // dresseur l'avait rangé, sous le nom qu'il lui avait donné.
+    // La place dans la boîte PC, le surnom et le verrou reviennent avec lui :
+    // un Pokémon qui évolue, ou qu'une compensation remet en place, reste où
+    // son dresseur l'avait rangé, sous le nom et la protection qu'il lui avait
+    // donnés.
     db.run(
       `INSERT INTO pokemon_owned
-         (id, user_id, species_id, is_shiny, sex, ball, origin, sterile, obtained_at, pc_pos, nickname)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         (id, user_id, species_id, is_shiny, sex, ball, origin, sterile, obtained_at, pc_pos,
+          nickname, locked)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         row.id,
         row.user_id,
@@ -378,6 +446,7 @@ export function restoreDuplicates(rows, cb = () => {}) {
         row.obtained_at,
         row.pc_pos ?? null,
         row.nickname ?? null,
+        row.locked ? 1 : 0,
       ],
       next
     );
@@ -419,28 +488,45 @@ export function describeHelper(helperKey, speciesId) {
 // normaux partent avant les shiny, et il en reste toujours un.
 export const DITTO_HELPER = "metamorph";
 
-// Qui paie les sacrifices d'une évolution, pour qui possède `owned` individus
-// de l'espèce — shiny compris, celui qui évolue compris. Des exemplaires de
-// l'espèce tant qu'il en reste un en plus de celui qui évolue, puis Métamorph
-// pour ce qui manque, à `dittosPerCopy` par sacrifice. La même fonction sert à
-// l'écran de /pk evolution et à evolve, qui tranche à la fin.
+// Qui paie les sacrifices d'une évolution. `owned.total` compte les individus
+// de l'espèce — shiny compris, celui qui évolue compris —, `owned.free` ceux
+// qui peuvent être sacrifiés : ni verrouillés, ni celui qui évolue. Des
+// exemplaires de l'espèce tant qu'il en reste un en plus de celui qui évolue,
+// puis Métamorph pour ce qui manque, à `dittosPerCopy` par sacrifice. La même
+// fonction sert à l'écran de /pk evolution et à evolve, qui tranche à la fin.
 export function sacrificeFill(plan, owned) {
   const perCopy = Math.max(1, Math.round(Number(getPokemonConfig().evolution.dittosPerCopy) || 1));
-  const real = Math.min(plan.sacrifices, Math.max(0, owned - 2));
+  const real = Math.min(plan.sacrifices, owned.free, Math.max(0, owned.total - 2));
   const missing = plan.sacrifices - real;
   return { real, missing, dittos: missing * perCopy };
 }
 
+// Combien on en a, et combien sont verrouillés : un verrouillé garde l'entrée
+// mais ne se sacrifie pas, le refus doit le dire quand c'est lui qui manque.
+// `owned` : { total, free }, ou null quand la lecture a échoué — on omet alors
+// plutôt que d'annoncer un faux zéro.
+const ownedText = (owned) => {
+  if (!owned) return "";
+  const locked = owned.total - owned.free;
+  return (
+    ` Tu en as **${owned.total}**` +
+    (locked > 0 ? `, dont **${locked}** verrouillé${locked > 1 ? "s" : ""} 🛡️` : "") +
+    "."
+  );
+};
+
 // Ce qui manque à une évolution, avec les chiffres : le refus d'evolve et celui
-// de /pk evolution disent la même chose. `owned` (l'espèce, shiny compris) est
-// omis quand la lecture a échoué, plutôt que d'annoncer un faux zéro.
+// de /pk evolution disent la même chose.
 export function evolutionShortage(plan, owned = null) {
   const sacrifices = plan.sacrifices;
   return (
     `Il te faut **${plan.required}** ${plan.species.name}, shiny ou non : celui qui évolue, ` +
-    (sacrifices > 0 ? `${sacrifices} sacrifice${sacrifices > 1 ? "s" : ""} ` : "") +
+    (sacrifices > 0
+      ? `${sacrifices} sacrifice${sacrifices > 1 ? "s" : ""} non ` +
+        `verrouillé${sacrifices > 1 ? "s" : ""} `
+      : "") +
     `et un qui reste.` +
-    (owned === null ? "" : ` Tu en as **${owned}**.`)
+    ownedText(owned)
   );
 }
 
@@ -482,7 +568,9 @@ export function describeEvolution(speciesId, chosenTargetId = null, helperKey = 
 
   // Sur une lignée à embranchement, le coût en points dépend de la cible :
   // un tirage aléatoire coûte le tarif normal du stade, choisir coûte plus cher.
-  const referenceStage = (target ?? targets[0]).stage;
+  // Un bébé et sa forme adulte sont tous deux de stade 1 : son évolution coûte
+  // ce que coûte une première évolution d'adulte, celle du stade 2.
+  const referenceStage = Math.max(2, (target ?? targets[0]).stage);
   const stageCost = config[referenceStage];
   if (!stageCost) return { error: "Aucun coût configuré pour ce stade." };
 
@@ -523,6 +611,10 @@ export function describeEvolution(speciesId, chosenTargetId = null, helperKey = 
 // prend d'abord ce qui est le plus probable de manquer, pour que le cas courant
 // (« il te manque un exemplaire ») ne déplace rien du tout.
 //
+// Un individu verrouillé évolue quand même — il ne quitte pas la boîte —, mais
+// seulement avec `group.confirmLocked` : sans elle, evolve le rend et répond
+// `locked`, pour que l'appelant demande confirmation.
+//
 // `group.pokemonId` désigne l'individu qui évolue ; sans `speciesId`, son espèce
 // se lit sur lui. Avec, c'est l'espèce attendue : la réservation ne le prend
 // que s'il l'a encore, ce qui refuse un second clic sur un Pokémon qui vient
@@ -533,7 +625,8 @@ export function evolve(userId, group, chosenTargetId, helperKey, cb) {
     return resolveSelector(userId, encodeIndividual(group.pokemonId), (err, selector) => {
       if (err) return cb(err);
       if (selector.error) return cb(null, { ok: false, reason: selector.error });
-      evolve(userId, selector, chosenTargetId, helperKey, cb);
+      const resolved = { ...selector, confirmLocked: group.confirmLocked };
+      evolve(userId, resolved, chosenTargetId, helperKey, cb);
     });
   }
   const { speciesId, isShiny, sex = null, pokemonId = null } = group;
@@ -642,7 +735,7 @@ export function evolve(userId, group, chosenTargetId, helperKey, cb) {
   // Le comptage de l'espèce ne fait que dimensionner les retraits et chiffrer
   // les refus : chaque retrait reste gardé, et si le stock a bougé entre-temps,
   // il échoue et tout ce qui a été pris revient.
-  const compter = (suite) => getOwned(userId, speciesId, null, suite);
+  const compter = (suite) => countSpecies(userId, speciesId, suite);
   const manque = () =>
     compter((err, owned) =>
       cb(null, { ok: false, reason: evolutionShortage(plan, err ? null : owned) })
@@ -655,13 +748,14 @@ export function evolve(userId, group, chosenTargetId, helperKey, cb) {
   // Le refus donne les chiffres ; une lecture ratée les omet plutôt que
   // d'annoncer un faux zéro.
   const manqueMetamorph = (metamorph, fill) =>
-    getOwned(userId, metamorph.id, null, (err, owned) =>
+    countSpecies(userId, metamorph.id, (err, owned) =>
       cb(null, {
         ok: false,
         reason:
-          `Il te faut **${fill.dittos + 1}** ${metamorph.name} pour compléter cette évolution ` +
-          `(${fill.dittos} sacrifié${fill.dittos > 1 ? "s" : ""} + 1 qui reste)` +
-          (err ? "." : `, tu en as **${owned}**.`),
+          `Il te faut **${fill.dittos + 1}** ${metamorph.name} pour compléter cette évolution : ` +
+          `${fill.dittos} à sacrifier, non verrouillé${fill.dittos > 1 ? "s" : ""}, et un qui ` +
+          `reste.` +
+          ownedText(err ? null : owned),
       })
     );
 
@@ -681,7 +775,8 @@ export function evolve(userId, group, chosenTargetId, helperKey, cb) {
     });
   };
 
-  reserveDuplicates(userId, { speciesId, isShiny, sex, pokemonId }, 1, (err, evolvers) => {
+  const evolverGroup = { speciesId, isShiny, sex, pokemonId, withLocked: true };
+  reserveDuplicates(userId, evolverGroup, 1, (err, evolvers) => {
     if (err) return cb(err);
     if (!evolvers.length && pokemonId) {
       return cb(null, {
@@ -692,13 +787,28 @@ export function evolve(userId, group, chosenTargetId, helperKey, cb) {
       });
     }
     if (!evolvers.length) return manque();
+    // Verrouillé : on ne le bloque pas, on demande. Il revient tel quel en
+    // attendant la réponse.
+    const [evolver] = evolvers;
+    if (evolver.locked && !group.confirmLocked) {
+      return rendre(evolvers)(() =>
+        cb(null, {
+          ok: false,
+          locked: true,
+          reason:
+            `#${evolver.id} ${name}${evolver.is_shiny ? " ✨" : ""} est verrouillé 🛡️. Il ne ` +
+            `quittera pas ta boîte, mais veux-tu vraiment le faire évoluer ?`,
+        })
+      );
+    }
     const sansSacrifice = { sacrifices: 0, dittos: 0, shinies: 0 };
     if (plan.sacrifices <= 0) return prendreAide(evolvers, sansSacrifice, rendre(evolvers));
 
     compter((err, owned) => {
       if (err) return rendre(evolvers)(() => cb(err));
-      // `owned` ne compte plus l'individu qui évolue, déjà réservé.
-      const fill = sacrificeFill(plan, owned + 1);
+      // Le compte ne voit plus l'individu qui évolue, déjà réservé : `free`
+      // est exactement ce qui peut être sacrifié.
+      const fill = sacrificeFill(plan, { total: owned.total + 1, free: owned.free });
       if (fill.missing > 0 && !ditto) return rendre(evolvers)(manque);
       const metamorph = fill.dittos > 0 ? dittoSpecies() : null;
       if (fill.dittos > 0 && !metamorph) {
@@ -856,8 +966,8 @@ export function acceptTrade(tradeId, cb) {
               cb(null, {
                 ok: false,
                 reason:
-                  "Le Pokémon proposé n'est plus disponible : il est parti, ou c'est le " +
-                  "dernier de son espèce chez l'initiateur.",
+                  "Le Pokémon proposé n'est plus disponible : il est parti, verrouillé, ou " +
+                  "c'est le dernier de son espèce chez l'initiateur.",
               })
             );
           }
@@ -872,8 +982,8 @@ export function acceptTrade(tradeId, cb) {
                   cb(null, {
                     ok: false,
                     reason:
-                      "Le Pokémon demandé n'est plus disponible : il est parti, ou c'est " +
-                      "ton dernier de son espèce.",
+                      "Le Pokémon demandé n'est plus disponible : il est parti, verrouillé, " +
+                      "ou c'est ton dernier de son espèce.",
                   })
                 );
               });
@@ -896,6 +1006,9 @@ export function acceptTrade(tradeId, cb) {
                 sex: sexAfterEvolution(species, row.sex),
                 origin: "echange",
                 obtained_at: now,
+                // Il arrive comme une capture : verrouillé d'office s'il est
+                // shiny ou légendaire, au nouveau dresseur de décider ensuite.
+                locked: lockedByDefault(species.id, row.is_shiny) ? 1 : 0,
                 // Sa place était celle du PC de l'autre : chez son nouveau
                 // dresseur, il prend la première libre. Son surnom le suit,
                 // comme dans les jeux.

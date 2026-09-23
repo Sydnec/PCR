@@ -284,19 +284,52 @@ const parseVariant = (raw) =>
         sex: ["M", "F"].includes(String(raw).slice(1)) ? String(raw).slice(1) : null,
       };
 
-function runEvolution(interaction, speciesId, variant, chosenTargetId, helperKey = null) {
+// `confirmed` : le dresseur a confirmé l'évolution d'un Pokémon verrouillé. Sans
+// elle, evolve le rend et répond `locked`, et le message propose de confirmer
+// — le même bouton, avec « ok » en dernier segment.
+function runEvolution(
+  interaction,
+  speciesId,
+  variant,
+  chosenTargetId,
+  helperKey = null,
+  confirmed = false
+) {
   // L'espèce du bouton voyage avec l'individu : la réservation ne le prend que
   // s'il est encore de cette espèce, et à celui qui clique. Un second clic sur
   // un Pokémon qui vient d'évoluer est donc refusé, au lieu de le faire
   // évoluer une seconde fois à un tarif qu'on ne lui a pas montré.
   const group = variant.pokemonId
-    ? { pokemonId: variant.pokemonId, speciesId }
-    : { speciesId, isShiny: variant.isShiny, sex: variant.sex };
+    ? { pokemonId: variant.pokemonId, speciesId, confirmLocked: confirmed }
+    : { speciesId, isShiny: variant.isShiny, sex: variant.sex, confirmLocked: confirmed };
   evolve(interaction.user.id, group, chosenTargetId, helperKey, (err, result) => {
     if (err) {
       handleException(err);
       return interaction
         .update({ content: "❌ Erreur base de données.", embeds: [], components: [] })
+        .catch(() => {});
+    }
+    if (!result.ok && result.locked) {
+      const segments = interaction.customId.split("|");
+      while (segments.length < 5) segments.push("");
+      segments[5] = "ok";
+      return interaction
+        .update({
+          content: `🛡️ ${result.reason}`,
+          embeds: [],
+          components: [
+            new ActionRowBuilder().addComponents(
+              new ButtonBuilder()
+                .setCustomId(segments.join("|"))
+                .setLabel("Faire évoluer quand même")
+                .setStyle(ButtonStyle.Danger),
+              new ButtonBuilder()
+                .setCustomId("poke_evo_cancel")
+                .setLabel("Annuler")
+                .setStyle(ButtonStyle.Secondary)
+            ),
+          ],
+        })
         .catch(() => {});
     }
     if (!result.ok) {
@@ -665,7 +698,7 @@ export async function handlePokemonButton(interaction) {
     // Le cinquième segment, facultatif, est l'objet qui aide l'évolution : une
     // pierre impose alors sa cible, un bonbon remplace un sacrifice manquant.
     case "poke_evo": {
-      const [speciesId, variant, mode, helper] = args;
+      const [speciesId, variant, mode, helper, confirm] = args;
       if (mode === "choose") {
         return showEvolutionChoices(
           interaction,
@@ -674,8 +707,20 @@ export async function handlePokemonButton(interaction) {
           helper === DITTO_HELPER ? helper : null
         );
       }
-      return runEvolution(interaction, Number(speciesId), parseVariant(variant), null, helper ?? null);
+      return runEvolution(
+        interaction,
+        Number(speciesId),
+        parseVariant(variant),
+        null,
+        helper || null,
+        confirm === "ok"
+      );
     }
+
+    case "poke_evo_cancel":
+      return interaction
+        .update({ content: "Évolution annulée : il reste tel quel.", embeds: [], components: [] })
+        .catch(() => {});
 
     // Pas d'objet ici, et ce n'est pas un oubli : choisir sa cible et utiliser
     // un objet sont deux chemins distincts. Une pierre impose déjà sa forme —
@@ -683,13 +728,14 @@ export async function handlePokemonButton(interaction) {
     // le supplément — et un bonbon laisse le hasard trancher. Métamorph, lui, ne
     // fait que remplacer des sacrifices : il se combine avec le choix.
     case "poke_evo_pick": {
-      const [speciesId, variant, targetId, helper] = args;
+      const [speciesId, variant, targetId, helper, confirm] = args;
       return runEvolution(
         interaction,
         Number(speciesId),
         parseVariant(variant),
         Number(targetId),
-        helper === DITTO_HELPER ? helper : null
+        helper === DITTO_HELPER ? helper : null,
+        confirm === "ok"
       );
     }
 

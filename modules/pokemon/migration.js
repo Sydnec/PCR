@@ -20,7 +20,8 @@
 // comprise, et le démarrage suivant recommence de zéro.
 import db from "../points-db.js";
 import { handleException, log } from "../utils.js";
-import { allSpeciesData, getSpecies, isGenderless, rollSex } from "./data.js";
+import { getPokemonConfig } from "./config.js";
+import { allSpeciesData, getSpecies, isGenderless, isLegendary, rollSex } from "./data.js";
 
 const all = (sql, params = []) =>
   new Promise((resolve, reject) =>
@@ -93,6 +94,7 @@ export async function runMigrations() {
   await migrateCollection();
   await migrateGenderless();
   await migratePc();
+  await migrateLock();
 }
 
 // ---------------------- 1. Individus ----------------------
@@ -224,5 +226,34 @@ async function migratePc() {
       )`
     );
     log("Boîte PC : place, surnom et noms de boîtes prêts.");
+  });
+}
+
+// ---------------------- 4. Verrou ----------------------
+
+// Un Pokémon verrouillé ne part jamais : ni revente, ni échange, ni sacrifice.
+// Les shiny et les légendaires le sont d'office à leur arrivée
+// (lockedByDefault) ; ceux qu'on possède déjà le deviennent ici, une seule
+// fois — ensuite, c'est le dresseur qui décide, et un redémarrage ne doit pas
+// reverrouiller ce qu'il a ouvert. Tout le jeu de données, générations fermées
+// comprises : une espèce cachée reste dans les collections.
+async function migrateLock() {
+  await once("verrou", async () => {
+    await run("ALTER TABLE pokemon_owned ADD COLUMN locked INTEGER NOT NULL DEFAULT 0").catch(
+      (error) => {
+        if (!/duplicate column/i.test(error.message)) throw error;
+      }
+    );
+    const legendaries = allSpeciesData()
+      .filter(isLegendary)
+      .map((species) => species.id);
+    const config = getPokemonConfig().lockByDefault ?? {};
+    const locked = await run(
+      `UPDATE pokemon_owned SET locked = 1
+        WHERE (? AND is_shiny = 1)
+           OR (? AND species_id IN (${legendaries.map(() => "?").join(", ") || "NULL"}))`,
+      [config.shiny ? 1 : 0, config.legendary ? 1 : 0, ...legendaries]
+    );
+    log(`Verrou : ${locked.changes} Pokémon shiny ou légendaires verrouillés d'office.`);
   });
 }

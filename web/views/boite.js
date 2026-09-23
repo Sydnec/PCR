@@ -344,7 +344,7 @@ export async function render(ctx) {
     // Le nom au survol et pour les lecteurs d'écran : la case n'en montre rien.
     const name =
       [mon.nickname, species?.name ?? "?"].filter(Boolean).join(" · ") +
-      `${mon.shiny ? " shiny" : ""} #${mon.id}`;
+      `${mon.shiny ? " shiny" : ""} #${mon.id}${mon.locked ? " · verrouillé" : ""}`;
     return h(
       "button",
       {
@@ -375,7 +375,8 @@ export async function render(ctx) {
         alt: "",
         loading: "lazy",
         draggable: "false",
-      })
+      }),
+      mon.locked ? icon("shield", { className: "pc-lock" }) : null
     );
   }
 
@@ -547,8 +548,61 @@ function openPokemon(ctx, item, pc, { reload, startMove }) {
             icon("pin"),
             ` C'est ton dernier ${species.name}, shiny ou non : il garde ton entrée du Pokédex, donc il ne peut ni partir ni évoluer.`
           )
-        : [sellAction(item, species, done), evolveAction(ctx, item, species, done)]
+        : [
+            // Verrouillé, il ne se revend pas : on le dit au lieu du bouton.
+            item.locked
+              ? h(
+                  "p",
+                  { class: "notice" },
+                  icon("shield"),
+                  " Verrouillé : il ne sera ni revendu, ni échangé, ni sacrifié."
+                )
+              : sellAction(item, species, done),
+            evolveAction(ctx, item, species, done),
+          ],
+      lockAction(item, done)
     )
+  );
+}
+
+// Le verrou, comme /pk verrou : un Pokémon verrouillé ne part jamais, mais
+// peut encore évoluer, après confirmation, et pondre.
+function lockAction(item, done) {
+  const button = h(
+    "button",
+    { class: "button" },
+    icon("shield"),
+    item.locked ? " Déverrouiller" : " Verrouiller"
+  );
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    try {
+      const result = await api(`/api/me/pokemon/${item.id}/lock`, {
+        method: "POST",
+        body: { locked: !item.locked },
+      });
+      toast(
+        result.locked ? `#${item.id} est verrouillé.` : `#${item.id} est déverrouillé.`,
+        "success"
+      );
+      await done();
+    } catch (error) {
+      toast(error.message, "error");
+      button.disabled = false;
+    }
+  });
+  return h(
+    "div",
+    { class: "action" },
+    h("h3", {}, "Verrou"),
+    h(
+      "p",
+      { class: "muted small" },
+      item.locked
+        ? "Verrouillé, il ne part jamais : ni revente, ni échange, ni sacrifice."
+        : "Verrouiller le protège de la revente, des échanges et des sacrifices."
+    ),
+    button
   );
 }
 
@@ -610,12 +664,33 @@ function evolveAction(ctx, item, species, done) {
     }
   }
 
+  // Verrouillé, il évolue quand même, mais après un second clic : on ne le
+  // bloque pas, on prévient. L'API refuse sans `confirmLocked`.
+  let armed = false;
+  let timer = null;
   button.addEventListener("click", async () => {
+    if (item.locked && !armed) {
+      armed = true;
+      button.textContent = "Il est verrouillé : évoluer quand même ?";
+      button.classList.add("danger");
+      timer = setTimeout(() => {
+        armed = false;
+        button.textContent = "Évoluer";
+        button.classList.remove("danger");
+      }, 4000);
+      return;
+    }
+    clearTimeout(timer);
     button.disabled = true;
     try {
       // L'espèce attendue accompagne l'individu : un second envoi sur un
       // Pokémon qui vient d'évoluer est refusé au lieu de le refaire évoluer.
-      const body = { pokemonId: item.id, speciesId: species.id, ...(targetId ? { targetId } : {}) };
+      const body = {
+        pokemonId: item.id,
+        speciesId: species.id,
+        ...(targetId ? { targetId } : {}),
+        ...(item.locked ? { confirmLocked: true } : {}),
+      };
       const result = await api("/api/me/evolve", { method: "POST", body });
       toast(
         `#${item.id} a évolué en ${ctx.species.get(result.pokemon.speciesId)?.name ?? "?"} !`,
@@ -625,6 +700,9 @@ function evolveAction(ctx, item, species, done) {
     } catch (error) {
       toast(error.message, "error");
       button.disabled = false;
+      armed = false;
+      button.textContent = "Évoluer";
+      button.classList.remove("danger");
     }
   });
 

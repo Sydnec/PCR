@@ -20,16 +20,21 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
   jamais — elles ne s'obtiennent que par évolution ou par échange —, un 🥚 celles qui ne sortent
   que d'un œuf.
 - `/pk boite [pokemon] [membre]` : les Pokémon un par un, page par page — `#numéro`, sexe, ball,
-  date, fertilité, et 📌 le dernier d'une espèce (voir [Individus](individus.md)).
+  date, fertilité, et 🛡️ les verrouillés (voir [Individus](individus.md)).
+- `/pk verrou <espece> <individu>` : verrouille ou déverrouille un Pokémon. **Verrouillé, il ne part
+  jamais** — ni revente, ni échange, ni sacrifice — mais peut encore évoluer, après confirmation,
+  et pondre. Les shiny et les légendaires arrivent verrouillés (`pokemon.lockByDefault`), y compris
+  reçus en échange. Réponse privée.
 - `/pk oeuf pondre <parent1> <parent2>` / `/pk oeuf voir` : faire pondre un couple d'une famille à bébé,
   suivre l'œuf (voir [Œufs](oeufs.md)).
 - `/pk classement` : classement des dresseurs par espèces distinctes.
 - `/pk info <pokemon>` : la même fiche que le bouton des apparitions — type, rareté,
   difficulté, et la lignée évolutive stade par stade avec ce que le dresseur en a déjà.
 - `/pk evolution <espece> <individu>` : fait évoluer **un Pokémon précis**, choisi après son espèce.
-  Il reste lui-même : même numéro, même ball, même sexe, même fertilité, shiny s'il l'était. Les
-  autres Pokémon de l'évolution sont des **sacrifices** : des exemplaires de l'espèce, shiny ou non
-  (les normaux partent d'abord), et il en reste toujours un. Avec un Salamèche et un Salamèche
+  Il reste lui-même : même numéro, même ball, même sexe, même fertilité, shiny s'il l'était, et
+  verrouillé s'il l'était — un verrouillé évolue après une confirmation. Les autres Pokémon de
+  l'évolution sont des **sacrifices** : des exemplaires de l'espèce, shiny ou non (les normaux
+  partent d'abord), jamais un verrouillé, et il en reste toujours un. Avec un Salamèche et un Salamèche
   shiny, on peut faire évoluer le shiny avec des bonbons ou des Métamorph : le normal garde
   l'entrée. Les lignées à embranchement (Évoli) peuvent évoluer au hasard, ou vers une cible
   choisie pour plus cher. La commande ne propose que les chemins réellement praticables, objets
@@ -98,8 +103,8 @@ prennent en compte immédiatement. Ce qu'elle change :
 - **Six légendaires** de plus : Raikou, Entei, Suicune, Lugia, Ho-Oh et Celebi.
 - **Les raretés de la 1ʳᵉ génération ne bougent pas.** Un bébé est de stade 1, sa forme adulte
   aussi : Pikachu reste commun et Raichu peu commun, là où compter Pichu en ferait un rare.
-  L'évolution d'un bébé vers sa forme adulte a son propre tarif, `pokemon.evolution.1` (1 sacrifice
-  et 250 points par défaut).
+  L'évolution d'un bébé vers sa forme adulte coûte comme une première évolution d'adulte :
+  le tarif du stade 2 (`pokemon.evolution.2`).
 
 Refermer une génération (`pokemon.generation 1`) cache ses espèces sans les retirer des
 collections ; elles réapparaissent à la réouverture.
