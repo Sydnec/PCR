@@ -54,7 +54,7 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
 | `GET /api/users/:userId/inventory` 🔒 | `{ items: [{ key, label, emoji, description, count }] }` |
 | `GET /api/me/egg` 🔒 | `{ egg }` ou `{ egg: null }` |
 | `GET /api/me/lineage/:speciesId` 🔒 | `{ lineage }` — la lignée et ce que le dresseur possède de chaque maillon |
-| `GET /api/spawn` 🔒 | `{ refreshSeconds, cooldownSeconds, pausedUntil, safari, spawn, last, drops }` — l'apparition du salon |
+| `GET /api/spawn` 🔒 | `{ refreshSeconds, cooldownSeconds, pausedUntil, wallet, safari, spawn, last, drops }` — l'apparition du salon |
 | `GET /api/safari` 🔒 | `{ offer, visit }` — ce que le dresseur peut faire du parc, et sa visite en cours (`null` sinon) |
 | `GET /api/me/pc` 🔒 | `{ slotsPerBox, columns, maxBoxes, boxNameLength, nicknameLength, boxes, pokemon }` — la boîte PC |
 
@@ -81,7 +81,8 @@ Discord), les balls (`price`, `probability`, `free` = balls offertes, `usable` =
 payable avec le solde) et le journal des derniers
 lancers (`throws`, avec le pseudo et l'avatar du serveur). L'objet tenu reste
 secret. `last` est le dernier Pokémon parti (`CAUGHT` ou `FLED`), `drops` les objets au sol, et
-`pausedUntil` la fin d'un parc safari qui suspend les apparitions.
+`pausedUntil` la fin d'un parc safari qui suspend les apparitions. `wallet` (`{ balance, balls }`,
+comme dans `/api/me`) fait suivre le solde à l'onglet Capture sans relire `/api/me`.
 
 `safari` (et `offer` de `/api/safari`) : `{ enabled, session, freePark, price, actions, tickets,
 retryAt, canBuy, blocked }`. `session` est la visite en cours (`{ id, actionsLeft }`), `freePark`

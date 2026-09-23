@@ -232,17 +232,27 @@ async function lineageJson(userId, species) {
 // image quand la configuration lui en donne une.
 const withImage = (entry) => ({ ...entry, image: itemImageUrl(entry.sprite) });
 
+// Le solde et les balls en poche, tels que l'en-tête du site les affiche. Lu
+// par /api/me et relu avec chaque apparition : des points gagnés sur Discord
+// doivent se voir sans recharger la page, comme les balls offertes.
+async function walletJson(userId) {
+  const [balance, balls] = await Promise.all([
+    promise((cb) => getBalance(userId, cb)),
+    promise((cb) => getBallStock(userId, cb)),
+  ]);
+  return { balance, balls: balls.map(withImage) };
+}
+
 // Une apparition, avec ce qu'en voit chaque dresseur : les chances de chaque
 // ball, calculées comme sur l'annonce Discord, et la fiche du bouton « Infos du
 // Pokémon ». L'objet tenu reste secret jusqu'à la fin, comme sur Discord.
-async function spawnJson(ctx, spawn) {
+async function spawnJson(ctx, spawn, balance) {
   const config = getPokemonConfig();
   const species = getSpecies(spawn.species_id);
-  const [throws, inventory, lineage, balance] = await Promise.all([
+  const [throws, inventory, lineage] = await Promise.all([
     promise((cb) => recentThrows(spawn.id, config.spawn.throwLogSize, cb)),
     promise((cb) => getInventory(ctx.user.id, cb)),
     lineageJson(ctx.user.id, species),
-    promise((cb) => getBalance(ctx.user.id, cb)),
   ]);
   const stock = new Map(inventory.map((row) => [row.item_key, row.count]));
   return {
@@ -383,12 +393,11 @@ export const routes = [
     path: "/api/me",
     auth: true,
     handler: async (ctx) => {
-      const [balance, balls, egg] = await Promise.all([
-        promise((cb) => getBalance(ctx.user.id, cb)),
-        promise((cb) => getBallStock(ctx.user.id, cb)),
+      const [wallet, egg] = await Promise.all([
+        walletJson(ctx.user.id),
         promise((cb) => getIncubatingEgg(ctx.user.id, cb)),
       ]);
-      return { user: ctx.user, balance, balls: balls.map(withImage), egg: eggJson(egg) };
+      return { user: ctx.user, ...wallet, egg: eggJson(egg) };
     },
   },
 
@@ -560,18 +569,20 @@ export const routes = [
     path: "/api/spawn",
     auth: true,
     handler: async (ctx) => {
-      const [active, last, pausedUntil, drops] = await Promise.all([
+      const [active, last, pausedUntil, drops, wallet] = await Promise.all([
         promise((cb) => getActiveSpawn((err, row) => cb(err, row ?? null))),
         promise((cb) => getLastEndedSpawn(cb)),
         promise((cb) => getSpawnPause(cb)),
         promise((cb) => getOpenDrops(cb)),
+        walletJson(ctx.user.id),
       ]);
       return {
         refreshSeconds: Math.max(1, Number(getConfig().web?.spawnRefreshSeconds) || 5),
         cooldownSeconds: getPokemonConfig().capture.throwCooldownSeconds,
         pausedUntil: pausedUntil > Date.now() ? pausedUntil : null,
+        wallet,
         safari: (await safariState(ctx)).json,
-        spawn: active ? await spawnJson(ctx, active) : null,
+        spawn: active ? await spawnJson(ctx, active, wallet.balance) : null,
         last: last
           ? {
               id: last.id,

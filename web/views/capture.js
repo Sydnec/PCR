@@ -39,6 +39,7 @@ const PANEL_ICONS = {
 export async function render(ctx) {
   let state = await api("/api/spawn");
   let signature = JSON.stringify(state);
+  ctx.setWallet(state.wallet);
   // Ce qui n'appartient qu'à cet onglet : la Master Ball ou l'entrée du parc en
   // attente de confirmation, la réponse du dernier lancer, et la fin du
   // cooldown affiché.
@@ -90,6 +91,7 @@ export async function render(ctx) {
     }
     state = next;
     signature = nextSignature;
+    ctx.setWallet(state.wallet);
     draw();
   }
 

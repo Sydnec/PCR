@@ -44,6 +44,7 @@ const ctx = {
   // Couleur de chaque type, celle des embeds Discord.
   types: {},
   refreshMe,
+  setWallet,
   navigate,
 };
 
@@ -57,8 +58,20 @@ async function refreshMe() {
   renderAccount();
 }
 
+// Le solde et les balls relus par une page (la Capture les reçoit avec chaque
+// apparition) : l'en-tête suit sans relire /api/me.
+function setWallet({ balance, balls }) {
+  if (!ctx.me) return;
+  if (ctx.me.balance === balance && JSON.stringify(ctx.me.balls) === JSON.stringify(balls)) return;
+  ctx.me = { ...ctx.me, balance, balls };
+  renderAccount();
+}
+
+// Changer de page relit aussi le solde, sans attendre : des points gagnés sur
+// Discord entre-temps apparaissent dans l'en-tête.
 function navigate(path) {
   history.pushState(null, "", path);
+  refreshMe().catch(() => {});
   render();
 }
 

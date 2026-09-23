@@ -1448,6 +1448,16 @@
       "commit": "pending",
       "timestamp": "2026-09-23T17:00:00.000Z",
       "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "fix",
+      "name": "Solde à jour sur le site",
+      "description": "Sur le site, le solde de points se met à jour tout seul, comme les balls en poche, sans recharger la page.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-23T18:00:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
     }
   ]
 }
