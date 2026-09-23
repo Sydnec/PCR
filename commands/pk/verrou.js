@@ -4,7 +4,7 @@ import {
   countBySpecies,
   getIndividuals,
   resolveIndividual,
-  setLock,
+  toggleLock,
 } from "../../modules/pokemon/collection.js";
 import { getSpecies } from "../../modules/pokemon/data.js";
 import {
@@ -64,7 +64,9 @@ export default {
           if (!species) return null;
           const locked = total - free;
           return {
-            name: `${species.name} (×${total}${locked ? `, dont ${locked} 🛡️` : ""})`,
+            name:
+              `${species.name} (×${total.toLocaleString("fr-FR")}` +
+              `${locked ? `, dont ${locked.toLocaleString("fr-FR")} 🛡️` : ""})`,
             value: String(speciesId),
           };
         })
@@ -91,9 +93,8 @@ export default {
           .catch(() => {});
       }
       const { pokemonId, row } = selector;
-      const locked = !row.locked;
       const name = `#${pokemonId} ${displayName(getSpecies(row.species_id), row.is_shiny, row.sex)}`;
-      setLock(interaction.user.id, pokemonId, locked, (err, changed) => {
+      toggleLock(interaction.user.id, pokemonId, (err, locked) => {
         if (err) {
           handleException("/pk verrou :", err);
           return interaction
@@ -102,7 +103,8 @@ export default {
         }
         interaction
           .reply({
-            content: !changed
+            content:
+              locked === null
               ? `❌ Le Pokémon #${pokemonId} n'est plus dans ta boîte.`
               : locked
               ? `🛡️ **${name}** est verrouillé : il ne sera ni revendu, ni échangé, ni ` +

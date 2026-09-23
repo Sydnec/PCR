@@ -12,7 +12,7 @@ import {
   dittoSpecies,
   evolutionTargets,
   getSpecies,
-  isLegendary,
+  lockedByDefault,
   rollSex,
   sexAfterEvolution,
   tradeEvolutionTarget,
@@ -297,18 +297,6 @@ export function getLeaderboard(limit, cb) {
 
 // ====================== ÉCRITURES ======================
 
-// Verrouillé d'office en arrivant dans une boîte — capture, parc, œuf,
-// échange : un shiny, un légendaire, selon pokemon.lockByDefault. Le dresseur
-// en décide ensuite avec /pk verrou. Un Pokémon verrouillé ne part jamais : ni
-// revente, ni échange, ni sacrifice.
-export function lockedByDefault(speciesId, isShiny) {
-  const config = getPokemonConfig().lockByDefault ?? {};
-  const species = getSpecies(speciesId);
-  return Boolean(
-    (isShiny && config.shiny) || (species && isLegendary(species) && config.legendary)
-  );
-}
-
 // Chemin unique de crédit de la collection : capture sauvage, parc safari et
 // éclosion passent tous par ici. Le sexe se tire selon l'espèce sauf s'il est
 // imposé ; la ball est celle de la capture, NULL quand il n'y en a pas eu.
@@ -350,6 +338,17 @@ export function setLock(userId, pokemonId, locked, cb) {
   );
 }
 
+// Bascule le verrou d'un Pokémon en une seule écriture gardée : deux bascules
+// simultanées s'appliquent l'une après l'autre, et RETURNING dit l'état obtenu.
+// Rend null si le Pokémon n'est pas (ou plus) à `userId`.
+export function toggleLock(userId, pokemonId, cb) {
+  db.get(
+    "UPDATE pokemon_owned SET locked = 1 - locked WHERE id = ? AND user_id = ? RETURNING locked",
+    [Number(pokemonId), userId],
+    (err, row) => cb(err, row ? Boolean(row.locked) : null)
+  );
+}
+
 // ====================== DOUBLONS ======================
 
 // Retire des individus d'un groupe en garantissant qu'il reste TOUJOURS un
@@ -366,7 +365,7 @@ export function setLock(userId, pokemonId, locked, cb) {
 // encore capable de pondre ne part qu'en dernier. Une variante absente du
 // groupe veut dire « shiny ou non ». Un verrouillé n'est jamais candidat, sauf
 // avec `withLocked` : l'individu qui évolue ne quitte pas la boîte, il revient
-// sous sa nouvelle forme.
+// sous sa nouvelle forme — et même alors, un ouvert passe avant lui.
 //
 // Une seule instruction, qui compte et retire d'un même geste : deux retraits
 // simultanés ne peuvent pas passer à deux sur le même individu, et c'est tout
@@ -395,7 +394,7 @@ export function reserveDuplicates(userId, group, quantity, cb) {
     `DELETE FROM pokemon_owned
       WHERE id IN (
         SELECT o.id FROM pokemon_owned o WHERE ${filter}
-         ORDER BY o.is_shiny ASC, o.sterile DESC, o.obtained_at DESC, o.id DESC
+         ORDER BY o.locked ASC, o.is_shiny ASC, o.sterile DESC, o.obtained_at DESC, o.id DESC
          LIMIT $quantity)
         AND (SELECT COUNT(*) FROM pokemon_owned o WHERE ${filter}) >= $quantity
         AND (SELECT COUNT(*) FROM pokemon_owned WHERE user_id = $user AND species_id = $species)
@@ -508,9 +507,10 @@ export function sacrificeFill(plan, owned) {
 const ownedText = (owned) => {
   if (!owned) return "";
   const locked = owned.total - owned.free;
+  const fr = (value) => value.toLocaleString("fr-FR");
   return (
-    ` Tu en as **${owned.total}**` +
-    (locked > 0 ? `, dont **${locked}** verrouillé${locked > 1 ? "s" : ""} 🛡️` : "") +
+    ` Tu en as **${fr(owned.total)}**` +
+    (locked > 0 ? `, dont **${fr(locked)}** verrouillé${locked > 1 ? "s" : ""} 🛡️` : "") +
     "."
   );
 };
@@ -775,32 +775,39 @@ export function evolve(userId, group, chosenTargetId, helperKey, cb) {
     });
   };
 
-  const evolverGroup = { speciesId, isShiny, sex, pokemonId, withLocked: true };
+  // Un verrouillé n'est pris qu'avec la confirmation : sans elle, il ne quitte
+  // jamais la boîte, et une relecture dit pourquoi rien n'a bougé.
+  const evolverGroup = {
+    speciesId,
+    isShiny,
+    sex,
+    pokemonId,
+    withLocked: Boolean(group.confirmLocked),
+  };
   reserveDuplicates(userId, evolverGroup, 1, (err, evolvers) => {
     if (err) return cb(err);
     if (!evolvers.length && pokemonId) {
-      return cb(null, {
-        ok: false,
-        reason:
-          `Le Pokémon #${pokemonId} ne peut pas évoluer : ce n'est plus un de tes ${name}, ` +
-          `ou c'est le dernier.`,
+      return getIndividual(pokemonId, (err, row) => {
+        if (err) return cb(err);
+        // Verrouillé : on ne le bloque pas, on demande.
+        if (row?.user_id === userId && row.species_id === Number(speciesId) && row.locked) {
+          return cb(null, {
+            ok: false,
+            locked: true,
+            reason:
+              `#${row.id} ${name}${row.is_shiny ? " ✨" : ""} est verrouillé 🛡️. Il ne ` +
+              `quittera pas ta boîte, mais veux-tu vraiment le faire évoluer ?`,
+          });
+        }
+        cb(null, {
+          ok: false,
+          reason:
+            `Le Pokémon #${pokemonId} ne peut pas évoluer : ce n'est plus un de tes ${name}, ` +
+            `ou c'est le dernier.`,
+        });
       });
     }
     if (!evolvers.length) return manque();
-    // Verrouillé : on ne le bloque pas, on demande. Il revient tel quel en
-    // attendant la réponse.
-    const [evolver] = evolvers;
-    if (evolver.locked && !group.confirmLocked) {
-      return rendre(evolvers)(() =>
-        cb(null, {
-          ok: false,
-          locked: true,
-          reason:
-            `#${evolver.id} ${name}${evolver.is_shiny ? " ✨" : ""} est verrouillé 🛡️. Il ne ` +
-            `quittera pas ta boîte, mais veux-tu vraiment le faire évoluer ?`,
-        })
-      );
-    }
     const sansSacrifice = { sacrifices: 0, dittos: 0, shinies: 0 };
     if (plan.sacrifices <= 0) return prendreAide(evolvers, sansSacrifice, rendre(evolvers));
 

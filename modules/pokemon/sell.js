@@ -98,7 +98,9 @@ export function sellPokemon(userId, { speciesId, isShiny, sex = null, pokemonId 
           ok: false,
           reason:
             `Tu as **${owned}** ${name}, dont **${spare}** revendable${spare > 1 ? "s" : ""}` +
-            (locked ? ` et **${locked}** verrouillé${locked > 1 ? "s" : ""} 🛡️` : "") +
+            (locked
+              ? ` et **${locked.toLocaleString("fr-FR")}** verrouillé${locked > 1 ? "s" : ""} 🛡️`
+              : "") +
             ` : impossible d'en revendre **${quantity}**. Il reste toujours au moins un ` +
             `exemplaire de chaque Pokémon.`,
         })

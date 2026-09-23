@@ -25,7 +25,8 @@ import {
 } from "../../modules/pokemon/embeds.js";
 
 const pts = (value) => value.toLocaleString("fr-FR");
-const NO_ENTRY = { total: 0, normal: 0, shiny: 0 };
+// Une espèce absente, avec les mêmes champs que countBySpecies.
+const NO_ENTRY = { total: 0, normal: 0, shiny: 0, free: 0, freeNormal: 0 };
 
 // Les objets d'évolution que ce dresseur a en assez grand nombre pour s'en
 // servir. Trois bonbons ou rien : deux ne remplacent pas deux tiers d'un

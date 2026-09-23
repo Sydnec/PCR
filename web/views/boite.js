@@ -641,8 +641,14 @@ function evolveAction(ctx, item, species, done) {
   const targets = species.evolvesInto.map((id) => ctx.species.get(id)).filter(Boolean);
   if (!targets.length) return null;
   let targetId = null;
+  // Verrouillé, il évolue quand même, mais après un second clic : on ne le
+  // bloque pas, on prévient. L'API refuse sans `confirmLocked`, et dit `locked`
+  // si le verrou a été posé depuis Discord après l'ouverture de la fiche : le
+  // bouton passe alors en confirmation.
+  let locked = item.locked;
   const cost = h("p", { class: "muted small" }, "Calcul du coût…");
-  const button = h("button", { class: "button primary", disabled: true }, "Évoluer");
+  let button = makeButton();
+  button.disabled = true;
 
   // Le coût vient de l'API, qui le calcule comme la commande : une forme
   // choisie sur une lignée à embranchement coûte plus cher que le hasard.
@@ -664,24 +670,7 @@ function evolveAction(ctx, item, species, done) {
     }
   }
 
-  // Verrouillé, il évolue quand même, mais après un second clic : on ne le
-  // bloque pas, on prévient. L'API refuse sans `confirmLocked`.
-  let armed = false;
-  let timer = null;
-  button.addEventListener("click", async () => {
-    if (item.locked && !armed) {
-      armed = true;
-      button.textContent = "Il est verrouillé : évoluer quand même ?";
-      button.classList.add("danger");
-      timer = setTimeout(() => {
-        armed = false;
-        button.textContent = "Évoluer";
-        button.classList.remove("danger");
-      }, 4000);
-      return;
-    }
-    clearTimeout(timer);
-    button.disabled = true;
+  async function evolveNow() {
     try {
       // L'espèce attendue accompagne l'individu : un second envoi sur un
       // Pokémon qui vient d'évoluer est refusé au lieu de le refaire évoluer.
@@ -689,7 +678,7 @@ function evolveAction(ctx, item, species, done) {
         pokemonId: item.id,
         speciesId: species.id,
         ...(targetId ? { targetId } : {}),
-        ...(item.locked ? { confirmLocked: true } : {}),
+        ...(locked ? { confirmLocked: true } : {}),
       };
       const result = await api("/api/me/evolve", { method: "POST", body });
       toast(
@@ -698,13 +687,38 @@ function evolveAction(ctx, item, species, done) {
       );
       await done();
     } catch (error) {
+      if (error.details?.locked && !locked) {
+        locked = true;
+        rebuild();
+        toast(`#${item.id} est verrouillé : confirme pour le faire évoluer quand même.`);
+        return;
+      }
       toast(error.message, "error");
-      button.disabled = false;
-      armed = false;
-      button.textContent = "Évoluer";
-      button.classList.remove("danger");
     }
-  });
+  }
+
+  // Le même confirmButton que la revente pour un verrouillé ; un bouton simple
+  // sinon.
+  function makeButton() {
+    if (locked) {
+      return confirmButton("Évoluer", "Il est verrouillé : évoluer quand même ?", evolveNow);
+    }
+    const plain = h("button", { class: "button primary" }, "Évoluer");
+    plain.addEventListener("click", async () => {
+      plain.disabled = true;
+      await evolveNow();
+      plain.disabled = false;
+    });
+    return plain;
+  }
+
+  // Un bouton neuf : changer de forme désarme une confirmation en cours. Il
+  // naît actif ; refresh() le grise le temps de relire le coût.
+  function rebuild() {
+    const next = makeButton();
+    button.replaceWith(next);
+    button = next;
+  }
 
   const choice =
     targets.length > 1
@@ -713,6 +727,7 @@ function evolveAction(ctx, item, species, done) {
           {
             onchange: (event) => {
               targetId = event.target.value ? Number(event.target.value) : null;
+              rebuild();
               refresh();
             },
           },

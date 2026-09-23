@@ -284,16 +284,16 @@ const parseVariant = (raw) =>
         sex: ["M", "F"].includes(String(raw).slice(1)) ? String(raw).slice(1) : null,
       };
 
-// `confirmed` : le dresseur a confirmé l'évolution d'un Pokémon verrouillé. Sans
-// elle, evolve le rend et répond `locked`, et le message propose de confirmer
-// — le même bouton, avec « ok » en dernier segment.
+// `confirmed` : le dresseur a confirmé l'évolution d'un Pokémon verrouillé.
+// Sans elle, evolve n'y touche pas et répond `locked` ; le message propose
+// alors `confirmId`, le même bouton avec « ok » en dernier segment.
 function runEvolution(
   interaction,
   speciesId,
   variant,
   chosenTargetId,
-  helperKey = null,
-  confirmed = false
+  helperKey,
+  { confirmed = false, confirmId = null } = {}
 ) {
   // L'espèce du bouton voyage avec l'individu : la réservation ne le prend que
   // s'il est encore de cette espèce, et à celui qui clique. Un second clic sur
@@ -309,18 +309,15 @@ function runEvolution(
         .update({ content: "❌ Erreur base de données.", embeds: [], components: [] })
         .catch(() => {});
     }
-    if (!result.ok && result.locked) {
-      const segments = interaction.customId.split("|");
-      while (segments.length < 5) segments.push("");
-      segments[5] = "ok";
+    if (!result.ok && result.locked && confirmId) {
       return interaction
         .update({
-          content: `🛡️ ${result.reason}`,
+          content: result.reason,
           embeds: [],
           components: [
             new ActionRowBuilder().addComponents(
               new ButtonBuilder()
-                .setCustomId(segments.join("|"))
+                .setCustomId(confirmId)
                 .setLabel("Faire évoluer quand même")
                 .setStyle(ButtonStyle.Danger),
               new ButtonBuilder()
@@ -713,7 +710,10 @@ export async function handlePokemonButton(interaction) {
         parseVariant(variant),
         null,
         helper || null,
-        confirm === "ok"
+        {
+          confirmed: confirm === "ok",
+          confirmId: ["poke_evo", speciesId, variant, mode, helper ?? "", "ok"].join("|"),
+        }
       );
     }
 
@@ -735,7 +735,10 @@ export async function handlePokemonButton(interaction) {
         parseVariant(variant),
         Number(targetId),
         helper === DITTO_HELPER ? helper : null,
-        confirm === "ok"
+        {
+          confirmed: confirm === "ok",
+          confirmId: ["poke_evo_pick", speciesId, variant, targetId, helper ?? "", "ok"].join("|"),
+        }
       );
     }
 
