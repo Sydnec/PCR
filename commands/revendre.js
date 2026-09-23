@@ -1,7 +1,11 @@
 import { SlashCommandBuilder, MessageFlags } from "discord.js";
 import { handleException } from "../modules/utils.js";
 import { getPokemonConfig } from "../modules/pokemon/config.js";
-import { decodeEntry, encodeEntry, getCollection } from "../modules/pokemon/collection.js";
+import {
+  decodeEntry,
+  getIndividuals,
+  groupIndividuals,
+} from "../modules/pokemon/collection.js";
 import { getSpecies } from "../modules/pokemon/data.js";
 import { getInventory, getItem, itemSellValue } from "../modules/pokemon/items.js";
 import { pokemonSellValue, sellItem, sellPokemon } from "../modules/pokemon/sell.js";
@@ -18,17 +22,17 @@ const HINT_VALUE = "—";
 
 const points = (value) => value.toLocaleString("fr-FR");
 
-// Les doublons revendables : tout ce dont on possède au moins deux exemplaires,
-// puisque le dernier ne se vend jamais.
+// Les doublons revendables, par espèce et par sexe : tout sauf l'individu
+// qu'on garde de chaque entrée, puisque celui-là ne se vend jamais.
 function listSellablePokemon(userId, cb) {
-  getCollection(userId, (err, rows) => {
+  getIndividuals(userId, (err, rows) => {
     if (err) return cb(err, []);
     const sellable = [];
-    for (const row of rows || []) {
-      const species = getSpecies(row.species_id);
-      if (!species || row.count < 2) continue;
-      const unit = pokemonSellValue(species, row.is_shiny);
-      if (unit > 0) sellable.push({ ...row, species, unit, spare: row.count - 1 });
+    for (const group of groupIndividuals(rows, { bySex: true })) {
+      const species = getSpecies(group.speciesId);
+      if (!species || group.spare < 1) continue;
+      const unit = pokemonSellValue(species, group.isShiny);
+      if (unit > 0) sellable.push({ ...group, species, unit });
     }
     // Les plus chers d'abord : c'est ce qu'on cherche en ouvrant la liste.
     sellable.sort((a, b) => b.unit * b.spare - a.unit * a.spare);
@@ -134,9 +138,9 @@ export default {
             // Le nombre de doublons ET le prix unitaire : ce sont les deux
             // chiffres dont on a besoin pour choisir la quantité juste après.
             name:
-              `${row.is_shiny ? "✨ " : ""}${row.species.name} — ` +
+              `${displayName(row.species, row.isShiny, row.sex)} — ` +
               `${row.spare} en trop, ${points(row.unit)} pts pièce`,
-            value: encodeEntry(row.species_id, row.is_shiny),
+            value: row.key,
           }))
           .filter((choice) => choice.name.toLowerCase().includes(query))
       );
@@ -181,7 +185,7 @@ export default {
         // astérisques en clair dans le message.
         const what = isItem
           ? `${result.item.emoji} **${result.quantity}× ${result.item.label}**`
-          : `**${result.quantity}× ${displayName(result.species, result.isShiny)}**`;
+          : `**${result.quantity}× ${displayName(result.species, result.isShiny, result.sex)}**`;
         interaction
           .editReply({
             content: `✅ Tu revends ${what} pour **${points(result.points)}** points.`,
@@ -191,13 +195,13 @@ export default {
 
       if (isItem) return sellItem(interaction.user.id, raw, quantity, done);
 
-      const { speciesId, isShiny } = decodeEntry(raw);
+      const { speciesId, isShiny, sex } = decodeEntry(raw);
       if (!getSpecies(speciesId)) {
         return interaction
           .editReply({ content: "❌ Choisis une proposition dans la liste d'autocomplétion." })
           .catch(() => {});
       }
-      sellPokemon(interaction.user.id, speciesId, isShiny, quantity, done);
+      sellPokemon(interaction.user.id, { speciesId, isShiny, sex }, quantity, done);
     } catch (error) {
       handleException(error);
     }

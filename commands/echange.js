@@ -1,15 +1,15 @@
 import { SlashCommandBuilder, MessageFlags } from "discord.js";
 import { handleException } from "../modules/utils.js";
 import {
+  countGroup,
   createTrade,
   decodeEntry,
-  encodeEntry,
-  getCollection,
-  getOwned,
+  getIndividuals,
+  groupIndividuals,
   setTradeMessage,
 } from "../modules/pokemon/collection.js";
 import { getSpecies, tradeEvolutionTarget } from "../modules/pokemon/data.js";
-import { buildTradeEmbed, buildTradeRow, displayName } from "../modules/pokemon/embeds.js";
+import { buildTradeEmbed, buildTradeRow, describeGroup } from "../modules/pokemon/embeds.js";
 
 // Discord n'autorise pas de liste vide accompagnée d'un message : une
 // proposition inerte est le seul moyen d'expliquer pourquoi il n'y a rien à
@@ -21,27 +21,25 @@ const hint = (interaction, name) =>
 // Le premier exemplaire de chaque entrée reste au Pokédex : on ne peut céder
 // que ce qu'on a en plus. acceptTrade tient la règle ; ce chiffre ne sert qu'à
 // ne proposer et n'accepter que des échanges qui ont une chance d'aboutir.
-const spareCopies = (count) => Math.max(0, count - 1);
-
-const ownedCopies = (userId, entry) =>
+const spareIn = (userId, group) =>
   new Promise((resolve, reject) =>
-    getOwned(userId, entry.speciesId, entry.isShiny, (err, count) =>
-      err ? reject(err) : resolve(count)
-    )
+    countGroup(userId, group, (err, { spare }) => (err ? reject(err) : resolve(spare)))
   );
 
-// Propose les doublons réellement possédés par `userId`.
+// Propose les doublons réellement possédés par `userId`, par espèce, sexe et
+// fertilité : c'est ce qu'on échange — qui reçoit une femelle fertile doit
+// pouvoir compter dessus pour pondre.
 function respondWithOwned(interaction, userId, query, emptyLabel) {
-  getCollection(userId, async (err, rows) => {
+  getIndividuals(userId, async (err, rows) => {
     if (err) {
       handleException("Autocomplétion d'échange :", err);
       return interaction.respond([]).catch(() => {});
     }
     const needle = query.toLowerCase();
-    const choices = (rows || [])
-      .map((row) => {
-        const species = getSpecies(row.species_id);
-        const spare = spareCopies(row.count);
+    const choices = groupIndividuals(rows, { bySex: true, byFertility: true })
+      .map((group) => {
+        const species = getSpecies(group.speciesId);
+        const spare = group.spare;
         if (!species || spare === 0) return null;
         // Les quatre évolutions par échange se déclarent ici plutôt que dans un
         // message d'aide que personne ne lit : c'est l'instant exact où on
@@ -50,9 +48,9 @@ function respondWithOwned(interaction, userId, query, emptyLabel) {
         const evolved = tradeEvolutionTarget(species);
         return {
           name:
-            `${row.is_shiny ? "✨ " : ""}${species.name} (${spare} en trop)` +
+            `${describeGroup(species, group)} ×${spare}` +
             (evolved ? ` — évolue en ${evolved.name}` : ""),
-          value: encodeEntry(row.species_id, row.is_shiny),
+          value: group.key,
         };
       })
       .filter((choice) => choice && choice.name.toLowerCase().includes(needle))
@@ -154,11 +152,11 @@ export default {
       // Une valeur tapée à la main contourne l'autocomplétion : sans ce
       // contrôle, on publierait une offre qu'acceptTrade refuserait au clic.
       // Le refus reste privé, avant que la proposition n'existe.
-      let offerCopies, requestCopies;
+      let offerSpare, requestSpare;
       try {
-        [offerCopies, requestCopies] = await Promise.all([
-          ownedCopies(interaction.user.id, offer),
-          ownedCopies(target.id, request),
+        [offerSpare, requestSpare] = await Promise.all([
+          spareIn(interaction.user.id, offer),
+          spareIn(target.id, request),
         ]);
       } catch (err) {
         handleException("Lecture des collections pour /echange :", err);
@@ -167,20 +165,20 @@ export default {
           flags: MessageFlags.Ephemeral,
         });
       }
-      if (spareCopies(offerCopies) === 0) {
+      if (offerSpare === 0) {
         return interaction.reply({
           content:
-            `❌ Tu n'as pas de doublon de **${displayName(offered, offer.isShiny)}** : ` +
+            `❌ Tu n'as pas de doublon de **${describeGroup(offered, offer)}** : ` +
             `le premier exemplaire de chaque Pokémon reste dans ton Pokédex, seuls les ` +
             `doublons s'échangent.`,
           flags: MessageFlags.Ephemeral,
         });
       }
-      if (spareCopies(requestCopies) === 0) {
+      if (requestSpare === 0) {
         return interaction.reply({
           content:
             `❌ <@${target.id}> n'a pas de doublon de ` +
-            `**${displayName(requested, request.isShiny)}** à échanger : son premier ` +
+            `**${describeGroup(requested, request)}** à échanger : son premier ` +
             `exemplaire reste dans son Pokédex.`,
           flags: MessageFlags.Ephemeral,
         });
@@ -194,8 +192,12 @@ export default {
           toUserId: target.id,
           offerSpeciesId: offer.speciesId,
           offerIsShiny: offer.isShiny,
+          offerSex: offer.sex,
+          offerFertile: offer.fertile,
           requestSpeciesId: request.speciesId,
           requestIsShiny: request.isShiny,
+          requestSex: request.sex,
+          requestFertile: request.fertile,
           channelId: interaction.channelId,
         },
         async (err, tradeId) => {
@@ -211,8 +213,12 @@ export default {
             to_user_id: target.id,
             offer_species_id: offer.speciesId,
             offer_is_shiny: offer.isShiny ? 1 : 0,
+            offer_sex: offer.sex,
+            offer_fertile: offer.fertile === null ? null : offer.fertile ? 1 : 0,
             request_species_id: request.speciesId,
             request_is_shiny: request.isShiny ? 1 : 0,
+            request_sex: request.sex,
+            request_fertile: request.fertile === null ? null : request.fertile ? 1 : 0,
           };
 
           const message = await interaction.editReply({

@@ -2,9 +2,9 @@
 
 # 🏕️ Parc Safari
 
-Contrepoids du puits à points : le pool naturel étrangle volontairement les évolutions et les
-légendaires (poids 100/35/10 par stade, 8 pour un légendaire), et le parc **compense ce malus** le
-temps d'une visite. C'est le seul contenu Pokémon où les actions ne coûtent rien.
+Contrepoids du puits à points : le pool naturel rend les évolutions et les légendaires plus rares
+(poids 100/60/25 par stade, 8 pour un légendaire), et le parc **compense ce malus** le temps d'une
+visite. C'est le seul contenu Pokémon où les actions ne coûtent rien.
 
 - **Ouverture aléatoire** : un tirage horaire (1 % par heure, soit environ un parc tous les quatre
   jours) annonce le parc dans le salon des apparitions, rôle Dresseur mentionné. Un délai minimum
@@ -24,9 +24,9 @@ temps d'une visite. C'est le seul contenu Pokémon où les actions ne coûtent r
 - **« Il te manque ? »** : chaque rencontre affiche si le dresseur possède déjà l'espèce — et la
   variante shiny compte à part. Le message étant privé, l'information tient dans l'embed, là où les
   apparitions publiques ont besoin d'un bouton pour répondre à chacun séparément.
-- **Raretés compensées** : stade 2 ×2, stade 3 (les *rares*) ×4, légendaires ×3, shiny 1/250 au lieu
-  de 1/500. Les rares passent de 1,3 % à 4 % du pool et les légendaires de 0,4 % à 1 %. Les
-  évolutions par échange restent hors pool, comme à l'état sauvage.
+- **Raretés compensées** : stade 2 ×1,5, stade 3 (les *rares*) ×2,4, légendaires ×3, shiny 1/250 au
+  lieu de 1/500. En 1ʳᵉ génération, les rares passent de 2,7 % à 5,4 % du pool et les légendaires de
+  0,4 % à 0,9 %. Les évolutions par échange et les bébés restent hors pool, comme à l'état sauvage.
 - **Une visite dure autant que le parc** : elle expire à la fermeture des grilles, avec un
   plancher d'une heure pour qui entre juste avant — 25 actions ne se jouent pas en dix minutes.
 - **La visite se reprend** : l'éphémère se ferme d'un geste et personne ne peut le rouvrir à la

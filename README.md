@@ -23,6 +23,8 @@ Un jeu de capture de Pokémon — 1ʳᵉ génération, la 2ᵉ prête à s'ouvri
 → **[Documentation du jeu](docs/pokemon/README.md)**
 
 - [Capture & Pokédex](docs/pokemon/capture.md) — apparitions, balls, shiny, fiche d'espèce.
+- [Individus](docs/pokemon/individus.md) — sexe, ball de capture, fertilité, `/boite`.
+- [Œufs](docs/pokemon/oeufs.md) — la seule façon d'obtenir les bébés.
 - [Objets](docs/pokemon/objets.md) — ce que tiennent les Pokémon, balls offertes, pierres.
 - [Loterie](docs/pokemon/loterie.md) — un tirage par jour et par dresseur.
 - [Revente](docs/pokemon/revente.md) — doublons et objets contre des points.

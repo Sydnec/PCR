@@ -108,6 +108,12 @@ try {
     bot.handlePokemonFleeOnTimer();
   });
 
+  // Éclosion des œufs arrivés à échéance. Le seuil de messages, lui, se vérifie
+  // au fil des messages de chaque propriétaire.
+  cron.schedule("* * * * *", () => {
+    bot.handleEggHatchOnTimer();
+  });
+
   // Tirage horaire d'ouverture du parc safari, et fermeture de ce qui a expiré.
   cron.schedule("0 * * * *", () => {
     bot.handleSafariParkOnTimer();

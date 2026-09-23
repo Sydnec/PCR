@@ -48,17 +48,22 @@ function table({ key, name, note, subject, gate = null, lots = false, rows }) {
   };
 }
 
-// Les espèces, groupées comme spawnWeight les traite : les légendaires d'abord
-// puisqu'il les prend en premier, les exclues ensuite, le reste par stade.
+// Les espèces, groupées comme spawnWeight les traite : les exclues d'abord —
+// évolutions par échange et bébés, chacune dans sa ligne puisqu'on ne les
+// obtient pas de la même façon —, puis les légendaires, le reste par stade. Un
+// bébé rangé avec son stade prendrait le poids du groupe et gonflerait le
+// total d'espèces qui ne sortent jamais.
 function speciesRows(poolConfig) {
   const groups = new Map();
   for (const species of allSpecies()) {
     const weight = spawnWeight(species, poolConfig);
     const key = species.tradeEvolution
       ? "Hors pool (échange)"
-      : isLegendary(species)
-        ? "Légendaires"
-        : `Stade ${species.stage}`;
+      : species.isBaby
+        ? "Hors pool (œuf)"
+        : isLegendary(species)
+          ? "Légendaires"
+          : `Stade ${species.stage}`;
     const group = groups.get(key) ?? { label: key, count: 0, weight };
     group.count += 1;
     // Un groupe dont les membres n'auraient pas le même poids serait un bug de
@@ -67,7 +72,14 @@ function speciesRows(poolConfig) {
     groups.set(key, group);
   }
 
-  const ordre = ["Stade 1", "Stade 2", "Stade 3", "Légendaires", "Hors pool (échange)"];
+  const ordre = [
+    "Stade 1",
+    "Stade 2",
+    "Stade 3",
+    "Légendaires",
+    "Hors pool (échange)",
+    "Hors pool (œuf)",
+  ];
   return [...groups.values()]
     .sort((a, b) => ordre.indexOf(a.label) - ordre.indexOf(b.label))
     // Les groupes se comptent au fil des espèces, mais c'est `row` qui fabrique

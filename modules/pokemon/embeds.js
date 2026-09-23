@@ -5,7 +5,7 @@ import {
   ButtonStyle,
   EmbedBuilder,
 } from "discord.js";
-import { getPokemonConfig, getSafariConfig } from "./config.js";
+import { getBall, getPokemonConfig, getSafariConfig } from "./config.js";
 import { getItem, sortByCatalogue } from "./items.js";
 import {
   RARITIES,
@@ -15,6 +15,7 @@ import {
   embedColor,
   evolutionChain,
   getSpecies,
+  isEggOnly,
   isEvolutionOnly,
   isSafariFinished,
   probabilitiesByBall,
@@ -23,6 +24,8 @@ import {
   safariBaitFactor,
   safariCatchProbability,
   safariFleeChance,
+  sexSymbol,
+  unobtainableMark,
   spriteUrl,
   tradeEvolutionTarget,
 } from "./data.js";
@@ -41,9 +44,21 @@ const timestamp = (ms) => `<t:${Math.floor(ms / 1000)}:R>`;
 
 const ballResultIcon = (result) => (result === "CATCH" ? "✅" : "❌");
 
-// Le nom affiché porte la marque shiny partout où il apparaît.
-export const displayName = (species, isShiny) =>
-  isShiny ? `✨ ${species.name}` : species.name;
+// Le nom affiché porte la marque shiny partout où il apparaît, et le symbole
+// du sexe quand on parle d'un individu plutôt que d'une espèce — sauf pour les
+// Nidoran, dont le nom le porte déjà.
+export const displayName = (species, isShiny, sex = null) => {
+  const symbol = sex ? sexSymbol(sex) : "";
+  const marked = symbol && !species.name.endsWith(symbol) ? ` ${symbol}` : "";
+  return `${isShiny ? "✨ " : ""}${species.name}${marked}`;
+};
+
+// Un groupe d'individus tel qu'une commande le désigne : « Pikachu ♀ », suivi
+// de sa fertilité quand elle compte — pour un échange ou une ponte, une femelle
+// stérile ne vaut pas une femelle fertile.
+export const describeGroup = (species, { isShiny, sex = null, fertile = null }) =>
+  displayName(species, isShiny, sex) +
+  (fertile === null || fertile === undefined ? "" : fertile ? " (fertile)" : " (stérile)");
 
 // Ligne « difficulté » : les probabilités réelles par ball. Indispensable, car
 // des Pokémon de stade 1 comme Ronflex (25) ou Leveinard (30) sont étiquetés
@@ -190,7 +205,7 @@ function chainLine(species, counts, { current = false, focusShiny = false } = {}
   return (
     `${current ? "\u25B8 " : ""}${has ? "\u2705" : "\u2754"} \`${dexNumber(species)}\` ` +
     `${current ? `__**${species.name}**__` : species.name}` +
-    `${isEvolutionOnly(species) ? " \u{1F512}" : ""}` +
+    `${unobtainableMark(species) ? ` ${unobtainableMark(species)}` : ""}` +
     `${marks.length ? ` ${marks.join(" ")}` : ""}`
   );
 }
@@ -253,11 +268,12 @@ export function buildSpeciesInfoEmbed(
     });
   }
 
-  if (chain.some(isEvolutionOnly)) {
-    embed.setFooter({
-      text: "\u{1F512} Introuvable à l'état sauvage : par fusion de doublons, ou par échange.",
-    });
-  }
+  const legend = [
+    chain.some(isEvolutionOnly) &&
+      "\u{1F512} Introuvable à l'état sauvage : par fusion de doublons, ou par échange.",
+    chain.some(isEggOnly) && "\u{1F95A} Ne sort que d'un œuf : /oeuf, avec un couple de parents.",
+  ].filter(Boolean);
+  if (legend.length) embed.setFooter({ text: legend.join("\n") });
   return embed;
 }
 
@@ -444,6 +460,71 @@ export function buildLotteryEmbed({ prize = null, nextAt, played = false } = {})
 // pas exister, mais si elle existe c'est qu'un renommage a laissé du monde avec
 // quelque chose en poche : le faire disparaître en silence serait le pire des
 // trois comportements possibles.
+// ====================== BOÎTE ======================
+
+// La ball d'un individu, telle qu'on la montre : l'icône et le nom de la
+// configuration, pour que changer l'emoji d'une ball suffise ici aussi.
+function ballOf(key) {
+  if (!key) return null;
+  if (key === "safari") return getSafariConfig().ball;
+  return getBall(key);
+}
+
+// D'où vient un individu, quand sa ball ne suffit pas à le dire.
+const ORIGINS = {
+  oeuf: "éclos d'un œuf",
+  evolution: "né d'une fusion",
+  migration: "ball inconnue",
+};
+
+const shortDate = (ms) =>
+  new Date(ms).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+
+// Une ligne par individu : sexe, espèce, ball, date d'arrivée, et ce qui le
+// distingue des autres — l'exemplaire qu'on garde (📌), celui qui a déjà pondu.
+function individualLine(row) {
+  const species = getSpecies(row.species_id);
+  const ball = ballOf(row.ball);
+  const provenance = ball ? `${ball.emoji} ${ball.label}` : ORIGINS[row.origin] ?? "—";
+  return (
+    `**${species ? displayName(species, row.is_shiny, row.sex) : `#${row.species_id}`}**` +
+    ` · ${provenance}` +
+    (row.origin === "echange" ? " · reçu en échange" : "") +
+    ` · ${shortDate(row.obtained_at)}` +
+    (row.locked ? " · 📌 gardé" : "") +
+    (row.sterile ? " · stérile" : "")
+  );
+}
+
+// La boîte d'un dresseur : ses Pokémon un par un, les plus récents d'abord, ou
+// seulement ceux d'une espèce. L'embed plafonne à 25 lignes ; le reste est
+// compté plutôt que tronqué au milieu d'une ligne.
+export function buildBoxEmbed(rows, { user, species = null, limit = 25 } = {}) {
+  const sorted = [...rows].sort((a, b) => b.obtained_at - a.obtained_at || b.id - a.id);
+  const shown = sorted.slice(0, limit);
+  const embed = new EmbedBuilder()
+    .setTitle(
+      `\u{1F4E6} Boîte de ${user.displayName ?? user.username}` +
+        (species ? ` — ${species.name}` : "")
+    )
+    .setColor(species ? embedColor(species, false) : 0x3b88c3);
+  if (species) embed.setThumbnail(spriteUrl(species, false));
+
+  if (!shown.length) {
+    return embed.setDescription(
+      species ? `*Aucun ${species.name} dans cette boîte.*` : "*Cette boîte est vide.*"
+    );
+  }
+  return embed
+    .setDescription(shown.map(individualLine).join("\n"))
+    .setFooter({
+      text:
+        `${rows.length} Pokémon` +
+        (rows.length > shown.length ? ` · ${rows.length - shown.length} de plus non affichés` : "") +
+        " · 📌 l'exemplaire gardé ne se cède jamais",
+    });
+}
+
 export function buildInventoryEmbed(rows, { user = null } = {}) {
   const embed = new EmbedBuilder()
     .setTitle(
@@ -525,8 +606,9 @@ export function buildDexEmbed(targetUser, rows, page) {
   // s'obtient en fusionnant des Machopeur ou en s'en faisant échanger un, et
   // rien ne le disait.
   const locked = slice.some(isEvolutionOnly);
+  const eggs = slice.some(isEggOnly);
   const lines = slice.map((species) => {
-    const cadenas = isEvolutionOnly(species) ? " \u{1F512}" : "";
+    const cadenas = unobtainableMark(species) ? ` ${unobtainableMark(species)}` : "";
     const entry = stats.owned.get(species.id);
     if (!entry || (entry.normal === 0 && entry.shiny === 0)) {
       // On affiche quand même le nom : les joueurs veulent savoir quoi chasser.
@@ -560,7 +642,8 @@ export function buildDexEmbed(targetUser, rows, page) {
     .setFooter({
       text:
         `Page ${page + 1}/${dexPageCount()}` +
-        (locked ? " · 🔒 ne s'obtient que par fusion ou par échange" : ""),
+        (locked ? " · 🔒 ne s'obtient que par fusion ou par échange" : "") +
+        (eggs ? " · 🥚 ne sort que d'un œuf" : ""),
     });
 
   columns.forEach((value, index) => {
@@ -636,13 +719,22 @@ export function buildTradeEmbed(trade, status = "PENDING") {
   const style = TRADE_STATUS[status] ?? TRADE_STATUS.PENDING;
   const offered = getSpecies(trade.offer_species_id);
   const requested = getSpecies(trade.request_species_id);
+  const side = (prefix, species) =>
+    describeGroup(species, {
+      isShiny: trade[`${prefix}_is_shiny`],
+      sex: trade[`${prefix}_sex`] || null,
+      fertile:
+        trade[`${prefix}_fertile`] === null || trade[`${prefix}_fertile`] === undefined
+          ? null
+          : Boolean(trade[`${prefix}_fertile`]),
+    });
 
   const embed = new EmbedBuilder()
     .setTitle(style.title)
     .setColor(style.color)
     .setDescription(
-      `<@${trade.from_user_id}> propose **${displayName(offered, trade.offer_is_shiny)}**\n` +
-        `contre **${displayName(requested, trade.request_is_shiny)}** de <@${trade.to_user_id}>.`
+      `<@${trade.from_user_id}> propose **${side("offer", offered)}**\n` +
+        `contre **${side("request", requested)}** de <@${trade.to_user_id}>.`
     )
     .setThumbnail(spriteUrl(offered, trade.offer_is_shiny));
 

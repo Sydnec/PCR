@@ -1209,6 +1209,36 @@
       "commit": "pending",
       "timestamp": "2026-09-23T07:10:00.000Z",
       "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "enhancement",
+      "name": "Les évolutions apparaissent plus souvent",
+      "description": "Les stades 2 et 3 sortent plus souvent, à l'état sauvage comme au parc : un stade 3 deux fois plus qu'avant.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-23T08:00:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "feature",
+      "name": "Chaque Pokémon a son sexe et sa ball",
+      "description": "Tes Pokémon sont désormais des individus : chacun a un sexe et garde la ball qui l'a capturé. /boite les montre un par un.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-23T08:00:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "feature",
+      "name": "Les œufs",
+      "description": "Dès l'ouverture de la 2ᵉ génération, /oeuf fait pondre un mâle et une femelle (ou un Métamorph) pour obtenir un bébé. L'œuf éclot en 5 jours ou 200 messages, et chaque parent ne pond qu'une fois.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-23T08:00:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
     }
   ]
 }

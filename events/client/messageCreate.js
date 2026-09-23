@@ -2,6 +2,7 @@ import { handleException } from "../../modules/utils.js";
 import db from "../../modules/db.js";
 import pointsDb from "../../modules/points-db.js";
 import { registerMessageForSpawn } from "../../modules/pokemon/spawn.js";
+import { countEggMessage } from "../../modules/pokemon/eggs.js";
 import { emojiRegex } from "../../modules/regex.js";
 import { twitterRegex } from "../../modules/regex.js";
 import { instagramRegex } from "../../modules/regex.js";
@@ -118,7 +119,11 @@ async function execute(message) {
     // --- Système Pokémon : compteur d'activité, spawn éventuel ---
     // Tir-et-oublie et protégé en interne : ce fichier est sur le chemin chaud
     // de chaque message du serveur. Les MP ne comptent pas.
-    if (message.guild) registerMessageForSpawn(message.client);
+    if (message.guild) {
+      registerMessageForSpawn(message.client);
+      // Chaque message de son propriétaire rapproche un œuf de l'éclosion.
+      countEggMessage(message.client, userId);
+    }
 
     // --- Statistiques mots les plus utilisés ---
     const words = messageContent

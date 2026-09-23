@@ -10,9 +10,8 @@ import { handleException } from "../modules/utils.js";
 import {
   decodeEntry,
   describeEvolution,
-  encodeEntry,
-  getCollection,
-  getOwned,
+  getIndividuals,
+  groupIndividuals,
 } from "../modules/pokemon/collection.js";
 import { embedColor, getSpecies, spriteUrl } from "../modules/pokemon/data.js";
 import { getInventory, getItem } from "../modules/pokemon/items.js";
@@ -40,19 +39,29 @@ function usableHelpers(userId, cb) {
   });
 }
 
-// Toutes les façons de faire évoluer cette entrée, aides comprises. Chacune
-// porte son propre plan : une pierre ne coûte pas ce que coûte un bonbon, et le
+// Ce qu'un groupe (espèce, variante, sexe) permet de payer. L'entrée entière
+// fournit les doublons, quel que soit leur sexe ; le groupe fournit l'individu
+// qui évolue, et celui-là ne peut pas être l'exemplaire qu'on garde — sauf si
+// une aide couvre tous les doublons, auquel cas rien n'est retiré.
+// `stock` : { total, count, spare } — l'entrée, puis le groupe.
+const canPay = (plan, stock) =>
+  !plan.error &&
+  stock.total >= plan.required &&
+  (plan.duplicates > 0 ? stock.spare >= 1 : stock.count >= 1);
+
+// Toutes les façons de faire évoluer ce groupe, aides comprises. Chacune porte
+// son propre plan : une pierre ne coûte pas ce que coûte un bonbon, et le
 // nombre d'exemplaires requis change avec elle.
-function evolutionPaths(row, helpers) {
+function evolutionPaths(speciesId, stock, helpers) {
   const paths = [];
-  const base = describeEvolution(row.species_id);
-  if (!base.error && row.count >= base.required) paths.push({ plan: base, helper: null });
+  const base = describeEvolution(speciesId);
+  if (canPay(base, stock)) paths.push({ plan: base, helper: null });
 
   for (const helper of helpers) {
-    const plan = describeEvolution(row.species_id, null, helper.key);
+    const plan = describeEvolution(speciesId, null, helper.key);
     // Une aide qui ne change rien à ce qui manque n'a pas à encombrer l'écran :
     // on ne la propose que si elle rend la fusion possible, ou moins chère.
-    if (plan.error || row.count < plan.required) continue;
+    if (!canPay(plan, stock)) continue;
     if (!paths.length || plan.points < base.points || plan.required < base.required) {
       paths.push({ plan, helper });
     }
@@ -60,26 +69,44 @@ function evolutionPaths(row, helpers) {
   return paths;
 }
 
-// Espèces que ce dresseur possède : celles qu'il peut faire évoluer — par ses
-// propres moyens ou avec un objet — et celles qui pourraient évoluer mais dont
-// il manque des exemplaires. Le second groupe sert à expliquer une liste vide au
-// lieu de la laisser muette : c'est exactement ce qui faisait croire à une
-// commande cassée.
+// Le stock d'un groupe : l'entrée entière et, dedans, le groupe du sexe choisi.
+function stockOf(rows, speciesId, isShiny, sex) {
+  const entry = rows.filter(
+    (row) => row.species_id === speciesId && Boolean(row.is_shiny) === Boolean(isShiny)
+  );
+  const group = entry.filter((row) => !sex || row.sex === sex);
+  return {
+    total: entry.length,
+    count: group.length,
+    spare: group.filter((row) => !row.locked).length,
+  };
+}
+
+// Groupes (espèce, variante, sexe) que ce dresseur possède : ceux qu'il peut
+// faire évoluer — par ses propres moyens ou avec un objet — et les entrées qui
+// pourraient évoluer mais dont il manque des exemplaires. Le second lot sert à
+// expliquer une liste vide au lieu de la laisser muette : c'est exactement ce
+// qui faisait croire à une commande cassée.
 function listEvolvable(userId, cb) {
   usableHelpers(userId, (err, helpers) => {
     if (err) return cb(err, [], []);
-    getCollection(userId, (err, rows) => {
+    getIndividuals(userId, (err, rows) => {
       if (err) return cb(err, [], []);
       const evolvable = [];
       const incomplete = [];
-      for (const row of rows || []) {
-        const paths = evolutionPaths(row, helpers);
+      for (const group of groupIndividuals(rows, { bySex: true })) {
+        const stock = stockOf(rows, group.speciesId, group.isShiny, group.sex);
+        const paths = evolutionPaths(group.speciesId, stock, helpers);
         if (paths.length) {
-          evolvable.push({ ...row, paths, plan: paths[0].plan });
+          evolvable.push({ ...group, stock, paths, plan: paths[0].plan });
+        }
+      }
+      for (const entry of groupIndividuals(rows)) {
+        if (evolvable.some((g) => g.speciesId === entry.speciesId && g.isShiny === entry.isShiny)) {
           continue;
         }
-        const plan = describeEvolution(row.species_id);
-        if (!plan.error) incomplete.push({ ...row, plan });
+        const plan = describeEvolution(entry.speciesId);
+        if (!plan.error) incomplete.push({ ...entry, plan });
       }
       // Les plus proches du seuil d'abord : ce sont les plus utiles à afficher.
       incomplete.sort((a, b) => b.count - a.count);
@@ -107,13 +134,13 @@ export default {
         handleException("Autocomplétion d'évolution :", err);
         return interaction.respond([]).catch(() => {});
       }
-      const label = (entry) =>
-        `${entry.is_shiny ? "✨ " : ""}${getSpecies(entry.species_id).name}`;
+      const label = (entry) => displayName(getSpecies(entry.speciesId), entry.isShiny, entry.sex);
 
+      // Le sexe choisi est celui de l'individu qui évolue : il le garde.
       const choices = entries
         .map((entry) => ({
-          name: `${label(entry)} (×${entry.count})`,
-          value: encodeEntry(entry.species_id, entry.is_shiny),
+          name: `${label(entry)} (×${entry.count}, ${entry.stock.total} au total)`,
+          value: entry.key,
         }))
         .filter((choice) => choice.name.toLowerCase().includes(query))
         .slice(0, 25);
@@ -148,7 +175,7 @@ export default {
 
   async execute(interaction) {
     try {
-      const { speciesId, isShiny } = decodeEntry(interaction.options.getString("pokemon"));
+      const { speciesId, isShiny, sex } = decodeEntry(interaction.options.getString("pokemon"));
       if (!getSpecies(speciesId)) {
         return interaction.reply({
           content:
@@ -175,16 +202,18 @@ export default {
         // fusion qu'il ne peut pas payer n'a pas à lui être proposée, et c'est
         // d'autant plus vrai depuis que les objets le font entrer dans cet
         // écran avec un exemplaire de moins que le minimum.
-        getOwned(interaction.user.id, speciesId, isShiny, (err, owned) => {
-        if (err) {
-          handleException("Lecture de la collection pour /evolution :", err);
-          owned = 0;
-        }
+        getIndividuals(interaction.user.id, (err, individuals) => {
+        if (err) handleException("Lecture de la collection pour /evolution :", err);
+        const stock = stockOf(err ? [] : individuals, speciesId, isShiny, sex);
+        const owned = stock.total;
 
         const species = plan.species;
-        const suffix = isShiny ? 1 : 0;
+        // Variante et sexe voyagent ensemble dans le deuxième segment du
+        // customId : « 1F » pour une femelle shiny, « 0 » pour n'importe quel
+        // sexe — le format d'avant, que les anciens boutons portent encore.
+        const suffix = `${isShiny ? 1 : 0}${sex ?? ""}`;
         const embed = new EmbedBuilder()
-          .setTitle(`Évolution de ${displayName(species, isShiny)}`)
+          .setTitle(`Évolution de ${displayName(species, isShiny, sex)}`)
           .setColor(embedColor(species, isShiny))
           .setThumbnail(spriteUrl(species, isShiny))
           .setDescription(
@@ -199,7 +228,7 @@ export default {
         // Le coût de la fusion ordinaire n'a sa place que si elle est
         // proposée : au-dessus d'un unique bouton « Pierre Feu → Pyroli
         // (gratuit) », annoncer « 2 doublons et 2000 points » se contredit.
-        if (owned >= plan.required) {
+        if (canPay(plan, stock)) {
           embed.addFields({
             name: "Coût",
             value:
@@ -211,7 +240,7 @@ export default {
 
         const rows = [];
         const normale = new ActionRowBuilder();
-        if (owned < plan.required) {
+        if (!canPay(plan, stock)) {
           // Rien du tout : ni les exemplaires, ni de quoi les remplacer.
         } else if (plan.branching) {
           normale.addComponents(
@@ -246,7 +275,7 @@ export default {
         const lignes = [];
         for (const helper of helpers.slice(0, 5)) {
           const aide = describeEvolution(speciesId, null, helper.key);
-          if (aide.error || owned < aide.required) continue;
+          if (!canPay(aide, stock)) continue;
           const cible = aide.target ? ` → ${aide.target.name}` : "";
           const prix = aide.points > 0 ? `${aide.points} pts` : "gratuit";
           aides.addComponents(
@@ -276,9 +305,12 @@ export default {
           return interaction
             .editReply({
               content:
-                `❌ Il te faut **${plan.required}** exemplaires de **${species.name}**` +
-                `${isShiny ? " ✨" : ""} pour cette fusion, tu en as **${owned}**.\n` +
-                `Trois 🍬 Super Bonbons peuvent tenir lieu d'un exemplaire manquant.`,
+                (owned >= plan.required && sex
+                  ? `❌ Ton seul **${displayName(species, isShiny, sex)}** est l'exemplaire ` +
+                    `que tu gardes : choisis un autre sexe, ou attrape-en un deuxième.`
+                  : `❌ Il te faut **${plan.required}** exemplaires de **${species.name}**` +
+                    `${isShiny ? " ✨" : ""} pour cette fusion, tu en as **${owned}**.\n` +
+                    `Trois 🍬 Super Bonbons peuvent tenir lieu d'un exemplaire manquant.`),
             })
             .catch(() => {});
         }

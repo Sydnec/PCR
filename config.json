@@ -8,7 +8,7 @@
 			"minDelayAfterEndMinutes":0,
 			"fleeAfterMinutes":{"min":180,"max":360},
 			"shinyOdds":500,
-			"weightsByStage":{"1":100,"2":35,"3":10},
+			"weightsByStage":{"1":100,"2":60,"3":25},
 			"legendaryWeight":8,
 			"pingRarities":["RARE","LEGENDAIRE"],
 			"throwLogSize":8,
@@ -67,7 +67,7 @@
 			"wildFleeChance":0.05,
 			"wildFleeChancePerBait":0.03,
 			"shinyOdds":250,
-			"weightsByStage":{"1":100,"2":70,"3":40},
+			"weightsByStage":{"1":100,"2":90,"3":60},
 			"legendaryWeight":24
 		}
 	}

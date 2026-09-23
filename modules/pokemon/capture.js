@@ -350,7 +350,9 @@ export async function throwBall(
             ball: ball.label,
             probability,
           });
-          creditSpecies(userId, spawn.species_id, spawn.is_shiny, (err) => {
+          // La ball qui l'a emporté reste attachée à l'individu, pour de bon.
+          const options = { ball: ball.key, origin: "capture" };
+          creditSpecies(userId, spawn.species_id, spawn.is_shiny, options, (err, caught) => {
             if (err) handleException("Crédit de la collection :", err);
             finalizeCaughtSpawn(interaction.client, spawnId, userId, ball.key);
             log(
@@ -366,7 +368,8 @@ export async function throwBall(
               interaction
                 .editReply(
                   view(
-                    `🎉 Bravo ! **${displayName(species, spawn.is_shiny)}** rejoint ton Pokédex ! (${mention})` +
+                    `🎉 Bravo ! **${displayName(species, spawn.is_shiny, caught?.sex)}** rejoint ton ` +
+                      `Pokédex ! (${mention})` +
                       butin,
                     { done: true }
                   )
