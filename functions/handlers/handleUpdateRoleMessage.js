@@ -1,4 +1,4 @@
-import { handleException, selfServiceRoles } from '../../modules/utils.js';
+import { selfServiceRoles } from '../../modules/utils.js';
 import { emojiRegex } from '../../modules/regex.js';
 
 export default (bot) => {

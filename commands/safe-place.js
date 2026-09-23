@@ -27,7 +27,7 @@ export default {
             }
 
             const message = await channel.send({
-                content: `Ce message a été envoyé anonymement en utilisant la commande \/safe-place : \n${interaction.options.getString(
+                content: `Ce message a été envoyé anonymement en utilisant la commande /safe-place : \n${interaction.options.getString(
                     'message'
                 )}`,
                 // Message anonyme : personne ne doit pouvoir s'en servir pour

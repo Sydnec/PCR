@@ -1,4 +1,4 @@
-import { log, updateThreadList } from '../../modules/utils.js';
+import { log } from '../../modules/utils.js';
 import { checkAndAnnounceNewRelease } from '../../modules/changelog-notifier.js';
 import db from '../../modules/db.js';
 import { rehydratePokemon } from '../../modules/pokemon/spawn.js';
@@ -24,7 +24,9 @@ async function execute(bot) {
                         isStillInVocal = true;
                         break;
                     }
-                } catch {}
+                } catch {
+                    // Serveur injoignable : on passe au suivant.
+                }
             }
             if (!isStillInVocal) {
                 // On retire la date d'arrivée en vocal (join_time)

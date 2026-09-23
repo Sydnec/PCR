@@ -158,7 +158,7 @@ export function movePokemon(userId, pokemonId, targetPos, cb) {
 // il vaut « pas de nom ».
 function cleanName(value, maxLength) {
   const text = String(value ?? "")
-    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/\p{Cc}/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
   return [...text].slice(0, maxLength).join("") || null;

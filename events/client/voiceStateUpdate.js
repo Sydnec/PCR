@@ -1,6 +1,6 @@
 // Événement: voiceStateUpdate
 //
-import { handleException, log } from '../../modules/utils.js';
+import { handleException } from '../../modules/utils.js';
 import dotenv from 'dotenv';
 import db from '../../modules/db.js';
 dotenv.config();

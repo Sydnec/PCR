@@ -73,7 +73,7 @@ async function listReminders(interaction, userId) {
         .setDescription('Voici la liste de tes rappels actifs')
         .setTimestamp();
 
-    reminders.forEach((reminder, index) => {
+    reminders.forEach((reminder) => {
         const relativeTime = `<t:${Math.floor(reminder.trigger_at / 1000)}:R>`;
         const fullDate = `<t:${Math.floor(reminder.trigger_at / 1000)}:F>`;
         

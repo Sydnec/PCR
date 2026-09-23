@@ -1,6 +1,6 @@
 import sqlite3 from "sqlite3";
 import path from "path";
-import { log, handleException } from "./utils.js";
+import { handleException } from "./utils.js";
 import { fileURLToPath } from "url";
 
 // Pour compatibilité ESM si besoin

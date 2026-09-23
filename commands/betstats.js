@@ -14,7 +14,6 @@ export default {
     async execute(interaction) {
         try {
             const targetUser = interaction.options.getUser("user") || interaction.user;
-            const isSelf = targetUser.id === interaction.user.id;
 
             // 1. Get User Stats
             db.get("SELECT total_wagered, max_win FROM bet_stats WHERE user_id = ?", [targetUser.id], (err, userStats) => {

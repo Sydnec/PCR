@@ -9,11 +9,12 @@
     "dev": "nodemon ./index.js",
     "test": "echo \"Error: no test specified\" && exit 0",
     "gen:pokemon": "node ./scripts/generate-pokemon-data.js",
-    "lint": "echo 'Linting code...' && node -c index.js",
+    "lint": "eslint .",
     "update": "bash ./pcr update",
     "deploy": "bash ./pcr deploy",
     "backup": "bash ./pcr backup",
-    "status": "bash ./pcr status"
+    "status": "bash ./pcr status",
+    "format:check": "prettier --check web/"
   },
   "repository": {
     "type": "git",
@@ -31,13 +32,15 @@
     "date-fns": "^2.30.0",
     "discord.js": "^14.13.0",
     "dotenv": "^16.3.1",
-    "fs": "^0.0.1-security",
-    "node-cron": "^3.0.3",
-    "sqlite3": "^5.1.7",
-    "url": "^0.11.3"
+    "node-cron": "^4.6.0",
+    "sqlite3": "^6.0.1"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1"
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "globals": "^16.5.0",
+    "nodemon": "^3.0.1",
+    "prettier": "^3.9.9"
   },
   "engines": {
     "node": ">=24"
