@@ -26,7 +26,7 @@ import { handleException, log } from "../utils.js";
 import { getConfig } from "../config.js";
 import { HttpError, routes } from "./api.js";
 import { authorizeUrl, fetchDiscordUser } from "./discord.js";
-import { parseCookies, serializeCookie, signToken, verifyToken } from "./session.js";
+import { readCookie, serializeCookie, signToken, verifyToken } from "./session.js";
 import { serveStatic } from "./static.js";
 
 const SESSION_COOKIE = "pcr_session";
@@ -207,8 +207,7 @@ function login(req, res, url) {
 }
 
 async function callback(req, res, url, bot) {
-  const cookies = parseCookies(req.headers.cookie);
-  const expected = verifyToken(cookies[STATE_COOKIE], "oauth-state");
+  const expected = verifyToken(readCookie(req.headers.cookie, STATE_COOKIE), "oauth-state");
   const clearState = serializeCookie(STATE_COOKIE, "", { maxAgeSeconds: 0, secure: secureCookies() });
   // Un échec renvoie sur l'accueil du site, qui l'explique : le visiteur est
   // dans un navigateur, pas devant un client d'API, et une page de JSON brut ne
@@ -274,7 +273,7 @@ async function handle(req, res, bot) {
     return send(res, allowed ? 405 : 404, { error: allowed ? "Méthode non autorisée." : "Introuvable." });
   }
 
-  const session = verifyToken(parseCookies(req.headers.cookie)[SESSION_COOKIE], "session");
+  const session = verifyToken(readCookie(req.headers.cookie, SESSION_COOKIE), "session");
   // Un identifiant Discord, et rien d'autre : sans lui, guild.members.fetch()
   // irait chercher la liste entière des membres.
   const user = SNOWFLAKE.test(String(session?.id))

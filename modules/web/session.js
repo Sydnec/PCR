@@ -47,22 +47,22 @@ export function verifyToken(token, use) {
   }
 }
 
-export function parseCookies(header = "") {
-  const cookies = {};
+// La valeur d'un cookie, ou undefined. On ne lit que le cookie demandé : bâtir
+// un objet de tous les cookies reçus écrirait des propriétés dont le nom vient
+// du navigateur (`__proto__`, `constructor`…).
+export function readCookie(header = "", wanted) {
   for (const part of String(header).split(";")) {
     const index = part.indexOf("=");
-    if (index < 0) continue;
-    const name = part.slice(0, index).trim();
-    if (!name) continue;
+    if (index < 0 || part.slice(0, index).trim() !== wanted) continue;
     // Un « % » mal formé ferait lever decodeURIComponent, et chaque requête
     // finirait en erreur 500 : un cookie illisible est un cookie absent.
     try {
-      cookies[name] = decodeURIComponent(part.slice(index + 1).trim());
+      return decodeURIComponent(part.slice(index + 1).trim());
     } catch {
-      // Ignoré : il n'arrive pas dans `cookies`.
+      return undefined;
     }
   }
-  return cookies;
+  return undefined;
 }
 
 // HttpOnly : aucun script de la page ne lit le jeton. SameSite=Lax : un autre
