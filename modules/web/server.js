@@ -33,6 +33,13 @@ const STATE_TTL_MS = 10 * 60 * 1000;
 
 const webConfig = () => getConfig().web;
 const baseUrl = () => String(process.env.WEB_BASE_URL || "").replace(/\/+$/, "");
+
+// Vrai une fois le serveur à l'écoute : sans WEB_PORT, ou avec une variable
+// manquante, il ne démarre pas, et son adresse mènerait à une page morte.
+let listening = false;
+
+// L'adresse publique du site pour /pk web, ou null s'il n'est pas en ligne.
+export const siteUrl = () => (listening ? baseUrl() : null);
 const secureCookies = () => baseUrl().startsWith("https://");
 
 // Les chemins déclarés dans api.js (« /api/users/:userId/box ») deviennent des
@@ -270,9 +277,10 @@ export function startWebServer(bot) {
   });
   // Derrière le reverse proxy : on n'écoute que la machine elle-même, sauf
   // réglage contraire.
-  server.listen(port, process.env.WEB_HOST || "127.0.0.1", () =>
-    log(`Site et API web à l'écoute sur ${process.env.WEB_HOST || "127.0.0.1"}:${port}`)
-  );
+  server.listen(port, process.env.WEB_HOST || "127.0.0.1", () => {
+    listening = true;
+    log(`Site et API web à l'écoute sur ${process.env.WEB_HOST || "127.0.0.1"}:${port}`);
+  });
   server.on("error", (error) => handleException("Serveur de l'API web :", error));
   return server;
 }

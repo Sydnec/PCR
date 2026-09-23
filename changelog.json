@@ -1421,6 +1421,16 @@
       "commit": "pending",
       "timestamp": "2026-09-23T15:00:00.000Z",
       "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "feature",
+      "name": "/pk web",
+      "description": "Nouvelle commande /pk web : elle te donne en privé le lien du site du jeu.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-23T16:00:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
     }
   ]
 }
