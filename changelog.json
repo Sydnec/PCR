@@ -1,7 +1,24 @@
 {
-  "version": "1.14.1",
-  "lastUpdated": "2026-09-23T08:19:31.713Z",
+  "version": "1.14.2",
+  "lastUpdated": "2026-09-23T09:20:37.895Z",
   "releases": [
+    {
+      "version": "1.14.2",
+      "date": "2026-09-23",
+      "title": "Release 1.14.2",
+      "features": [
+        {
+          "type": "feature",
+          "name": "Le site PokéPCR",
+          "description": "Première version du site pokepcr.simonbourlier.fr : ta boîte, ton Pokédex, ton sac et ton œuf dans le navigateur, avec revente, évolution et ponte. Connexion avec ton compte Discord.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-23T09:10:00.000Z",
+          "branch": "claude/adoring-darwin-4o541o"
+        }
+      ]
+    },
     {
       "version": "1.14.1",
       "date": "2026-09-23",
@@ -1293,16 +1310,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "feature",
-      "name": "Le site PokéPCR",
-      "description": "Première version du site pokepcr.simonbourlier.fr : ta boîte, ton Pokédex, ton sac et ton œuf dans le navigateur, avec revente, évolution et ponte. Connexion avec ton compte Discord.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-23T09:10:00.000Z",
-      "branch": "claude/adoring-darwin-4o541o"
-    }
-  ]
+  "pending": []
 }
