@@ -53,12 +53,16 @@ export function babyFamilies() {
 
 // Le bébé qu'un parent peut donner, ou null. Métamorph n'en donne aucun seul :
 // c'est l'autre parent qui décide de la famille.
-export function babyOf(species) {
+//
+// `families` se passe quand on interroge toute une liste : les recalculer pour
+// chacune des 251 espèces relirait la configuration des milliers de fois.
+export function babyOf(species, families = babyFamilies()) {
   if (!species) return null;
-  return babyFamilies().find((family) => family.parents.has(species.id))?.baby ?? null;
+  return families.find((family) => family.parents.has(species.id))?.baby ?? null;
 }
 
-export const canBreed = (species) => isDitto(species) || Boolean(babyOf(species));
+export const canBreed = (species, families = babyFamilies()) =>
+  isDitto(species) || Boolean(babyOf(species, families));
 
 // L'œuf qu'un couple pondrait, ou la raison pour laquelle il n'en pondra pas.
 // Chaque parent est { species, sex }. Rend aussi les rôles : `father` et

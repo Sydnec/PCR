@@ -29,7 +29,7 @@ Toutes ses commandes vivent sous `/pk`. → **[Documentation du jeu](docs/pokemo
 - [Loterie](docs/pokemon/loterie.md) — un tirage par jour et par dresseur.
 - [Revente](docs/pokemon/revente.md) — doublons et objets contre des points.
 - [Parc Safari](docs/pokemon/safari.md) — l'événement où les actions ne coûtent rien.
-- [API web](docs/api.md) — pour la future interface, éteinte tant qu'elle n'est pas configurée.
+- [Site web](docs/site.md) — boîte, Pokédex, sac et œuf dans le navigateur, et son [API](docs/api.md).
 
 ### 💰 Économie & Pot commun
 
@@ -157,8 +157,9 @@ Pour plus de détails sur la configuration CI/CD, voir [CICD.md](./CICD.md).
 ├── functions/      # Handlers (timers, events, commands...)
 ├── modules/        # Modules partagés (DB, Utils, Regex, Economy...)
 │   ├── pokemon/    # Système de capture (données, spawns, capture, collection)
-│   └── web/        # API de l'interface web (connexion Discord, routes)
+│   └── web/        # Serveur du site et API (connexion Discord, routes)
 ├── scripts/        # Scripts ponctuels (génération du dataset Pokémon)
+├── web/            # Le site (fichiers statiques, sans compilation)
 ├── pcr             # Script CLI de gestion
 ├── CICD.md         # Documentation du déploiement
 ├── CLAUDE.md       # Consignes de livraison pour Claude

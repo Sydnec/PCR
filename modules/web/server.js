@@ -1,9 +1,9 @@
-// Le serveur de l'API web, dans le même processus que le bot.
+// Le serveur du site et de son API, dans le même processus que le bot.
 //
 // Même processus et même base : l'API appelle les fonctions du jeu en direct,
 // sans rien dupliquer, et le bot sert à vérifier qu'un visiteur est bien membre
-// du serveur. Rien ne démarre sans WEB_PORT : tant que l'interface n'existe
-// pas, le bot tourne exactement comme avant.
+// du serveur. Tout ce qui n'est pas sous /api/ est le site (static.js). Rien ne
+// démarre sans WEB_PORT : sans lui, le bot tourne exactement comme avant.
 //
 // Node pur (http, crypto, fetch) : pas de framework pour une vingtaine de
 // routes, donc pas de dépendance de plus à tenir à jour.
@@ -24,6 +24,7 @@ import { getConfig } from "../config.js";
 import { HttpError, routes } from "./api.js";
 import { authorizeUrl, fetchDiscordUser } from "./discord.js";
 import { parseCookies, serializeCookie, signToken, verifyToken } from "./session.js";
+import { serveStatic } from "./static.js";
 
 const SESSION_COOKIE = "pcr_session";
 const STATE_COOKIE = "pcr_oauth_state";
@@ -156,28 +157,24 @@ async function callback(req, res, url, bot) {
   const cookies = parseCookies(req.headers.cookie);
   const expected = verifyToken(cookies[STATE_COOKIE]);
   const clearState = serializeCookie(STATE_COOKIE, "", { maxAgeSeconds: 0, secure: secureCookies() });
+  // Un échec renvoie sur l'accueil du site, qui l'explique : le visiteur est
+  // dans un navigateur, pas devant un client d'API, et une page de JSON brut ne
+  // lui dirait rien.
+  const fail = (reason) => redirect(res, `${baseUrl()}/?connexion=${reason}`, [clearState]);
   // Le `state` lie la réponse de Discord au navigateur qui a demandé la
   // connexion : sans lui, on pourrait connecter quelqu'un à un autre compte.
-  if (!expected || expected.state !== url.searchParams.get("state")) {
-    return send(res, 400, { error: "Connexion expirée ou invalide, recommence." }, {
-      "Set-Cookie": clearState,
-    });
-  }
+  if (!expected || expected.state !== url.searchParams.get("state")) return fail("expiree");
   const code = url.searchParams.get("code");
-  if (!code) return send(res, 400, { error: "Connexion refusée." }, { "Set-Cookie": clearState });
+  if (!code) return fail("refusee");
 
   let user;
   try {
     user = await fetchDiscordUser(code);
   } catch (error) {
     handleException("Connexion web par Discord :", error);
-    return send(res, 502, { error: "Discord n'a pas confirmé la connexion, recommence." }, {
-      "Set-Cookie": clearState,
-    });
+    return fail("discord");
   }
-  if (!(await isGuildMember(bot, user.id))) {
-    return send(res, 403, { error: "Réservé aux membres du serveur." }, { "Set-Cookie": clearState });
-  }
+  if (!(await isGuildMember(bot, user.id))) return fail("membre");
 
   const hours = Math.max(1, Number(webConfig()?.sessionHours) || 168);
   const session = signToken(user, hours * 3600 * 1000);
@@ -196,6 +193,13 @@ async function callback(req, res, url, bot) {
 async function handle(req, res, bot) {
   const url = new URL(req.url, "http://localhost");
   const method = req.method.toUpperCase();
+
+  if (!url.pathname.startsWith("/api/")) {
+    if (method !== "GET" && method !== "HEAD") {
+      return send(res, 405, { error: "Méthode non autorisée." });
+    }
+    return serveStatic(req, res, url.pathname);
+  }
 
   if (method === "GET" && url.pathname === "/api/auth/login") return login(req, res, url);
   if (method === "GET" && url.pathname === "/api/auth/callback") {
@@ -244,7 +248,7 @@ async function handle(req, res, bot) {
 
 export function startWebServer(bot) {
   const port = Number(process.env.WEB_PORT);
-  if (!port) return log("API web désactivée (WEB_PORT absent)");
+  if (!port) return log("Site et API web désactivés (WEB_PORT absent)");
 
   // Sans ces réglages, la connexion ne peut pas marcher : mieux vaut ne pas
   // démarrer que servir une API où personne ne peut entrer.
@@ -267,7 +271,7 @@ export function startWebServer(bot) {
   // Derrière le reverse proxy : on n'écoute que la machine elle-même, sauf
   // réglage contraire.
   server.listen(port, process.env.WEB_HOST || "127.0.0.1", () =>
-    log(`API web à l'écoute sur ${process.env.WEB_HOST || "127.0.0.1"}:${port}`)
+    log(`Site et API web à l'écoute sur ${process.env.WEB_HOST || "127.0.0.1"}:${port}`)
   );
   server.on("error", (error) => handleException("Serveur de l'API web :", error));
   return server;
