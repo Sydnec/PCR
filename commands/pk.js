@@ -12,6 +12,7 @@ import revendre from "./pk/revendre.js";
 import inventaire from "./pk/inventaire.js";
 import loterie from "./pk/loterie.js";
 import safari from "./pk/safari.js";
+import web from "./pk/web.js";
 
 // Routeur du jeu Pokémon : toutes ses commandes vivent sous /pk, comme celles
 // d'administration sous /admin. Chaque sous-commande garde son fichier dans
@@ -32,6 +33,7 @@ const SUBCOMMANDS = [
   inventaire,
   loterie,
   safari,
+  web,
 ];
 
 const data = SUBCOMMANDS.reduce(

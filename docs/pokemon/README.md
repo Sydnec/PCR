@@ -39,6 +39,7 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
 - `/pk safari` : paie l'entrée du parc safari (voir [Parc Safari](safari.md)). Réponse privée.
 - `/pk inventaire [membre]` : les objets qu'un dresseur a en poche (voir [Objets](objets.md)).
 - `/pk loterie` : un tirage par jour et par dresseur (voir [Loterie](loterie.md)). Réponse privée.
+- `/pk web` : le lien du [site](../site.md), en réponse privée.
 - `/pk revendre pokemon <doublon> [quantite]` / `/pk revendre objet <objet> [quantite]` : convertit
   en points ce qu'on a en trop, par espèce et sexe. Un exemplaire est **toujours** conservé.
 
