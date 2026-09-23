@@ -109,6 +109,22 @@ export function pokemonName(species, shiny = false, sex = null) {
   );
 }
 
+// Comment on obtient une espèce qu'on ne croise pas dans la nature : les mêmes
+// repères que sur Discord.
+export const OBTENTION_MARKS = { evolution: "🔒", egg: "🥚" };
+export const OBTENTION_LEGENDS = {
+  evolution: "🔒 Introuvable à l'état sauvage : par fusion de doublons, ou par échange.",
+  egg: "🥚 Ne sort que d'un œuf : /pk oeuf pondre, avec un couple de parents.",
+};
+
+// Une pastille colorée. La couleur passe par le CSSOM (--chip) : la politique
+// de sécurité du site refuse les attributs `style`.
+export function colorChip(content, { color = null, className = "" } = {}) {
+  const chip = h("span", { class: `chip chip-color ${className}`.trim() }, content);
+  if (color) chip.style.setProperty("--chip", color);
+  return chip;
+}
+
 // Un message du jeu, écrit pour Discord : le gras (**…**) et les emoji du
 // serveur (<:nom:id>) y sont rendus comme là-bas, le reste reste du texte. On
 // découpe la chaîne, on ne l'interprète jamais comme du HTML.

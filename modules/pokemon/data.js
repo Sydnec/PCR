@@ -142,6 +142,12 @@ const ICON_BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/spri
 export const iconUrl = (species, isShiny) =>
   `${ICON_BASE}/${isShiny ? "shiny/" : ""}${species.id}.png`;
 
+// Les couleurs des types, en « #rrggbb » : celles des embeds, pour que le site
+// colore un type comme Discord.
+const hexColor = (color) => `#${color.toString(16).padStart(6, "0")}`;
+export const typeColors = () =>
+  Object.fromEntries(Object.entries(TYPE_COLORS).map(([type, color]) => [type, hexColor(color)]));
+
 export function embedColor(species, isShiny) {
   if (isShiny) return 0xffd700;
   return TYPE_COLORS[species.types[0]] ?? 0x5865f2;
@@ -287,14 +293,23 @@ export function safariCatchProbability(catchRate, baitStacks, safariConfig) {
   );
 }
 
-export function difficultyLabel(catchRate) {
-  if (catchRate >= 190) return "Très facile";
-  if (catchRate >= 120) return "Facile";
-  if (catchRate >= 60) return "Moyenne";
-  if (catchRate >= 40) return "Difficile";
-  if (catchRate >= 10) return "Très difficile";
-  return "Extrême";
+// Du plus facile au plus dur. Le rang (`level`, de 0 à 5) sert au site, qui
+// colore la difficulté ; Discord n'en affiche que le libellé.
+const DIFFICULTIES = [
+  { min: 190, label: "Très facile" },
+  { min: 120, label: "Facile" },
+  { min: 60, label: "Moyenne" },
+  { min: 40, label: "Difficile" },
+  { min: 10, label: "Très difficile" },
+  { min: -Infinity, label: "Extrême" },
+];
+
+export function difficultyOf(catchRate) {
+  const level = DIFFICULTIES.findIndex((difficulty) => catchRate >= difficulty.min);
+  return { level, label: DIFFICULTIES[level].label };
 }
+
+export const difficultyLabel = (catchRate) => difficultyOf(catchRate).label;
 
 // Cible d'autocomplétion : jusqu'à `limit` espèces dont le nom contient la requête.
 export function searchByName(query, limit = 25) {

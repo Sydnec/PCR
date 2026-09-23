@@ -1,7 +1,7 @@
 // Le Pokédex : toutes les espèces des générations ouvertes, celles qu'on
 // possède en couleur, les autres en silhouette. Comme /pk pokedex, ne compte
 // que ce qui est physiquement dans la boîte.
-import { api, fmt, h, normalize, openDialog, progressBar } from "../lib.js";
+import { OBTENTION_MARKS, api, fmt, h, normalize, openDialog, progressBar } from "../lib.js";
 
 // Comment on obtient une espèce qu'on ne croise pas dans la nature — les mêmes
 // repères que sur Discord.
@@ -10,7 +10,6 @@ const OBTENTION = {
   evolution: "Ne s'obtient qu'en évoluant (🔒).",
   egg: "Ne sort que d'un œuf (🥚).",
 };
-const MARKS = { evolution: "🔒", egg: "🥚" };
 
 export async function render(ctx) {
   const dex = await api("/api/users/me/pokedex");
@@ -122,7 +121,9 @@ function card(ctx, species, counts) {
       h("span", { class: "card-id" }, `n° ${String(species.id).padStart(3, "0")}`),
       has ? h("span", { class: "tag" }, `×${counts.normal + counts.shiny}`) : null,
       counts?.shiny ? h("span", { title: "Shiny possédé" }, "✨") : null,
-      !has && MARKS[species.obtention] ? h("span", {}, MARKS[species.obtention]) : null
+      !has && OBTENTION_MARKS[species.obtention]
+        ? h("span", {}, OBTENTION_MARKS[species.obtention])
+        : null
     )
   );
 }

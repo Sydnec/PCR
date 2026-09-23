@@ -3,7 +3,22 @@
 // même chemin que les boutons Discord (même cooldown, même paiement, même
 // course), et l'annonce du salon suit. La page relit l'apparition à la cadence
 // que donne l'API, tant qu'elle est ouverte et visible.
-import { api, emoji, fmt, h, pokemonName, richText, toast } from "../lib.js";
+//
+// Le Pokémon au centre, les balls juste en dessous, puis ce que donnerait le
+// bouton « Infos du Pokémon » sur Discord : ce qu'on possède de sa lignée, son
+// solde et ses balls en poche. Le journal des lancers vit sur le côté.
+import {
+  OBTENTION_LEGENDS,
+  OBTENTION_MARKS,
+  api,
+  colorChip,
+  emoji,
+  fmt,
+  h,
+  pokemonName,
+  richText,
+  toast,
+} from "../lib.js";
 
 // Les chances affichées comme sur l'annonce Discord.
 function percent(probability) {
@@ -12,6 +27,11 @@ function percent(probability) {
   if (value >= 1) return `${value.toFixed(1).replace(".", ",")} %`;
   return `${value.toFixed(2).replace(".", ",")} %`;
 }
+
+// Les stades tels que les nomme la fiche Discord.
+const STAGE_LABELS = ["Forme de base", "Stade 1", "Stade 2"];
+
+const dexNumber = (species) => `n° ${String(species.id).padStart(3, "0")}`;
 
 export async function render(ctx) {
   let state = await api("/api/spawn");
@@ -39,9 +59,12 @@ export async function render(ctx) {
               "Il se visite sur Discord avec /pk safari."
             )
           : null,
-        state.spawn ? spawnCard() : waiting(),
-        state.spawn ? journal() : null,
-        state.drops.length ? drops() : null,
+        h(
+          "div",
+          { class: "capture-layout" },
+          h("div", { class: "capture-main" }, state.spawn ? spawnCard() : waiting()),
+          h("aside", { class: "capture-aside" }, journal(), drops())
+        ),
       ].filter(Boolean)
     );
 
@@ -62,6 +85,12 @@ export async function render(ctx) {
     }
     state = next;
     signature = nextSignature;
+    draw();
+  }
+
+  // Après une action : l'apparition et le solde ont pu changer tous les deux.
+  async function refreshAll() {
+    await Promise.all([refresh({ force: true }), ctx.refreshMe().catch(() => {})]);
     draw();
   }
 
@@ -89,50 +118,92 @@ export async function render(ctx) {
       panel = { text: error.message, status: "error" };
     }
     throwing = false;
-    await Promise.all([refresh({ force: true }), ctx.refreshMe().catch(() => {})]);
+    await refreshAll();
   }
+
+  // ---------------------- Le Pokémon ----------------------
 
   function spawnCard() {
     const spawn = state.spawn;
     const species = ctx.species.get(spawn.speciesId);
     if (!species) return h("p", { class: "notice" }, "Un Pokémon inconnu apparaît…");
-    const owned = spawn.shiny ? spawn.owned.shiny : spawn.owned.normal;
-    return h(
+    const card = h(
       "article",
       { class: `spawn${spawn.shiny ? " spawn-shiny" : ""}` },
+      h(
+        "div",
+        { class: "chips" },
+        spawn.rarityLabel
+          ? colorChip(spawn.rarityLabel, { className: `rarity-${spawn.rarity}` })
+          : null,
+        species.types.map((type) => colorChip(type, { color: ctx.types[type] })),
+        colorChip(`Difficulté : ${spawn.difficulty.label}`, {
+          className: `difficulty-${spawn.difficulty.level}`,
+        })
+      ),
       h("img", {
         class: "spawn-art",
         src: spawn.shiny ? species.spriteShiny : species.sprite,
         alt: species.name,
       }),
       h(
-        "div",
-        { class: "spawn-side" },
-        h(
-          "h2",
-          {},
-          spawn.shiny
-            ? `✨ Un ${species.name} SHINY apparaît ! ✨`
-            : `Un ${species.name} sauvage apparaît !`
-        ),
-        h(
-          "div",
-          { class: "chips" },
-          spawn.rarityLabel ? h("span", { class: "chip" }, spawn.rarityLabel) : null,
-          h("span", { class: "chip" }, species.types.join(" / ")),
-          h("span", { class: "chip" }, `Difficulté : ${spawn.difficulty}`)
-        ),
-        h(
-          "p",
-          { class: "muted small" },
-          owned
-            ? `Tu en as ${fmt(owned)}${spawn.shiny ? " en shiny" : ""} dans ta boîte.`
-            : `🆕 Tu n'en as pas encore${spawn.shiny ? " en shiny" : ""} !`
-        ),
-        balls(spawn),
-        confirming ? confirmation(spawn) : null,
-        panel ? throwPanel() : null
-      )
+        "h2",
+        { class: "spawn-title" },
+        spawn.shiny
+          ? `✨ Un ${species.name} SHINY apparaît ! ✨`
+          : `Un ${species.name} sauvage apparaît !`
+      ),
+      h("p", { class: "muted small spawn-dex" }, dexNumber(species)),
+      ownedLine(spawn),
+      wallet(),
+      balls(spawn),
+      confirming ? confirmation(spawn) : null,
+      panel ? throwPanel() : null,
+      lineage(spawn, species)
+    );
+    // Un halo de la couleur de son premier type, comme la bordure de l'embed.
+    const glow = ctx.types[species.types[0]];
+    if (glow) card.style.setProperty("--glow", glow);
+    return card;
+  }
+
+  // « Est-ce que je l'ai déjà ? » La variante qui compte est celle qu'on a sous
+  // les yeux : un shiny est une entrée de Pokédex à part. Les deux compteurs
+  // restent visibles, comme sur la fiche Discord.
+  function ownedLine(spawn) {
+    const { normal, shiny } = spawn.owned;
+    const has = spawn.shiny ? shiny > 0 : normal > 0;
+    const counts = [normal ? `×${fmt(normal)}` : null, shiny ? `✨×${fmt(shiny)}` : null]
+      .filter(Boolean)
+      .join(" · ");
+    return h(
+      "p",
+      { class: `spawn-owned${has ? " has" : ""}` },
+      has
+        ? `✅ Déjà dans ta boîte (${counts})`
+        : `🆕 Pas encore dans ta boîte${spawn.shiny ? " en shiny" : ""}` +
+            (counts ? ` (tu as ${counts})` : "")
+    );
+  }
+
+  // Le solde et les balls en poche : les deux questions qu'on se pose avant de
+  // lancer, comme dans la fiche Discord.
+  function wallet() {
+    const { balance, balls: stock } = ctx.me;
+    return h(
+      "div",
+      { class: "wallet" },
+      h("span", { class: "wallet-balance" }, "Solde ", h("strong", {}, `${fmt(balance)} pts`)),
+      stock.length
+        ? stock.map((ball) =>
+            h(
+              "span",
+              { class: "wallet-ball", title: ball.label },
+              emoji(ball.emoji, ball.label),
+              `×${fmt(ball.count)}`
+            )
+          )
+        : h("span", { class: "muted" }, "Aucune ball en poche")
     );
   }
 
@@ -163,8 +234,11 @@ export async function render(ctx) {
             { class: "ball-meta" },
             ball.free
               ? `${fmt(ball.free)} offerte${ball.free > 1 ? "s" : ""}`
-              : `${fmt(ball.price)} pts`,
-            " · ",
+              : `${fmt(ball.price)} pts`
+          ),
+          h(
+            "span",
+            { class: "ball-odds" },
             ball.guaranteed ? "garantie" : percent(ball.probability)
           )
         )
@@ -222,6 +296,85 @@ export async function render(ctx) {
   const throwPanel = () =>
     h("div", { class: `throw-panel throw-${panel.status}`, role: "status" }, richText(panel.text));
 
+  // La lignée, stade par stade comme la fiche Discord : un embranchement
+  // (Évoli) empile ses formes dans la colonne de leur stade.
+  function lineage(spawn, species) {
+    const stages = new Map();
+    for (const link of spawn.lineage) {
+      const linkSpecies = ctx.species.get(link.speciesId);
+      if (!linkSpecies) continue;
+      const list = stages.get(link.stage) ?? [];
+      list.push({ ...link, species: linkSpecies });
+      stages.set(link.stage, list);
+    }
+    const solo = stages.size <= 1;
+    const kinds = new Set(
+      spawn.lineage.map((link) => ctx.species.get(link.speciesId)?.obtention).filter(Boolean)
+    );
+    return h(
+      "section",
+      { class: "lineage" },
+      h("h3", {}, solo ? "Ton Pokédex" : "Lignée"),
+      h(
+        "div",
+        { class: "lineage-stages" },
+        [...stages]
+          .sort((a, b) => a[0] - b[0])
+          .map(([stage, links]) =>
+            h(
+              "div",
+              { class: "lineage-stage" },
+              solo
+                ? null
+                : h(
+                    "span",
+                    { class: "lineage-label" },
+                    STAGE_LABELS[stage - 1] ?? `Stade ${stage - 1}`
+                  ),
+              h(
+                "div",
+                { class: "lineage-links" },
+                links.map((link) => lineageLink(link, spawn, species))
+              )
+            )
+          )
+      ),
+      ["evolution", "egg"]
+        .filter((kind) => kinds.has(kind))
+        .map((kind) => h("p", { class: "muted small" }, OBTENTION_LEGENDS[kind]))
+    );
+  }
+
+  function lineageLink(link, spawn, species) {
+    const { normal, shiny } = link.owned;
+    const has = spawn.shiny ? shiny > 0 : normal > 0;
+    const current = link.speciesId === species.id;
+    const mark = OBTENTION_MARKS[link.species.obtention];
+    const counts = [normal ? `×${fmt(normal)}` : null, shiny ? `✨×${fmt(shiny)}` : null]
+      .filter(Boolean)
+      .join(" · ");
+    return h(
+      "div",
+      { class: `lineage-link${has ? " has" : ""}${current ? " current" : ""}` },
+      h("img", {
+        class: "sprite",
+        src: spawn.shiny ? link.species.iconShiny : link.species.icon,
+        alt: "",
+        width: 72,
+        height: 72,
+      }),
+      h(
+        "span",
+        { class: "lineage-name" },
+        `${has ? "✅" : "❔"} ${link.species.name}`,
+        mark ? ` ${mark}` : null
+      ),
+      h("span", { class: "muted small" }, counts || "—")
+    );
+  }
+
+  // ---------------------- Entre deux apparitions ----------------------
+
   function waiting() {
     const last = state.last;
     const species = last ? ctx.species.get(last.speciesId) : null;
@@ -261,11 +414,15 @@ export async function render(ctx) {
         { class: "muted" },
         "Aucun Pokémon dans les parages. Le prochain apparaîtra avec l'activité du salon ",
         "Discord, et cette page le montrera dès son arrivée."
-      )
+      ),
+      wallet()
     );
   }
 
+  // ---------------------- Sur le côté ----------------------
+
   function journal() {
+    if (!state.spawn) return null;
     const { throws, throwCount } = state.spawn;
     return h(
       "section",
@@ -280,7 +437,7 @@ export async function render(ctx) {
               const ball = ctx.balls.get(row.ball);
               return h(
                 "li",
-                {},
+                { class: row.result === "CATCH" ? "throw-won" : null },
                 h("span", { "aria-hidden": "true" }, row.result === "CATCH" ? "✅" : "❌"),
                 row.trainer.avatar
                   ? h("img", { class: "avatar", src: row.trainer.avatar, alt: "" })
@@ -295,6 +452,7 @@ export async function render(ctx) {
   }
 
   function drops() {
+    if (!state.drops.length) return null;
     return h(
       "section",
       { class: "drops" },
@@ -326,7 +484,7 @@ export async function render(ctx) {
                 } catch (error) {
                   toast(error.message, "error");
                 }
-                await Promise.all([refresh({ force: true }), ctx.refreshMe().catch(() => {})]);
+                await refreshAll();
               },
             },
             "Ramasser"

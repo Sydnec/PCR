@@ -7,7 +7,7 @@ se connecter avec son compte Discord ; seuls les membres du serveur entrent.
 
 | Page | Contenu |
 |---|---|
-| **Capture** (accueil) | Le Pokémon qui apparaît dans le salon Discord, en direct : ses chances par ball, ce que tu en as déjà, le journal des lancers. On lui **lance ses balls** comme depuis Discord, et on **ramasse** ce qu'un Pokémon laisse tomber. |
+| **Capture** (accueil) | Le Pokémon qui apparaît dans le salon Discord, en direct, avec ses balls juste en dessous : rareté, types et difficulté en couleur, chances par ball, ton solde et tes balls en poche, et sa lignée avec ce que tu en possèdes (la fiche du bouton « Infos du Pokémon »). Le journal des lancers est sur le côté. On lui **lance ses balls** comme depuis Discord, et on **ramasse** ce qu'un Pokémon laisse tomber. |
 | **Boîte** | Chaque Pokémon avec son numéro, filtrable par espèce, sexe, fertilité et shiny. Sa fiche permet de le **revendre** ou de le **faire évoluer**. |
 | **Pokédex** | Toutes les espèces des générations ouvertes, celles qu'on possède en couleur. La fiche d'une espèce montre sa lignée. |
 | **Sac** | Le solde et les objets. |

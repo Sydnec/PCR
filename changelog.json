@@ -1337,5 +1337,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Onglet Capture remanié",
+      "description": "Sur le site, le Pokémon est au centre avec les balls juste en dessous, rareté, types et difficulté en couleur, ton solde, tes balls et sa lignée ; le journal des lancers passe sur le côté.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-23T12:00:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    }
+  ]
 }
