@@ -1,8 +1,8 @@
-// Membres porteurs du rôle par défaut.
+// Membres porteurs d'un rôle — le rôle par défaut, sauf mention contraire.
 //
-// Trois appelants en ont besoin (/admin points-tous, le pot commun,
-// randomizabaise) et tous tombaient dans le même piège : guild.members.cache
-// n'est pas garanti complet. Sans le fetch préalable, la liste se limite aux
+// Plusieurs appelants en ont besoin (/admin points et /admin item sur un rôle,
+// le pot commun, randomizabaise) et tous tombaient dans le même piège :
+// guild.members.cache n'est pas garanti complet. Sans le fetch préalable, la liste se limite aux
 // membres que Discord a bien voulu envoyer — un tirage ou une distribution
 // n'aurait alors porté que sur une partie du serveur, sans le dire.
 //
@@ -21,7 +21,14 @@ export async function fetchRoleMembers(guild, roleId = process.env.DEFAULT_ROLE_
   if (!guild) return { reason: "Cette action doit se faire depuis un serveur." };
 
   const role = guild.roles.cache.get(roleId);
-  if (!role) return { reason: "`DEFAULT_ROLE_ID` est introuvable sur ce serveur." };
+  if (!role) {
+    return {
+      reason:
+        roleId === process.env.DEFAULT_ROLE_ID
+          ? "`DEFAULT_ROLE_ID` est introuvable sur ce serveur."
+          : "Ce rôle est introuvable sur ce serveur.",
+    };
+  }
 
   await guild.members.fetch();
   const members = [
@@ -32,4 +39,19 @@ export async function fetchRoleMembers(guild, roleId = process.env.DEFAULT_ROLE_
   if (!members.length) return { role, reason: `Personne ne porte le rôle **${role.name}**.` };
 
   return { role, members };
+}
+
+// La cible d'une commande d'administration qui sert un dresseur ou tout un rôle
+// d'un coup. Une seule option « mentionnable » plutôt qu'une commande par cas :
+// /admin points et /admin points-tous étaient deux portes pour le même geste,
+// et chaque nouvelle distribution aurait réclamé sa jumelle « -tous ».
+//
+// Rend { user } pour un dresseur, { role, members } pour un rôle — bots exclus,
+// comme partout —, ou { reason } si la distribution ne peut pas se faire.
+// @everyone est un rôle comme un autre : il sert tout le serveur.
+export async function resolveTarget(interaction, optionName = "cible") {
+  const option = interaction.options.get(optionName, true);
+  if (option.role) return fetchRoleMembers(interaction.guild, option.role.id);
+  if (option.user) return { user: option.user };
+  return { reason: "Cible introuvable : choisis un membre ou un rôle." };
 }

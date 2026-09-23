@@ -2,8 +2,8 @@
 
 # 🎯 Capture & Pokédex
 
-- **Spawns automatiques** : un Pokémon de 1ʳᵉ génération apparaît dans un salon dédié, un seul à la
-  fois. Dès que le salon est vide — le précédent ayant été capturé ou s'étant enfui — le **message
+- **Spawns automatiques** : un Pokémon des générations ouvertes (voir
+  [Générations](README.md#générations)) apparaît dans un salon dédié, un seul à la fois. Dès que le salon est vide — le précédent ayant été capturé ou s'étant enfui — le **message
   suivant** en fait apparaître un nouveau. Tant qu'un Pokémon est là, ce sont le seuil de messages et
   le délai minimum (~40 messages et 1 h) qui décident du moment où il s'enfuit, remplacé par le
   suivant. Un délai plancher après capture est disponible (`minDelayAfterEndMinutes`, à 0 par défaut)

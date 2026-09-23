@@ -1,6 +1,6 @@
 {
-  "generation": 1,
-  "generatedAt": "2026-09-03",
+  "maxGeneration": 2,
+  "generatedAt": "2026-09-23",
   "source": "PokéAPI CSV dataset (github.com/PokeAPI/pokeapi, data/v2/csv)",
   "species": [
     {
@@ -12,6 +12,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Plante",
@@ -33,6 +34,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Plante",
@@ -54,6 +56,7 @@
       "stage": 3,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Plante",
@@ -73,6 +76,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Feu"
@@ -93,6 +97,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Feu"
@@ -113,6 +118,7 @@
       "stage": 3,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Feu",
@@ -132,6 +138,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Eau"
@@ -152,6 +159,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Eau"
@@ -172,6 +180,7 @@
       "stage": 3,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Eau"
@@ -190,6 +199,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Insecte"
@@ -210,6 +220,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Insecte"
@@ -230,6 +241,7 @@
       "stage": 3,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Insecte",
@@ -249,6 +261,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Insecte",
@@ -270,6 +283,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Insecte",
@@ -291,6 +305,7 @@
       "stage": 3,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Insecte",
@@ -310,6 +325,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Normal",
@@ -331,6 +347,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Normal",
@@ -352,6 +369,7 @@
       "stage": 3,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Normal",
@@ -371,6 +389,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Normal"
@@ -391,6 +410,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Normal"
@@ -409,6 +429,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Normal",
@@ -430,6 +451,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Normal",
@@ -449,6 +471,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Poison"
@@ -469,6 +492,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Poison"
@@ -487,11 +511,12 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Électrik"
       ],
-      "evolvesFrom": null,
+      "evolvesFrom": 172,
       "evolvesInto": [
         26
       ],
@@ -507,6 +532,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Électrik"
@@ -525,6 +551,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Sol"
@@ -545,6 +572,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Sol"
@@ -563,6 +591,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Poison"
@@ -583,6 +612,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Poison"
@@ -603,6 +633,7 @@
       "stage": 3,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Poison",
@@ -622,6 +653,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Poison"
@@ -642,6 +674,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Poison"
@@ -662,6 +695,7 @@
       "stage": 3,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Poison",
@@ -681,11 +715,12 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Fée"
       ],
-      "evolvesFrom": null,
+      "evolvesFrom": 173,
       "evolvesInto": [
         36
       ],
@@ -701,6 +736,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Fée"
@@ -719,6 +755,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Feu"
@@ -739,6 +776,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Feu"
@@ -757,12 +795,13 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Normal",
         "Fée"
       ],
-      "evolvesFrom": null,
+      "evolvesFrom": 174,
       "evolvesInto": [
         40
       ],
@@ -778,6 +817,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Normal",
@@ -797,6 +837,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Poison",
@@ -818,13 +859,16 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Poison",
         "Vol"
       ],
       "evolvesFrom": 41,
-      "evolvesInto": [],
+      "evolvesInto": [
+        169
+      ],
       "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/42.png",
       "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/42.png"
     },
@@ -837,6 +881,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Plante",
@@ -858,6 +903,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Plante",
@@ -865,7 +911,8 @@
       ],
       "evolvesFrom": 43,
       "evolvesInto": [
-        45
+        45,
+        182
       ],
       "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/44.png",
       "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/44.png"
@@ -879,6 +926,7 @@
       "stage": 3,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Plante",
@@ -898,6 +946,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Insecte",
@@ -919,6 +968,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Insecte",
@@ -938,6 +988,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Insecte",
@@ -959,6 +1010,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Insecte",
@@ -978,6 +1030,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Sol"
@@ -998,6 +1051,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Sol"
@@ -1016,6 +1070,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Normal"
@@ -1036,6 +1091,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Normal"
@@ -1054,6 +1110,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Eau"
@@ -1074,6 +1131,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Eau"
@@ -1092,6 +1150,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Combat"
@@ -1112,6 +1171,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Combat"
@@ -1130,6 +1190,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Feu"
@@ -1150,6 +1211,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Feu"
@@ -1168,6 +1230,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Eau"
@@ -1188,13 +1251,15 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Eau"
       ],
       "evolvesFrom": 60,
       "evolvesInto": [
-        62
+        62,
+        186
       ],
       "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/61.png",
       "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/61.png"
@@ -1208,6 +1273,7 @@
       "stage": 3,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Eau",
@@ -1227,6 +1293,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Psy"
@@ -1247,6 +1314,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Psy"
@@ -1267,6 +1335,7 @@
       "stage": 3,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": true,
       "types": [
         "Psy"
@@ -1285,6 +1354,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Combat"
@@ -1305,6 +1375,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Combat"
@@ -1325,6 +1396,7 @@
       "stage": 3,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": true,
       "types": [
         "Combat"
@@ -1343,6 +1415,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Plante",
@@ -1364,6 +1437,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Plante",
@@ -1385,6 +1459,7 @@
       "stage": 3,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Plante",
@@ -1404,6 +1479,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Eau",
@@ -1425,6 +1501,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Eau",
@@ -1444,6 +1521,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Roche",
@@ -1465,6 +1543,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Roche",
@@ -1486,6 +1565,7 @@
       "stage": 3,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": true,
       "types": [
         "Roche",
@@ -1505,6 +1585,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Feu"
@@ -1525,6 +1606,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Feu"
@@ -1543,6 +1625,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Eau",
@@ -1550,7 +1633,8 @@
       ],
       "evolvesFrom": null,
       "evolvesInto": [
-        80
+        80,
+        199
       ],
       "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/79.png",
       "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/79.png"
@@ -1564,6 +1648,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Eau",
@@ -1583,6 +1668,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Électrik",
@@ -1604,6 +1690,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Électrik",
@@ -1623,6 +1710,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Normal",
@@ -1642,6 +1730,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Normal",
@@ -1663,6 +1752,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Normal",
@@ -1682,6 +1772,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Eau"
@@ -1702,6 +1793,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Eau",
@@ -1721,6 +1813,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Poison"
@@ -1741,6 +1834,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Poison"
@@ -1759,6 +1853,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Eau"
@@ -1779,6 +1874,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Eau",
@@ -1798,6 +1894,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Spectre",
@@ -1819,6 +1916,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Spectre",
@@ -1840,6 +1938,7 @@
       "stage": 3,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": true,
       "types": [
         "Spectre",
@@ -1859,13 +1958,16 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Roche",
         "Sol"
       ],
       "evolvesFrom": null,
-      "evolvesInto": [],
+      "evolvesInto": [
+        208
+      ],
       "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/95.png",
       "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/95.png"
     },
@@ -1878,6 +1980,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Psy"
@@ -1898,6 +2001,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Psy"
@@ -1916,6 +2020,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Eau"
@@ -1936,6 +2041,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Eau"
@@ -1954,6 +2060,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Électrik"
@@ -1974,6 +2081,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Électrik"
@@ -1992,6 +2100,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Plante",
@@ -2013,6 +2122,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Plante",
@@ -2032,6 +2142,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Sol"
@@ -2052,6 +2163,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Sol"
@@ -2070,11 +2182,12 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Combat"
       ],
-      "evolvesFrom": null,
+      "evolvesFrom": 236,
       "evolvesInto": [],
       "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/106.png",
       "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/106.png"
@@ -2088,11 +2201,12 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Combat"
       ],
-      "evolvesFrom": null,
+      "evolvesFrom": 236,
       "evolvesInto": [],
       "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/107.png",
       "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/107.png"
@@ -2106,6 +2220,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Normal"
@@ -2124,6 +2239,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Poison"
@@ -2144,6 +2260,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Poison"
@@ -2162,6 +2279,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Sol",
@@ -2183,6 +2301,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Sol",
@@ -2202,12 +2321,15 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Normal"
       ],
       "evolvesFrom": null,
-      "evolvesInto": [],
+      "evolvesInto": [
+        242
+      ],
       "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/113.png",
       "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/113.png"
     },
@@ -2220,6 +2342,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Plante"
@@ -2238,6 +2361,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Normal"
@@ -2256,6 +2380,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Eau"
@@ -2276,12 +2401,15 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Eau"
       ],
       "evolvesFrom": 116,
-      "evolvesInto": [],
+      "evolvesInto": [
+        230
+      ],
       "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/117.png",
       "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/117.png"
     },
@@ -2294,6 +2422,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Eau"
@@ -2314,6 +2443,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Eau"
@@ -2332,6 +2462,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Eau"
@@ -2352,6 +2483,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Eau",
@@ -2371,6 +2503,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Psy",
@@ -2390,13 +2523,16 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Insecte",
         "Vol"
       ],
       "evolvesFrom": null,
-      "evolvesInto": [],
+      "evolvesInto": [
+        212
+      ],
       "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/123.png",
       "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/123.png"
     },
@@ -2409,12 +2545,13 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Glace",
         "Psy"
       ],
-      "evolvesFrom": null,
+      "evolvesFrom": 238,
       "evolvesInto": [],
       "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/124.png",
       "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/124.png"
@@ -2428,11 +2565,12 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Électrik"
       ],
-      "evolvesFrom": null,
+      "evolvesFrom": 239,
       "evolvesInto": [],
       "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/125.png",
       "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/125.png"
@@ -2446,11 +2584,12 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Feu"
       ],
-      "evolvesFrom": null,
+      "evolvesFrom": 240,
       "evolvesInto": [],
       "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/126.png",
       "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/126.png"
@@ -2464,6 +2603,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Insecte"
@@ -2482,6 +2622,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Normal"
@@ -2500,6 +2641,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Eau"
@@ -2520,6 +2662,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Eau",
@@ -2539,6 +2682,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Eau",
@@ -2558,6 +2702,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Normal"
@@ -2576,6 +2721,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Normal"
@@ -2584,7 +2730,9 @@
       "evolvesInto": [
         134,
         135,
-        136
+        136,
+        196,
+        197
       ],
       "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/133.png",
       "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/133.png"
@@ -2598,6 +2746,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Eau"
@@ -2616,6 +2765,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Électrik"
@@ -2634,6 +2784,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Feu"
@@ -2652,12 +2803,15 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Normal"
       ],
       "evolvesFrom": null,
-      "evolvesInto": [],
+      "evolvesInto": [
+        233
+      ],
       "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/137.png",
       "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/137.png"
     },
@@ -2670,6 +2824,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Roche",
@@ -2691,6 +2846,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Roche",
@@ -2710,6 +2866,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Roche",
@@ -2731,6 +2888,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Roche",
@@ -2750,6 +2908,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Roche",
@@ -2769,6 +2928,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Normal"
@@ -2787,6 +2947,7 @@
       "stage": 1,
       "isLegendary": true,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Glace",
@@ -2806,6 +2967,7 @@
       "stage": 1,
       "isLegendary": true,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Électrik",
@@ -2825,6 +2987,7 @@
       "stage": 1,
       "isLegendary": true,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Feu",
@@ -2844,6 +3007,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Dragon"
@@ -2864,6 +3028,7 @@
       "stage": 2,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Dragon"
@@ -2884,6 +3049,7 @@
       "stage": 3,
       "isLegendary": false,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Dragon",
@@ -2903,6 +3069,7 @@
       "stage": 1,
       "isLegendary": true,
       "isMythical": false,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Psy"
@@ -2921,6 +3088,7 @@
       "stage": 1,
       "isLegendary": false,
       "isMythical": true,
+      "isBaby": false,
       "tradeEvolution": false,
       "types": [
         "Psy"
@@ -2929,6 +3097,2031 @@
       "evolvesInto": [],
       "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/151.png",
       "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/151.png"
+    },
+    {
+      "id": 152,
+      "name": "Germignon",
+      "slug": "chikorita",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Plante"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        153
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/152.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/152.png"
+    },
+    {
+      "id": 153,
+      "name": "Macronium",
+      "slug": "bayleef",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Plante"
+      ],
+      "evolvesFrom": 152,
+      "evolvesInto": [
+        154
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/153.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/153.png"
+    },
+    {
+      "id": 154,
+      "name": "Méganium",
+      "slug": "meganium",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 3,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Plante"
+      ],
+      "evolvesFrom": 153,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/154.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/154.png"
+    },
+    {
+      "id": 155,
+      "name": "Héricendre",
+      "slug": "cyndaquil",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Feu"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        156
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/155.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/155.png"
+    },
+    {
+      "id": 156,
+      "name": "Feurisson",
+      "slug": "quilava",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Feu"
+      ],
+      "evolvesFrom": 155,
+      "evolvesInto": [
+        157
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/156.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/156.png"
+    },
+    {
+      "id": 157,
+      "name": "Typhlosion",
+      "slug": "typhlosion",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 3,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Feu"
+      ],
+      "evolvesFrom": 156,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/157.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/157.png"
+    },
+    {
+      "id": 158,
+      "name": "Kaiminus",
+      "slug": "totodile",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Eau"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        159
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/158.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/158.png"
+    },
+    {
+      "id": 159,
+      "name": "Crocrodil",
+      "slug": "croconaw",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Eau"
+      ],
+      "evolvesFrom": 158,
+      "evolvesInto": [
+        160
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/159.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/159.png"
+    },
+    {
+      "id": 160,
+      "name": "Aligatueur",
+      "slug": "feraligatr",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 3,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Eau"
+      ],
+      "evolvesFrom": 159,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/160.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/160.png"
+    },
+    {
+      "id": 161,
+      "name": "Fouinette",
+      "slug": "sentret",
+      "generation": 2,
+      "catchRate": 255,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Normal"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        162
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/161.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/161.png"
+    },
+    {
+      "id": 162,
+      "name": "Fouinar",
+      "slug": "furret",
+      "generation": 2,
+      "catchRate": 90,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Normal"
+      ],
+      "evolvesFrom": 161,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/162.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/162.png"
+    },
+    {
+      "id": 163,
+      "name": "Hoothoot",
+      "slug": "hoothoot",
+      "generation": 2,
+      "catchRate": 255,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Normal",
+        "Vol"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        164
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/163.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/163.png"
+    },
+    {
+      "id": 164,
+      "name": "Noarfang",
+      "slug": "noctowl",
+      "generation": 2,
+      "catchRate": 90,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Normal",
+        "Vol"
+      ],
+      "evolvesFrom": 163,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/164.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/164.png"
+    },
+    {
+      "id": 165,
+      "name": "Coxy",
+      "slug": "ledyba",
+      "generation": 2,
+      "catchRate": 255,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Insecte",
+        "Vol"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        166
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/165.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/165.png"
+    },
+    {
+      "id": 166,
+      "name": "Coxyclaque",
+      "slug": "ledian",
+      "generation": 2,
+      "catchRate": 90,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Insecte",
+        "Vol"
+      ],
+      "evolvesFrom": 165,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/166.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/166.png"
+    },
+    {
+      "id": 167,
+      "name": "Mimigal",
+      "slug": "spinarak",
+      "generation": 2,
+      "catchRate": 255,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Insecte",
+        "Poison"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        168
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/167.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/167.png"
+    },
+    {
+      "id": 168,
+      "name": "Migalos",
+      "slug": "ariados",
+      "generation": 2,
+      "catchRate": 90,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Insecte",
+        "Poison"
+      ],
+      "evolvesFrom": 167,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/168.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/168.png"
+    },
+    {
+      "id": 169,
+      "name": "Nostenfer",
+      "slug": "crobat",
+      "generation": 2,
+      "catchRate": 90,
+      "stage": 3,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Poison",
+        "Vol"
+      ],
+      "evolvesFrom": 42,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/169.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/169.png"
+    },
+    {
+      "id": 170,
+      "name": "Loupio",
+      "slug": "chinchou",
+      "generation": 2,
+      "catchRate": 190,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Eau",
+        "Électrik"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        171
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/170.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/170.png"
+    },
+    {
+      "id": 171,
+      "name": "Lanturn",
+      "slug": "lanturn",
+      "generation": 2,
+      "catchRate": 75,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Eau",
+        "Électrik"
+      ],
+      "evolvesFrom": 170,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/171.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/171.png"
+    },
+    {
+      "id": 172,
+      "name": "Pichu",
+      "slug": "pichu",
+      "generation": 2,
+      "catchRate": 190,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": true,
+      "tradeEvolution": false,
+      "types": [
+        "Électrik"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        25
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/172.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/172.png"
+    },
+    {
+      "id": 173,
+      "name": "Mélo",
+      "slug": "cleffa",
+      "generation": 2,
+      "catchRate": 150,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": true,
+      "tradeEvolution": false,
+      "types": [
+        "Fée"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        35
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/173.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/173.png"
+    },
+    {
+      "id": 174,
+      "name": "Toudoudou",
+      "slug": "igglybuff",
+      "generation": 2,
+      "catchRate": 170,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": true,
+      "tradeEvolution": false,
+      "types": [
+        "Normal",
+        "Fée"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        39
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/174.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/174.png"
+    },
+    {
+      "id": 175,
+      "name": "Togepi",
+      "slug": "togepi",
+      "generation": 2,
+      "catchRate": 190,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": true,
+      "tradeEvolution": false,
+      "types": [
+        "Fée"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        176
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/175.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/175.png"
+    },
+    {
+      "id": 176,
+      "name": "Togetic",
+      "slug": "togetic",
+      "generation": 2,
+      "catchRate": 75,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Fée",
+        "Vol"
+      ],
+      "evolvesFrom": 175,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/176.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/176.png"
+    },
+    {
+      "id": 177,
+      "name": "Natu",
+      "slug": "natu",
+      "generation": 2,
+      "catchRate": 190,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Psy",
+        "Vol"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        178
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/177.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/177.png"
+    },
+    {
+      "id": 178,
+      "name": "Xatu",
+      "slug": "xatu",
+      "generation": 2,
+      "catchRate": 75,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Psy",
+        "Vol"
+      ],
+      "evolvesFrom": 177,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/178.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/178.png"
+    },
+    {
+      "id": 179,
+      "name": "Wattouat",
+      "slug": "mareep",
+      "generation": 2,
+      "catchRate": 235,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Électrik"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        180
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/179.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/179.png"
+    },
+    {
+      "id": 180,
+      "name": "Lainergie",
+      "slug": "flaaffy",
+      "generation": 2,
+      "catchRate": 120,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Électrik"
+      ],
+      "evolvesFrom": 179,
+      "evolvesInto": [
+        181
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/180.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/180.png"
+    },
+    {
+      "id": 181,
+      "name": "Pharamp",
+      "slug": "ampharos",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 3,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Électrik"
+      ],
+      "evolvesFrom": 180,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/181.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/181.png"
+    },
+    {
+      "id": 182,
+      "name": "Joliflor",
+      "slug": "bellossom",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 3,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Plante"
+      ],
+      "evolvesFrom": 44,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/182.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/182.png"
+    },
+    {
+      "id": 183,
+      "name": "Marill",
+      "slug": "marill",
+      "generation": 2,
+      "catchRate": 190,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Eau",
+        "Fée"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        184
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/183.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/183.png"
+    },
+    {
+      "id": 184,
+      "name": "Azumarill",
+      "slug": "azumarill",
+      "generation": 2,
+      "catchRate": 75,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Eau",
+        "Fée"
+      ],
+      "evolvesFrom": 183,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/184.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/184.png"
+    },
+    {
+      "id": 185,
+      "name": "Simularbre",
+      "slug": "sudowoodo",
+      "generation": 2,
+      "catchRate": 65,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Roche"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/185.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/185.png"
+    },
+    {
+      "id": 186,
+      "name": "Tarpaud",
+      "slug": "politoed",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 3,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": true,
+      "types": [
+        "Eau"
+      ],
+      "evolvesFrom": 61,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/186.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/186.png"
+    },
+    {
+      "id": 187,
+      "name": "Granivol",
+      "slug": "hoppip",
+      "generation": 2,
+      "catchRate": 255,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Plante",
+        "Vol"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        188
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/187.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/187.png"
+    },
+    {
+      "id": 188,
+      "name": "Floravol",
+      "slug": "skiploom",
+      "generation": 2,
+      "catchRate": 120,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Plante",
+        "Vol"
+      ],
+      "evolvesFrom": 187,
+      "evolvesInto": [
+        189
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/188.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/188.png"
+    },
+    {
+      "id": 189,
+      "name": "Cotovol",
+      "slug": "jumpluff",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 3,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Plante",
+        "Vol"
+      ],
+      "evolvesFrom": 188,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/189.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/189.png"
+    },
+    {
+      "id": 190,
+      "name": "Capumain",
+      "slug": "aipom",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Normal"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/190.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/190.png"
+    },
+    {
+      "id": 191,
+      "name": "Tournegrin",
+      "slug": "sunkern",
+      "generation": 2,
+      "catchRate": 235,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Plante"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        192
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/191.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/191.png"
+    },
+    {
+      "id": 192,
+      "name": "Héliatronc",
+      "slug": "sunflora",
+      "generation": 2,
+      "catchRate": 120,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Plante"
+      ],
+      "evolvesFrom": 191,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/192.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/192.png"
+    },
+    {
+      "id": 193,
+      "name": "Yanma",
+      "slug": "yanma",
+      "generation": 2,
+      "catchRate": 75,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Insecte",
+        "Vol"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/193.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/193.png"
+    },
+    {
+      "id": 194,
+      "name": "Axoloto",
+      "slug": "wooper",
+      "generation": 2,
+      "catchRate": 255,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Eau",
+        "Sol"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        195
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/194.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/194.png"
+    },
+    {
+      "id": 195,
+      "name": "Maraiste",
+      "slug": "quagsire",
+      "generation": 2,
+      "catchRate": 90,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Eau",
+        "Sol"
+      ],
+      "evolvesFrom": 194,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/195.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/195.png"
+    },
+    {
+      "id": 196,
+      "name": "Mentali",
+      "slug": "espeon",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Psy"
+      ],
+      "evolvesFrom": 133,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/196.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/196.png"
+    },
+    {
+      "id": 197,
+      "name": "Noctali",
+      "slug": "umbreon",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Ténèbres"
+      ],
+      "evolvesFrom": 133,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/197.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/197.png"
+    },
+    {
+      "id": 198,
+      "name": "Cornèbre",
+      "slug": "murkrow",
+      "generation": 2,
+      "catchRate": 30,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Ténèbres",
+        "Vol"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/198.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/198.png"
+    },
+    {
+      "id": 199,
+      "name": "Roigada",
+      "slug": "slowking",
+      "generation": 2,
+      "catchRate": 70,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": true,
+      "types": [
+        "Eau",
+        "Psy"
+      ],
+      "evolvesFrom": 79,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/199.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/199.png"
+    },
+    {
+      "id": 200,
+      "name": "Feuforêve",
+      "slug": "misdreavus",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Spectre"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/200.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/200.png"
+    },
+    {
+      "id": 201,
+      "name": "Zarbi",
+      "slug": "unown",
+      "generation": 2,
+      "catchRate": 225,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Psy"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/201.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/201.png"
+    },
+    {
+      "id": 202,
+      "name": "Qulbutoké",
+      "slug": "wobbuffet",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Psy"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/202.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/202.png"
+    },
+    {
+      "id": 203,
+      "name": "Girafarig",
+      "slug": "girafarig",
+      "generation": 2,
+      "catchRate": 60,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Normal",
+        "Psy"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/203.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/203.png"
+    },
+    {
+      "id": 204,
+      "name": "Pomdepik",
+      "slug": "pineco",
+      "generation": 2,
+      "catchRate": 190,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Insecte"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        205
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/204.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/204.png"
+    },
+    {
+      "id": 205,
+      "name": "Foretress",
+      "slug": "forretress",
+      "generation": 2,
+      "catchRate": 75,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Insecte",
+        "Acier"
+      ],
+      "evolvesFrom": 204,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/205.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/205.png"
+    },
+    {
+      "id": 206,
+      "name": "Insolourdo",
+      "slug": "dunsparce",
+      "generation": 2,
+      "catchRate": 190,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Normal"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/206.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/206.png"
+    },
+    {
+      "id": 207,
+      "name": "Scorplane",
+      "slug": "gligar",
+      "generation": 2,
+      "catchRate": 60,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Sol",
+        "Vol"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/207.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/207.png"
+    },
+    {
+      "id": 208,
+      "name": "Steelix",
+      "slug": "steelix",
+      "generation": 2,
+      "catchRate": 25,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": true,
+      "types": [
+        "Acier",
+        "Sol"
+      ],
+      "evolvesFrom": 95,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/208.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/208.png"
+    },
+    {
+      "id": 209,
+      "name": "Snubbull",
+      "slug": "snubbull",
+      "generation": 2,
+      "catchRate": 190,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Fée"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        210
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/209.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/209.png"
+    },
+    {
+      "id": 210,
+      "name": "Granbull",
+      "slug": "granbull",
+      "generation": 2,
+      "catchRate": 75,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Fée"
+      ],
+      "evolvesFrom": 209,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/210.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/210.png"
+    },
+    {
+      "id": 211,
+      "name": "Qwilfish",
+      "slug": "qwilfish",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Eau",
+        "Poison"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/211.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/211.png"
+    },
+    {
+      "id": 212,
+      "name": "Cizayox",
+      "slug": "scizor",
+      "generation": 2,
+      "catchRate": 25,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": true,
+      "types": [
+        "Insecte",
+        "Acier"
+      ],
+      "evolvesFrom": 123,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/212.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/212.png"
+    },
+    {
+      "id": 213,
+      "name": "Caratroc",
+      "slug": "shuckle",
+      "generation": 2,
+      "catchRate": 190,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Insecte",
+        "Roche"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/213.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/213.png"
+    },
+    {
+      "id": 214,
+      "name": "Scarhino",
+      "slug": "heracross",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Insecte",
+        "Combat"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/214.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/214.png"
+    },
+    {
+      "id": 215,
+      "name": "Farfuret",
+      "slug": "sneasel",
+      "generation": 2,
+      "catchRate": 60,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Ténèbres",
+        "Glace"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/215.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/215.png"
+    },
+    {
+      "id": 216,
+      "name": "Teddiursa",
+      "slug": "teddiursa",
+      "generation": 2,
+      "catchRate": 120,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Normal"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        217
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/216.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/216.png"
+    },
+    {
+      "id": 217,
+      "name": "Ursaring",
+      "slug": "ursaring",
+      "generation": 2,
+      "catchRate": 60,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Normal"
+      ],
+      "evolvesFrom": 216,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/217.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/217.png"
+    },
+    {
+      "id": 218,
+      "name": "Limagma",
+      "slug": "slugma",
+      "generation": 2,
+      "catchRate": 190,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Feu"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        219
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/218.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/218.png"
+    },
+    {
+      "id": 219,
+      "name": "Volcaropod",
+      "slug": "magcargo",
+      "generation": 2,
+      "catchRate": 75,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Feu",
+        "Roche"
+      ],
+      "evolvesFrom": 218,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/219.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/219.png"
+    },
+    {
+      "id": 220,
+      "name": "Marcacrin",
+      "slug": "swinub",
+      "generation": 2,
+      "catchRate": 225,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Glace",
+        "Sol"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        221
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/220.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/220.png"
+    },
+    {
+      "id": 221,
+      "name": "Cochignon",
+      "slug": "piloswine",
+      "generation": 2,
+      "catchRate": 75,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Glace",
+        "Sol"
+      ],
+      "evolvesFrom": 220,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/221.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/221.png"
+    },
+    {
+      "id": 222,
+      "name": "Corayon",
+      "slug": "corsola",
+      "generation": 2,
+      "catchRate": 60,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Eau",
+        "Roche"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/222.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/222.png"
+    },
+    {
+      "id": 223,
+      "name": "Rémoraid",
+      "slug": "remoraid",
+      "generation": 2,
+      "catchRate": 190,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Eau"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        224
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/223.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/223.png"
+    },
+    {
+      "id": 224,
+      "name": "Octillery",
+      "slug": "octillery",
+      "generation": 2,
+      "catchRate": 75,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Eau"
+      ],
+      "evolvesFrom": 223,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/224.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/224.png"
+    },
+    {
+      "id": 225,
+      "name": "Cadoizo",
+      "slug": "delibird",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Glace",
+        "Vol"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/225.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/225.png"
+    },
+    {
+      "id": 226,
+      "name": "Démanta",
+      "slug": "mantine",
+      "generation": 2,
+      "catchRate": 25,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Eau",
+        "Vol"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/226.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/226.png"
+    },
+    {
+      "id": 227,
+      "name": "Airmure",
+      "slug": "skarmory",
+      "generation": 2,
+      "catchRate": 25,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Acier",
+        "Vol"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/227.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/227.png"
+    },
+    {
+      "id": 228,
+      "name": "Malosse",
+      "slug": "houndour",
+      "generation": 2,
+      "catchRate": 120,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Ténèbres",
+        "Feu"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        229
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/228.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/228.png"
+    },
+    {
+      "id": 229,
+      "name": "Démolosse",
+      "slug": "houndoom",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Ténèbres",
+        "Feu"
+      ],
+      "evolvesFrom": 228,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/229.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/229.png"
+    },
+    {
+      "id": 230,
+      "name": "Hyporoi",
+      "slug": "kingdra",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 3,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": true,
+      "types": [
+        "Eau",
+        "Dragon"
+      ],
+      "evolvesFrom": 117,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/230.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/230.png"
+    },
+    {
+      "id": 231,
+      "name": "Phanpy",
+      "slug": "phanpy",
+      "generation": 2,
+      "catchRate": 120,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Sol"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        232
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/231.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/231.png"
+    },
+    {
+      "id": 232,
+      "name": "Donphan",
+      "slug": "donphan",
+      "generation": 2,
+      "catchRate": 60,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Sol"
+      ],
+      "evolvesFrom": 231,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/232.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/232.png"
+    },
+    {
+      "id": 233,
+      "name": "Porygon2",
+      "slug": "porygon2",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": true,
+      "types": [
+        "Normal"
+      ],
+      "evolvesFrom": 137,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/233.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/233.png"
+    },
+    {
+      "id": 234,
+      "name": "Cerfrousse",
+      "slug": "stantler",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Normal"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/234.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/234.png"
+    },
+    {
+      "id": 235,
+      "name": "Queulorior",
+      "slug": "smeargle",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Normal"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/235.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/235.png"
+    },
+    {
+      "id": 236,
+      "name": "Debugant",
+      "slug": "tyrogue",
+      "generation": 2,
+      "catchRate": 75,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": true,
+      "tradeEvolution": false,
+      "types": [
+        "Combat"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        106,
+        107,
+        237
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/236.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/236.png"
+    },
+    {
+      "id": 237,
+      "name": "Kapoera",
+      "slug": "hitmontop",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Combat"
+      ],
+      "evolvesFrom": 236,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/237.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/237.png"
+    },
+    {
+      "id": 238,
+      "name": "Lippouti",
+      "slug": "smoochum",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": true,
+      "tradeEvolution": false,
+      "types": [
+        "Glace",
+        "Psy"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        124
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/238.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/238.png"
+    },
+    {
+      "id": 239,
+      "name": "Élekid",
+      "slug": "elekid",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": true,
+      "tradeEvolution": false,
+      "types": [
+        "Électrik"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        125
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/239.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/239.png"
+    },
+    {
+      "id": 240,
+      "name": "Magby",
+      "slug": "magby",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": true,
+      "tradeEvolution": false,
+      "types": [
+        "Feu"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        126
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/240.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/240.png"
+    },
+    {
+      "id": 241,
+      "name": "Écrémeuh",
+      "slug": "miltank",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Normal"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/241.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/241.png"
+    },
+    {
+      "id": 242,
+      "name": "Leuphorie",
+      "slug": "blissey",
+      "generation": 2,
+      "catchRate": 30,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Normal"
+      ],
+      "evolvesFrom": 113,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/242.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/242.png"
+    },
+    {
+      "id": 243,
+      "name": "Raikou",
+      "slug": "raikou",
+      "generation": 2,
+      "catchRate": 3,
+      "stage": 1,
+      "isLegendary": true,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Électrik"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/243.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/243.png"
+    },
+    {
+      "id": 244,
+      "name": "Entei",
+      "slug": "entei",
+      "generation": 2,
+      "catchRate": 3,
+      "stage": 1,
+      "isLegendary": true,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Feu"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/244.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/244.png"
+    },
+    {
+      "id": 245,
+      "name": "Suicune",
+      "slug": "suicune",
+      "generation": 2,
+      "catchRate": 3,
+      "stage": 1,
+      "isLegendary": true,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Eau"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/245.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/245.png"
+    },
+    {
+      "id": 246,
+      "name": "Embrylex",
+      "slug": "larvitar",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Roche",
+        "Sol"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [
+        247
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/246.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/246.png"
+    },
+    {
+      "id": 247,
+      "name": "Ymphect",
+      "slug": "pupitar",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 2,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Roche",
+        "Sol"
+      ],
+      "evolvesFrom": 246,
+      "evolvesInto": [
+        248
+      ],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/247.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/247.png"
+    },
+    {
+      "id": 248,
+      "name": "Tyranocif",
+      "slug": "tyranitar",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 3,
+      "isLegendary": false,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Roche",
+        "Ténèbres"
+      ],
+      "evolvesFrom": 247,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/248.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/248.png"
+    },
+    {
+      "id": 249,
+      "name": "Lugia",
+      "slug": "lugia",
+      "generation": 2,
+      "catchRate": 3,
+      "stage": 1,
+      "isLegendary": true,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Psy",
+        "Vol"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/249.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/249.png"
+    },
+    {
+      "id": 250,
+      "name": "Ho-Oh",
+      "slug": "ho-oh",
+      "generation": 2,
+      "catchRate": 3,
+      "stage": 1,
+      "isLegendary": true,
+      "isMythical": false,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Feu",
+        "Vol"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/250.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/250.png"
+    },
+    {
+      "id": 251,
+      "name": "Celebi",
+      "slug": "celebi",
+      "generation": 2,
+      "catchRate": 45,
+      "stage": 1,
+      "isLegendary": false,
+      "isMythical": true,
+      "isBaby": false,
+      "tradeEvolution": false,
+      "types": [
+        "Psy",
+        "Plante"
+      ],
+      "evolvesFrom": null,
+      "evolvesInto": [],
+      "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/251.png",
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/251.png"
     }
   ]
 }

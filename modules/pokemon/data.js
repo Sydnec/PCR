@@ -3,6 +3,12 @@
 // Le JSON est produit par scripts/generate-pokemon-data.js et commité : rien
 // n'est téléchargé à l'exécution. Il est chargé une seule fois à l'import,
 // contrairement à config.json qui doit rester modifiable à chaud.
+//
+// Il contient plus d'espèces que le jeu n'en montre : toutes celles jusqu'à la
+// dernière génération préparée, alors que seules les générations activées
+// (`pokemon.generation`) sont jouables. Ouvrir une génération n'est donc qu'un
+// réglage, relu à chaque appel comme le reste de la configuration — aucune
+// régénération, aucun redémarrage.
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -11,7 +17,7 @@ import { getPokemonConfig, getSafariConfig } from "./config.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const dataset = JSON.parse(
-  fs.readFileSync(path.join(__dirname, "../pokemon-gen1.json"), "utf8")
+  fs.readFileSync(path.join(__dirname, "../pokemon-data.json"), "utf8")
 );
 
 const byId = new Map(dataset.species.map((s) => [s.id, s]));
@@ -42,10 +48,39 @@ const TYPE_COLORS = {
   "Ténèbres": 0x705848, "Fée": 0xee99ac,
 };
 
-export const allSpecies = () => dataset.species;
-export const dexSize = () => dataset.species.length;
+// La dernière génération jouable. Un réglage au-delà de ce que contient le
+// fichier retombe sur la dernière génération préparée, en deçà sur la première :
+// une faute de frappe ne peut ni vider le Pokédex ni promettre des espèces
+// absentes du jeu de données.
+export function activeGeneration() {
+  const wanted = Math.floor(Number(getPokemonConfig().generation) || 1);
+  return Math.min(dataset.maxGeneration, Math.max(1, wanted));
+}
+
+// `generation` se passe quand on filtre une liste : la configuration est relue
+// sur le disque à chaque accès, et la relire pour chacune des 251 espèces
+// multiplierait d'autant le coût de chaque apparition.
+export const isAvailable = (species, generation = activeGeneration()) =>
+  Boolean(species) && species.generation <= generation;
+
+// Les espèces jouables, dans l'ordre du Pokédex. C'est la porte de tout ce qui
+// énumère — apparitions, recherche, Pokédex, tables de poids — donc aucune
+// espèce d'une génération fermée ne peut s'y glisser.
+export function allSpecies() {
+  const generation = activeGeneration();
+  return dataset.species.filter((species) => isAvailable(species, generation));
+}
+export const dexSize = () => allSpecies().length;
+
+// Lecture brute, sans filtre de génération : une entrée de collection garde son
+// espèce même si l'on referme sa génération, et doit pouvoir s'afficher. Ce qui
+// vient d'une saisie de joueur passe par getAvailableSpecies.
 export const getSpecies = (id) => byId.get(Number(id)) || null;
-export const generation = () => dataset.generation;
+
+export function getAvailableSpecies(id) {
+  const species = getSpecies(id);
+  return isAvailable(species) ? species : null;
+}
 
 export const isLegendary = (species) => species.isLegendary || species.isMythical;
 
@@ -94,7 +129,7 @@ export function isEvolutionOnly(species) {
 export function pickWeightedSpecies(spawnConfig) {
   const pool = [];
   let total = 0;
-  for (const species of dataset.species) {
+  for (const species of allSpecies()) {
     const weight = spawnWeight(species, spawnConfig);
     if (weight > 0) {
       total += weight;
@@ -203,18 +238,24 @@ export function difficultyLabel(catchRate) {
 // Cible d'autocomplétion : jusqu'à `limit` espèces dont le nom contient la requête.
 export function searchByName(query, limit = 25) {
   const needle = normalize(query || "");
-  const matches = needle
-    ? dataset.species.filter((s) => s.searchKey.includes(needle))
-    : dataset.species;
+  const available = allSpecies();
+  const matches = needle ? available.filter((s) => s.searchKey.includes(needle)) : available;
   return matches.slice(0, limit);
 }
 
-export const evolutionTargets = (species) =>
-  species.evolvesInto.map(getSpecies).filter(Boolean);
+// Le jeu de données relie les générations entre elles — Onix évolue en Steelix,
+// Pikachu descend de Pichu — mais une évolution vers une génération fermée
+// n'existe pas encore pour les joueurs : elle serait une porte dérobée vers des
+// espèces qu'on ne peut pas même consulter.
+export function evolutionTargets(species) {
+  const generation = activeGeneration();
+  return species.evolvesInto.map(getSpecies).filter((target) => isAvailable(target, generation));
+}
 
 // La cible d'une évolution par échange, s'il y en a une. Quatre Pokémon de la
 // première génération évoluent en changeant de dresseur : Kadabra, Machopeur,
-// Gravalanch et Spectrum. Le dataset pose le marqueur sur la CIBLE, parce que
+// Gravalanch et Spectrum — six de plus une fois la deuxième ouverte, parmi
+// lesquels Onix et Insécateur. Le dataset pose le marqueur sur la CIBLE, parce que
 // c'est elle qu'on exclut des apparitions — la source se déduit donc en
 // regardant ses évolutions, et jamais par une liste d'identifiants écrite à la
 // main qui divergerait à la première régénération du JSON.
@@ -235,7 +276,7 @@ export function evolutionChain(species) {
   const climbed = new Set([root.id]);
   while (root.evolvesFrom) {
     const parent = getSpecies(root.evolvesFrom);
-    if (!parent || climbed.has(parent.id)) break;
+    if (!isAvailable(parent) || climbed.has(parent.id)) break;
     climbed.add(parent.id);
     root = parent;
   }

@@ -1,6 +1,11 @@
 import { log } from "../../modules/utils.js";
 import { claimForcedSpawn, doSpawn } from "../../modules/pokemon/spawn.js";
-import { getSpecies, searchByName } from "../../modules/pokemon/data.js";
+import {
+  activeGeneration,
+  getAvailableSpecies,
+  getSpecies,
+  searchByName,
+} from "../../modules/pokemon/data.js";
 
 export default {
   describe: (sub) =>
@@ -58,10 +63,16 @@ export default {
     }
 
     const speciesOption = interaction.options.getString("espece");
-    const species = speciesOption ? getSpecies(speciesOption) : null;
+    // Une saisie tapée à la main peut viser une génération encore fermée : un
+    // événement ne doit pas servir à l'ouvrir en douce.
+    const species = speciesOption ? getAvailableSpecies(speciesOption) : null;
     if (speciesOption && !species) {
+      const hidden = getSpecies(speciesOption);
       return interaction.editReply({
-        content: "❌ Espèce inconnue.",
+        content: hidden
+          ? `❌ **${hidden.name}** est de génération ${hidden.generation}, et le jeu ` +
+            `s'arrête pour l'instant à la génération ${activeGeneration()}.`
+          : "❌ Espèce inconnue.",
       });
     }
 
