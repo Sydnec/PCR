@@ -568,7 +568,8 @@ function resolveAction({ session, species, action, config }, cb) {
     return done("MISS");
   }
 
-  creditSpecies(session.user_id, species.id, isShiny, (err) => {
+  const options = { ball: "safari", origin: "safari" };
+  creditSpecies(session.user_id, species.id, isShiny, options, (err) => {
     if (err) return cb(err);
     recordSafariCatch({ userId: session.user_id, species, isShiny });
     log(

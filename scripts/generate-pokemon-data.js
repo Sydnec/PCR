@@ -214,6 +214,10 @@ async function main() {
         isLegendary: row.is_legendary === "1",
         isMythical: row.is_mythical === "1",
         isBaby: isBaby(id),
+        // Part de femelles, en huitièmes (0 : toujours mâle, 8 : toujours
+        // femelle), ou -1 pour les espèces asexuées des jeux. Le bot donne un
+        // sexe à TOUS les Pokémon : les asexuées tirent à pile ou face.
+        genderRate: Number(row.gender_rate),
         tradeEvolution: tradeEvolutions.has(id),
         types: (typesBySpecies.get(id) || []).filter(Boolean),
         evolvesFrom: previous !== null && inGeneration(previous) ? previous : null,

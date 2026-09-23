@@ -3,8 +3,9 @@
 # 🎯 Capture & Pokédex
 
 - **Spawns automatiques** : un Pokémon des générations ouvertes (voir
-  [Générations](README.md#générations)) apparaît dans un salon dédié, un seul à la fois. Dès que le salon est vide — le précédent ayant été capturé ou s'étant enfui — le **message
-  suivant** en fait apparaître un nouveau. Tant qu'un Pokémon est là, ce sont le seuil de messages et
+  [Générations](README.md#générations)) apparaît dans un salon dédié, un seul à la fois. Dès que le
+  salon est vide — le précédent ayant été capturé ou s'étant enfui — le **message suivant** en fait
+  apparaître un nouveau. Tant qu'un Pokémon est là, ce sont le seuil de messages et
   le délai minimum (~40 messages et 1 h) qui décident du moment où il s'enfuit, remplacé par le
   suivant. Un délai plancher après capture est disponible (`minDelayAfterEndMinutes`, à 0 par défaut)
   si l'enchaînement devient trop rapide.
@@ -24,6 +25,8 @@
   avec confirmation obligatoire). Les probabilités suivent la formule officielle de la génération 3,
   à partir du taux de capture réel de chaque espèce.
 - **Shiny** (~1/500) comptant comme une entrée de Pokédex distincte.
+- **Chaque capture est un individu** : son sexe est tiré selon l'espèce, et la ball qui l'a emporté
+  reste attachée à lui (voir [Individus](individus.md)).
 - **🔒 Espèces hors pool** : celles dont le poids d'apparition est nul dans le pool sauvage **et**
   dans celui du parc ne peuvent s'obtenir que par fusion. Le Pokédex et les fiches les marquent d'un
   cadenas, sans quoi on peut chasser des mois un Mackogneur qui n'apparaîtra pas. Le marqueur est

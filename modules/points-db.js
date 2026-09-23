@@ -270,10 +270,10 @@ const db = new sqlite3.Database(dbPath, (err) => {
       }
     );
 
-    // Collection. is_shiny fait partie de la clé : un shiny est une entrée de
-    // Pokédex distincte. Une ligne peut retomber à count = 0 après une fusion
-    // ou un échange ; on la garde pour préserver first_caught_at, donc TOUTE
-    // lecture doit filtrer sur count > 0.
+    // Ancienne collection : un compteur par espèce. Elle n'est plus ni lue ni
+    // écrite par le jeu — pokemon_owned l'a remplacée — et ne sert qu'une fois,
+    // de source à la migration vers les individus. Gardée telle quelle : c'est
+    // la sauvegarde de ce que chacun possédait avant la migration.
     db.run(
       `CREATE TABLE IF NOT EXISTS pokemon_collection (
         user_id TEXT NOT NULL,
@@ -290,6 +290,80 @@ const db = new sqlite3.Database(dbPath, (err) => {
           "CREATE INDEX IF NOT EXISTS idx_pokemon_collection_user ON pokemon_collection(user_id)",
           (err) => {
             if (err) handleException("Erreur création index pokemon_collection_user :", err);
+          }
+        );
+      }
+    );
+
+    // Les Pokémon eux-mêmes, un par ligne. Un compteur par espèce ne savait pas
+    // dire qu'un Pikachu est une femelle, qu'il a été pris à l'Hyper Ball, ni
+    // qu'il a déjà pondu : tout ce qui distingue deux individus vit ici.
+    //
+    // - `ball` : la ball de capture (clé de la config, ou « safari »), NULL
+    //   quand il n'y en a pas eu — éclos d'un œuf — ou qu'on ne la sait plus.
+    // - `origin` : comment le dresseur actuel l'a obtenu (capture, safari,
+    //   evolution, echange, oeuf, migration).
+    // - `sterile` : un individu ne pond qu'un œuf dans sa vie.
+    // - `obtained_at` : depuis quand ce dresseur le possède. Le plus ancien de
+    //   chaque entrée de Pokédex (espèce + variante) est celui qu'on garde :
+    //   aucune revente, fusion ni échange ne peut le prendre.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_owned (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        species_id INTEGER NOT NULL,
+        is_shiny INTEGER NOT NULL DEFAULT 0,
+        sex TEXT NOT NULL CHECK (sex IN ('M', 'F')),
+        ball TEXT,
+        origin TEXT NOT NULL,
+        sterile INTEGER NOT NULL DEFAULT 0,
+        obtained_at INTEGER NOT NULL
+      )`,
+      (err) => {
+        if (err) return handleException("Erreur création table pokemon_owned :", err);
+        db.run(
+          `CREATE INDEX IF NOT EXISTS idx_pokemon_owned_entry
+             ON pokemon_owned(user_id, species_id, is_shiny)`,
+          (err) => {
+            if (err) handleException("Erreur création index pokemon_owned_entry :", err);
+            // La migration part d'ici, une fois la table là. Import dynamique :
+            // elle a besoin de cette base, qui ne peut pas l'importer en tête
+            // sans cycle.
+            import("./pokemon/migration.js")
+              .then(({ migrateCollection }) => migrateCollection())
+              .catch((error) => handleException("Migration de la collection :", error));
+          }
+        );
+      }
+    );
+
+    // Œufs. Un seul en couvaison par dresseur, garanti en base comme la session
+    // de safari. Le seuil de messages et l'échéance sont figés à la ponte :
+    // retoucher la configuration ne doit pas changer la règle d'un œuf déjà pondu.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_eggs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        species_id INTEGER NOT NULL,
+        father_id INTEGER,
+        mother_id INTEGER,
+        father_species_id INTEGER NOT NULL,
+        mother_species_id INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'INCUBATING',
+        messages INTEGER NOT NULL DEFAULT 0,
+        hatch_messages INTEGER NOT NULL,
+        laid_at INTEGER NOT NULL,
+        hatch_at INTEGER NOT NULL,
+        hatched_at INTEGER,
+        pokemon_id INTEGER
+      )`,
+      (err) => {
+        if (err) return handleException("Erreur création table pokemon_eggs :", err);
+        db.run(
+          `CREATE UNIQUE INDEX IF NOT EXISTS idx_pokemon_eggs_incubating
+             ON pokemon_eggs(user_id) WHERE status = 'INCUBATING'`,
+          (err) => {
+            if (err) handleException("Erreur création index pokemon_eggs_incubating :", err);
           }
         );
       }
@@ -314,7 +388,18 @@ const db = new sqlite3.Database(dbPath, (err) => {
         message_id TEXT
       )`,
       (err) => {
-        if (err) handleException("Erreur création table pokemon_trades :", err);
+        if (err) return handleException("Erreur création table pokemon_trades :", err);
+        // Chaque côté désigne un groupe d'individus : espèce, variante, sexe et
+        // fertilité. NULL — les offres d'avant les individus — veut dire
+        // « n'importe lequel ».
+        const columns = ["offer_sex TEXT", "offer_fertile INTEGER", "request_sex TEXT", "request_fertile INTEGER"];
+        for (const column of columns) {
+          db.run(`ALTER TABLE pokemon_trades ADD COLUMN ${column}`, (err) => {
+            if (err && !err.message.includes("duplicate column")) {
+              handleException(`Erreur lors de l'ajout de ${column} :`, err);
+            }
+          });
+        }
       }
     );
 

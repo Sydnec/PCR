@@ -13,8 +13,8 @@ import { addPoints } from "../economy.js";
 import db from "../points-db.js";
 import { handleException, log } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
-import { getSpecies, rarityOf } from "./data.js";
-import { getOwned, reserveDuplicates, restoreDuplicates } from "./collection.js";
+import { getSpecies, rarityOf, sexSymbol } from "./data.js";
+import { countGroup, reserveDuplicates, restoreDuplicates } from "./collection.js";
 import { consumeItem, getItem, grantItem, itemSellValue } from "./items.js";
 
 // Ce que vaut un exemplaire. Un tarif absent vaut zéro, donc invendable : mieux
@@ -46,7 +46,10 @@ function journal(userId, speciesId, isShiny, quantity, points) {
 
 // ====================== POKÉMON ======================
 
-export function sellPokemon(userId, speciesId, isShiny, quantity, cb) {
+// `sex` restreint la vente à un sexe, NULL à n'importe lequel. Parmi les
+// candidats, reserveDuplicates prend les stériles puis les plus récents : on
+// revend ce qui vaut le moins, jamais l'individu qu'on garde.
+export function sellPokemon(userId, { speciesId, isShiny, sex = null }, quantity, cb) {
   const species = getSpecies(speciesId);
   if (!species) return cb(null, { ok: false, reason: "Espèce inconnue." });
   if (!Number.isInteger(quantity) || quantity <= 0) {
@@ -59,28 +62,29 @@ export function sellPokemon(userId, speciesId, isShiny, quantity, cb) {
   }
   const points = unit * quantity;
 
-  reserveDuplicates(userId, speciesId, isShiny, quantity, (err, reserved) => {
+  const name = `${species.name}${isShiny ? " ✨" : ""}${sex ? ` ${sexSymbol(sex)}` : ""}`;
+  reserveDuplicates(userId, { speciesId, isShiny, sex }, quantity, (err, reserved) => {
     if (err) return cb(err);
-    if (!reserved) {
+    if (!reserved.length) {
       // Le refus est le même quelle qu'en soit la cause — pas assez
       // d'exemplaires, ou juste celui qu'on garde — donc on relit pour le dire
-      // avec le bon chiffre plutôt qu'avec une formule passe-partout.
-      return getOwned(userId, speciesId, isShiny, (err, owned) =>
+      // avec les bons chiffres plutôt qu'avec une formule passe-partout.
+      return countGroup(userId, { speciesId, isShiny, sex }, (err, { owned, spare }) =>
         cb(err, {
           ok: false,
           reason:
-            `Tu as **${owned}** ${species.name}${isShiny ? " ✨" : ""} et il t'en faut ` +
-            `**${quantity + 1}** pour en revendre **${quantity}** : un exemplaire est ` +
-            `toujours conservé.`,
+            `Tu as **${owned}** ${name}, dont **${spare}** revendable${spare > 1 ? "s" : ""} : ` +
+            `impossible d'en revendre **${quantity}**. Le premier exemplaire de chaque ` +
+            `Pokémon est toujours conservé.`,
         })
       );
     }
 
     addPoints(userId, points, (err) => {
       if (err) {
-        // Compensation : les exemplaires réservés reviennent. Sans elle, un
-        // crédit raté détruirait des Pokémon sans rien rendre.
-        restoreDuplicates(userId, speciesId, isShiny, quantity, (restoreError) => {
+        // Compensation : les exemplaires réservés reviennent, à l'identique.
+        // Sans elle, un crédit raté détruirait des Pokémon sans rien rendre.
+        restoreDuplicates(reserved, (restoreError) => {
           if (restoreError) {
             handleException("Restitution de doublons revendus :", restoreError);
           }
@@ -90,9 +94,9 @@ export function sellPokemon(userId, speciesId, isShiny, quantity, cb) {
 
       journal(userId, speciesId, isShiny, quantity, points);
       log(
-        `Revente : ${userId} vend ${quantity}× ${species.name}${isShiny ? " ✨" : ""} pour ${points} pts`
+        `Revente : ${userId} vend ${quantity}× ${name} pour ${points} pts`
       );
-      cb(null, { ok: true, species, isShiny, quantity, unit, points });
+      cb(null, { ok: true, species, isShiny, sex, quantity, unit, points });
     });
   });
 }

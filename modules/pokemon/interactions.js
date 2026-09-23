@@ -241,8 +241,18 @@ function showDexPage(interaction, targetUserId, page) {
 
 // ---------------------- Évolution ----------------------
 
-function runEvolution(interaction, speciesId, isShiny, chosenTargetId, helperKey = null) {
-  evolve(interaction.user.id, speciesId, isShiny, chosenTargetId, helperKey, (err, result) => {
+// Le deuxième segment des boutons d'évolution porte la variante et le sexe de
+// l'individu qui évolue : « 1F » pour une femelle shiny, « 0 » pour n'importe
+// quel sexe — le format d'avant, que les anciens boutons portent encore.
+const parseVariant = (raw) => ({
+  isShiny: String(raw).startsWith("1"),
+  sex: ["M", "F"].includes(String(raw).slice(1)) ? String(raw).slice(1) : null,
+});
+
+function runEvolution(interaction, speciesId, variant, chosenTargetId, helperKey = null) {
+  const { isShiny, sex } = variant;
+  const group = { speciesId, isShiny, sex };
+  evolve(interaction.user.id, group, chosenTargetId, helperKey, (err, result) => {
     if (err) {
       handleException(err);
       return interaction
@@ -271,8 +281,9 @@ function runEvolution(interaction, speciesId, isShiny, chosenTargetId, helperKey
     interaction
       .update({
         content:
-          `✨ Félicitations ! Ton **${displayName(source, isShiny)}** a évolué en ` +
-          `**${displayName(result.target, isShiny)}** ! (${paye.join(", ")})`,
+          `✨ Félicitations ! Ton **${displayName(source, isShiny, result.evolved?.sex)}** a ` +
+          `évolué en **${displayName(result.target, isShiny, result.evolved?.sex)}** ! ` +
+          `(${paye.join(", ")})`,
         embeds: [],
         components: [],
       })
@@ -280,7 +291,7 @@ function runEvolution(interaction, speciesId, isShiny, chosenTargetId, helperKey
   });
 }
 
-function showEvolutionChoices(interaction, speciesId, isShiny) {
+function showEvolutionChoices(interaction, speciesId, variant) {
   const plan = describeEvolution(speciesId);
   if (plan.error) {
     return interaction
@@ -292,7 +303,9 @@ function showEvolutionChoices(interaction, speciesId, isShiny) {
   for (const target of plan.targets) {
     row.addComponents(
       new ButtonBuilder()
-        .setCustomId(`poke_evo_pick|${speciesId}|${isShiny ? 1 : 0}|${target.id}`)
+        .setCustomId(
+          `poke_evo_pick|${speciesId}|${variant.isShiny ? 1 : 0}${variant.sex ?? ""}|${target.id}`
+        )
         .setLabel(target.name)
         .setStyle(ButtonStyle.Primary)
     );
@@ -594,11 +607,11 @@ export async function handlePokemonButton(interaction) {
     // Le cinquième segment, facultatif, est l'objet qui aide la fusion : une
     // pierre impose alors sa cible, un bonbon remplace un exemplaire manquant.
     case "poke_evo": {
-      const [speciesId, shiny, mode, helper] = args;
+      const [speciesId, variant, mode, helper] = args;
       if (mode === "choose") {
-        return showEvolutionChoices(interaction, Number(speciesId), shiny === "1");
+        return showEvolutionChoices(interaction, Number(speciesId), parseVariant(variant));
       }
-      return runEvolution(interaction, Number(speciesId), shiny === "1", null, helper ?? null);
+      return runEvolution(interaction, Number(speciesId), parseVariant(variant), null, helper ?? null);
     }
 
     // Pas d'aide ici, et ce n'est pas un oubli : choisir sa cible et utiliser un
@@ -606,8 +619,8 @@ export async function handlePokemonButton(interaction) {
     // précisément ce qui en fait le moyen de choisir son Évoli sans payer le
     // supplément — et un bonbon laisse le hasard trancher.
     case "poke_evo_pick": {
-      const [speciesId, shiny, targetId] = args;
-      return runEvolution(interaction, Number(speciesId), shiny === "1", Number(targetId));
+      const [speciesId, variant, targetId] = args;
+      return runEvolution(interaction, Number(speciesId), parseVariant(variant), Number(targetId));
     }
 
     case "poke_safari_enter":

@@ -1,42 +1,126 @@
 // Collection des dresseurs : lecture, fusion (évolution) et échanges.
 //
-// Règle valable partout : une ligne de pokemon_collection peut valoir
-// count = 0 — les échanges d'avant le verrouillage du premier exemplaire en ont
-// laissé. On la conserve pour préserver first_caught_at, donc TOUTE lecture
-// filtre sur count > 0.
+// Un Pokémon est une ligne de pokemon_owned : un individu, avec son sexe, sa
+// ball, sa fertilité et sa date d'arrivée. Les lectures agrégées (combien de
+// Pikachu ?) se calculent à partir des individus, jamais d'un compteur tenu à
+// côté qui finirait par ne plus dire la même chose.
 import db from "../points-db.js";
 import { addPoints, spendPoints } from "../economy.js";
 import { handleException } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
-import { evolutionTargets, getSpecies, tradeEvolutionTarget } from "./data.js";
+import { evolutionTargets, getSpecies, rollSex, tradeEvolutionTarget } from "./data.js";
 import { consumeItem, getItem, grantItem } from "./items.js";
 import { recordFusion, recordTrade } from "./stats.js";
 
-// Une entrée de collection, c'est une espèce ET une variante : un shiny est une
-// entrée de Pokédex distincte, qui évolue, s'échange et se revend séparément.
-// Les commandes encodent donc les deux dans la valeur d'une option — ce couple
-// vivait dans commands/evolution.js, que deux autres commandes importaient.
-export const encodeEntry = (speciesId, isShiny) => `${speciesId}:${isShiny ? 1 : 0}`;
+// Un groupe d'individus : une espèce, une variante (un shiny est une entrée de
+// Pokédex distincte), et au besoin un sexe et une fertilité. Les commandes
+// encodent le tout dans la valeur d'une option ; une partie absente veut dire
+// « peu importe ».
+export function encodeEntry(speciesId, isShiny, sex = null, fertile = null) {
+  const parts = [speciesId, isShiny ? 1 : 0];
+  if (sex || fertile !== null) parts.push(sex ?? "");
+  if (fertile !== null) parts.push(fertile ? 1 : 0);
+  return parts.join(":");
+}
 
 export const decodeEntry = (value) => {
-  const [speciesId, shiny] = String(value).split(":");
-  return { speciesId: Number(speciesId), isShiny: shiny === "1" };
+  const [speciesId, shiny, sex, fertile] = String(value).split(":");
+  return {
+    speciesId: Number(speciesId),
+    isShiny: shiny === "1",
+    sex: sex === "M" || sex === "F" ? sex : null,
+    fertile: fertile === "1" ? true : fertile === "0" ? false : null,
+  };
 };
 
+// ====================== LECTURES ======================
+
+// Une ligne par entrée de Pokédex, dans la forme qu'avait l'ancienne table :
+// { species_id, is_shiny, count, first_caught_at }. Pokédex, classement et
+// listes de commandes n'ont pas eu à changer.
 export function getCollection(userId, cb) {
   db.all(
-    `SELECT species_id, is_shiny, count, first_caught_at
-       FROM pokemon_collection
-      WHERE user_id = ? AND count > 0
-      ORDER BY species_id`,
+    `SELECT species_id, is_shiny, COUNT(*) AS count, MIN(obtained_at) AS first_caught_at
+       FROM pokemon_owned
+      WHERE user_id = ?
+      GROUP BY species_id, is_shiny
+      ORDER BY species_id, is_shiny`,
     [userId],
     cb
   );
 }
 
+// Le plus ancien individu de chaque entrée est celui qu'on garde. La règle vit
+// ici, en SQL, et partout ailleurs par ce seul fragment : le sous-select désigne
+// l'individu verrouillé d'une entrée, pour un alias `o` de pokemon_owned.
+const LOCKED_ID = `(SELECT k.id FROM pokemon_owned k
+    WHERE k.user_id = o.user_id AND k.species_id = o.species_id AND k.is_shiny = o.is_shiny
+    ORDER BY k.obtained_at, k.id LIMIT 1)`;
+
+// Tous les individus d'un dresseur, `locked` indiquant celui que rien ne peut
+// prendre. Triés par entrée puis par ancienneté.
+export function getIndividuals(userId, cb) {
+  db.all(
+    `SELECT o.*, (o.id = ${LOCKED_ID}) AS locked
+       FROM pokemon_owned o
+      WHERE o.user_id = ?
+      ORDER BY o.species_id, o.is_shiny, o.obtained_at, o.id`,
+    [userId],
+    (err, rows) => cb(err, rows || [])
+  );
+}
+
+// Regroupe des individus par espèce et variante, et au besoin par sexe et
+// fertilité. `spare` compte ceux qu'on peut céder : tous, sauf l'individu
+// verrouillé de l'entrée. C'est le chiffre que les commandes affichent.
+export function groupIndividuals(rows, { bySex = false, byFertility = false } = {}) {
+  const groups = new Map();
+  for (const row of rows) {
+    const sex = bySex ? row.sex : null;
+    const fertile = byFertility ? !row.sterile : null;
+    const key = encodeEntry(row.species_id, row.is_shiny, sex, fertile);
+    if (!groups.has(key)) {
+      groups.set(key, {
+        key,
+        speciesId: row.species_id,
+        isShiny: Boolean(row.is_shiny),
+        sex,
+        fertile,
+        count: 0,
+        spare: 0,
+        fertileCount: 0,
+      });
+    }
+    const group = groups.get(key);
+    group.count++;
+    if (!row.locked) group.spare++;
+    if (!row.sterile) group.fertileCount++;
+  }
+  return [...groups.values()];
+}
+
+// Combien un dresseur possède d'individus d'un groupe, et combien il peut en
+// céder. Sert aux refus, pour les dire avec les bons chiffres.
+export function countGroup(userId, group, cb) {
+  getIndividuals(userId, (err, rows) => {
+    if (err) return cb(err, { owned: 0, spare: 0 });
+    const matching = rows.filter((row) => matchesGroup(row, group));
+    cb(null, {
+      owned: matching.length,
+      spare: matching.filter((row) => !row.locked).length,
+    });
+  });
+}
+
+const matchesGroup = (row, { speciesId, isShiny, sex = null, fertile = null }) =>
+  row.species_id === Number(speciesId) &&
+  Boolean(row.is_shiny) === Boolean(isShiny) &&
+  (!sex || row.sex === sex) &&
+  (fertile === null || fertile === undefined || Boolean(row.sterile) === !fertile);
+
 export function getOwned(userId, speciesId, isShiny, cb) {
   db.get(
-    "SELECT count FROM pokemon_collection WHERE user_id = ? AND species_id = ? AND is_shiny = ?",
+    "SELECT COUNT(*) AS count FROM pokemon_owned WHERE user_id = ? AND species_id = ? AND is_shiny = ?",
     [userId, speciesId, isShiny ? 1 : 0],
     (err, row) => cb(err, row ? row.count : 0)
   );
@@ -45,19 +129,8 @@ export function getOwned(userId, speciesId, isShiny, cb) {
 // Les deux variantes d'une espèce en une requête : un shiny est une entrée de
 // Pokédex distincte, donc « est-ce que je l'ai ? » a deux réponses possibles.
 export function getOwnedVariants(userId, speciesId, cb) {
-  db.all(
-    `SELECT is_shiny, count FROM pokemon_collection
-      WHERE user_id = ? AND species_id = ? AND count > 0`,
-    [userId, speciesId],
-    (err, rows) => {
-      if (err) return cb(err, { normal: 0, shiny: 0 });
-      const counts = { normal: 0, shiny: 0 };
-      for (const row of rows || []) {
-        if (row.is_shiny) counts.shiny = row.count;
-        else counts.normal = row.count;
-      }
-      cb(null, counts);
-    }
+  getOwnedVariantsFor(userId, [speciesId], (err, counts) =>
+    cb(err, counts.get(Number(speciesId)) ?? { normal: 0, shiny: 0 })
   );
 }
 
@@ -71,9 +144,9 @@ export function getOwnedVariantsFor(userId, speciesIds, cb) {
   if (!ids.length) return cb(null, counts);
 
   db.all(
-    `SELECT species_id, is_shiny, count FROM pokemon_collection
-      WHERE user_id = ? AND count > 0
-        AND species_id IN (${ids.map(() => "?").join(", ")})`,
+    `SELECT species_id, is_shiny, COUNT(*) AS count FROM pokemon_owned
+      WHERE user_id = ? AND species_id IN (${ids.map(() => "?").join(", ")})
+      GROUP BY species_id, is_shiny`,
     [userId, ...ids],
     (err, rows) => {
       if (err) return cb(err, counts);
@@ -93,9 +166,8 @@ export function getLeaderboard(limit, cb) {
     `SELECT user_id,
             COUNT(DISTINCT CASE WHEN is_shiny = 0 THEN species_id END) AS dex,
             COUNT(DISTINCT CASE WHEN is_shiny = 1 THEN species_id END) AS shinies,
-            SUM(count) AS total
-       FROM pokemon_collection
-      WHERE count > 0
+            COUNT(*) AS total
+       FROM pokemon_owned
       GROUP BY user_id
       ORDER BY dex DESC, shinies DESC, total DESC
       LIMIT ?`,
@@ -104,57 +176,101 @@ export function getLeaderboard(limit, cb) {
   );
 }
 
-// Chemin unique de crédit de la collection : capture sauvage, parc safari et
-// évolution passent tous par ici, sinon la règle « un shiny est une entrée
-// distincte » finit par diverger entre les copies.
-export function creditSpecies(userId, speciesId, isShiny, cb) {
-  const now = Date.now();
+// ====================== ÉCRITURES ======================
+
+// Chemin unique de crédit de la collection : capture sauvage, parc safari,
+// éclosion et évolution sans individu à transformer passent tous par ici. Le
+// sexe se tire selon l'espèce sauf s'il est imposé ; la ball est celle de la
+// capture, NULL quand il n'y en a pas eu. Rend l'individu créé { id, sex }.
+export function creditSpecies(userId, speciesId, isShiny, options, cb) {
+  const { ball = null, origin, sex = null, obtainedAt = Date.now() } = options;
+  const chosenSex = sex ?? rollSex(getSpecies(speciesId));
   db.run(
-    `INSERT INTO pokemon_collection (user_id, species_id, is_shiny, count, first_caught_at, last_caught_at)
-     VALUES (?, ?, ?, 1, ?, ?)
-     ON CONFLICT(user_id, species_id, is_shiny) DO UPDATE SET
-       count = count + 1,
-       first_caught_at = COALESCE(first_caught_at, excluded.first_caught_at),
-       last_caught_at = excluded.last_caught_at`,
-    [userId, speciesId, isShiny ? 1 : 0, now, now],
-    cb
+    `INSERT INTO pokemon_owned (user_id, species_id, is_shiny, sex, ball, origin, sterile, obtained_at)
+     VALUES (?, ?, ?, ?, ?, ?, 0, ?)`,
+    [userId, speciesId, isShiny ? 1 : 0, chosenSex, ball, origin, obtainedAt],
+    function (err) {
+      if (err) return cb(err, null);
+      cb(null, { id: this.lastID, sex: chosenSex });
+    }
   );
 }
 
 // ====================== DOUBLONS ======================
 
-// Retire des exemplaires en garantissant qu'il en reste TOUJOURS un. C'est
-// l'invariant du Pokédex : une fusion, une revente, un échange, rien ne doit
-// pouvoir effacer une entrée durement gagnée. Contrairement aux jeux, avoir
-// capturé un Pokémon ne suffit pas à le garder au Pokédex, il faut le posséder :
-// le premier exemplaire de chaque entrée est donc verrouillé, et seuls les
-// doublons circulent. Le `count >= quantity + 1` du WHERE le tient en une
-// instruction, donc deux retraits simultanés ne peuvent pas passer à deux.
-
-export function reserveDuplicates(userId, speciesId, isShiny, quantity, cb) {
+// Retire des individus d'un groupe en garantissant qu'il en reste TOUJOURS un de
+// l'entrée. C'est l'invariant du Pokédex : une fusion, une revente, un échange,
+// rien ne doit pouvoir effacer une entrée durement gagnée. Contrairement aux
+// jeux, avoir capturé un Pokémon ne suffit pas à le garder au Pokédex, il faut
+// le posséder : l'individu le plus ancien de chaque entrée est donc verrouillé,
+// et seuls les autres circulent.
+//
+// Parmi les candidats, on prend d'abord ce qui vaut le moins — les stériles,
+// puis les plus récents : un individu encore capable de pondre ne part qu'en
+// dernier.
+//
+// Une seule instruction, qui compte et retire d'un même geste : deux retraits
+// simultanés ne peuvent pas passer à deux sur le même individu, et c'est tout
+// ou rien — soit `quantity` individus, soit aucun. RETURNING rend les lignes
+// retirées, telles quelles : c'est ce qui permet de les rendre à l'identique si
+// la suite de l'opération échoue.
+export function reserveDuplicates(userId, group, quantity, cb) {
   if (!Number.isInteger(quantity) || quantity <= 0) {
-    return cb(new Error(`Quantité invalide : ${quantity}`), false);
+    return cb(new Error(`Quantité invalide : ${quantity}`), []);
   }
-  db.run(
-    `UPDATE pokemon_collection SET count = count - ?
-      WHERE user_id = ? AND species_id = ? AND is_shiny = ? AND count >= ?`,
-    [quantity, userId, speciesId, isShiny ? 1 : 0, quantity + 1],
-    function (err) {
-      cb(err, this ? this.changes === 1 : false);
-    }
+  const { speciesId, isShiny, sex = null, fertile = null } = group;
+  const filter = `o.user_id = $user AND o.species_id = $species AND o.is_shiny = $shiny
+    AND ($sex IS NULL OR o.sex = $sex)
+    AND ($sterile IS NULL OR o.sterile = $sterile)
+    AND o.id <> ${LOCKED_ID}`;
+  db.all(
+    `DELETE FROM pokemon_owned
+      WHERE id IN (
+        SELECT o.id FROM pokemon_owned o WHERE ${filter}
+         ORDER BY o.sterile DESC, o.obtained_at DESC, o.id DESC
+         LIMIT $quantity)
+        AND (SELECT COUNT(*) FROM pokemon_owned o WHERE ${filter}) >= $quantity
+      RETURNING *`,
+    {
+      $user: userId,
+      $species: Number(speciesId),
+      $shiny: isShiny ? 1 : 0,
+      $sex: sex,
+      $sterile: fertile === null || fertile === undefined ? null : fertile ? 0 : 1,
+      $quantity: quantity,
+    },
+    (err, rows) => cb(err, rows || [])
   );
 }
 
-// Rend des exemplaires réservés, quand la suite de l'opération a échoué. Jamais
-// un chemin de crédit ordinaire : creditSpecies l'est, et lui tient
-// first_caught_at à jour.
-export function restoreDuplicates(userId, speciesId, isShiny, quantity, cb = () => {}) {
-  db.run(
-    `UPDATE pokemon_collection SET count = count + ?
-      WHERE user_id = ? AND species_id = ? AND is_shiny = ?`,
-    [quantity, userId, speciesId, isShiny ? 1 : 0],
-    cb
-  );
+// Rend des individus réservés, à l'identique — même identifiant, même sexe,
+// même ball —, quand la suite de l'opération a échoué. Accepte aussi des lignes
+// modifiées : c'est ainsi qu'un individu change d'espèce en évoluant, ou de
+// dresseur en étant échangé, sans cesser d'être lui-même.
+export function restoreDuplicates(rows, cb = () => {}) {
+  const list = [...rows];
+  const next = (err) => {
+    if (err) return cb(err);
+    const row = list.shift();
+    if (!row) return cb(null);
+    db.run(
+      `INSERT INTO pokemon_owned (id, user_id, species_id, is_shiny, sex, ball, origin, sterile, obtained_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        row.id,
+        row.user_id,
+        row.species_id,
+        row.is_shiny,
+        row.sex,
+        row.ball,
+        row.origin,
+        row.sterile,
+        row.obtained_at,
+      ],
+      next
+    );
+  };
+  next(null);
 }
 
 // ====================== FUSION / ÉVOLUTION ======================
@@ -256,7 +372,13 @@ export function describeEvolution(speciesId, chosenTargetId = null, helperKey = 
 // ce que les précédentes ont réservé si elle échoue. L'ordre n'est pas
 // indifférent — on prend d'abord ce qui est le plus probable de manquer, pour
 // que le cas courant (« il te manque un exemplaire ») ne déplace rien du tout.
-export function evolve(userId, speciesId, isShiny, chosenTargetId, helperKey, cb) {
+//
+// `group` désigne l'entrée qui évolue et, au besoin, le sexe de l'individu qui
+// évolue : les doublons consommés sont des individus, et l'un d'eux — du sexe
+// demandé — devient la forme évoluée en gardant son sexe, sa ball et sa
+// fertilité. Les autres disparaissent : c'est le prix de la fusion.
+export function evolve(userId, group, chosenTargetId, helperKey, cb) {
+  const { speciesId, isShiny, sex = null } = group;
   const plan = describeEvolution(speciesId, chosenTargetId, helperKey);
   if (plan.error) return cb(null, { ok: false, reason: plan.error });
 
@@ -267,16 +389,14 @@ export function evolve(userId, speciesId, isShiny, chosenTargetId, helperKey, cb
   // Étape 3 : les points. Zéro se saute au lieu de se débiter — spendPoints
   // refuserait un dresseur sans ligne de solde, et une fusion gratuite n'a pas à
   // dépendre de ça.
-  const payer = (rendreExemplaires) => {
+  const payer = (reserved, rendreExemplaires) => {
     // `rendreTout` est la compensation COMPLÈTE au point où on l'appelle : les
     // exemplaires, l'aide, et les points s'ils sont déjà partis. Sans elle, un
     // crédit de collection raté au tout dernier moment laissait le dresseur
     // délesté de tout et sans rien — exactement ce que cette cascade existe pour
     // empêcher, et la seule étape qui y échappait.
     const finir = (rendreTout) => {
-      // Un shiny évolue en shiny : is_shiny est conservé.
-      creditSpecies(userId, target.id, isShiny, (err) => {
-        if (err) return rendreTout(() => cb(err));
+      const journal = (evolved) =>
         db.run(
           `INSERT INTO pokemon_fusions
              (user_id, from_species_id, to_species_id, is_shiny, duplicates_spent, points_spent, created_at)
@@ -285,9 +405,25 @@ export function evolve(userId, speciesId, isShiny, chosenTargetId, helperKey, cb
           (err) => {
             if (err) handleException("Journal de fusion :", err);
             recordFusion({ userId, duplicates: plan.duplicates, points: plan.points });
-            cb(null, { ok: true, target, plan });
+            cb(null, { ok: true, target, plan, evolved });
           }
         );
+
+      // L'individu qui évolue est le premier réservé, celui du sexe demandé. Il
+      // revient sous sa nouvelle forme, même identifiant ; un shiny évolue en
+      // shiny puisque rien d'autre ne change.
+      const [evolver] = reserved;
+      if (evolver) {
+        return restoreDuplicates([{ ...evolver, species_id: target.id }], (err) => {
+          if (err) return rendreTout(() => cb(err));
+          journal({ id: evolver.id, sex: evolver.sex });
+        });
+      }
+      // Rien de réservé : une aide couvre tous les exemplaires. La forme évoluée
+      // est un nouvel individu, du sexe demandé.
+      creditSpecies(userId, target.id, isShiny, { origin: "evolution", sex }, (err, created) => {
+        if (err) return rendreTout(() => cb(err));
+        journal(created);
       });
     };
 
@@ -315,8 +451,8 @@ export function evolve(userId, speciesId, isShiny, chosenTargetId, helperKey, cb
 
   // Étape 2 : l'aide, s'il y en a une. Elle est consommée après les exemplaires
   // parce qu'elle est plus rare : mieux vaut rendre un doublon qu'une pierre.
-  const prendreAide = (rendreExemplaires) => {
-    if (!helper) return payer(rendreExemplaires);
+  const prendreAide = (reserved, rendreExemplaires) => {
+    if (!helper) return payer(reserved, rendreExemplaires);
     consumeItem(userId, helper.item.key, helper.quantity, { source: "fusion" }, (err, pris) => {
       if (err) return rendreExemplaires(() => cb(err));
       if (!pris) {
@@ -329,7 +465,7 @@ export function evolve(userId, speciesId, isShiny, chosenTargetId, helperKey, cb
           })
         );
       }
-      payer((suite) =>
+      payer(reserved, (suite) =>
         // Compensation en cascade : l'aide revient, puis les exemplaires.
         grantItem(userId, helper.item.key, helper.quantity, { source: "fusion-annulee" }, (err) => {
           if (err) handleException("Restitution d'une aide de fusion :", err);
@@ -341,32 +477,47 @@ export function evolve(userId, speciesId, isShiny, chosenTargetId, helperKey, cb
 
   // Étape 1 : les exemplaires. `plan.duplicates` peut valoir zéro si une aide
   // couvre tout : il n'y a alors rien à réserver, seulement à vérifier qu'il
-  // reste bien le Pokémon qu'on fait évoluer.
+  // reste bien un Pokémon du sexe demandé à faire évoluer.
   const manque = () =>
     cb(null, {
       ok: false,
       reason:
         `Il te faut **${plan.required}** exemplaires de ${plan.species.name} ` +
-        `(${plan.duplicates} consommés + 1 conservé).`,
+        `(${plan.duplicates} consommés + 1 conservé)` +
+        (sex && plan.duplicates > 0
+          ? `, dont un ${sex === "F" ? "femelle" : "mâle"} autre que celui que tu gardes.`
+          : "."),
     });
 
   if (plan.duplicates <= 0) {
-    return getOwned(userId, speciesId, isShiny, (err, owned) => {
+    return countGroup(userId, { speciesId, isShiny, sex }, (err, { owned }) => {
       if (err) return cb(err);
       if (owned < 1) return manque();
-      prendreAide((suite) => suite());
+      prendreAide([], (suite) => suite());
     });
   }
 
-  reserveDuplicates(userId, speciesId, isShiny, plan.duplicates, (err, reserved) => {
+  const rendre = (rows) => (suite) =>
+    restoreDuplicates(rows, (err) => {
+      if (err) handleException("Compensation de fusion impossible :", err);
+      suite();
+    });
+
+  // L'individu qui évolue d'abord, du sexe demandé ; puis le reste de la
+  // facture, sans condition de sexe. Deux réservations, donc deux gardes : si
+  // la seconde échoue, la première est rendue avant de dire ce qui manque.
+  reserveDuplicates(userId, { speciesId, isShiny, sex }, 1, (err, evolvers) => {
     if (err) return cb(err);
-    if (!reserved) return manque();
-    prendreAide((suite) =>
-      restoreDuplicates(userId, speciesId, isShiny, plan.duplicates, (err) => {
-        if (err) handleException("Compensation de fusion impossible :", err);
-        suite();
-      })
-    );
+    if (!evolvers.length) return manque();
+    const others = plan.duplicates - 1;
+    if (others <= 0) return prendreAide(evolvers, rendre(evolvers));
+    reserveDuplicates(userId, { speciesId, isShiny }, others, (err, rest) => {
+      if (err || !rest.length) {
+        return rendre(evolvers)(() => (err ? cb(err) : manque()));
+      }
+      const reserved = [...evolvers, ...rest];
+      prendreAide(reserved, rendre(reserved));
+    });
   });
 }
 
@@ -384,21 +535,34 @@ export function evolve(userId, speciesId, isShiny, chosenTargetId, helperKey, cb
 const tradedForm = (speciesId) =>
   tradeEvolutionTarget(getSpecies(speciesId))?.id ?? Number(speciesId);
 
+// Chaque côté désigne un groupe — espèce, variante, sexe, fertilité — plutôt
+// qu'un individu précis : l'individu est choisi à l'acceptation, selon la même
+// règle que partout (jamais celui qu'on garde, les moins précieux d'abord).
+// La fertilité fait partie du groupe parce qu'elle change la valeur d'un
+// Pokémon : qui reçoit une femelle fertile doit pouvoir compter dessus.
+const fertileFlag = (fertile) =>
+  fertile === null || fertile === undefined ? null : fertile ? 1 : 0;
+
 export function createTrade(trade, cb) {
   const now = Date.now();
   const expiresAt = now + getPokemonConfig().trade.expiryHours * 3600 * 1000;
   db.run(
     `INSERT INTO pokemon_trades
-       (from_user_id, to_user_id, offer_species_id, offer_is_shiny,
-        request_species_id, request_is_shiny, created_at, expires_at, channel_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (from_user_id, to_user_id, offer_species_id, offer_is_shiny, offer_sex, offer_fertile,
+        request_species_id, request_is_shiny, request_sex, request_fertile,
+        created_at, expires_at, channel_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       trade.fromUserId,
       trade.toUserId,
       trade.offerSpeciesId,
       trade.offerIsShiny ? 1 : 0,
+      trade.offerSex ?? null,
+      fertileFlag(trade.offerFertile),
       trade.requestSpeciesId,
       trade.requestIsShiny ? 1 : 0,
+      trade.requestSex ?? null,
+      fertileFlag(trade.requestFertile),
       now,
       expiresAt,
       trade.channelId,
@@ -454,102 +618,97 @@ export function acceptTrade(tradeId, cb) {
       getTrade(tradeId, (err, trade) => {
         if (err || !trade) return cb(err || new Error("Échange introuvable"));
 
+        // Le groupe de chaque côté ; fertile NULL — offres d'avant les
+        // individus — veut dire « n'importe lequel ».
+        const side = (prefix) => ({
+          speciesId: trade[`${prefix}_species_id`],
+          isShiny: Boolean(trade[`${prefix}_is_shiny`]),
+          sex: trade[`${prefix}_sex`] || null,
+          fertile:
+            trade[`${prefix}_fertile`] === null || trade[`${prefix}_fertile`] === undefined
+              ? null
+              : Boolean(trade[`${prefix}_fertile`]),
+        });
+
         // Retrait chez l'initiateur, puis chez la cible, avec compensation si
         // le second échoue (le Pokémon a pu être fusionné entre-temps). Chacun
-        // ne cède qu'un doublon : reserveDuplicates refuse de toucher au
-        // dernier exemplaire, exactement comme pour une fusion ou une revente.
-        reserveDuplicates(
-          trade.from_user_id,
-          trade.offer_species_id,
-          trade.offer_is_shiny,
-          1,
-          (err, reserved) => {
-            if (err) return cb(err);
-            if (!reserved) {
-              return releaseTrade(tradeId, "FAILED", () =>
-                cb(null, {
-                  ok: false,
-                  reason:
-                    "L'initiateur n'a plus de doublon du Pokémon proposé : son dernier " +
-                    "exemplaire reste dans son Pokédex.",
-                })
-              );
-            }
-
-            reserveDuplicates(
-              trade.to_user_id,
-              trade.request_species_id,
-              trade.request_is_shiny,
-              1,
-              (err, reserved) => {
-                if (err) return cb(err);
-                if (!reserved) {
-                  // Compensation : on rend son Pokémon à l'initiateur.
-                  return restoreDuplicates(
-                    trade.from_user_id,
-                    trade.offer_species_id,
-                    trade.offer_is_shiny,
-                    1,
-                    () =>
-                      releaseTrade(tradeId, "FAILED", () =>
-                        cb(null, {
-                          ok: false,
-                          reason:
-                            "Tu n'as plus de doublon du Pokémon demandé : ton dernier " +
-                            "exemplaire reste dans ton Pokédex.",
-                        })
-                      )
-                  );
-                }
-
-                // Les deux crédits passent par tradedForm : un échange de
-                // Machopeur contre Machopeur fait deux Mackogneur, et c'est
-                // bien ce que fait le jeu d'origine.
-                const arrivals = [
-                  {
-                    userId: trade.to_user_id,
-                    from: trade.offer_species_id,
-                    to: tradedForm(trade.offer_species_id),
-                    isShiny: trade.offer_is_shiny,
-                  },
-                  {
-                    userId: trade.from_user_id,
-                    from: trade.request_species_id,
-                    to: tradedForm(trade.request_species_id),
-                    isShiny: trade.request_is_shiny,
-                  },
-                ];
-
-                creditSpecies(
-                  arrivals[0].userId,
-                  arrivals[0].to,
-                  arrivals[0].isShiny,
-                  (err) => {
-                    if (err) return cb(err);
-                    creditSpecies(
-                      arrivals[1].userId,
-                      arrivals[1].to,
-                      arrivals[1].isShiny,
-                      (err) => {
-                        recordTrade({
-                          fromUserId: trade.from_user_id,
-                          toUserId: trade.to_user_id,
-                        });
-                        // La fonction qui a appliqué les évolutions est la
-                        // seule à pouvoir dire lesquelles ont eu lieu.
-                        cb(err, {
-                          ok: true,
-                          trade,
-                          evolutions: arrivals.filter((a) => a.to !== a.from),
-                        });
-                      }
-                    );
-                  }
-                );
-              }
+        // ne cède qu'un doublon : reserveDuplicates refuse de toucher à
+        // l'individu qu'on garde, exactement comme pour une fusion ou une revente.
+        reserveDuplicates(trade.from_user_id, side("offer"), 1, (err, offered) => {
+          if (err) return cb(err);
+          if (!offered.length) {
+            return releaseTrade(tradeId, "FAILED", () =>
+              cb(null, {
+                ok: false,
+                reason:
+                  "L'initiateur n'a plus de doublon du Pokémon proposé : son premier " +
+                  "exemplaire reste dans son Pokédex.",
+              })
             );
           }
-        );
+
+          reserveDuplicates(trade.to_user_id, side("request"), 1, (err, requested) => {
+            if (err || !requested.length) {
+              // Compensation : on rend son Pokémon à l'initiateur.
+              return restoreDuplicates(offered, (restoreError) => {
+                if (restoreError) handleException("Restitution d'un échange :", restoreError);
+                if (err) return cb(err);
+                releaseTrade(tradeId, "FAILED", () =>
+                  cb(null, {
+                    ok: false,
+                    reason:
+                      "Tu n'as plus de doublon du Pokémon demandé : ton premier " +
+                      "exemplaire reste dans ton Pokédex.",
+                  })
+                );
+              });
+            }
+
+            // Chaque individu change de dresseur sans cesser d'être lui-même :
+            // même identifiant, même sexe, même ball. Il passe par tradedForm,
+            // qui le fait évoluer s'il est de ceux qui évoluent à l'échange — un
+            // échange de Machopeur contre Machopeur fait deux Mackogneur, comme
+            // dans le jeu d'origine.
+            const now = Date.now();
+            const [mine] = offered;
+            const [theirs] = requested;
+            const arrivals = [
+              { ...mine, user_id: trade.to_user_id, species_id: tradedForm(mine.species_id) },
+              { ...theirs, user_id: trade.from_user_id, species_id: tradedForm(theirs.species_id) },
+            ].map((row) => ({ ...row, origin: "echange", obtained_at: now }));
+
+            restoreDuplicates(arrivals, (err) => {
+              if (err) {
+                // Au mieux : chacun récupère son Pokémon plutôt que de le perdre.
+                handleException("Livraison d'un échange :", err);
+                return db.run(
+                  "DELETE FROM pokemon_owned WHERE id IN (?, ?)",
+                  [mine.id, theirs.id],
+                  () => restoreDuplicates([mine, theirs], () => cb(err))
+                );
+              }
+              recordTrade({ fromUserId: trade.from_user_id, toUserId: trade.to_user_id });
+              // La fonction qui a appliqué les évolutions est la seule à pouvoir
+              // dire lesquelles ont eu lieu — et quels individus ont traversé.
+              cb(null, {
+                ok: true,
+                trade,
+                received: { byTarget: arrivals[0], byInitiator: arrivals[1] },
+                evolutions: [
+                  { userId: trade.to_user_id, from: mine, to: arrivals[0] },
+                  { userId: trade.from_user_id, from: theirs, to: arrivals[1] },
+                ]
+                  .filter(({ from, to }) => from.species_id !== to.species_id)
+                  .map(({ userId, from, to }) => ({
+                    userId,
+                    from: from.species_id,
+                    to: to.species_id,
+                    isShiny: from.is_shiny,
+                  })),
+              });
+            });
+          });
+        });
       });
     }
   );

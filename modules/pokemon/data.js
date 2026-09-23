@@ -84,6 +84,26 @@ export function getAvailableSpecies(id) {
 
 export const isLegendary = (species) => species.isLegendary || species.isMythical;
 
+// ====================== SEXE ======================
+
+export const SEXES = {
+  M: { label: "mâle", symbol: "♂" },
+  F: { label: "femelle", symbol: "♀" },
+};
+
+export const sexSymbol = (sex) => SEXES[sex]?.symbol ?? "";
+
+// Le sexe d'un nouvel individu, tiré selon la proportion des jeux :
+// `genderRate` est la part de femelles en huitièmes. Les espèces asexuées des
+// jeux (-1 : Magnéti, les légendaires, Métamorph…) reçoivent quand même un
+// sexe, à pile ou face : tout Pokémon en a un ici, et c'est ce qui permet à
+// Métamorph de tenir le rôle du père comme de la mère.
+export function rollSex(species) {
+  const rate = Number(species?.genderRate);
+  const femaleShare = rate >= 0 && rate <= 8 ? rate / 8 : 0.5;
+  return Math.random() < femaleShare ? "F" : "M";
+}
+
 export function rarityOf(species) {
   if (isLegendary(species)) return "LEGENDAIRE";
   if (species.stage >= 3) return "RARE";
@@ -104,11 +124,23 @@ export function embedColor(species, isShiny) {
 // s'obtiennent en fusionnant des doublons, ou en faisant changer de dresseur
 // leur pré-évolution. Les deux routes donnent de la valeur à cette
 // pré-évolution, qui reste le seul maillon qu'on croise dans la nature.
+//
+// Les bébés non plus : comme dans les jeux, ils ne sortent que d'un œuf.
 export function spawnWeight(species, spawnConfig) {
-  if (species.tradeEvolution) return 0;
+  if (species.tradeEvolution || species.isBaby) return 0;
   if (isLegendary(species)) return spawnConfig.legendaryWeight;
   return spawnConfig.weightsByStage[species.stage] ?? 0;
 }
+
+// Un bébé ne sort que d'un œuf : aucune apparition ne le donne, et aucune
+// fusion ne mène à lui puisqu'il est la première forme de sa lignée.
+export const isEggOnly = (species) => Boolean(species?.isBaby);
+
+// Le repère affiché à côté d'une espèce qu'on ne croisera jamais : 🥚 pour un
+// bébé, 🔒 pour ce qui ne s'obtient qu'en évoluant. Une seule fonction pour le
+// Pokédex et les fiches, pour que les deux ne se contredisent pas.
+export const unobtainableMark = (species) =>
+  isEggOnly(species) ? "\u{1F95A}" : isEvolutionOnly(species) ? "\u{1F512}" : "";
 
 // Une espèce qu'aucun tirage ne peut faire apparaître : poids nul dans le pool
 // sauvage ET dans celui du parc. Il ne reste alors qu'une évolution pour
@@ -120,6 +152,7 @@ export function spawnWeight(species, spawnConfig) {
 // fusion sans que rien ne le dise, et un stade absent du pool sauvage reste
 // trouvable si le parc, lui, le tire. C'est donc calculé, jamais recopié.
 export function isEvolutionOnly(species) {
+  if (isEggOnly(species)) return false;
   return (
     spawnWeight(species, getPokemonConfig().spawn) <= 0 &&
     spawnWeight(species, getSafariConfig()) <= 0

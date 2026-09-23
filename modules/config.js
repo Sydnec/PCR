@@ -47,7 +47,11 @@ const POKEMON = {
     // délai tiré au hasard dans cet intervalle, sans dépendre de l'activité.
     fleeAfterMinutes: { min: 180, max: 360 },
     shinyOdds: 500,
-    weightsByStage: { 1: 100, 2: 35, 3: 10 },
+    // Le stade 2 pèse 60 % d'un stade 1, le stade 3 un quart : les évolutions
+    // restent plus rares que leur forme de base, comme dans les jeux, sans être
+    // introuvables. 35 et 10 en faisaient des curiosités — un stade 3 sur 75
+    // apparitions.
+    weightsByStage: { 1: 100, 2: 60, 3: 25 },
     legendaryWeight: 8,
     pingRarities: ["RARE", "LEGENDAIRE"],
     throwLogSize: 8,
@@ -97,6 +101,15 @@ const POKEMON = {
     branchChoicePoints: 1000,
   },
   trade: { expiryHours: 24 },
+  // Les œufs, seule porte vers les bébés. Un couple de parents — un mâle et une
+  // femelle de la famille, Métamorph pouvant tenir l'un des deux rôles — pond
+  // un œuf qui éclot au premier des deux seuils : tant d'heures, ou tant de
+  // messages de son propriétaire. Chaque parent ne pond qu'une fois dans sa vie.
+  eggs: {
+    enabled: true,
+    hatchHours: 120,
+    hatchMessages: 200,
+  },
   pokedex: { pageSize: 30 },
   // Catalogue des objets. L'inventaire ne stocke qu'une clé et un compteur :
   // c'est ici que la clé prend un nom et une icône, réglables à chaud comme ceux
@@ -267,7 +280,9 @@ const POKEMON = {
     wildFleeChance: 0.05,
     wildFleeChancePerBait: 0.03,
     shinyOdds: 250,
-    weightsByStage: { 1: 100, 2: 70, 3: 40 },
+    // La compensation suit le malus sauvage, qui s'est adouci : ×1,5 au
+    // stade 2, ×2,4 au stade 3, ×3 pour un légendaire.
+    weightsByStage: { 1: 100, 2: 90, 3: 60 },
     legendaryWeight: 24,
   },
 };

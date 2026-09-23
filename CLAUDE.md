@@ -35,18 +35,20 @@ d'écrire et en reprendre le style : en cas de doute, c'est le code existant qui
 - **Commentaires en français qui disent pourquoi** : la décision, le piège évité, la règle de jeu.
   Jamais une paraphrase du code, et la même densité que le code autour.
 - **Réutiliser les chemins uniques** au lieu de les recopier — une règle écrite deux fois finit par
-  diverger : `creditSpecies` (crédit de collection), `reserveDuplicates` / `restoreDuplicates`
-  (retrait de Pokémon), `grantItem` / `consumeItem` (inventaire), `spendPoints` / `addPoints`
-  (points), `displayName`, `encodeEntry` / `decodeEntry`, `buildBalanceEmbed`.
+  diverger : `creditSpecies` (nouvel individu), `reserveDuplicates` / `restoreDuplicates` (retrait
+  d'individus d'un groupe, et remise à l'identique), `getIndividuals` / `groupIndividuals`
+  (lecture), `grantItem` / `consumeItem` (inventaire), `spendPoints` / `addPoints` (points),
+  `displayName`, `encodeEntry` / `decodeEntry`, `buildBalanceEmbed`.
 - **Pas d'état de jeu en mémoire** : tout vit en base, pour que les boutons répondent encore après
   un redémarrage.
 - **Jamais « lire puis écrire »** : un retrait, un débit ou une revendication est un `UPDATE` /
   `INSERT` gardé dans son `WHERE`, et `this.changes` tranche. Deux clics simultanés, un seul gagnant.
 - **Opérations en plusieurs étapes** : retirer avant de créditer, et compenser en cascade si une
   étape échoue. Rien ne doit se perdre, rien ne doit se créer.
-- **Invariants du jeu** : le premier exemplaire de chaque entrée du Pokédex (un shiny compte à
-  part) ne se retire jamais ; une ligne tombée à zéro reste en base, donc toute lecture filtre
-  `count > 0`.
+- **Invariants du jeu** : un Pokémon est un individu de `pokemon_owned` (sexe, ball, fertilité,
+  date d'arrivée) ; le plus ancien individu de chaque entrée du Pokédex (un shiny compte à part) ne
+  se retire jamais ; quand on cède, les stériles partent d'abord, puis les plus récents. Côté
+  objets, une ligne tombée à zéro reste en base, donc toute lecture filtre `count > 0`.
 - **Aucun nombre en dur** : prix, poids, taux et durées vivent dans `modules/config.js`
   (`DEFAULTS`) et `config.json`, relus à l'exécution. Ce qui s'affiche se calcule avec les mêmes
   fonctions que ce qui se tire, jamais recopié.

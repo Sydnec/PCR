@@ -6,6 +6,8 @@ Système de capture qui sert de **puits à points** : chaque lancer de ball déb
 que la capture réussisse ou non.
 
 - [Capture & Pokédex](capture.md) — apparitions, balls, shiny, fiche d'espèce.
+- [Individus](individus.md) — sexe, ball de capture, fertilité, l'exemplaire gardé.
+- [Œufs](oeufs.md) — la seule façon d'obtenir les bébés.
 - [Objets](objets.md) — ce que tiennent les Pokémon, balls offertes, pierres.
 - [Loterie](loterie.md) — un tirage par jour et par dresseur.
 - [Revente](revente.md) — doublons et objets contre des points.
@@ -15,17 +17,22 @@ que la capture réussisse ou non.
 
 - `/pokedex [membre]` : collection, doublons, shinies et progression. Réponse privée. Un 🔒 marque
   les espèces qu'aucune apparition ne donnera jamais — elles ne s'obtiennent que par fusion ou
-  par échange.
+  par échange —, un 🥚 celles qui ne sortent que d'un œuf.
+- `/boite [pokemon] [membre]` : les Pokémon un par un — sexe, ball, date, fertilité, et 📌
+  l'exemplaire gardé (voir [Individus](individus.md)).
+- `/oeuf pondre <male> <femelle>` / `/oeuf voir` : faire pondre un couple, suivre l'œuf (voir
+  [Œufs](oeufs.md)).
 - `/pokeclassement` : classement des dresseurs par espèces distinctes.
 - `/pokeinfo <pokemon>` : la même fiche que le bouton des apparitions — type, rareté,
   difficulté, et la lignée évolutive stade par stade avec ce que le dresseur en a déjà.
-- `/evolution <pokemon>` : fait évoluer un Pokémon en sacrifiant des doublons. Les lignées à
-  embranchement (Évoli) peuvent évoluer au hasard, ou vers une cible choisie pour plus cher. La
-  commande ne propose que les chemins réellement praticables, objets d'évolution compris.
-- `/echange <membre> <je_donne> <je_recois>` : échange entre dresseurs. **Seuls les doublons
-  s'échangent** : contrairement aux jeux, avoir capturé un Pokémon ne suffit pas à le garder au
-  Pokédex, il faut le posséder. Le premier exemplaire de chaque entrée — un shiny compte à part —
-  reste donc verrouillé dans la collection, et l'autocomplétion ne propose que ce qu'on a en trop.
+- `/evolution <pokemon>` : fait évoluer un Pokémon en sacrifiant des doublons. On choisit le sexe
+  de l'individu qui évolue ; il le garde, avec sa ball. Les lignées à embranchement (Évoli) peuvent
+  évoluer au hasard, ou vers une cible choisie pour plus cher. La commande ne propose que les
+  chemins réellement praticables, objets d'évolution compris.
+- `/echange <membre> <je_donne> <je_recois>` : échange entre dresseurs, par espèce, sexe et
+  fertilité. **Seuls les doublons s'échangent** : contrairement aux jeux, avoir capturé un Pokémon
+  ne suffit pas à le garder au Pokédex, il faut le posséder. L'exemplaire gardé de chaque entrée
+  ne part jamais, et l'autocomplétion ne propose que ce qu'on a en trop.
   **Kadabra, Machopeur, Gravalanch et Spectrum évoluent en changeant de dresseur**, comme en
   première génération : c'est celui qui *reçoit* le Pokémon qui reçoit sa forme évoluée. La
   proposition l'annonce avant le clic, et un shiny reste shiny en évoluant.
@@ -33,7 +40,7 @@ que la capture réussisse ou non.
 - `/inventaire [membre]` : les objets qu'un dresseur a en poche (voir [Objets](objets.md)).
 - `/loterie` : un tirage par jour et par dresseur (voir [Loterie](loterie.md)). Réponse privée.
 - `/revendre pokemon <doublon> [quantite]` / `/revendre objet <objet> [quantite]` : convertit
-  en points ce qu'on a en trop. Un exemplaire est **toujours** conservé.
+  en points ce qu'on a en trop, par espèce et sexe. Un exemplaire est **toujours** conservé.
 - `/admin pokespawn` *(Admin)* : déclenche une apparition pour organiser un événement. Donne accès aux
   espèces hors pool naturel (légendaires et évolutions par échange), avec forçage du shiny, texte
   d'annonce et mention de rôle.
@@ -62,7 +69,8 @@ prennent en compte immédiatement. Ce qu'elle change :
 
 - **Des lignées s'allongent** : Nosferalto → Nostenfer, Leveinard → Leuphorie, Évoli → Mentali et
   Noctali, Ortide → Joliflor, et les bébés en amont (Pichu → Pikachu, Mélo, Toudoudou, Élekid,
-  Magby, Lippouti, Debugant → Kicklee, Tygnon ou Kapoera).
+  Magby, Lippouti, Debugant → Kicklee, Tygnon ou Kapoera). Les bébés n'apparaissent pas : ils
+  sortent des [œufs](oeufs.md), qui n'ont donc rien à pondre tant que la génération 2 est fermée.
 - **Six nouvelles évolutions par échange**, dont la source est souvent de 1ʳᵉ génération : Onix →
   Steelix, Insécateur → Cizayox, Hypocéan → Hyporoi, Ramoloss → Roigada, Têtarte → Tarpaud, Porygon
   → Porygon2. Comme les quatre premières, elles n'apparaissent jamais à l'état sauvage (🔒).
