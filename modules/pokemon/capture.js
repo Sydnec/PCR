@@ -294,8 +294,9 @@ export function resolveThrow(client, userId, spawnId, ballKey, { requireItem = f
             ball: ball.label,
             probability,
           });
-          // La ball qui l'a emportée reste attachée à l'individu, pour de bon.
-          const options = { ball: ball.key, origin: "capture" };
+          // La ball qui l'a emportée reste attachée à l'individu, pour de bon,
+          // et il a le sexe que l'annonce montrait.
+          const options = { ball: ball.key, origin: "capture", sex: spawn.sex };
           creditSpecies(userId, spawn.species_id, spawn.is_shiny, options, (err, caught) => {
             if (err) handleException("Crédit de la collection :", err);
             finalizeCaughtSpawn(client, spawnId, userId, ball.key);
@@ -381,7 +382,7 @@ export function throwMessage(outcome) {
       );
     case "miss":
       return (
-        `❌ Raté ! **${displayName(outcome.species, outcome.spawn.is_shiny)}** s'est dégagé de ` +
+        `❌ Raté ! **${displayName(outcome.species, outcome.spawn.is_shiny, outcome.spawn.sex)}** s'est dégagé de ` +
         `ta ${ball.label}. (${mention}, ${(outcome.probability * 100).toFixed(1)} % de réussite)`
       );
     case "catch": {

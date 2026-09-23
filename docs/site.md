@@ -7,9 +7,9 @@ se connecter avec son compte Discord ; seuls les membres du serveur entrent.
 
 | Page | Contenu |
 |---|---|
-| **Capture** (accueil) | Le Pokémon qui apparaît dans le salon Discord, en direct, avec ses balls juste en dessous : rareté, types et difficulté en couleur, chances par ball, ton solde et tes balls en poche, et sa lignée avec ce que tu en possèdes (la fiche du bouton « Infos du Pokémon »). Le journal des lancers est sur le côté. On lui **lance ses balls** comme depuis Discord, et on **ramasse** ce qu'un Pokémon laisse tomber. |
-| **Boîte** | Chaque Pokémon avec son numéro, filtrable par espèce, sexe, fertilité et shiny. Sa fiche permet de le **revendre** ou de le **faire évoluer**. |
-| **Pokédex** | Toutes les espèces des générations ouvertes, celles qu'on possède en couleur. La fiche d'une espèce montre sa lignée. |
+| **Capture** (accueil) | Le Pokémon qui apparaît dans le salon Discord, en direct, avec son sexe et ses balls juste en dessous : rareté, types et difficulté en couleur, chances par ball, ton solde et tes balls en poche, et sa lignée avec ce que tu en possèdes (la fiche du bouton « Infos du Pokémon »). Une ball hors de portée est grisée, sauf si tu en as en poche. Le journal des lancers est sur le côté. On lui **lance ses balls** comme depuis Discord, et on **ramasse** ce qu'un Pokémon laisse tomber. |
+| **Boîte** | Chaque Pokémon avec son numéro, filtrable par espèce, sexe, fertilité et shiny. Sa fiche montre sa provenance, sa lignée et ce qu'il vaut, et permet de le **revendre** ou de le **faire évoluer**. |
+| **Pokédex** | Toutes les espèces des générations ouvertes, celles qu'on possède en couleur. La fiche d'une espèce montre sa lignée et ce que tu en possèdes. |
 | **Sac** | Le solde et les objets. |
 | **Œuf** | L'œuf qui couve, ou le formulaire pour en **pondre** un. |
 
@@ -36,6 +36,9 @@ elle est ouverte et visible. Les apparitions naissent toujours de l'activité du
   `web/`, et une adresse de page (`/boite`, `/pokedex`…) renvoie `index.html`.
 - Aucune règle de jeu dans le site : il affiche ce que renvoie l'[API](api.md) et lui confie
   chaque action, avec les mêmes refus que les commandes.
+- Des images plutôt que des emojis : sprites et objets de PokéAPI (le nom de l'image d'un objet
+  est son `sprite` dans la configuration), pictogrammes dessinés en SVG. Seuls les emoji du
+  serveur Discord (les balls) restent des emoji.
 - Politique de sécurité stricte : seuls les scripts et styles du site s'exécutent. Les images
   viennent du dépôt de sprites de PokéAPI et du CDN de Discord (avatars, emoji des balls). Aucun
   HTML n'est injecté : un pseudo ne peut rien exécuter.

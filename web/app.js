@@ -4,7 +4,7 @@
 // chaque action. Ce qu'elle refuse revient avec un message déjà rédigé pour le
 // joueur, qu'on affiche tel quel. Tout ce qui se fait ici reste faisable sur
 // Discord avec /pk.
-import { api, avatarUrl, emoji, errorBox, fmt, h } from "./lib.js";
+import { api, avatarUrl, errorBox, fmt, h, itemIcon, registerItemImages } from "./lib.js";
 import * as capture from "./views/capture.js";
 import * as boite from "./views/boite.js";
 import * as pokedex from "./views/pokedex.js";
@@ -73,12 +73,7 @@ function renderAccount() {
   account.replaceChildren(
     h("span", { class: "chip", title: "Ton solde" }, `${fmt(balance)} pts`),
     ...balls.map((ball) =>
-      h(
-        "span",
-        { class: "chip chip-ball", title: ball.label },
-        emoji(ball.emoji, ball.label),
-        fmt(ball.count)
-      )
+      h("span", { class: "chip chip-ball", title: ball.label }, itemIcon(ball), fmt(ball.count))
     ),
     h("img", { class: "avatar", src: avatarUrl(user), alt: "", width: 32, height: 32 }),
     h("span", { class: "username" }, user.username),
@@ -186,6 +181,9 @@ async function boot() {
   for (const entry of species.species) ctx.species.set(entry.id, entry);
   for (const ball of catalogue.balls) ctx.balls.set(ball.key, ball);
   ctx.types = catalogue.types ?? {};
+  // Les messages du jeu citent les objets par leur emoji : le site montre leur
+  // image à la place.
+  registerItemImages([...catalogue.balls, ...catalogue.items]);
   await render();
 }
 

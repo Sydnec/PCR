@@ -5,7 +5,8 @@
 La collection n'est plus un compteur par espèce : chaque Pokémon est une ligne à part, avec ce qui
 le distingue des autres.
 
-- **Un sexe**, tiré à l'arrivée selon la proportion des jeux : Nidoran♀ et Lippoutou sont toujours
+- **Un sexe**, tiré selon la proportion des jeux — dès l'apparition pour un Pokémon sauvage, dont
+  l'annonce le montre, et à l'éclosion pour un œuf : Nidoran♀ et Lippoutou sont toujours
   femelles, Kicklee et Tygnon toujours mâles, Évoli mâle sept fois sur huit. Les espèces asexuées des
   jeux (Magnéti, Stari, Porygon, Métamorph, les légendaires…) n'en ont pas ici non plus.
 - **La ball de capture**, mémorisée pour de bon — y compris la Safari Ball du parc. Un Pokémon éclos

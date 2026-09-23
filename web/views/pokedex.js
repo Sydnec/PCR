@@ -1,14 +1,25 @@
 // Le Pokédex : toutes les espèces des générations ouvertes, celles qu'on
 // possède en couleur, les autres en silhouette. Comme /pk pokedex, ne compte
 // que ce qui est physiquement dans la boîte.
-import { OBTENTION_MARKS, api, fmt, h, normalize, openDialog, progressBar } from "../lib.js";
+import { icon } from "../icons.js";
+import { lineageView, loadLineage } from "../lineage.js";
+import {
+  api,
+  fmt,
+  h,
+  normalize,
+  obtentionMark,
+  openDialog,
+  progressBar,
+  speciesChips,
+} from "../lib.js";
 
 // Comment on obtient une espèce qu'on ne croise pas dans la nature — les mêmes
 // repères que sur Discord.
 const OBTENTION = {
   wild: "Se capture à l'état sauvage.",
-  evolution: "Ne s'obtient qu'en évoluant (🔒).",
-  egg: "Ne sort que d'un œuf (🥚).",
+  evolution: "Ne s'obtient qu'en évoluant.",
+  egg: "Ne sort que d'un œuf.",
 };
 
 export async function render(ctx) {
@@ -120,19 +131,24 @@ function card(ctx, species, counts) {
       { class: "card-meta" },
       h("span", { class: "card-id" }, `n° ${String(species.id).padStart(3, "0")}`),
       has ? h("span", { class: "tag" }, `×${counts.normal + counts.shiny}`) : null,
-      counts?.shiny ? h("span", { title: "Shiny possédé" }, "✨") : null,
-      !has && OBTENTION_MARKS[species.obtention]
-        ? h("span", {}, OBTENTION_MARKS[species.obtention])
-        : null
+      counts?.shiny ? icon("sparkle", { label: "Shiny possédé" }) : null,
+      has ? null : obtentionMark(species.obtention)
     )
   );
 }
 
-async function openSpecies(ctx, species, counts) {
-  const chain = h("div", { class: "chain" });
+function openSpecies(ctx, species, counts) {
   const gender = species.genderless
     ? "Asexué"
     : `♂ ${Math.round((1 - species.femaleShare) * 100)} % · ♀ ${Math.round(species.femaleShare * 100)} %`;
+
+  // La lignée arrive après la fiche, avec ce qu'on possède de chaque maillon :
+  // le même rendu que sur l'onglet Capture.
+  const lineage = h("div", { class: "lineage-slot" });
+  loadLineage(species.id)
+    .then((links) => lineage.replaceWith(lineageView(ctx, links, { currentId: species.id })))
+    .catch(() => lineage.remove());
+
   const dialog = openDialog(
     h(
       "div",
@@ -142,34 +158,27 @@ async function openSpecies(ctx, species, counts) {
         src: species.sprite,
         alt: "",
       }),
-      h("h2", {}, species.name),
-      h(
-        "p",
-        { class: "muted" },
-        `n° ${String(species.id).padStart(3, "0")} · ${species.types.join(" / ")}`
-      )
+      h("h2", {}, species.name, obtentionMark(species.obtention)),
+      h("p", { class: "muted" }, `n° ${String(species.id).padStart(3, "0")}`),
+      speciesChips(ctx, species)
     ),
     h(
       "dl",
       { class: "facts" },
-      h("dt", {}, "Rareté"),
-      h("dd", {}, species.rarityLabel),
       h("dt", {}, "Obtention"),
       h("dd", {}, OBTENTION[species.obtention]),
       h("dt", {}, "Sexe"),
       h("dd", {}, gender),
-      h("dt", {}, "Taux de capture"),
-      h("dd", {}, `${species.catchRate} / 255`),
+      h("dt", {}, "Capture"),
+      h("dd", {}, `Taux ${species.catchRate} / 255`),
       h("dt", {}, "Revente"),
       h(
         "dd",
         {},
         species.sellValue ? `${fmt(species.sellValue)} pts l'exemplaire` : "Ne se revend pas"
-      ),
-      h("dt", {}, "Dans ta boîte"),
-      h("dd", {}, counts ? `${fmt(counts.normal)} normal · ${fmt(counts.shiny)} shiny` : "Aucun")
+      )
     ),
-    chain,
+    lineage,
     counts
       ? h(
           "a",
@@ -183,31 +192,4 @@ async function openSpecies(ctx, species, counts) {
         )
       : null
   );
-
-  // La lignée vient de l'API, qui sait quelles évolutions sont ouvertes.
-  try {
-    const detail = await api(`/api/species/${species.id}`);
-    if (detail.chain.length < 2) return;
-    chain.replaceChildren(
-      h("h3", {}, "Lignée"),
-      h(
-        "div",
-        { class: "chain-row" },
-        detail.chain
-          .map((id) => ctx.species.get(id))
-          .filter(Boolean)
-          .map((link) =>
-            h(
-              "span",
-              { class: `chain-link${link.id === species.id ? " current" : ""}` },
-              h("img", { src: link.icon, alt: "", width: 64, height: 64 }),
-              link.name
-            )
-          )
-      )
-    );
-  } catch {
-    // Sans lignée, la fiche reste lisible : on n'affiche rien plutôt qu'une
-    // erreur pour un détail.
-  }
 }

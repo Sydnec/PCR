@@ -162,9 +162,10 @@ function rollNextEncounter(sessionId, config, cb) {
             encounter_species_id = ?,
             encounter_is_shiny = ?,
             encounter_catch_rate = ?,
+            encounter_sex = ?,
             encounter_bait = 0
       WHERE id = ?`,
-    [encounter.species.id, encounter.isShiny ? 1 : 0, encounter.catchRate, sessionId],
+    [encounter.species.id, encounter.isShiny ? 1 : 0, encounter.catchRate, encounter.sex, sessionId],
     (err) => cb(err)
   );
 }
@@ -281,8 +282,9 @@ function startSession(userId, { park = null, entryCost = 0 }, cb) {
     db.run(
       `INSERT INTO pokemon_safari_sessions
          (park_id, user_id, actions_left, entry_cost, started_at, expires_at,
-          encounter_no, encounter_species_id, encounter_is_shiny, encounter_catch_rate)
-       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+          encounter_no, encounter_species_id, encounter_is_shiny, encounter_catch_rate,
+          encounter_sex)
+       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
       [
         parkId,
         userId,
@@ -293,6 +295,7 @@ function startSession(userId, { park = null, entryCost = 0 }, cb) {
         encounter.species.id,
         encounter.isShiny ? 1 : 0,
         encounter.catchRate,
+        encounter.sex,
       ],
       function (err) {
         // C'est la base qui arbitre, pas un SELECT préalable qui laisserait une
@@ -522,7 +525,8 @@ function resolveAction({ session, species, action, config }, cb) {
     session.encounter_bait,
     config
   );
-  const base = { species, isShiny, probability, baitStacks: session.encounter_bait };
+  const sex = session.encounter_sex;
+  const base = { species, isShiny, sex, probability, baitStacks: session.encounter_bait };
   const done = (outcome, extra = {}) =>
     finishOrContinue(session.id, { ...base, outcome, ...extra }, cb);
 
@@ -568,7 +572,7 @@ function resolveAction({ session, species, action, config }, cb) {
     return done("MISS");
   }
 
-  const options = { ball: "safari", origin: "safari" };
+  const options = { ball: "safari", origin: "safari", sex };
   creditSpecies(session.user_id, species.id, isShiny, options, (err) => {
     if (err) return cb(err);
     recordSafariCatch({ userId: session.user_id, species, isShiny });

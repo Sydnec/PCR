@@ -7,7 +7,7 @@
 import db from "../points-db.js";
 import { handleException, log } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
-import { getSpecies, pickWeightedSpecies, rarityOf } from "./data.js";
+import { getSpecies, pickWeightedSpecies, rarityOf, rollSex } from "./data.js";
 import { rollHeldItem } from "./items.js";
 import { dropItem, leavesItemBehind } from "./drops.js";
 import {
@@ -255,12 +255,15 @@ function createSpawn(client, channel, species, isShiny, announcement, ping, prev
   // Tiré ici, une fois, et figé dans la ligne : ce que porte ce Pokémon lui
   // appartient. Celui qui s'enfuit part avec — on ne fouille pas les fuyards.
   const heldItem = rollHeldItem();
+  // Son sexe aussi, pour que l'annonce le montre : c'est celui de l'individu
+  // qui rejoindra la boîte de son vainqueur.
+  const sex = rollSex(species);
 
   db.run(
     `INSERT INTO pokemon_spawns
-       (species_id, is_shiny, catch_rate, rarity, channel_id, spawned_at, flees_at, held_item)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [species.id, isShiny ? 1 : 0, species.catchRate, rarity, channel.id, now, fleesAt, heldItem],
+       (species_id, is_shiny, catch_rate, rarity, channel_id, spawned_at, flees_at, held_item, sex)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [species.id, isShiny ? 1 : 0, species.catchRate, rarity, channel.id, now, fleesAt, heldItem, sex],
     async function (err) {
       if (err) {
         handleException("Insertion du spawn :", err);
@@ -275,6 +278,7 @@ function createSpawn(client, channel, species, isShiny, announcement, ping, prev
         rarity,
         throw_count: 0,
         held_item: heldItem,
+        sex,
       };
 
       const shouldPing =

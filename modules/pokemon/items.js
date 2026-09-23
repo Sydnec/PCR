@@ -32,6 +32,7 @@ function resolve(key, item) {
     ...item,
     label: item.label ?? ball?.label ?? key,
     emoji: item.emoji ?? ball?.emoji ?? "\u{1F4E6}",
+    sprite: item.sprite ?? ball?.sprite ?? null,
   };
 }
 
@@ -170,7 +171,10 @@ export function getBallStock(userId, cb) {
     const stock = [];
     for (const row of sortByCatalogue(rows)) {
       const item = getItem(row.item_key);
-      if (item?.ball) stock.push({ label: item.label, emoji: item.emoji, count: row.count });
+      if (item?.ball) {
+        const { key, label, emoji, sprite } = item;
+        stock.push({ key, label, emoji, sprite, count: row.count });
+      }
     }
     cb(null, stock);
   });

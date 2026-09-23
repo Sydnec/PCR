@@ -1,16 +1,19 @@
 // La boîte : chaque Pokémon un par un, avec son numéro. Cliquer sur l'un ouvre
 // sa fiche, d'où il se revend ou évolue — comme /pk revendre et /pk evolution
 // avec un `#id`.
+import { icon } from "../icons.js";
+import { lineageView, loadLineage } from "../lineage.js";
 import {
   api,
   confirmButton,
   dateFr,
-  emoji,
   fmt,
   h,
+  itemIcon,
   openDialog,
   pokemonName,
   richText,
+  speciesChips,
   toast,
 } from "../lib.js";
 
@@ -158,7 +161,7 @@ export async function render(ctx) {
 
 function ballOf(ctx, item) {
   const ball = item.ball ? ctx.balls.get(item.ball) : null;
-  return ball ? emoji(ball.emoji, ball.label) : null;
+  return ball ? itemIcon(ball) : null;
 }
 
 function card(ctx, item, reload) {
@@ -183,7 +186,7 @@ function card(ctx, item, reload) {
       { class: "card-meta" },
       h("span", { class: "card-id" }, `#${item.id}`),
       ballOf(ctx, item),
-      item.last ? h("span", { title: "Ton dernier : il reste dans la boîte" }, "📌") : null,
+      item.last ? icon("pin", { label: "Ton dernier : il reste dans la boîte" }) : null,
       item.fertile ? null : h("span", { class: "tag" }, "stérile")
     )
   );
@@ -198,23 +201,35 @@ function openPokemon(ctx, item, reload) {
     await Promise.all([ctx.refreshMe(), reload()]);
   };
 
+  const value = item.shiny ? species.sellValueShiny : species.sellValue;
   const facts = h(
     "dl",
     { class: "facts" },
-    h("dt", {}, "Espèce"),
-    h("dd", {}, `n° ${species.id} · ${species.types.join(" / ")} · ${species.rarityLabel}`),
     h("dt", {}, "Provenance"),
     h(
       "dd",
       {},
-      ball ? [emoji(ball.emoji, ball.label), " ", ball.label, " · "] : null,
+      ball ? [itemIcon(ball), " ", ball.label, " · "] : null,
       ORIGINS[item.origin] ?? item.origin
     ),
     h("dt", {}, "Arrivé le"),
     h("dd", {}, dateFr(item.obtainedAt)),
     h("dt", {}, "Fertilité"),
-    h("dd", {}, item.fertile ? "Fertile" : "Stérile (a déjà pondu)")
+    h("dd", {}, item.fertile ? "Fertile" : "Stérile (a déjà pondu)"),
+    h("dt", {}, "Capture"),
+    h("dd", {}, `Taux ${species.catchRate} / 255`),
+    h("dt", {}, "Revente"),
+    h("dd", {}, value ? `${fmt(value)} pts` : "Ne se revend pas")
   );
+
+  // La lignée arrive après la fiche : elle demande une lecture de plus, et la
+  // fiche est lisible sans elle.
+  const lineage = h("div", { class: "lineage-slot" });
+  loadLineage(species.id)
+    .then((links) =>
+      lineage.replaceWith(lineageView(ctx, links, { currentId: species.id, shiny: item.shiny }))
+    )
+    .catch(() => lineage.remove());
 
   const dialog = openDialog(
     h(
@@ -226,14 +241,17 @@ function openPokemon(ctx, item, reload) {
         alt: "",
       }),
       h("h2", {}, pokemonName(species, item.shiny, item.sex)),
-      h("p", { class: "muted" }, `#${item.id}`)
+      h("p", { class: "muted" }, `#${item.id} · n° ${String(species.id).padStart(3, "0")}`),
+      speciesChips(ctx, species)
     ),
     facts,
+    lineage,
     item.last
       ? h(
           "p",
           { class: "notice" },
-          `📌 C'est ton dernier ${species.name}${item.shiny ? " shiny" : ""} : il garde ton entrée du Pokédex, donc il ne peut ni partir ni évoluer.`
+          icon("pin"),
+          ` C'est ton dernier ${species.name}${item.shiny ? " shiny" : ""} : il garde ton entrée du Pokédex, donc il ne peut ni partir ni évoluer.`
         )
       : h(
           "div",

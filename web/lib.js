@@ -1,4 +1,5 @@
 // Petits outils partagés par les pages du site.
+import { EMOJI_ICONS, icon } from "./icons.js";
 
 // Appel à l'API. Une réponse d'erreur devient une exception qui porte le
 // message du serveur, déjà rédigé pour le joueur.
@@ -80,6 +81,29 @@ export function emoji(text, label = "") {
   });
 }
 
+// Une ball ou un objet : l'emoji du serveur quand il en a un (c'est le même
+// visuel que sur Discord), sinon son image PokéAPI, et l'emoji ordinaire en
+// dernier recours.
+export function itemIcon(entry, label = entry?.label ?? "") {
+  if (/^<a?:\w+:\d+>$/.test(entry?.emoji ?? "")) return emoji(entry.emoji, label);
+  if (entry?.image) {
+    return h("img", { class: "emoji item-img", src: entry.image, alt: label, title: label });
+  }
+  return emoji(entry?.emoji ?? "", label);
+}
+
+// Les emojis ordinaires des objets, et leur image : un message du jeu qui dit
+// « 🍬 Il tenait Super Bonbon » montre alors le bonbon. Rempli au démarrage
+// avec le catalogue.
+const itemImages = new Map();
+export function registerItemImages(entries) {
+  for (const entry of entries) {
+    if (entry.image && entry.emoji && !entry.emoji.startsWith("<")) {
+      itemImages.set(entry.emoji, entry);
+    }
+  }
+}
+
 export function avatarUrl(user) {
   if (user.avatar)
     return `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png?size=64`;
@@ -105,13 +129,20 @@ export function pokemonName(species, shiny = false, sex = null) {
     { class: "pokemon-name" },
     name,
     sexNode ? [" ", sexNode] : null,
-    shiny ? [" ", h("span", { class: "shiny-mark", title: "Shiny" }, "✨")] : null
+    shiny ? [" ", icon("sparkle", { label: "Shiny" })] : null
   );
 }
 
 // Comment on obtient une espèce qu'on ne croise pas dans la nature : les mêmes
-// repères que sur Discord.
-export const OBTENTION_MARKS = { evolution: "🔒", egg: "🥚" };
+// repères que sur Discord, en icônes.
+const OBTENTION_ICONS = {
+  evolution: ["lock", "Ne s'obtient qu'en évoluant"],
+  egg: ["egg", "Ne sort que d'un œuf"],
+};
+export function obtentionMark(obtention) {
+  const entry = OBTENTION_ICONS[obtention];
+  return entry ? icon(entry[0], { label: entry[1] }) : null;
+}
 export const OBTENTION_LEGENDS = {
   evolution: "🔒 Introuvable à l'état sauvage : par fusion de doublons, ou par échange.",
   egg: "🥚 Ne sort que d'un œuf : /pk oeuf pondre, avec un couple de parents.",
@@ -125,19 +156,39 @@ export function colorChip(content, { color = null, className = "" } = {}) {
   return chip;
 }
 
+// Rareté et types d'une espèce, en pastilles de couleur : la rareté selon les
+// repères de Discord, les types de la couleur de leurs embeds.
+export function speciesChips(ctx, species, ...extra) {
+  return h(
+    "div",
+    { class: "chips" },
+    colorChip(species.rarityLabel, { className: `rarity-${species.rarity}` }),
+    species.types.map((type) => colorChip(type, { color: ctx.types[type] })),
+    extra
+  );
+}
+
 // Un message du jeu, écrit pour Discord : le gras (**…**) et les emoji du
 // serveur (<:nom:id>) y sont rendus comme là-bas, le reste reste du texte. On
 // découpe la chaîne, on ne l'interprète jamais comme du HTML.
 export function richText(text) {
+  // Les plus longs d'abord : « ⚠️ » doit passer avant « ⚠ ».
+  const symbols = [...Object.keys(EMOJI_ICONS), ...itemImages.keys()]
+    .sort((a, b) => b.length - a.length)
+    .map((symbol) => symbol.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  const pattern = new RegExp(`(\\*\\*[^*]+\\*\\*|<a?:\\w+:\\d+>|${symbols.join("|")})`, "u");
   const nodes = [];
   String(text)
     .split("\n")
     .forEach((line, index) => {
       if (index) nodes.push(h("br"));
-      for (const part of line.split(/(\*\*[^*]+\*\*|<a?:\w+:\d+>)/)) {
+      for (const part of line.split(pattern)) {
         if (!part) continue;
-        if (/^\*\*[^*]+\*\*$/.test(part)) nodes.push(h("strong", {}, part.slice(2, -2)));
+        // Un gras peut porter un emoji (« **✨ Pikachu** ») : on le rend aussi.
+        if (/^\*\*[^*]+\*\*$/.test(part)) nodes.push(h("strong", {}, richText(part.slice(2, -2))));
         else if (/^<a?:\w+:\d+>$/.test(part)) nodes.push(emoji(part));
+        else if (EMOJI_ICONS[part]) nodes.push(icon(EMOJI_ICONS[part]));
+        else if (itemImages.has(part)) nodes.push(itemIcon(itemImages.get(part)));
         else nodes.push(part.replace(/`/g, ""));
       }
     });
@@ -146,7 +197,11 @@ export function richText(text) {
 
 export function toast(message, kind = "info") {
   const box = document.getElementById("toasts");
-  const item = h("div", { class: `toast toast-${kind}`, role: "status" }, richText(message));
+  const item = h(
+    "div",
+    { class: `toast toast-${kind}`, role: "status" },
+    h("span", {}, richText(message))
+  );
   box.append(item);
   setTimeout(() => item.remove(), 5000);
 }
@@ -209,5 +264,5 @@ export function progressBar(percent) {
 }
 
 export function errorBox(error) {
-  return h("div", { class: "notice error" }, richText(error.message));
+  return h("div", { class: "notice error" }, h("span", {}, richText(error.message)));
 }

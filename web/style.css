@@ -1,7 +1,9 @@
-/* PokéPCR — une feuille, des variables, un thème clair et un sombre. */
+/* PokéPCR — une feuille, des variables, un thème clair et un sombre.
+   Minimaliste : pas de cadres ni d'ombres ; seuls les boutons, les champs et les
+   fenêtres ont un contour. L'espace et de fins séparateurs font le reste. */
 
 :root {
-  --bg: #f3f4f6;
+  --bg: #f6f7f9;
   --surface: #ffffff;
   --surface-2: #eceef1;
   --text: #1d2025;
@@ -12,11 +14,12 @@
   --accent-text: #ffffff;
   --male: #2d6bd6;
   --female: #d2427a;
-  --shiny: #b88900;
+  --shiny: #c99400;
   --danger: #c0271f;
   --success-text: #1f7a45;
+  --warning: #b45309;
   --radius: 12px;
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.05), 0 2px 10px rgb(0 0 0 / 0.05);
+  --chip-tint: 26%;
   color-scheme: light dark;
 }
 
@@ -36,7 +39,8 @@
     --shiny: #f3c53a;
     --danger: #ff6b61;
     --success-text: #4cc27f;
-    --shadow: none;
+    --warning: #f59e0b;
+    --chip-tint: 34%;
   }
 }
 
@@ -68,12 +72,15 @@ h3 {
 }
 
 h1 {
-  font-size: 1.6rem;
+  font-size: 1.5rem;
 }
 
 h3 {
-  font-size: 0.95rem;
-  margin-bottom: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 .muted {
@@ -82,6 +89,57 @@ h3 {
 
 .small {
   font-size: 0.85rem;
+}
+
+/* ---------- Icônes et images ---------- */
+
+.icon {
+  width: 1.1em;
+  height: 1.1em;
+  vertical-align: -0.2em;
+  flex: none;
+}
+
+.icon-check {
+  color: var(--success-text);
+}
+
+.icon-cross {
+  color: var(--danger);
+}
+
+.icon-sparkle,
+.icon-star {
+  color: var(--shiny);
+}
+
+.icon-question,
+.icon-lock,
+.icon-egg,
+.icon-wind,
+.icon-hourglass,
+.icon-tent {
+  color: var(--muted);
+}
+
+.icon-warning {
+  color: var(--warning);
+}
+
+.icon-pin {
+  color: var(--accent);
+}
+
+.emoji {
+  width: 1.3em;
+  height: 1.3em;
+  vertical-align: -0.3em;
+  object-fit: contain;
+}
+
+/* Les images d'objets de PokéAPI sont du pixel art. */
+.item-img {
+  image-rendering: pixelated;
 }
 
 /* ---------- En-tête ---------- */
@@ -139,7 +197,7 @@ h3 {
 .account {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   margin-left: auto;
 }
 
@@ -153,19 +211,12 @@ h3 {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 3px 10px;
+  padding: 2px 10px;
   border-radius: 999px;
   background: var(--surface-2);
   font-weight: 600;
   font-size: 0.85rem;
   font-variant-numeric: tabular-nums;
-}
-
-.emoji {
-  width: 1.25em;
-  height: 1.25em;
-  vertical-align: -0.25em;
-  object-fit: contain;
 }
 
 /* ---------- Boutons et champs ---------- */
@@ -216,6 +267,11 @@ h3 {
   background: transparent;
 }
 
+.button.small {
+  padding: 4px 10px;
+  font-size: 0.85rem;
+}
+
 .button.big {
   padding: 12px 22px;
   font-size: 1.05rem;
@@ -241,7 +297,7 @@ input[type="search"] {
 .page {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 24px 20px 64px;
+  padding: 20px 20px 56px;
 }
 
 .view {
@@ -279,6 +335,9 @@ input[type="search"] {
 }
 
 .notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   margin: 0;
   padding: 10px 14px;
   border-radius: 10px;
@@ -308,48 +367,105 @@ input[type="search"] {
   margin: 0;
 }
 
+/* ---------- Pastilles ---------- */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+/* Une pilule de la couleur de --chip, teintée pour rester lisible dans les deux
+   thèmes. */
+.chip-color {
+  background: color-mix(in srgb, var(--chip, var(--muted)) var(--chip-tint), var(--surface));
+}
+
+/* Les mêmes repères que les pastilles de rareté sur Discord. */
+.rarity-COMMUN {
+  --chip: #9aa0a6;
+}
+
+.rarity-PEU_COMMUN {
+  --chip: #3ba55c;
+}
+
+.rarity-RARE {
+  --chip: #3b82f6;
+}
+
+.rarity-LEGENDAIRE {
+  --chip: #f59e0b;
+}
+
+/* Du vert au violet, du plus facile au plus dur. */
+.difficulty-0 {
+  --chip: #22c55e;
+}
+
+.difficulty-1 {
+  --chip: #84cc16;
+}
+
+.difficulty-2 {
+  --chip: #eab308;
+}
+
+.difficulty-3 {
+  --chip: #f97316;
+}
+
+.difficulty-4 {
+  --chip: #ef4444;
+}
+
+.difficulty-5 {
+  --chip: #a855f7;
+}
+
+.pill-new {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
 /* ---------- Grilles de Pokémon ---------- */
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(116px, 1fr));
+  gap: 4px;
 }
 
 .empty-grid {
   grid-column: 1 / -1;
 }
 
+/* Une tuile à plat : c'est le survol qui la révèle. */
 .card {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  padding: 8px 6px 10px;
-  border: 1px solid var(--border);
+  padding: 6px 4px 10px;
+  border: 0;
   border-radius: var(--radius);
-  background: var(--surface);
-  box-shadow: var(--shadow);
+  background: transparent;
   color: var(--text);
   font: inherit;
   cursor: pointer;
-  transition:
-    transform 0.1s ease,
-    border-color 0.1s ease;
 }
 
 .card:hover {
-  transform: translateY(-2px);
-  border-color: var(--accent);
+  background: var(--surface-2);
 }
 
-.card-shiny {
-  border-color: var(--shiny);
-  background: linear-gradient(
-    160deg,
-    color-mix(in srgb, var(--shiny) 14%, var(--surface)),
-    var(--surface) 60%
-  );
+.card-shiny .card-name {
+  color: var(--shiny);
 }
 
 .sprite {
@@ -358,7 +474,8 @@ input[type="search"] {
   image-rendering: pixelated;
 }
 
-.card-missing .sprite {
+.card-missing .sprite,
+.artwork-missing {
   filter: brightness(0);
   opacity: 0.18;
 }
@@ -436,11 +553,10 @@ input[type="search"] {
 .segmented button.active {
   background: var(--surface);
   color: var(--text);
-  box-shadow: var(--shadow);
 }
 
 .progress {
-  height: 8px;
+  height: 6px;
   border-radius: 999px;
   background: var(--surface-2);
   overflow: hidden;
@@ -455,9 +571,9 @@ input[type="search"] {
 /* ---------- Fiches ---------- */
 
 .dialog {
-  width: min(480px, calc(100vw - 32px));
+  width: min(520px, calc(100vw - 32px));
   max-height: calc(100vh - 32px);
-  padding: 24px;
+  padding: 22px;
   border: 1px solid var(--border);
   border-radius: 16px;
   background: var(--surface);
@@ -484,29 +600,31 @@ input[type="search"] {
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 6px;
   text-align: center;
 }
 
+.dialog-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .dialog-head p {
-  margin: 2px 0 0;
+  margin: 0;
 }
 
 .artwork {
-  width: 180px;
-  height: 180px;
+  width: 150px;
+  height: 150px;
   object-fit: contain;
-}
-
-.artwork-missing {
-  filter: brightness(0);
-  opacity: 0.2;
 }
 
 .facts {
   display: grid;
   grid-template-columns: max-content 1fr;
-  gap: 6px 16px;
-  margin: 18px 0;
+  gap: 4px 16px;
+  margin: 16px 0;
 }
 
 .facts dt {
@@ -535,32 +653,83 @@ input[type="search"] {
   margin: 0;
 }
 
-.chain {
-  margin-bottom: 16px;
-}
+/* ---------- Lignée (Capture, boîte, Pokédex) ---------- */
 
-.chain-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.chain-link {
+.lineage {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 4px 8px;
-  border-radius: 10px;
+  gap: 4px;
+  margin: 8px 0;
+}
+
+.lineage-stages {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 8px;
+}
+
+/* Les formes d'un même stade (les évolutions d'Évoli) se rangent en grille
+   plutôt qu'en une colonne interminable. */
+.lineage-stage {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 330px;
+}
+
+.lineage-arrow {
+  color: var(--muted);
+  font-size: 1.4rem;
+}
+
+.lineage-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 104px;
+  padding: 2px;
   font-size: 0.8rem;
 }
 
-.chain-link img {
-  image-rendering: pixelated;
+.lineage-link .sprite {
+  width: 64px;
+  height: 64px;
+  filter: brightness(0);
+  opacity: 0.18;
 }
 
-.chain-link.current {
-  background: var(--surface-2);
+.lineage-link.has .sprite {
+  filter: none;
+  opacity: 1;
+}
+
+.lineage-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   font-weight: 600;
+}
+
+/* Le maillon consulté : souligné, pas coloré — le rouge se lirait comme une
+   erreur. */
+.lineage-link.current .lineage-name {
+  text-decoration: underline 2px var(--accent);
+  text-underline-offset: 4px;
+}
+
+.lineage-counts {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.lineage-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
 }
 
 /* ---------- Capture ---------- */
@@ -568,23 +737,25 @@ input[type="search"] {
 .capture {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
-/* Le Pokémon au centre, le journal sur le côté. */
+/* Le Pokémon au centre, le journal sur le côté, séparé d'un simple filet. */
 .capture-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 300px;
+  grid-template-columns: minmax(0, 1fr) 250px;
   align-items: start;
-  gap: 20px;
+  gap: 24px;
 }
 
 .capture-aside {
   position: sticky;
-  top: 76px;
+  top: 72px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
+  padding-left: 20px;
+  border-left: 1px solid var(--border);
 }
 
 .capture-aside:empty {
@@ -595,24 +766,14 @@ input[type="search"] {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 24px;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  /* Un halo de la couleur du premier type derrière le Pokémon. */
-  background:
-    radial-gradient(
-      circle at 50% 30%,
-      color-mix(in srgb, var(--glow, transparent) 26%, transparent),
-      transparent 55%
-    ),
-    var(--surface);
-  box-shadow: var(--shadow);
+  gap: 8px;
+  /* Un halo de la couleur du premier type derrière le Pokémon, sans cadre. */
+  background: radial-gradient(
+    circle at 50% 110px,
+    color-mix(in srgb, var(--glow, transparent) 22%, transparent),
+    transparent 190px
+  );
   text-align: center;
-}
-
-.spawn-shiny {
-  border-color: var(--shiny);
 }
 
 .spawn p {
@@ -620,93 +781,31 @@ input[type="search"] {
 }
 
 .spawn-art {
-  width: min(320px, 100%);
-  aspect-ratio: 1;
+  width: 200px;
+  height: 200px;
   object-fit: contain;
-  filter: drop-shadow(0 8px 16px rgb(0 0 0 / 0.18));
 }
 
 .spawn-title {
-  font-size: 1.5rem;
-}
-
-.spawn-dex {
-  margin-top: -8px !important;
-}
-
-.spawn-owned {
-  padding: 4px 12px;
-  border-radius: 999px;
-  background: var(--surface-2);
-  font-weight: 600;
-}
-
-.spawn-owned.has {
-  color: var(--success-text);
-}
-
-.chips {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0 6px;
+  font-size: 1.35rem;
+}
+
+.spawn-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   justify-content: center;
   gap: 6px;
 }
 
-/* Pastille colorée : teinte de fond et bordure dérivées de --chip, pour rester
-   lisible en clair comme en sombre. */
-.chip-color {
-  border: 1px solid color-mix(in srgb, var(--chip, var(--muted)) 55%, transparent);
-  background: color-mix(in srgb, var(--chip, var(--muted)) 22%, var(--surface));
-}
-
-.chip-color::before {
-  content: "";
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--chip, var(--muted));
-}
-
-/* Les mêmes repères que les pastilles de rareté sur Discord. */
-.rarity-COMMUN {
-  --chip: #9aa0a6;
-}
-
-.rarity-PEU_COMMUN {
-  --chip: #3ba55c;
-}
-
-.rarity-RARE {
-  --chip: #3b82f6;
-}
-
-.rarity-LEGENDAIRE {
-  --chip: #f59e0b;
-}
-
-/* Du vert au violet, du plus facile au plus dur. */
-.difficulty-0 {
-  --chip: #22c55e;
-}
-
-.difficulty-1 {
-  --chip: #84cc16;
-}
-
-.difficulty-2 {
-  --chip: #eab308;
-}
-
-.difficulty-3 {
-  --chip: #f97316;
-}
-
-.difficulty-4 {
-  --chip: #ef4444;
-}
-
-.difficulty-5 {
-  --chip: #a855f7;
+.owned {
+  color: var(--success-text);
+  font-weight: 600;
 }
 
 .wallet {
@@ -714,89 +813,117 @@ input[type="search"] {
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
-  gap: 6px 14px;
+  gap: 4px 14px;
   font-variant-numeric: tabular-nums;
 }
 
 .wallet-ball {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   font-weight: 600;
 }
 
 .balls {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  gap: 6px;
   width: 100%;
-  max-width: 640px;
+  max-width: 720px;
+  margin-top: 4px;
 }
 
 .ball {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 10px 8px;
+  gap: 10px;
+  padding: 8px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface);
   color: var(--text);
   font: inherit;
+  text-align: left;
   cursor: pointer;
-  transition:
-    transform 0.1s ease,
-    border-color 0.1s ease;
 }
 
 .ball:hover:not(:disabled) {
-  transform: translateY(-2px);
   border-color: var(--accent);
 }
 
 .ball:disabled {
-  opacity: 0.5;
   cursor: not-allowed;
 }
 
-.ball .emoji {
-  width: 32px;
-  height: 32px;
-  font-size: 1.6rem;
-  line-height: 32px;
+/* Hors de portée : grisée, et sa ball en noir et blanc. */
+.ball-off {
+  opacity: 0.45;
 }
 
-.ball-master {
-  border-color: var(--danger);
+.ball-off .emoji {
+  filter: grayscale(1);
+}
+
+.ball .emoji {
+  width: 30px;
+  height: 30px;
+  font-size: 1.5rem;
+  line-height: 30px;
+}
+
+.ball-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .ball-label {
+  overflow: hidden;
   font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.ball-meta,
-.ball-odds {
+.ball-meta {
+  overflow: hidden;
   color: var(--muted);
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.ball-odds {
-  font-weight: 600;
+.ball-icon {
+  position: relative;
+  display: inline-flex;
+  flex: none;
 }
 
-.confirm,
-.throw-panel {
-  width: 100%;
-  max-width: 640px;
-  text-align: left;
+.ball-stock {
+  position: absolute;
+  right: -6px;
+  bottom: -4px;
+  min-width: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 17px;
+  text-align: center;
 }
 
 .confirm {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+  width: 100%;
+  max-width: 720px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  text-align: left;
 }
 
 .confirm-actions {
@@ -806,110 +933,23 @@ input[type="search"] {
 }
 
 .throw-panel {
-  padding: 10px 14px;
-  border-left: 4px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface-2);
-}
-
-.throw-catch {
-  border-left-color: var(--shiny);
-}
-
-.throw-miss,
-.throw-error,
-.throw-insufficient,
-.throw-no-item {
-  border-left-color: var(--danger);
-}
-
-/* La lignée, stade par stade, comme la fiche Discord. */
-.lineage {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
-}
-
-.lineage h3 {
-  margin: 0;
-}
-
-.lineage-stages {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px 20px;
-}
-
-.lineage-stage {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
+  max-width: 720px;
+  text-align: left;
 }
 
-/* Les formes d'un même stade (les évolutions d'Évoli) se rangent en grille
-   plutôt qu'en une colonne interminable. */
-.lineage-links {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
-  max-width: 380px;
-}
-
-.lineage-label {
-  color: var(--muted);
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.lineage-link {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  min-width: 110px;
-  padding: 6px 10px;
-  border: 1px solid transparent;
-  border-radius: 12px;
-}
-
-.lineage-link .sprite {
-  width: 72px;
-  height: 72px;
-  filter: brightness(0);
-  opacity: 0.2;
-}
-
-.lineage-link.has .sprite {
-  filter: none;
-  opacity: 1;
-}
-
-.lineage-link.current {
-  border-color: var(--border);
-  background: var(--surface-2);
-}
-
-.lineage-name {
-  font-weight: 600;
-  font-size: 0.85rem;
+.throw-panel .icon {
+  margin-top: 0.2em;
 }
 
 .spawn-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 32px 20px;
-  border: 1px dashed var(--border);
-  border-radius: 16px;
+  gap: 10px;
+  padding: 24px 0;
   text-align: center;
 }
 
@@ -921,23 +961,12 @@ input[type="search"] {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
 }
 
-.journal,
-.drops {
+.side-section {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 14px 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-}
-
-.journal h3,
-.drops h3 {
-  margin: 0;
 }
 
 .throws {
@@ -973,36 +1002,31 @@ input[type="search"] {
 
 .drop {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
 
 .drop-text {
   flex: 1;
-  min-width: 140px;
+  font-weight: 600;
 }
 
 /* ---------- Sac ---------- */
 
 .balance {
   display: flex;
-  flex-direction: column;
-  padding: 16px 20px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
+  align-items: baseline;
+  gap: 10px;
 }
 
 .balance strong {
-  font-size: 1.8rem;
+  font-size: 1.6rem;
   font-variant-numeric: tabular-nums;
 }
 
 .items {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -1012,14 +1036,15 @@ input[type="search"] {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
 }
 
-.item-icon {
+.item-icon .emoji {
+  width: 32px;
+  height: 32px;
   font-size: 1.6rem;
+  line-height: 32px;
 }
 
 .item-text {
@@ -1047,8 +1072,13 @@ input[type="search"] {
 }
 
 .egg-shell {
-  font-size: 4.5rem;
-  line-height: 1;
+  width: 64px;
+  height: 64px;
+  color: #c9a45c;
+}
+
+.egg-shell path {
+  fill: #f5e6c8;
 }
 
 .egg-bars {
@@ -1092,11 +1122,13 @@ input[type="search"] {
 }
 
 .toast {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 10px 16px;
   border-radius: 10px;
   background: var(--text);
   color: var(--bg);
-  box-shadow: 0 4px 16px rgb(0 0 0 / 0.2);
   font-weight: 600;
 }
 
@@ -1109,6 +1141,10 @@ input[type="search"] {
 .toast-error {
   background: #b3261e;
   color: #fff;
+}
+
+.toast .icon {
+  color: inherit;
 }
 
 /* ---------- Silhouettes ---------- */
@@ -1131,6 +1167,9 @@ input[type="search"] {
 
   .capture-aside {
     position: static;
+    padding: 16px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--border);
   }
 }
 
@@ -1157,19 +1196,11 @@ input[type="search"] {
   }
 
   .page {
-    padding: 16px 16px 48px;
+    padding: 14px 16px 48px;
   }
 
   .grid {
     grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  }
-
-  .card {
-    padding: 8px 4px 10px;
-  }
-
-  .card-name {
-    font-size: 0.8rem;
   }
 
   .sprite {
@@ -1177,15 +1208,20 @@ input[type="search"] {
     height: 80px;
   }
 
-  .spawn {
-    padding: 16px;
+  .card-name {
+    font-size: 0.8rem;
   }
 
   .spawn-art {
-    width: min(220px, 100%);
+    width: 160px;
+    height: 160px;
   }
 
   .balls {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .lineage-link {
+    width: 92px;
   }
 }

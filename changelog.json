@@ -1354,5 +1354,36 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "feature",
+      "name": "Le sexe du Pokémon apparu",
+      "description": "Les apparitions et les rencontres du parc safari montrent le sexe du Pokémon : c'est celui qu'il aura une fois capturé.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-23T13:00:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "fix",
+      "name": "Évolution d'un Pokémon précis",
+      "description": "Faire évoluer un Pokémon désigné par son numéro ne parle plus de trouver un mâle ou une femelle quand il manque des exemplaires.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-23T13:00:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "enhancement",
+      "name": "Site plus sobre",
+      "description": "Sur le site, une page Capture plus compacte, des balls grisées quand elles sont hors de portée, la lignée dans les fiches de la boîte et du Pokédex, et des images à la place des emojis.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-23T13:00:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    }
+  ]
 }

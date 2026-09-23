@@ -89,11 +89,11 @@ export function buildSpawnEmbed(spawn, species, throws = [], announcement = null
   const isShiny = Boolean(spawn.is_shiny);
   const rarity = RARITIES[spawn.rarity] ?? RARITIES[rarityOf(species)];
 
+  // Le sexe dans le titre : un symbole, pas un emoji, donc Discord l'affiche.
+  const name = displayName(species, false, spawn.sex);
   const embed = new EmbedBuilder()
     .setTitle(
-      isShiny
-        ? `✨ Un ${species.name} SHINY apparaît ! ✨`
-        : `Un ${species.name} sauvage apparaît !`
+      isShiny ? `✨ Un ${name} SHINY apparaît ! ✨` : `Un ${name} sauvage apparaît !`
     )
     .setColor(embedColor(species, isShiny))
     .setImage(spriteUrl(species, isShiny))
@@ -346,7 +346,7 @@ export function buildCaughtEmbed(spawn, species, winnerId, ballKey, spending) {
 
   return new EmbedBuilder()
     .setDescription(
-      `${ball?.emoji ?? ""} **${displayName(species, isShiny)}** a été capturé par <@${winnerId}> !`
+      `${ball?.emoji ?? ""} **${displayName(species, isShiny, spawn.sex)}** a été capturé par <@${winnerId}> !`
     )
     .setColor(embedColor(species, isShiny))
     .setThumbnail(spriteUrl(species, isShiny))
@@ -366,7 +366,7 @@ export function buildFledEmbed(spawn, species, spending, { dropped = false } = {
   const total = spending?.total ?? 0;
 
   return new EmbedBuilder()
-    .setTitle(`\u{1F4A8} ${displayName(species, isShiny)} s'est enfui...`)
+    .setTitle(`\u{1F4A8} ${displayName(species, isShiny, spawn.sex)} s'est enfui...`)
     .setDescription("Personne n'a réussi à le capturer à temps.")
     .setColor(0x4f545c)
     .setThumbnail(spriteUrl(species, isShiny))
@@ -921,7 +921,7 @@ export function buildParkRow(parkId, { disabled = false } = {}) {
 // seule trace qu'en garde le joueur : le message est unique et réécrit à chaque
 // clic, il n'y a pas de fil de discussion où relire ce qui s'est passé.
 function safariOutcomeLine(result, config) {
-  const name = displayName(result.species, result.isShiny);
+  const name = displayName(result.species, result.isShiny, result.sex);
   switch (result.outcome) {
     case "CATCH":
       return `\u{1F389} **${name}** est capturé ! Il rejoint ton Pokédex.`;
@@ -980,11 +980,12 @@ function buildEncounterEmbed(session, species, config, { intro = null, owned = n
   // « Rareté | Type | Chances » puis « Ton Pokédex | Actions restantes ».
   const ownership = ownedLine(owned, isShiny);
 
+  const name = displayName(species, false, session.encounter_sex);
   const embed = new EmbedBuilder()
     .setTitle(
       isShiny
-        ? `\u2728 Un ${species.name} SHINY vous observe ! \u2728`
-        : `Un ${species.name} sauvage vous observe...`
+        ? `\u2728 Un ${name} SHINY vous observe ! \u2728`
+        : `Un ${name} sauvage vous observe...`
     )
     .setColor(embedColor(species, isShiny))
     .setImage(spriteUrl(species, isShiny))

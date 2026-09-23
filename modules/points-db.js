@@ -242,6 +242,15 @@ const db = new sqlite3.Database(dbPath, (err) => {
               handleException("Erreur lors de l'ajout de held_item :", err);
             }
           });
+          // Le sexe du Pokémon apparu, tiré à l'apparition pour que l'annonce
+          // le montre — et c'est celui qu'aura l'individu capturé. NULL pour
+          // une espèce asexuée, et pour les apparitions d'avant la colonne,
+          // dont le sexe se tire à la capture comme autrefois.
+          db.run("ALTER TABLE pokemon_spawns ADD COLUMN sex TEXT", (err) => {
+            if (err && !err.message.includes("duplicate column")) {
+              handleException("Erreur lors de l'ajout du sexe des apparitions :", err);
+            }
+          });
         });
       }
     );
@@ -627,6 +636,13 @@ const db = new sqlite3.Database(dbPath, (err) => {
         // La suite est DANS le callback, comme les autres migrations de ce
         // fichier : sqlite3 n'ordonne pas deux db.run successifs, et rien de ce
         // qui touche à la nouvelle colonne ne doit partir avant qu'elle existe.
+        // Le sexe de la rencontre, comme celui d'une apparition : tiré quand
+        // elle arrive, montré, puis donné à l'individu capturé.
+        db.run("ALTER TABLE pokemon_safari_sessions ADD COLUMN encounter_sex TEXT", (err) => {
+          if (err && !err.message.includes("duplicate column")) {
+            handleException("Erreur lors de l'ajout du sexe des rencontres :", err);
+          }
+        });
         db.run("ALTER TABLE pokemon_safari_sessions ADD COLUMN shared_at INTEGER", (err) => {
           if (err && !err.message.includes("duplicate column")) {
             handleException("Erreur lors de l'ajout de shared_at :", err);
