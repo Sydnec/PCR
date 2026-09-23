@@ -1,4 +1,5 @@
 import { log } from "../../modules/utils.js";
+import { pseudoOf } from "../../modules/pseudo.js";
 // Discord refuse un bulkDelete de plus de 100 messages à la fois.
 const MAX_MESSAGES = 100;
 
@@ -41,7 +42,7 @@ export default {
       await interaction.editReply({
         content: `${deleted.size} message(s) supprimé(s).`,
       });
-      log(`/admin purge : ${deleted.size} message(s) par ${interaction.user.tag}`);
+      log(`/admin purge : ${deleted.size} message(s) par ${pseudoOf(interaction)}`);
       return;
     }
 
@@ -91,7 +92,7 @@ export default {
           ? `\n⚠️ Limite de ${MAX_MESSAGES} messages atteinte, relancez la commande pour continuer.`
           : ""),
     });
-    log(`/admin purge (lien) : ${deleted.size} message(s) par ${interaction.user.tag}`);
+    log(`/admin purge (lien) : ${deleted.size} message(s) par ${pseudoOf(interaction)}`);
   },
 };
 

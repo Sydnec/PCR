@@ -20,6 +20,7 @@
 import { EmbedBuilder } from "discord.js";
 import db from "../points-db.js";
 import { handleException, log } from "../utils.js";
+import { pseudo } from "../pseudo.js";
 import { getPokemonConfig } from "./config.js";
 import {
   allSpecies,
@@ -249,9 +250,11 @@ export function layEgg(userId, firstGroup, secondGroup, cb) {
                 cb(err);
               });
             }
-            log(
-              `Œuf : ${userId} obtient un œuf de ${plan.baby.name} ` +
-                `(${fatherSpecies.name} × ${motherSpecies.name})`
+            pseudo(userId).then((name) =>
+              log(
+                `Œuf : ${name} obtient un œuf de ${plan.baby.name} ` +
+                  `(${fatherSpecies.name} × ${motherSpecies.name})`
+              )
             );
             getIncubatingEgg(userId, (err, egg) =>
               cb(err, { ok: true, egg: egg ?? { id: this.lastID, species_id: plan.baby.id } })
@@ -294,7 +297,9 @@ export function hatchEgg(eggId, cb) {
           db.run("UPDATE pokemon_eggs SET pokemon_id = ? WHERE id = ?", [born.id, eggId], (err) => {
             if (err) handleException("Lien de l'œuf vers son bébé :", err);
           });
-          log(`Éclosion : ${egg.user_id} obtient ${species.name}${isShiny ? " ✨" : ""} (œuf #${eggId})`);
+          pseudo(egg.user_id).then((name) =>
+            log(`Éclosion : ${name} obtient ${species.name}${isShiny ? " ✨" : ""} (œuf #${eggId})`)
+          );
           cb(null, { egg, species, isShiny, sex: born.sex });
         });
       });

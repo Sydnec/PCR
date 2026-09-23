@@ -11,6 +11,7 @@
 import { EmbedBuilder } from "discord.js";
 import db from "./points-db.js";
 import { handleException } from "./utils.js";
+import { pseudo } from "./pseudo.js";
 
 // Débite cost points si le solde le permet.
 // Rappelle cb(err, true) si le débit a eu lieu, cb(err, false) sinon.
@@ -136,16 +137,15 @@ async function applyMovementsNow(movements) {
     handleException("Transaction refusée, mouvements appliqués un à un :", beginError);
   }
 
-  let failures = 0;
+  // Les échecs se journalisent APRÈS la transaction : retrouver un pseudo peut
+  // demander à Discord, et rien ne doit la garder ouverte pendant ce temps.
+  const failed = [];
   let commitError = null;
   try {
     for (const { userId, amount } of movements) {
       if (!amount) continue;
       const err = await new Promise((resolve) => addPoints(userId, amount, resolve));
-      if (err) {
-        failures++;
-        handleException(`Mouvement de ${amount} points impossible pour ${userId} :`, err);
-      }
+      if (err) failed.push({ userId, amount, err });
     }
   } finally {
     // COMMIT tenté DANS TOUS LES CAS, y compris après un BEGIN refusé. Le sauter
@@ -158,6 +158,11 @@ async function applyMovementsNow(movements) {
     // fermer, et c'est très bien.
     if (commitError && /no transaction is active/i.test(commitError.message)) commitError = null;
   }
+
+  for (const { userId, amount, err } of failed) {
+    handleException(`Mouvement de ${amount} points impossible pour ${await pseudo(userId)} :`, err);
+  }
+  const failures = failed.length;
 
   if (commitError) {
     handleException("Validation des mouvements impossible :", commitError);

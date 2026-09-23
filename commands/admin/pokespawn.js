@@ -1,4 +1,5 @@
 import { log } from "../../modules/utils.js";
+import { pseudoOf } from "../../modules/pseudo.js";
 import { claimForcedSpawn, doSpawn } from "../../modules/pokemon/spawn.js";
 import {
   activeGeneration,
@@ -105,7 +106,7 @@ export default {
     });
 
     log(
-      `/admin pokespawn par ${interaction.user.username} : ${species ? species.name : "aléatoire"}${forceShiny ? " ✨" : ""}`
+      `/admin pokespawn par ${pseudoOf(interaction)} : ${species ? species.name : "aléatoire"}${forceShiny ? " ✨" : ""}`
     );
     await interaction
       .editReply({

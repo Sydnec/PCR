@@ -12,6 +12,7 @@
 // redémarrage du bot.
 import db from "../points-db.js";
 import { handleException, log } from "../utils.js";
+import { pseudo } from "../pseudo.js";
 import { getPokemonConfig } from "./config.js";
 import { getItem, grantItem } from "./items.js";
 import { buildDropEmbed, buildDropRow } from "./embeds.js";
@@ -140,7 +141,9 @@ export function claimDrop(userId, dropId, cb) {
             // serait perdu pour tout le monde.
             return reopen(dropId, () => cb(err, null));
           }
-          log(`Objet au sol #${dropId} ramassé par ${userId} (${item.label})`);
+          pseudo(userId).then((name) =>
+            log(`Objet au sol #${dropId} ramassé par ${name} (${item.label})`)
+          );
           cb(null, { drop, item });
         });
       });

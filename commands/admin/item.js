@@ -1,4 +1,5 @@
 import { handleException, log } from "../../modules/utils.js";
+import { pseudo, pseudoOf } from "../../modules/pseudo.js";
 import { resolveTarget } from "../../modules/members.js";
 import {
   consumeItem,
@@ -118,7 +119,7 @@ export default {
         }
       }
       log(
-        `/admin item par ${interaction.user.username} : ${signed(quantity)} ${item.label} ` +
+        `/admin item par ${pseudoOf(interaction)} : ${signed(quantity)} ${item.label} ` +
           `à ${served} membre(s) du rôle ${role.name}` +
           (short ? `, ${short} sans assez d'exemplaires` : "") +
           (failures ? `, ${failures} échec(s)` : "")
@@ -153,8 +154,8 @@ export default {
     // n'a jamais existé, et le journaliser, vaut moins qu'une requête de plus.
     const after = await lire(user.id, key);
     log(
-      `/admin item par ${interaction.user.username} : ${signed(quantity)} ` +
-        `${item.label} à ${user.username} (${before} → ${after})`
+      `/admin item par ${pseudoOf(interaction)} : ${signed(quantity)} ` +
+        `${item.label} à ${await pseudo(user.id)} (${before} → ${after})`
     );
     await interaction
       .editReply({

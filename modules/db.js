@@ -143,24 +143,6 @@ const db = new sqlite3.Database(dbPath, (err) => {
             "Erreur lors de la création de la table randomizabaise_stats :",
             err
           );
-        } else {
-          // Migration : ajouter user_c et is_shiny si la table existe en ancien format
-          db.run(
-            "ALTER TABLE randomizabaise_stats ADD COLUMN user_c TEXT",
-            (err) => {
-              if (err && !err.message.includes("duplicate column")) {
-                handleException("Erreur lors de l'ajout de user_c :", err);
-              }
-            }
-          );
-          db.run(
-            "ALTER TABLE randomizabaise_stats ADD COLUMN is_shiny INTEGER DEFAULT 0",
-            (err) => {
-              if (err && !err.message.includes("duplicate column")) {
-                handleException("Erreur lors de l'ajout de is_shiny :", err);
-              }
-            }
-          );
         }
       }
     );
@@ -197,16 +179,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
       )`,
       (err) => {
         if (err) {
-          return handleException("Erreur lors de la création de la table pokemon_stats :", err);
-        }
-        // La base de l'année est déjà créée : CREATE TABLE IF NOT EXISTS ne
-        // suffit pas à faire apparaître les colonnes du parc safari.
-        for (const column of ["safari_sessions", "safari_catches", "safari_points_spent"]) {
-          db.run(`ALTER TABLE pokemon_stats ADD COLUMN ${column} INTEGER DEFAULT 0`, (err) => {
-            if (err && !err.message.includes("duplicate column")) {
-              handleException(`Erreur lors de l'ajout de ${column} :`, err);
-            }
-          });
+          handleException("Erreur lors de la création de la table pokemon_stats :", err);
         }
       }
     );

@@ -13,6 +13,7 @@ import { MessageFlags } from "discord.js";
 import db from "../points-db.js";
 import { addPoints, getBalance, spendPoints } from "../economy.js";
 import { handleException, log } from "../utils.js";
+import { pseudo } from "../pseudo.js";
 import { getBall, getPokemonConfig } from "./config.js";
 import { creditSpecies } from "./collection.js";
 import { consumeItem, getBallItem, getItem, grantItem } from "./items.js";
@@ -157,9 +158,11 @@ function refundThrow(userId, spawnId, ball, probability, payment, cb) {
   const done = (err) => {
     if (err) handleException("Remboursement impossible :", err);
     logThrow(spawnId, userId, ball.key, gratuit ? 0 : ball.price, probability, "VOID");
-    log(
-      `Remboursement à ${userId} (spawn #${spawnId} déjà résolu) : ` +
-        (gratuit ? payment.label : `${ball.price} pts`)
+    pseudo(userId).then((name) =>
+      log(
+        `Remboursement à ${name} (spawn #${spawnId} déjà résolu) : ` +
+          (gratuit ? payment.label : `${ball.price} pts`)
+      )
     );
     cb(null, { status: "void", ball, payment });
   };
@@ -300,8 +303,11 @@ export function resolveThrow(client, userId, spawnId, ballKey, { requireItem = f
           creditSpecies(userId, spawn.species_id, spawn.is_shiny, options, (err, caught) => {
             if (err) handleException("Crédit de la collection :", err);
             finalizeCaughtSpawn(client, spawnId, userId, ball.key);
-            log(
-              `Capture : ${userId} attrape ${species.name}${spawn.is_shiny ? " ✨" : ""} (spawn #${spawnId}, ${ball.key})`
+            pseudo(userId).then((name) =>
+              log(
+                `Capture : ${name} attrape ${species.name}${spawn.is_shiny ? " ✨" : ""} ` +
+                  `(spawn #${spawnId}, ${ball.key})`
+              )
             );
 
             // L'objet tenu suit le Pokémon dans le sac de celui qui l'attrape.
@@ -336,7 +342,9 @@ export function resolveThrow(client, userId, spawnId, ballKey, { requireItem = f
                 handleException("Remise de l'objet tenu :", err);
                 return caughtOutcome(null);
               }
-              log(`Butin : ${userId} récupère ${held.label} (spawn #${spawnId})`);
+              pseudo(userId).then((name) =>
+                log(`Butin : ${name} récupère ${held.label} (spawn #${spawnId})`)
+              );
               caughtOutcome({ item: held, dropped: false });
             });
           });

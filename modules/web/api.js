@@ -81,6 +81,7 @@ import {
 } from "../pokemon/spawn.js";
 import { configOverrideStatus, configTree, getConfig, writeConfigValue } from "../config.js";
 import { log } from "../utils.js";
+import { pseudo } from "../pseudo.js";
 
 // Les fonctions du jeu sont à callbacks ; les routes, en promesses.
 const promise = (fn) =>
@@ -940,7 +941,7 @@ export const routes = [
         throw new HttpError(409, statut.ok ? result.reason : `${result.reason}\n${statut.reason}`);
       }
       log(
-        `Web : config par ${ctx.user.username} : ${result.path} ` +
+        `Web : config par ${await pseudo(ctx.user.id)} : ${result.path} ` +
           `${JSON.stringify(result.before)} → ${JSON.stringify(result.after)}`
       );
       return { path: result.path, before: result.before, after: result.after };

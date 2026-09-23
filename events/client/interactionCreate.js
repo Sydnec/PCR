@@ -3,6 +3,7 @@ import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, Messa
 import pointsDb from '../../modules/points-db.js';
 import { addPoints, getBalance, spendPoints } from '../../modules/economy.js';
 import { handlePokemonButton } from '../../modules/pokemon/interactions.js';
+import { pseudoOf } from '../../modules/pseudo.js';
 
 const name = 'interactionCreate';
 const once = false;
@@ -52,7 +53,7 @@ async function execute(interaction, bot) {
 
         if (interaction.commandName != 'safe-place')
             log(
-                `/${commandLabel} par ${interaction.member?.displayName ?? interaction.user.username}`
+                `/${commandLabel} par ${pseudoOf(interaction)}`
             );
         // --- Statistiques commandes les plus utilisées ---
         try {

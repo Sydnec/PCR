@@ -23,6 +23,7 @@ import http from "http";
 import crypto from "crypto";
 import { RESTJSONErrorCodes } from "discord.js";
 import { handleException, log } from "../utils.js";
+import { pseudo } from "../pseudo.js";
 import { getConfig } from "../config.js";
 import { HttpError, routes } from "./api.js";
 import { authorizeUrl, fetchDiscordUser } from "./discord.js";
@@ -237,7 +238,7 @@ async function callback(req, res, url, bot) {
 
   const hours = Math.max(1, Number(webConfig()?.sessionHours) || 168);
   const session = signToken(user, hours * 3600 * 1000, "session");
-  log(`Web : connexion de ${user.username} (${user.id})`);
+  log(`Web : connexion de ${await pseudo(user.id)}`);
   redirect(res, `${baseUrl()}${expected.back}`, [
     clearState,
     serializeCookie(SESSION_COOKIE, session, {
