@@ -838,8 +838,9 @@ export async function openPark(
         await new Promise((resolve) => setSpawnPause(0, { clear: true }, resolve));
       }
 
+      const forWhom = reservedFor ? ` pour ${await pseudo(reservedFor)}` : "";
       log(
-        `Parc safari #${parkId} ouvert${reservedFor ? ` pour ${reservedFor}` : ""}` +
+        `Parc safari #${parkId} ouvert${forWhom}` +
           `${shouldPause ? `, apparitions suspendues ${config.spawnPauseHours} h` : ""}`
       );
       return { ok: true, parkId, park, paused: shouldPause };

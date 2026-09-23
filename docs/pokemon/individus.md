@@ -10,7 +10,8 @@ le distingue des autres.
   femelles, Kicklee et Tygnon toujours mâles, Évoli mâle sept fois sur huit. Les espèces asexuées des
   jeux (Magnéti, Stari, Porygon, Métamorph, les légendaires…) n'en ont pas ici non plus.
 - **La ball de capture**, mémorisée pour de bon — y compris la Safari Ball du parc. Un Pokémon éclos
-  d'un œuf n'en a pas.
+  d'un œuf n'en a pas, et ceux d'avant les individus portent « ball inconnue » quand l'historique
+  des captures ne disait pas laquelle.
 - **La fertilité** : un individu ne pond qu'un œuf dans sa vie, puis il devient stérile (voir
   [Œufs](oeufs.md)).
 - **Sa date d'arrivée** chez son dresseur actuel.

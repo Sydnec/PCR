@@ -4,6 +4,13 @@
 // le même, pour qu'on retrouve quelqu'un d'une ligne à l'autre.
 let bot = null;
 
+// Les membres partis du serveur, pour une heure : sans ce souvenir, chaque
+// ligne de journal à leur nom redemanderait à Discord un membre qu'il n'a pas,
+// une requête perdue de plus sur la limite du bot. Ce n'est pas un état de
+// jeu : le perdre au redémarrage coûte au pire une requête.
+const ABSENT_MS = 3600 * 1000;
+const absent = new Map();
+
 // Le client se déclare au démarrage (clientReady) : les modules du jeu n'en
 // ont pas toujours un sous la main, et un journal ne doit pas en dépendre.
 export function setPseudoClient(client) {
@@ -22,15 +29,18 @@ export const pseudoOf = (interaction) =>
 export async function pseudo(userId) {
   const id = String(userId);
   if (!bot) return id;
-  try {
-    const guild = await bot.guilds.fetch(process.env.GUILD_ID);
-    return (await guild.members.fetch(id)).displayName;
-  } catch {
+  if ((absent.get(id) ?? 0) < Date.now()) {
     try {
-      return (await bot.users.fetch(id)).displayName;
+      const guild = await bot.guilds.fetch(process.env.GUILD_ID);
+      return (await guild.members.fetch(id)).displayName;
     } catch {
-      return id;
+      absent.set(id, Date.now() + ABSENT_MS);
     }
+  }
+  try {
+    return (await bot.users.fetch(id)).displayName;
+  } catch {
+    return id;
   }
 }
 

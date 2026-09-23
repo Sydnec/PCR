@@ -52,9 +52,9 @@ export default (bot) => {
             console.log(`⏰ ${reminders.length} rappel(s) à envoyer...`);
             
             // Log des rappels à traiter
-            for (const r of reminders) {
-                console.log(`  - Rappel #${r.id} pour ${await pseudo(r.user_id)} : "${r.message.substring(0, 30)}..."`);
-            }
+            reminders.forEach(r => {
+                console.log(`  - Rappel #${r.id} : "${r.message.substring(0, 30)}..."`);
+            });
 
             // Envoyer chaque rappel
             for (const reminder of reminders) {
@@ -62,7 +62,8 @@ export default (bot) => {
                     // Récupérer l'utilisateur
                     const user = await bot.users.fetch(reminder.user_id).catch(() => null);
                     if (!user) {
-                        console.warn(`⚠️ Utilisateur ${await pseudo(reminder.user_id)} introuvable pour rappel #${reminder.id}`);
+                        // Discord ne le connaît plus : son identifiant est tout ce qui reste.
+                        console.warn(`⚠️ Utilisateur ${reminder.user_id} introuvable pour rappel #${reminder.id}`);
                         await markReminderAsSent(reminder.id);
                         continue;
                     }
@@ -90,7 +91,11 @@ export default (bot) => {
 
                     // Envoyer le DM
                     await user.send({ embeds: [embed] });
-                    console.log(`✅ Rappel #${reminder.id} envoyé à ${await pseudo(user.id)}`);
+                    // Sans attendre : le rappel se marque envoyé tout de suite, sans quoi
+                    // le passage suivant pourrait le renvoyer.
+                    pseudo(user.id).then((name) =>
+                        console.log(`✅ Rappel #${reminder.id} envoyé à ${name}`)
+                    );
 
                     // Marquer comme envoyé
                     await markReminderAsSent(reminder.id);
