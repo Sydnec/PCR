@@ -285,10 +285,12 @@ const parseVariant = (raw) =>
       };
 
 function runEvolution(interaction, speciesId, variant, chosenTargetId, helperKey = null) {
-  // Un individu désigné se résout dans evolve, qui lit sur lui espèce, variante
-  // et sexe — et vérifie qu'il appartient bien à celui qui clique.
+  // L'espèce du bouton voyage avec l'individu : la réservation ne le prend que
+  // s'il est encore de cette espèce, et à celui qui clique. Un second clic sur
+  // un Pokémon qui vient d'évoluer est donc refusé, au lieu de le faire
+  // évoluer une seconde fois à un tarif qu'on ne lui a pas montré.
   const group = variant.pokemonId
-    ? { pokemonId: variant.pokemonId }
+    ? { pokemonId: variant.pokemonId, speciesId }
     : { speciesId, isShiny: variant.isShiny, sex: variant.sex };
   evolve(interaction.user.id, group, chosenTargetId, helperKey, (err, result) => {
     if (err) {
@@ -305,29 +307,30 @@ function runEvolution(interaction, speciesId, variant, chosenTargetId, helperKey
 
     const source = getSpecies(speciesId);
     const aide = result.plan.helper;
-    // Les Métamorph consommés comptent parmi les exemplaires de la fusion : on
-    // les sépare des vrais doublons pour dire ce qui est parti.
-    const metamorphs = result.plan.ditto?.dittos ?? 0;
-    const doublons = result.plan.duplicates - (result.plan.ditto?.copies ?? 0);
+    // Ce qui a été sacrifié : des exemplaires de l'espèce, et les Métamorph qui
+    // ont comblé le reste, comptés à part.
+    const { sacrifices, dittos: metamorphs, shinies } = result.spent;
     const paye = [
-      `-${doublons} doublon${doublons > 1 ? "s" : ""}`,
+      sacrifices ? `-${sacrifices} ${source.name}` : null,
       metamorphs ? `-${metamorphs} Métamorph` : null,
+      shinies ? `dont ${shinies} ✨` : null,
       aide ? `-${aide.quantity} ${aide.item.label}` : null,
       result.plan.points > 0 ? `-${result.plan.points} points` : null,
     ].filter(Boolean);
 
     log(
-      `Fusion : ${interaction.user.id} transforme ${source.name} en ${result.target.name}` +
-        ` (${doublons} doublons, ${result.plan.points} pts` +
+      `Évolution : ${interaction.user.id} fait évoluer #${result.evolved.id} ${source.name} en ` +
+        `${result.target.name} (${sacrifices} sacrifiés, ${result.plan.points} pts` +
         `${metamorphs ? `, ${metamorphs}× Métamorph` : ""}` +
         `${aide ? `, ${aide.quantity}× ${aide.item.label}` : ""})`
     );
     interaction
       .update({
         content:
-          `✨ Félicitations ! Ton **${displayName(source, result.isShiny, result.evolved?.sex)}** a ` +
-          `évolué en **${displayName(result.target, result.isShiny, result.evolved?.sex)}** ! ` +
-          `(${paye.join(", ")})`,
+          `✨ Félicitations ! Ton #${result.evolved.id} ` +
+          `**${displayName(source, result.isShiny, result.evolved.sex)}** a évolué en ` +
+          `**${displayName(result.target, result.isShiny, result.evolved.sex)}** ! ` +
+          (paye.length ? `(${paye.join(", ")})` : ""),
         embeds: [],
         components: [],
       })
@@ -364,7 +367,8 @@ function showEvolutionChoices(interaction, speciesId, variant, helperKey = null)
   interaction
     .update({
       content:
-        `🎯 Choisis l'évolution (**${cost}** points, ${plan.duplicates} doublons` +
+        `🎯 Choisis l'évolution (**${cost}** points, ` +
+        `${plan.sacrifices} sacrifice${plan.sacrifices > 1 ? "s" : ""}` +
         `${helperKey ? ", Métamorph en renfort" : ""}) :`,
       embeds: [],
       components: [row],
@@ -658,8 +662,8 @@ export async function handlePokemonButton(interaction) {
     case "poke_box":
       return showBoxPage(interaction, args[0], Number(args[1]) || null, Number(args[2]) || 0);
 
-    // Le cinquième segment, facultatif, est l'objet qui aide la fusion : une
-    // pierre impose alors sa cible, un bonbon remplace un exemplaire manquant.
+    // Le cinquième segment, facultatif, est l'objet qui aide l'évolution : une
+    // pierre impose alors sa cible, un bonbon remplace un sacrifice manquant.
     case "poke_evo": {
       const [speciesId, variant, mode, helper] = args;
       if (mode === "choose") {
@@ -677,7 +681,7 @@ export async function handlePokemonButton(interaction) {
     // un objet sont deux chemins distincts. Une pierre impose déjà sa forme —
     // c'est précisément ce qui en fait le moyen de choisir son Évoli sans payer
     // le supplément — et un bonbon laisse le hasard trancher. Métamorph, lui, ne
-    // fait que remplacer des exemplaires : il se combine avec le choix.
+    // fait que remplacer des sacrifices : il se combine avec le choix.
     case "poke_evo_pick": {
       const [speciesId, variant, targetId, helper] = args;
       return runEvolution(

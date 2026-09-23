@@ -121,8 +121,9 @@ const POKEMON = {
     2: { duplicates: 5, points: 500 },
     3: { duplicates: 10, points: 2000 },
     branchChoicePoints: 1000,
-    // Métamorph, joker des fusions : autant de Métamorph de la même variante
-    // tiennent lieu d'un exemplaire manquant.
+    // `duplicates` compte l'individu qui évolue : il en sacrifie un de moins.
+    // Métamorph, joker des évolutions : autant de Métamorph, shiny ou non,
+    // tiennent lieu d'un sacrifice manquant.
     dittosPerCopy: 1,
   },
   trade: { expiryHours: 24 },
@@ -134,6 +135,9 @@ const POKEMON = {
     enabled: true,
     hatchHours: 120,
     hatchMessages: 200,
+    // Le bébé a les chances de shiny d'une apparition, multipliées par ce
+    // facteur pour chaque parent shiny : ×2 pour un, ×4 pour deux.
+    shinyParentMultiplier: 2,
   },
   pokedex: { pageSize: 30 },
   box: { pageSize: 15 },
@@ -173,8 +177,8 @@ const POKEMON = {
   // Pépite et la Master Ball à la cadence qu'elles avaient à 50 % — une tous les
   // 92 jours, une tous les 615 — sans toucher à ce que tiennent les Pokémon.
   //
-  // `evolution` le rend utilisable dans une fusion : `quantity` exemplaires de
-  // l'objet tiennent lieu de `copies` exemplaires du Pokémon, `freePoints`
+  // `evolution` le rend utilisable dans une évolution : `quantity` exemplaires
+  // de l'objet tiennent lieu de `copies` sacrifices, `freePoints`
   // dispense du coût en points, et `from`/`target` l'enferment dans une lignée
   // précise — c'est ce qui fait des pierres des objets à Évoli.
   //
@@ -202,7 +206,7 @@ const POKEMON = {
       label: "Super Bonbon",
       emoji: "🍬",
       sprite: "rare-candy",
-      description: "Trois d'entre eux tiennent lieu d'un exemplaire manquant dans une fusion.",
+      description: "Trois d'entre eux tiennent lieu d'un sacrifice dans une évolution.",
       sellValue: 300,
       dropWeight: 120,
       evolution: { copies: 1, quantity: 3 },
@@ -530,7 +534,7 @@ const BOUNDS = {
   "pokemon.pc.maxBoxes": { min: 1, max: 200 },
   "pokemon.pc.boxNameLength": { min: 1, max: 40 },
   "pokemon.pc.nicknameLength": { min: 1, max: 24 },
-  // À 0, Métamorph comblerait une fusion sans être consommé.
+  // À 0, Métamorph comblerait une évolution sans être consommé.
   "pokemon.evolution.dittosPerCopy": { min: 1 },
   // À 0, chaque onglet ouvert relirait l'apparition en boucle.
   "web.spawnRefreshSeconds": { min: 2, max: 60 },
@@ -538,6 +542,8 @@ const BOUNDS = {
   // Math.floor(Math.random() * odds) === 0 : à 0, tout devient shiny.
   "pokemon.spawn.shinyOdds": { min: 1 },
   "pokemon.safari.shinyOdds": { min: 1 },
+  // Sous 1, un parent shiny ferait baisser les chances au lieu de les monter.
+  "pokemon.eggs.shinyParentMultiplier": { min: 1 },
   // On n'ouvre que ce que le jeu de données contient. Le plafond est lu dans le
   // fichier plutôt qu'écrit ici : préparer la génération suivante, c'est
   // régénérer ce fichier, et rien d'autre ne doit avoir à suivre.

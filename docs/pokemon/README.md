@@ -15,9 +15,10 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
 
 ## Commandes
 
-- `/pk pokedex [membre]` : collection, doublons, shinies et progression. Réponse privée. Un 🔒 marque
-  les espèces qu'aucune apparition ne donnera jamais — elles ne s'obtiennent que par fusion ou
-  par échange —, un 🥚 celles qui ne sortent que d'un œuf.
+- `/pk pokedex [membre]` : collection, doublons, shinies et progression. Réponse privée. Une entrée
+  est une **espèce**, shiny ou non. Un 🔒 marque les espèces qu'aucune apparition ne donnera
+  jamais — elles ne s'obtiennent que par évolution ou par échange —, un 🥚 celles qui ne sortent
+  que d'un œuf.
 - `/pk boite [pokemon] [membre]` : les Pokémon un par un, page par page — `#numéro`, sexe, ball,
   date, fertilité, et 📌 le dernier d'une espèce (voir [Individus](individus.md)).
 - `/pk oeuf pondre <parent1> <parent2>` / `/pk oeuf voir` : faire pondre un couple d'une famille à bébé,
@@ -25,19 +26,25 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
 - `/pk classement` : classement des dresseurs par espèces distinctes.
 - `/pk info <pokemon>` : la même fiche que le bouton des apparitions — type, rareté,
   difficulté, et la lignée évolutive stade par stade avec ce que le dresseur en a déjà.
-- `/pk evolution <pokemon>` : fait évoluer un Pokémon en sacrifiant des doublons. On choisit le sexe
-  de l'individu qui évolue ; il le garde, avec sa ball. Les lignées à embranchement (Évoli) peuvent
-  évoluer au hasard, ou vers une cible choisie pour plus cher. La commande ne propose que les
-  chemins réellement praticables, objets d'évolution compris.
-  **Métamorph sert de joker** : quand il manque des exemplaires, un bouton propose de les
-  remplacer par des Métamorph de la même variante (un shiny pour un shiny), un par exemplaire
-  (`pokemon.evolution.dittosPerCopy`). Les vrais doublons partent d'abord, celui qui évolue et
-  celui qui garde l'entrée restent de vrais exemplaires, et il reste toujours un Métamorph. Il
-  n'est jamais pris sans qu'on le demande, et le choix de la forme (Évoli) reste possible avec lui.
-- `/pk echange <membre> <je_donne> <je_recois>` : échange entre dresseurs, par espèce, sexe et
-  fertilité. **Seuls les doublons s'échangent** : contrairement aux jeux, avoir capturé un Pokémon
-  ne suffit pas à le garder au Pokédex, il faut le posséder. Il en reste toujours au moins un de
-  chaque entrée, et l'autocomplétion ne propose que ce qu'on a en trop.
+- `/pk evolution <espece> <individu>` : fait évoluer **un Pokémon précis**, choisi après son espèce.
+  Il reste lui-même : même numéro, même ball, même sexe, même fertilité, shiny s'il l'était. Les
+  autres Pokémon de l'évolution sont des **sacrifices** : des exemplaires de l'espèce, shiny ou non
+  (les normaux partent d'abord), et il en reste toujours un. Avec un Salamèche et un Salamèche
+  shiny, on peut faire évoluer le shiny avec des bonbons ou des Métamorph : le normal garde
+  l'entrée. Les lignées à embranchement (Évoli) peuvent évoluer au hasard, ou vers une cible
+  choisie pour plus cher. La commande ne propose que les chemins réellement praticables, objets
+  d'évolution compris.
+  **Métamorph sert de joker** : quand il manque des sacrifices, un bouton propose de les remplacer
+  par des Métamorph, shiny ou non (les normaux d'abord), un par sacrifice
+  (`pokemon.evolution.dittosPerCopy`). Les exemplaires de l'espèce partent d'abord, et il reste
+  toujours un Métamorph. Il n'est jamais pris sans qu'on le demande, et le choix de la forme
+  (Évoli) reste possible avec lui.
+- `/pk echange <membre> <je_donne> <mon_individu> <je_recois> <son_individu>` : échange entre
+  dresseurs, d'un Pokémon précis contre un autre, chacun choisi après son espèce : qui reçoit sait
+  exactement ce qu'il aura, fertilité comprise. **Seuls les doublons s'échangent** : contrairement
+  aux jeux, avoir capturé un Pokémon ne suffit pas à le garder au Pokédex, il faut le posséder. Il
+  en reste toujours au moins un de chaque espèce, shiny ou non, et l'autocomplétion ne propose que
+  ce qu'on a en trop.
   **Kadabra, Machopeur, Gravalanch et Spectrum évoluent en changeant de dresseur**, comme en
   première génération : c'est celui qui *reçoit* le Pokémon qui reçoit sa forme évoluée. La
   proposition l'annonce avant le clic, et un shiny reste shiny en évoluant.
@@ -45,12 +52,14 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
 - `/pk inventaire [membre]` : les objets qu'un dresseur a en poche (voir [Objets](objets.md)).
 - `/pk loterie` : un tirage par jour et par dresseur (voir [Loterie](loterie.md)). Réponse privée.
 - `/pk web` : le lien du [site](../site.md), en réponse privée.
-- `/pk revendre pokemon <doublon> [quantite]` / `/pk revendre objet <objet> [quantite]` : convertit
-  en points ce qu'on a en trop, par espèce et sexe. Un exemplaire est **toujours** conservé.
+- `/pk revendre pokemon <espece> [individu] [quantite]` / `/pk revendre objet <objet> [quantite]` :
+  convertit en points ce qu'on a en trop. Sans individu précis, `quantite` normaux de l'espèce
+  partent, les moins précieux d'abord ; un shiny se choisit. Un exemplaire de chaque espèce est
+  **toujours** conservé.
 
-Partout où une commande désigne un Pokémon (`/pk echange`, `/pk oeuf pondre`, `/pk revendre
-pokemon`, `/pk evolution`), on peut choisir un groupe dans la liste ou taper **`#numéro`** — le
-numéro qu'affiche `/pk boite` — pour désigner un Pokémon précis.
+`/pk evolution`, `/pk echange` et `/pk revendre pokemon` demandent l'espèce, puis l'individu parmi
+les siens. `/pk oeuf pondre` accepte un groupe de la liste ou **`#numéro`** — le numéro qu'affiche
+`/pk boite` — pour désigner un Pokémon précis.
 - `/admin pokespawn` *(Admin)* : déclenche une apparition pour organiser un événement. Donne accès aux
   espèces hors pool naturel (légendaires et évolutions par échange), avec forçage du shiny, texte
   d'annonce et mention de rôle.
@@ -60,10 +69,12 @@ numéro qu'affiche `/pk boite` — pour désigner un Pokémon précis.
 ## Réglages
 
 Tous les nombres (prix, multiplicateurs, taux de shiny, cadence, poids de rareté,
-coûts de fusion, et l'intégralité du parc safari dans `pokemon.safari`) vivent dans le bloc
+coûts d'évolution, et l'intégralité du parc safari dans `pokemon.safari`) vivent dans le bloc
 `pokemon` de `config.json`, relu à l'exécution — ils sont donc modifiables **sans redémarrer le
 bot**. Le curseur `capture.globalMultiplier` rend l'ensemble du jeu
-plus ou moins difficile tout en préservant la hiérarchie entre espèces.
+plus ou moins difficile tout en préservant la hiérarchie entre espèces. Le `duplicates` d'un stade
+d'évolution (`pokemon.evolution.2.duplicates`…) compte l'individu qui évolue : il sacrifie un
+exemplaire de moins.
 
 ## Générations
 
@@ -86,9 +97,9 @@ prennent en compte immédiatement. Ce qu'elle change :
   → Porygon2. Comme les quatre premières, elles n'apparaissent jamais à l'état sauvage (🔒).
 - **Six légendaires** de plus : Raikou, Entei, Suicune, Lugia, Ho-Oh et Celebi.
 - **Les raretés de la 1ʳᵉ génération ne bougent pas.** Un bébé est de stade 1, sa forme adulte
-  aussi : Pikachu reste commun et Raichu peu commun, là où compter Pichu en ferait un rare. La
-  fusion d'un bébé vers sa forme adulte a son propre tarif, `pokemon.evolution.1` (2 doublons et
-  250 points par défaut).
+  aussi : Pikachu reste commun et Raichu peu commun, là où compter Pichu en ferait un rare.
+  L'évolution d'un bébé vers sa forme adulte a son propre tarif, `pokemon.evolution.1` (1 sacrifice
+  et 250 points par défaut).
 
 Refermer une génération (`pokemon.generation 1`) cache ses espèces sans les retirer des
 collections ; elles réapparaissent à la réouverture.

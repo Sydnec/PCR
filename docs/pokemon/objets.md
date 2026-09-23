@@ -12,7 +12,7 @@ noieraient la table.
 |---|---|---|---|
 | Poké Ball | 43 % | un lancer offert | — |
 | Super Ball | 22 % | un lancer offert | — |
-| 🍬 Super Bonbon | 13 % | **trois** tiennent lieu d'un exemplaire manquant dans une fusion | 300 |
+| 🍬 Super Bonbon | 13 % | **trois** tiennent lieu d'un sacrifice dans une évolution | 300 |
 | Hyper Ball | 8,7 % | un lancer offert | — |
 | 🔥⚡💧 Pierres | 3,3 % chacune | font évoluer un Évoli vers *leur* forme, sans exemplaire ni point en plus | 500 |
 | 💎 Pépite | 2,2 % | rien, sinon se revendre | 2 000 |
@@ -37,8 +37,8 @@ que de le faire disparaître.
   réglables à chaud, comme les balls. Une entrée `ball: "poke"` lui fait *emprunter* le libellé et
   l'icône de la ball correspondante, si bien que changer l'emoji d'une ball suffit.
 - **Trois attributs décident du reste** : `sellValue` le rend revendable, `dropWeight` le fait
-  tomber, `evolution` le rend utilisable dans une fusion — combien d'exemplaires de l'objet valent
-  combien d'exemplaires du Pokémon, s'ils dispensent des points, et à quelle lignée ils sont
+  tomber, `evolution` le rend utilisable dans une évolution — combien d'exemplaires de l'objet
+  valent combien de sacrifices, s'ils dispensent des points, et à quelle lignée ils sont
   réservés. C'est ce dernier point qui fait des pierres des objets à Évoli : une Pierre Feu jetée
   sur un Chenipan est refusée, elle ne part pas.
 - **Les balls offertes partent d'elles-mêmes.** Cliquer sur *Poké Ball (120)* en ayant une Poké Ball
@@ -50,8 +50,8 @@ que de le faire disparaître.
   jamais sa valeur en points : la convertir en monnaie ferait d'un Pokémon disputé une petite
   imprimerie. Le lancer est alors journalisé à coût nul, ce qui garde honnête le total des points
   brûlés. Même chose pour un ticket dont la visite n'a pas pu s'ouvrir.
-- **Une fusion aidée rend tout ce qu'elle a pris si elle échoue** : les exemplaires d'abord, l'aide
-  ensuite, dans l'ordre inverse où ils ont été réservés.
+- **Une évolution aidée rend tout ce qu'elle a pris si elle échoue** : l'aide d'abord, puis les
+  exemplaires, dans l'ordre inverse où ils ont été réservés.
 - **Une seule écriture retire un objet**, et elle est gardée (`count >= ?`, puis `this.changes`).
 - **Tout mouvement est journalisé** dans `pokemon_item_log` avec sa provenance (`lancer`,
   `capture:42`, `sol:8`, `fusion`, `safari`, `vente`, `admin:…`).

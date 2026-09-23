@@ -12,6 +12,7 @@ import { getSpecies, isDitto } from "../../modules/pokemon/data.js";
 import {
   displayName,
   individualChoices,
+  respondHint,
   wantsIndividual,
 } from "../../modules/pokemon/embeds.js";
 import {
@@ -28,8 +29,7 @@ import {
 // proposition inerte est le seul moyen d'expliquer pourquoi il n'y a rien à
 // choisir. Sa valeur ne correspond à aucune espèce, donc execute() la refuse.
 const HINT_VALUE = "0:0";
-const hint = (interaction, name) =>
-  interaction.respond([{ name, value: HINT_VALUE }]).catch(() => {});
+const hint = (interaction, name) => respondHint(interaction, name, HINT_VALUE);
 
 // Les parents possibles : les individus fertiles d'une famille qui a un bébé,
 // de n'importe quel sexe, et Métamorph. Groupés par espèce, variante et sexe —

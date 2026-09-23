@@ -317,8 +317,8 @@ const db = new sqlite3.Database(dbPath, (err) => {
     //   evolution, echange, oeuf, migration).
     // - `sterile` : un individu ne pond qu'un œuf dans sa vie.
     // - `obtained_at` : depuis quand ce dresseur le possède. Aucune revente,
-    //   fusion ni échange ne peut prendre le dernier individu d'une entrée de
-    //   Pokédex (espèce + variante) : il en reste toujours au moins un.
+    //   évolution ni échange ne peut prendre le dernier individu d'une espèce,
+    //   shiny ou non : il en reste toujours au moins un.
     db.run(
       `CREATE TABLE IF NOT EXISTS pokemon_owned (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -371,6 +371,16 @@ const db = new sqlite3.Database(dbPath, (err) => {
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_eggs :", err);
+        // Combien de parents étaient shiny à la ponte : chacun multiplie les
+        // chances de shiny du bébé, même s'il est parti avant l'éclosion.
+        db.run(
+          "ALTER TABLE pokemon_eggs ADD COLUMN shiny_parents INTEGER NOT NULL DEFAULT 0",
+          (err) => {
+            if (err && !err.message.includes("duplicate column")) {
+              handleException("Erreur lors de l'ajout de shiny_parents :", err);
+            }
+          }
+        );
         db.run(
           `CREATE UNIQUE INDEX IF NOT EXISTS idx_pokemon_eggs_incubating
              ON pokemon_eggs(user_id) WHERE status = 'INCUBATING'`,
@@ -423,7 +433,9 @@ const db = new sqlite3.Database(dbPath, (err) => {
       }
     );
 
-    // Journal des fusions (audit et statistiques).
+    // Journal des évolutions (audit et statistiques). La table garde son nom
+    // d'avant, quand on parlait de fusion ; `duplicates_spent` compte les
+    // sacrifices.
     db.run(
       `CREATE TABLE IF NOT EXISTS pokemon_fusions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,

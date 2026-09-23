@@ -185,14 +185,15 @@ function referenceBall(catchRate) {
   );
 }
 
-// Un maillon de la lignée : possession, numéro, nom. La variante qui compte est
-// celle qu'on a sous les yeux — sur une apparition shiny, « je l'ai » veut dire
-// « je l'ai en shiny », un shiny étant une entrée de Pokédex distincte. Les deux
-// compteurs restent affichés : « pas en shiny, mais j'en ai deux normaux » est
-// précisément ce que le dresseur cherche à savoir avant de lancer une ball.
+// Un maillon de la lignée : possession, numéro, nom. Une entrée de Pokédex est
+// une espèce, shiny ou non : « je l'ai » veut dire qu'on en a un — sauf sur une
+// apparition shiny, où il veut dire « je l'ai en shiny », puisqu'un premier
+// shiny se signale. Les deux compteurs restent affichés : « pas en shiny, mais
+// j'en ai deux normaux » est précisément ce que le dresseur cherche à savoir
+// avant de lancer une ball.
 function chainLine(species, counts, { current = false, focusShiny = false } = {}) {
   const owned = counts ?? { normal: 0, shiny: 0 };
-  const has = focusShiny ? owned.shiny > 0 : owned.normal > 0;
+  const has = focusShiny ? owned.shiny > 0 : owned.normal + owned.shiny > 0;
   const marks = [];
   if (owned.normal > 0) marks.push(`\u00D7${owned.normal}`);
   if (owned.shiny > 0) marks.push(`\u2728\u00D7${owned.shiny}`);
@@ -271,7 +272,7 @@ export function buildSpeciesInfoEmbed(
 
   const legend = [
     chain.some(isEvolutionOnly) &&
-      "\u{1F512} Introuvable à l'état sauvage : par fusion de doublons, ou par échange.",
+      "\u{1F512} Introuvable à l'état sauvage : par évolution, ou par échange.",
     chain.some(isEggOnly) && "\u{1F95A} Ne sort que d'un œuf : /pk oeuf pondre, avec un couple de parents.",
   ].filter(Boolean);
   if (legend.length) embed.setFooter({ text: legend.join("\n") });
@@ -474,7 +475,7 @@ function ballOf(key) {
 // D'où vient un individu, quand sa ball ne suffit pas à le dire.
 const ORIGINS = {
   oeuf: "éclos d'un œuf",
-  evolution: "né d'une fusion",
+  evolution: "obtenu par évolution",
   migration: "ball inconnue",
 };
 
@@ -483,6 +484,14 @@ const shortDate = (ms) =>
 
 // Taper « # » ou un nombre dans une option qui désigne un Pokémon, c'est
 // demander un individu précis plutôt qu'un groupe.
+// Une proposition inerte : Discord n'autorise pas de liste vide accompagnée
+// d'un message, c'est le seul moyen d'expliquer pourquoi il n'y a rien à
+// choisir. `value` ne doit désigner ni une espèce ni un individu, pour
+// qu'execute() la refuse.
+export const HINT_VALUE = "—";
+export const respondHint = (interaction, name, value = HINT_VALUE) =>
+  interaction.respond([{ name, value }]).catch(() => {});
+
 export const wantsIndividual = (query) => /^\s*(#|\d+\s*$)/.test(String(query ?? ""));
 
 // Les individus proposés pour cette saisie : ceux que `keep` accepte, dont
@@ -661,7 +670,7 @@ export function buildDexEmbed(targetUser, rows, page) {
   const slice = allSpecies().slice(page * pageSize, (page + 1) * pageSize);
   // Le cadenas des espèces qu'aucune apparition ne donnera jamais. Sans lui, un
   // dresseur peut chasser des mois un Mackogneur qui n'apparaîtra pas : il
-  // s'obtient en fusionnant des Machopeur ou en s'en faisant échanger un, et
+  // s'obtient en faisant évoluer un Machopeur ou en s'en faisant échanger un, et
   // rien ne le disait.
   const locked = slice.some(isEvolutionOnly);
   const eggs = slice.some(isEggOnly);
@@ -700,7 +709,7 @@ export function buildDexEmbed(targetUser, rows, page) {
     .setFooter({
       text:
         `Page ${page + 1}/${dexPageCount()}` +
-        (locked ? " · 🔒 ne s'obtient que par fusion ou par échange" : "") +
+        (locked ? " · 🔒 ne s'obtient que par évolution ou par échange" : "") +
         (eggs ? " · 🥚 ne sort que d'un œuf" : ""),
     });
 
@@ -943,8 +952,9 @@ export function safariOutcomeLine(result, config) {
   }
 }
 
-// Mêmes règles que le bouton « Je l'ai déjà ? » des spawns publics : un shiny
-// est une entrée de Pokédex distincte, donc on compare la variante rencontrée.
+// Une entrée de Pokédex est une espèce, shiny ou non : on dit si l'espèce
+// manque, et si la variante rencontrée est nouvelle — un premier shiny se
+// signale même quand l'entrée est déjà là.
 // Formulations courtes : le champ est affiché en colonne, à un tiers de largeur.
 function ownedLine(owned, isShiny) {
   if (!owned) return null;
@@ -954,10 +964,12 @@ function ownedLine(owned, isShiny) {
   if (mine > 0) {
     return isShiny ? `\u2705 Déjà en shiny${times}` : `\u2705 Déjà capturé${times}`;
   }
-  if (!isShiny) return "\u{1F195} Il te manque !";
+  if (!isShiny) {
+    return owned.shiny > 0 ? "\u2705 Déjà capturé (en shiny)" : "\u{1F195} Il te manque !";
+  }
   return owned.normal > 0
     ? "\u{1F195} Shiny inédit ! (tu as la normale)"
-    : "\u{1F195} Shiny inédit, et pas la normale !";
+    : "\u{1F195} Shiny inédit, et l'espèce te manque !";
 }
 
 function buildEncounterEmbed(session, species, config, { intro = null, owned = null } = {}) {

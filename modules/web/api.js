@@ -56,7 +56,13 @@ import {
   refreshParkMessage,
   startPaidSession,
 } from "../pokemon/safari.js";
-import { babyFamilies, canBreed, getIncubatingEgg, layEgg } from "../pokemon/eggs.js";
+import {
+  babyFamilies,
+  canBreed,
+  eggShinyFactor,
+  getIncubatingEgg,
+  layEgg,
+} from "../pokemon/eggs.js";
 import {
   getBallItem,
   getBallStock,
@@ -149,6 +155,10 @@ function eggJson(egg) {
     hatchMessages: egg.hatch_messages,
     laidAt: egg.laid_at,
     hatchAt: egg.hatch_at,
+    // Combien de parents étaient shiny, et par combien cela multiplie les
+    // chances de shiny du bébé : le calcul du tirage, pas une copie.
+    shinyParents: egg.shiny_parents ?? 0,
+    shinyFactor: eggShinyFactor(egg.shiny_parents),
   };
 }
 
@@ -541,7 +551,7 @@ export const routes = [
     }),
   },
 
-  // Ce qu'une évolution coûterait, sans rien faire : l'écran de fusion.
+  // Ce qu'une évolution coûterait, sans rien faire : l'écran d'évolution.
   {
     method: "GET",
     path: "/api/species/:speciesId/evolution",
@@ -555,7 +565,7 @@ export const routes = [
       return {
         targets: plan.targets.map((target) => target.id),
         target: plan.target?.id ?? null,
-        duplicates: plan.duplicates,
+        sacrifices: plan.sacrifices,
         required: plan.required,
         points: plan.points,
         helper: plan.helper ? { key: plan.helper.item.key, quantity: plan.helper.quantity } : null,
@@ -827,20 +837,24 @@ export const routes = [
       const selector = await resolveOwn(ctx.user.id, ctx.body, "Pokémon");
       const targetId = ctx.body.targetId ? Number(ctx.body.targetId) : null;
       const helper = typeof ctx.body.helper === "string" ? ctx.body.helper : null;
-      const result = await promise((cb) => evolve(ctx.user.id, selector, targetId, helper, cb));
-      return outcome(result, ({ target, plan, evolved, isShiny }) => ({
-        pokemon: {
-          id: evolved?.id ?? null,
-          speciesId: target.id,
-          sex: evolved?.sex ?? null,
-          shiny: isShiny,
-        },
-        // Les Métamorph qui ont comblé la fusion sont comptés à part : ce ne
-        // sont pas des doublons de l'espèce.
-        duplicatesSpent: plan.duplicates - (plan.ditto?.copies ?? 0),
-        dittosSpent: plan.ditto?.dittos ?? 0,
+      // Avec un individu, `speciesId` est l'espèce attendue, comme dans les
+      // boutons Discord : un second envoi sur un Pokémon qui vient d'évoluer
+      // est refusé au lieu de le faire évoluer une seconde fois.
+      const expected = Number(ctx.body.speciesId);
+      const group =
+        selector.pokemonId && getSpecies(expected)
+          ? { pokemonId: selector.pokemonId, speciesId: expected }
+          : selector;
+      const result = await promise((cb) => evolve(ctx.user.id, group, targetId, helper, cb));
+      return outcome(result, ({ target, plan, spent, evolved, isShiny }) => ({
+        pokemon: { id: evolved.id, speciesId: target.id, sex: evolved.sex, shiny: isShiny },
+        // Les Métamorph qui ont comblé les sacrifices sont comptés à part : ce
+        // ne sont pas des exemplaires de l'espèce.
+        sacrificesSpent: spent.sacrifices,
+        dittosSpent: spent.dittos,
+        shiniesSacrificed: spent.shinies,
         pointsSpent: plan.points,
-        helper: plan.helper ? plan.helper.item.key : plan.ditto ? DITTO_HELPER : null,
+        helper: plan.helper ? plan.helper.item.key : spent.dittos ? DITTO_HELPER : null,
       }));
     },
   },
