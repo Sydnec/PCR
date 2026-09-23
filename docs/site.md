@@ -13,7 +13,7 @@ en donne le lien, en réponse privée (ou dit que le site n'est pas en ligne, ou
 |---|---|
 | **Capture** (accueil) | Le Pokémon qui apparaît dans le salon Discord, en direct, avec son sexe et ses balls juste en dessous : rareté, types et difficulté en couleur, chances par ball, ton solde et tes balls en poche, et sa lignée avec ce que tu en possèdes (la fiche du bouton « Infos du Pokémon »). Une ball hors de portée est grisée, sauf si tu en as en poche. Le journal des lancers est sur le côté. On lui **lance ses balls** comme depuis Discord, et on **ramasse** ce qu'un Pokémon laisse tomber. En haut, le bouton du **parc safari**. |
 | **Parc safari** | La visite du parc, ouverte depuis la Capture : la rencontre, ses chances et le risque qu'elle détale, et les trois actions de Discord (Safari Ball, appât, fuite). Tes prises s'affichent sur le côté, et le bilan à la fin. |
-| **Boîte** | Ton PC : des boîtes de cases où tu ranges tes Pokémon comme tu veux. Une case ne montre que le sprite ; un clic ouvre la fiche (provenance, place, lignée, valeur), d'où l'on **surnomme**, **déplace**, **revend** ou **fait évoluer** le Pokémon. |
+| **Boîte** | Ton PC : des boîtes de cases où tu ranges tes Pokémon comme tu veux. Une case ne montre que le sprite ; un clic ouvre la fiche (provenance, place, lignée, valeur), d'où l'on **surnomme**, **déplace**, **verrouille**, **revend** ou **fait évoluer** le Pokémon. |
 | **Pokédex** | Toutes les espèces des générations ouvertes, celles qu'on possède en couleur. La fiche d'une espèce montre sa lignée et ce que tu en possèdes. |
 | **Sac** | Le solde et les objets. |
 | **Œuf** | L'œuf qui couve, ou le formulaire pour en **pondre** un. |
@@ -63,6 +63,9 @@ Des boîtes de `pokemon.pc.slotsPerBox` cases (30), sur `columns` colonnes (6). 
   son nom par défaut.
 - **Surnommer un Pokémon** depuis sa fiche (`nicknameLength` caractères, 12) ; vide, il reprend le
   nom de son espèce.
+- **Verrouiller un Pokémon** depuis sa fiche, comme `/pk verrou` : il ne part plus (ni revente, ni
+  échange, ni sacrifice) et porte un bouclier dans sa case. Le faire évoluer demande un second
+  clic de confirmation.
 
 Un Pokémon garde sa place et son surnom quand il évolue. Reçu en échange, il garde son surnom et
 prend la première case libre ; une capture ou une éclosion aussi. Le Pokédex ouvre la boîte sur

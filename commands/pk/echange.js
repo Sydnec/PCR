@@ -25,7 +25,8 @@ const spareIn = (userId, group) =>
     countGroup(userId, group, (err, { spare }) => (err ? reject(err) : resolve(spare)))
   );
 
-// Premier temps : les espèces dont `userId` a des Pokémon en trop, shiny ou non.
+// Premier temps : les espèces dont `userId` a des Pokémon en trop, shiny ou
+// non — jamais le dernier de l'espèce, jamais un verrouillé.
 function respondWithSpecies(interaction, userId, query, emptyLabel) {
   getIndividuals(userId, (err, rows) => {
     if (err) {
@@ -34,9 +35,10 @@ function respondWithSpecies(interaction, userId, query, emptyLabel) {
     }
     const needle = query.toLowerCase();
     const choices = [...countBySpecies(rows)]
-      .map(([speciesId, { total }]) => {
+      .map(([speciesId, { total, free }]) => {
         const species = getSpecies(speciesId);
-        if (!species || total < 2) return null;
+        const spare = Math.min(free, total - 1);
+        if (!species || spare < 1) return null;
         // Les quatre évolutions par échange se déclarent ici plutôt que dans un
         // message d'aide que personne ne lit : c'est l'instant exact où on
         // choisit ce qu'on donne. Le filtre portant sur le libellé, taper
@@ -44,7 +46,7 @@ function respondWithSpecies(interaction, userId, query, emptyLabel) {
         const evolved = tradeEvolutionTarget(species);
         return {
           name:
-            `${species.name} ×${total - 1} en trop` +
+            `${species.name} ×${spare} en trop` +
             (evolved ? ` — évolue en ${evolved.name}` : ""),
           value: String(speciesId),
         };
@@ -60,7 +62,7 @@ function respondWithSpecies(interaction, userId, query, emptyLabel) {
 }
 
 // Second temps : les individus de l'espèce choisie dans `speciesOption`,
-// jamais le dernier de l'espèce. Qui reçoit sait ainsi exactement quel
+// jamais le dernier de l'espèce ni un verrouillé. Qui reçoit sait ainsi exactement quel
 // Pokémon il aura : sexe, variante, fertilité, ball.
 function respondWithIndividuals(interaction, userId, speciesOption, query) {
   const species = getSpecies(Number(interaction.options.get(speciesOption)?.value));
@@ -75,9 +77,11 @@ function respondWithIndividuals(interaction, userId, speciesOption, query) {
     const choices = individualChoices(
       rows.filter((row) => row.species_id === species.id),
       query,
-      (row) => !row.last
+      (row) => !row.last && !row.locked
     );
-    if (!choices.length) return hint(interaction, `Aucun ${species.name} à échanger`);
+    if (!choices.length) {
+      return hint(interaction, `Aucun ${species.name} à échanger : verrouillés, ou il n'en reste qu'un`);
+    }
     interaction.respond(choices).catch(() => {});
   });
 }
@@ -214,9 +218,25 @@ export default {
         });
       }
 
-      // Une valeur tapée à la main contourne l'autocomplétion : sans ce
-      // contrôle, on publierait une offre qu'acceptTrade refuserait au clic.
+      // Une valeur tapée à la main contourne l'autocomplétion : sans ces
+      // contrôles, on publierait une offre qu'acceptTrade refuserait au clic.
       // Le refus reste privé, avant que la proposition n'existe.
+      if (offer.row.locked) {
+        return interaction.reply({
+          content:
+            `❌ **${describeGroup(offered, offer)}** est verrouillé 🛡️ : déverrouille-le avec ` +
+            `/pk verrou pour l'échanger.`,
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      if (request.row.locked) {
+        return interaction.reply({
+          content:
+            `❌ **${describeGroup(requested, request)}** est verrouillé 🛡️ chez ` +
+            `<@${target.id}> : il ne s'échange pas.`,
+          flags: MessageFlags.Ephemeral,
+        });
+      }
       let offerSpare, requestSpare;
       try {
         [offerSpare, requestSpare] = await Promise.all([

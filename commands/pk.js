@@ -9,6 +9,7 @@ import evolution from "./pk/evolution.js";
 import echange from "./pk/echange.js";
 import oeuf from "./pk/oeuf.js";
 import revendre from "./pk/revendre.js";
+import verrou from "./pk/verrou.js";
 import inventaire from "./pk/inventaire.js";
 import loterie from "./pk/loterie.js";
 import safari from "./pk/safari.js";
@@ -30,6 +31,7 @@ const SUBCOMMANDS = [
   echange,
   oeuf,
   revendre,
+  verrou,
   inventaire,
   loterie,
   safari,

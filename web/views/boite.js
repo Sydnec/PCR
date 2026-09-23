@@ -344,7 +344,7 @@ export async function render(ctx) {
     // Le nom au survol et pour les lecteurs d'écran : la case n'en montre rien.
     const name =
       [mon.nickname, species?.name ?? "?"].filter(Boolean).join(" · ") +
-      `${mon.shiny ? " shiny" : ""} #${mon.id}`;
+      `${mon.shiny ? " shiny" : ""} #${mon.id}${mon.locked ? " · verrouillé" : ""}`;
     return h(
       "button",
       {
@@ -375,7 +375,8 @@ export async function render(ctx) {
         alt: "",
         loading: "lazy",
         draggable: "false",
-      })
+      }),
+      mon.locked ? icon("shield", { className: "pc-lock" }) : null
     );
   }
 
@@ -547,8 +548,61 @@ function openPokemon(ctx, item, pc, { reload, startMove }) {
             icon("pin"),
             ` C'est ton dernier ${species.name}, shiny ou non : il garde ton entrée du Pokédex, donc il ne peut ni partir ni évoluer.`
           )
-        : [sellAction(item, species, done), evolveAction(ctx, item, species, done)]
+        : [
+            // Verrouillé, il ne se revend pas : on le dit au lieu du bouton.
+            item.locked
+              ? h(
+                  "p",
+                  { class: "notice" },
+                  icon("shield"),
+                  " Verrouillé : il ne sera ni revendu, ni échangé, ni sacrifié."
+                )
+              : sellAction(item, species, done),
+            evolveAction(ctx, item, species, done),
+          ],
+      lockAction(item, done)
     )
+  );
+}
+
+// Le verrou, comme /pk verrou : un Pokémon verrouillé ne part jamais, mais
+// peut encore évoluer, après confirmation, et pondre.
+function lockAction(item, done) {
+  const button = h(
+    "button",
+    { class: "button" },
+    icon("shield"),
+    item.locked ? " Déverrouiller" : " Verrouiller"
+  );
+  button.addEventListener("click", async () => {
+    button.disabled = true;
+    try {
+      const result = await api(`/api/me/pokemon/${item.id}/lock`, {
+        method: "POST",
+        body: { locked: !item.locked },
+      });
+      toast(
+        result.locked ? `#${item.id} est verrouillé.` : `#${item.id} est déverrouillé.`,
+        "success"
+      );
+      await done();
+    } catch (error) {
+      toast(error.message, "error");
+      button.disabled = false;
+    }
+  });
+  return h(
+    "div",
+    { class: "action" },
+    h("h3", {}, "Verrou"),
+    h(
+      "p",
+      { class: "muted small" },
+      item.locked
+        ? "Verrouillé, il ne part jamais : ni revente, ni échange, ni sacrifice."
+        : "Verrouiller le protège de la revente, des échanges et des sacrifices."
+    ),
+    button
   );
 }
 
@@ -587,8 +641,14 @@ function evolveAction(ctx, item, species, done) {
   const targets = species.evolvesInto.map((id) => ctx.species.get(id)).filter(Boolean);
   if (!targets.length) return null;
   let targetId = null;
+  // Verrouillé, il évolue quand même, mais après un second clic : on ne le
+  // bloque pas, on prévient. L'API refuse sans `confirmLocked`, et dit `locked`
+  // si le verrou a été posé depuis Discord après l'ouverture de la fiche : le
+  // bouton passe alors en confirmation.
+  let locked = item.locked;
   const cost = h("p", { class: "muted small" }, "Calcul du coût…");
-  const button = h("button", { class: "button primary", disabled: true }, "Évoluer");
+  let button = makeButton();
+  button.disabled = true;
 
   // Le coût vient de l'API, qui le calcule comme la commande : une forme
   // choisie sur une lignée à embranchement coûte plus cher que le hasard.
@@ -610,12 +670,16 @@ function evolveAction(ctx, item, species, done) {
     }
   }
 
-  button.addEventListener("click", async () => {
-    button.disabled = true;
+  async function evolveNow() {
     try {
       // L'espèce attendue accompagne l'individu : un second envoi sur un
       // Pokémon qui vient d'évoluer est refusé au lieu de le refaire évoluer.
-      const body = { pokemonId: item.id, speciesId: species.id, ...(targetId ? { targetId } : {}) };
+      const body = {
+        pokemonId: item.id,
+        speciesId: species.id,
+        ...(targetId ? { targetId } : {}),
+        ...(locked ? { confirmLocked: true } : {}),
+      };
       const result = await api("/api/me/evolve", { method: "POST", body });
       toast(
         `#${item.id} a évolué en ${ctx.species.get(result.pokemon.speciesId)?.name ?? "?"} !`,
@@ -623,10 +687,38 @@ function evolveAction(ctx, item, species, done) {
       );
       await done();
     } catch (error) {
+      if (error.details?.locked && !locked) {
+        locked = true;
+        rebuild();
+        toast(`#${item.id} est verrouillé : confirme pour le faire évoluer quand même.`);
+        return;
+      }
       toast(error.message, "error");
-      button.disabled = false;
     }
-  });
+  }
+
+  // Le même confirmButton que la revente pour un verrouillé ; un bouton simple
+  // sinon.
+  function makeButton() {
+    if (locked) {
+      return confirmButton("Évoluer", "Il est verrouillé : évoluer quand même ?", evolveNow);
+    }
+    const plain = h("button", { class: "button primary" }, "Évoluer");
+    plain.addEventListener("click", async () => {
+      plain.disabled = true;
+      await evolveNow();
+      plain.disabled = false;
+    });
+    return plain;
+  }
+
+  // Un bouton neuf : changer de forme désarme une confirmation en cours. Il
+  // naît actif ; refresh() le grise le temps de relire le coût.
+  function rebuild() {
+    const next = makeButton();
+    button.replaceWith(next);
+    button = next;
+  }
 
   const choice =
     targets.length > 1
@@ -635,6 +727,7 @@ function evolveAction(ctx, item, species, done) {
           {
             onchange: (event) => {
               targetId = event.target.value ? Number(event.target.value) : null;
+              rebuild();
               refresh();
             },
           },

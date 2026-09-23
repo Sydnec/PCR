@@ -510,14 +510,16 @@ export function individualChoices(rows, query, keep = () => true) {
           `#${row.id} · ${species ? displayName(species, row.is_shiny, row.sex) : "?"}` +
           (ball ? ` · ${ball.label}` : "") +
           (row.sterile ? " · stérile" : "") +
-          (row.last ? " · dernier" : ""),
+          (row.locked ? " · 🛡️ verrouillé" : ""),
         value: `#${row.id}`,
       };
     });
 }
 
 // Une ligne par individu : sexe, espèce, ball, date d'arrivée, et ce qui le
-// distingue des autres — le dernier de son espèce (📌), celui qui a déjà pondu.
+// distingue des autres — verrouillé (🛡️), ou qui a déjà pondu. Le dernier de
+// son espèce n'y est pas marqué : ce n'est pas lui que la règle garde, mais un
+// individu quelconque de l'espèce, et le pied de page le dit.
 function individualLine(row) {
   const species = getSpecies(row.species_id);
   const ball = ballOf(row.ball);
@@ -527,7 +529,7 @@ function individualLine(row) {
     ` · ${provenance}` +
     (row.origin === "echange" ? " · reçu en échange" : "") +
     ` · ${shortDate(row.obtained_at)}` +
-    (row.last ? " · 📌 dernier" : "") +
+    (row.locked ? " · 🛡️" : "") +
     (row.sterile ? " · stérile" : "")
   );
 }
@@ -562,8 +564,8 @@ export function buildBoxEmbed(rows, { user, species = null, page = 0 } = {}) {
     .setDescription(shown.map(individualLine).join("\n"))
     .setFooter({
       text:
-        `Page ${current + 1}/${pages} · ${rows.length} Pokémon · 📌 le dernier d'une espèce ` +
-        `ne peut pas partir · #numéro utilisable dans les commandes`,
+        `Page ${current + 1}/${pages} · ${rows.length} Pokémon · le dernier d'une espèce ne ` +
+        `peut pas partir · 🛡️ verrouillé, voir /pk verrou · #numéro utilisable dans les commandes`,
     });
 }
 

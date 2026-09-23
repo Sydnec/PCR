@@ -25,6 +25,8 @@ export async function api(path, { method = "GET", body } = {}) {
     if (response.status === 401) window.dispatchEvent(new Event("session-perdue"));
     const error = new Error(data?.error ?? `Le serveur a répondu ${response.status}.`);
     error.status = response.status;
+    // Les champs de plus d'un refus (un Pokémon verrouillé à confirmer…).
+    error.details = data;
     throw error;
   }
   return data;

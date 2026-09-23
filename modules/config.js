@@ -114,10 +114,9 @@ const POKEMON = {
     },
   },
   evolution: {
-    // Le stade 1 n'est la cible que d'un bébé (Pichu → Pikachu, à partir de la
-    // génération 2) : sa forme adulte est aussi commune que lui, d'où un tarif
-    // plus doux que celui des vraies évolutions.
-    1: { duplicates: 2, points: 250 },
+    // Le tarif du stade atteint. Un bébé qui devient adulte (Pichu → Pikachu,
+    // à partir de la génération 2) paie celui du stade 2, comme toute première
+    // évolution.
     2: { duplicates: 5, points: 500 },
     3: { duplicates: 10, points: 2000 },
     branchChoicePoints: 1000,
@@ -127,6 +126,12 @@ const POKEMON = {
     dittosPerCopy: 1,
   },
   trade: { expiryHours: 24 },
+  // Le verrou : un Pokémon verrouillé ne part jamais — ni revente, ni échange,
+  // ni sacrifice —, mais peut évoluer, après confirmation, et pondre. Ce qui
+  // arrive dans une boîte — capture, parc, œuf, échange — est verrouillé
+  // d'office s'il est shiny ou légendaire ; /pk verrou change ça individu par
+  // individu.
+  lockByDefault: { shiny: true, legendary: true },
   // Les œufs, seule porte vers les bébés. Un couple de parents — un mâle et une
   // femelle de la famille, Métamorph pouvant tenir l'un des deux rôles — pond
   // un œuf qui éclot au premier des deux seuils : tant d'heures, ou tant de

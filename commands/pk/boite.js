@@ -5,7 +5,7 @@ import { getSpecies } from "../../modules/pokemon/data.js";
 import { buildBoxEmbed, buildBoxRow } from "../../modules/pokemon/embeds.js";
 
 // La boîte : les Pokémon d'un dresseur un par un, avec ce qui les distingue —
-// sexe, ball de capture, date d'arrivée, fertilité, et le dernier d'une espèce.
+// sexe, ball de capture, date d'arrivée, fertilité, et le verrou.
 // Le Pokédex compte des espèces ; ici, on regarde des individus.
 export default {
   describe: (sub) =>

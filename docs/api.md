@@ -71,7 +71,8 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
   "nickname": null }
 ```
 
-`last` : dernier de son espèce (shiny compris), il ne peut pas partir. Une espèce porte `obtention` (`wild`,
+`last` : dernier de son espèce (shiny compris), il ne peut pas partir. `locked` : verrouillé, il ne
+part pas non plus. Une espèce porte `obtention` (`wild`,
 `evolution` ou `egg`), `femaleShare` (`null` si asexuée), `breeder` (parent possible d'un œuf),
 `sellValue` / `sellValueShiny` (prix de revente, 0 si invendable), ses évolutions, ses
 illustrations (`sprite`, `spriteShiny`) et ses petites images (`icon`, `iconShiny`).
@@ -117,7 +118,7 @@ ou par un groupe `{ "speciesId": 25, "isShiny": false, "sex": "F" }` — les deu
 | Route | Corps | Réponse |
 |---|---|---|
 | `POST /api/me/sell` | Pokémon, `quantity` pour un groupe | `{ sold, unit, points }` |
-| `POST /api/me/evolve` | Pokémon (celui qui évolue, avec `speciesId` son espèce attendue : refus s'il a déjà évolué), `targetId?`, `helper?` (clé d'un objet, ou `metamorph`) | `{ pokemon, sacrificesSpent, dittosSpent, shiniesSacrificed, pointsSpent, helper }` — `pokemon` est le même individu, sous sa nouvelle forme |
+| `POST /api/me/evolve` | Pokémon (celui qui évolue, avec `speciesId` son espèce attendue : refus s'il a déjà évolué), `targetId?`, `helper?` (clé d'un objet, ou `metamorph`), `confirmLocked?` (obligatoire pour un verrouillé, sinon 409) | `{ pokemon, sacrificesSpent, dittosSpent, shiniesSacrificed, pointsSpent, helper }` — `pokemon` est le même individu, sous sa nouvelle forme |
 | `POST /api/me/eggs` | `{ parent1, parent2 }` | `{ egg }` |
 | `POST /api/spawn/throw` | `{ spawnId, ball, requireItem? }` | `{ status, message, final, remaining, pokemon }` |
 | `POST /api/drops/:id/claim` | `{}` | `{ item }` — `409` si quelqu'un a été plus rapide |
@@ -127,6 +128,7 @@ ou par un groupe `{ "speciesId": 25, "isShiny": false, "sex": "F" }` — les deu
 | `POST /api/me/pc/move` | `{ pokemonId, pos }` | la boîte PC relue — l'occupant de la case prend l'ancienne place |
 | `POST /api/me/pc/boxes/:box/name` | `{ name }` | `{ name, custom }` — vide : nom par défaut |
 | `POST /api/me/pokemon/:id/nickname` | `{ nickname }` | `{ nickname }` — vide : plus de surnom |
+| `POST /api/me/pokemon/:id/lock` | `{ locked }` (booléen) | `{ id, locked }` — verrouillé, il ne part plus (ni revente, ni échange, ni sacrifice) |
 | `POST /api/admin/config` 🔑 | `{ path, value }` | `{ path, before, after }` — comme `/admin config` |
 
 Un lancer répond toujours `200` : un raté ou un « trop tard » sont des issues du jeu, pas des

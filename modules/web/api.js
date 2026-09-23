@@ -15,6 +15,7 @@ import {
   resolveSelector,
   evolve,
   describeEvolution,
+  setLock,
   DITTO_HELPER,
 } from "../pokemon/collection.js";
 import { isFinalThrow, resolveThrow, startThrow, throwMessage } from "../pokemon/capture.js";
@@ -85,10 +86,14 @@ import { log } from "../utils.js";
 const promise = (fn) =>
   new Promise((resolve, reject) => fn((err, value) => (err ? reject(err) : resolve(value))));
 
+// `details` : des champs de plus dans la réponse, pour qu'une interface
+// reconnaisse un refus qui appelle une réponse — un Pokémon verrouillé à
+// confirmer — sans en lire le texte.
 export class HttpError extends Error {
-  constructor(status, message) {
+  constructor(status, message, details = null) {
     super(message);
     this.status = status;
+    this.details = details;
   }
 }
 
@@ -139,6 +144,7 @@ function individualJson(row) {
     origin: row.origin,
     fertile: !row.sterile,
     last: Boolean(row.last),
+    locked: Boolean(row.locked),
     obtainedAt: row.obtained_at,
     nickname: row.nickname ?? null,
   };
@@ -751,6 +757,27 @@ export const routes = [
     },
   },
 
+  // Verrouiller ou déverrouiller un Pokémon, comme /pk verrou : par le même
+  // chemin, gardé par le propriétaire. Verrouillé, il ne part jamais.
+  {
+    method: "POST",
+    path: "/api/me/pokemon/:pokemonId/lock",
+    auth: true,
+    write: true,
+    handler: async (ctx) => {
+      if (typeof ctx.body.locked !== "boolean") {
+        throw new HttpError(400, "locked : true ou false.");
+      }
+      const pokemonId = Number(ctx.params.pokemonId);
+      if (!Number.isInteger(pokemonId) || pokemonId <= 0) {
+        throw new HttpError(400, "pokemonId invalide.");
+      }
+      const changed = await promise((cb) => setLock(ctx.user.id, pokemonId, ctx.body.locked, cb));
+      if (!changed) throw new HttpError(404, `Le Pokémon #${pokemonId} n'est pas dans ta boîte.`);
+      return { id: pokemonId, locked: ctx.body.locked };
+    },
+  },
+
   // Donner un surnom à un Pokémon ; vide, il le perd.
   {
     method: "POST",
@@ -841,11 +868,15 @@ export const routes = [
       // boutons Discord : un second envoi sur un Pokémon qui vient d'évoluer
       // est refusé au lieu de le faire évoluer une seconde fois.
       const expected = Number(ctx.body.speciesId);
+      // Un Pokémon verrouillé évolue quand même, mais seulement si le site a
+      // demandé confirmation : sans `confirmLocked`, evolve refuse (409).
+      const confirmLocked = ctx.body.confirmLocked === true;
       const group =
         selector.pokemonId && getSpecies(expected)
-          ? { pokemonId: selector.pokemonId, speciesId: expected }
-          : selector;
+          ? { pokemonId: selector.pokemonId, speciesId: expected, confirmLocked }
+          : { ...selector, confirmLocked };
       const result = await promise((cb) => evolve(ctx.user.id, group, targetId, helper, cb));
+      if (!result.ok && result.locked) throw new HttpError(409, result.reason, { locked: true });
       return outcome(result, ({ target, plan, spent, evolved, isShiny }) => ({
         pokemon: { id: evolved.id, speciesId: target.id, sex: evolved.sex, shiny: isShiny },
         // Les Métamorph qui ont comblé les sacrifices sont comptés à part : ce

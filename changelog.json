@@ -1571,6 +1571,26 @@
       "commit": "pending",
       "timestamp": "2026-09-23T20:15:00.000Z",
       "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "feature",
+      "name": "Verrou des Pokémon",
+      "description": "/pk verrou protège un Pokémon : verrouillé, il ne se revend pas, ne s'échange pas et n'est jamais sacrifié. Les shiny et les légendaires le sont d'office.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-23T21:00:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "enhancement",
+      "name": "Évolution des bébés",
+      "description": "Faire évoluer un bébé coûte désormais comme une première évolution d'adulte.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-23T21:00:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
     }
   ]
 }

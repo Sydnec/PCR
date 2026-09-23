@@ -25,7 +25,8 @@ import {
 } from "../../modules/pokemon/embeds.js";
 
 const pts = (value) => value.toLocaleString("fr-FR");
-const NO_ENTRY = { total: 0, normal: 0, shiny: 0 };
+// Une espèce absente, avec les mêmes champs que countBySpecies.
+const NO_ENTRY = { total: 0, normal: 0, shiny: 0, free: 0, freeNormal: 0 };
 
 // Les objets d'évolution que ce dresseur a en assez grand nombre pour s'en
 // servir. Trois bonbons ou rien : deux ne remplacent pas deux tiers d'un
@@ -46,8 +47,10 @@ function usableHelpers(userId, cb) {
 
 // Ce qu'une espèce permet de payer. `stock.total` compte ses individus, shiny
 // compris et celui qui évolue compris : une entrée de Pokédex est une espèce,
-// et `required` compte déjà celui qui reste.
-const canPay = (plan, stock) => !plan.error && stock.total >= plan.required;
+// et `required` compte déjà celui qui reste. Les sacrifices, eux, ne se
+// prennent que parmi ceux qui ne sont pas verrouillés.
+const canPay = (plan, stock) =>
+  !plan.error && stock.total >= plan.required && stock.sacrificeable >= plan.sacrifices;
 
 // Métamorph en renfort, ou null : seulement quand les exemplaires ne suffisent
 // pas, que l'espèce a de quoi évoluer tout en gardant son entrée, et qu'il reste
@@ -55,8 +58,10 @@ const canPay = (plan, stock) => !plan.error && stock.total >= plan.required;
 // même fonction qu'evolve, qui tranche à la fin.
 function dittoPath(plan, stock) {
   if (plan.error || canPay(plan, stock) || stock.total < 2) return null;
-  const fill = sacrificeFill(plan, stock.total);
-  if (!fill.dittos || stock.dittos < fill.dittos + 1) return null;
+  const fill = sacrificeFill(plan, { total: stock.total, free: stock.sacrificeable });
+  if (!fill.dittos || stock.dittos < fill.dittos + 1 || stock.dittoFree < fill.dittos) {
+    return null;
+  }
   return fill;
 }
 
@@ -84,12 +89,24 @@ function evolutionPaths(speciesId, stock, helpers) {
 
 // Le stock d'une espèce, lu dans les comptes de countBySpecies : ses
 // individus, shiny compris, et les Métamorph — toutes variantes — qui peuvent
-// combler les sacrifices qui manquent.
-function stockOf(counts, speciesId) {
+// combler les sacrifices qui manquent. `sacrificeable` compte ceux qui peuvent
+// être sacrifiés : ni verrouillés, ni `evolver`, celui qui évolue. Sans
+// individu choisi (la liste des espèces), on suppose le cas le plus favorable :
+// un verrouillé qui évolue laisse tous les autres libres.
+function stockOf(counts, speciesId, evolver = null) {
   const entry = counts.get(speciesId) ?? NO_ENTRY;
   const metamorph = dittoSpecies();
   const dittos = (metamorph && counts.get(metamorph.id)) || NO_ENTRY;
-  return { ...entry, dittos: dittos.total, dittoNormals: dittos.normal };
+  const evolverFree = evolver ? !evolver.locked : entry.free === entry.total;
+  const evolverFreeNormal = evolver ? evolverFree && !evolver.is_shiny : false;
+  return {
+    ...entry,
+    sacrificeable: Math.max(0, entry.free - (evolverFree ? 1 : 0)),
+    sacrificeableNormal: Math.max(0, entry.freeNormal - (evolverFreeNormal ? 1 : 0)),
+    dittos: dittos.total,
+    dittoFree: dittos.free,
+    dittoFreeNormal: dittos.freeNormal,
+  };
 }
 
 // Combien de shiny partiraient parmi `count` sacrifices, quand `normals`
@@ -237,7 +254,7 @@ export default {
       if (selector.error) {
         return interaction.reply({ content: `❌ ${selector.error}`, flags: MessageFlags.Ephemeral });
       }
-      const { speciesId, isShiny, sex, pokemonId } = selector;
+      const { speciesId, isShiny, sex, pokemonId, row: evolver } = selector;
       const plan = describeEvolution(speciesId);
       if (plan.error) {
         return interaction.reply({
@@ -257,10 +274,9 @@ export default {
         // évolution qu'il ne peut pas payer n'a pas à lui être proposée.
         getIndividuals(interaction.user.id, (err, individuals) => {
           if (err) handleException("Lecture de la collection pour /pk evolution :", err);
-          const stock = stockOf(countBySpecies(err ? [] : individuals), speciesId);
-          // Les normaux qui peuvent être sacrifiés avant un shiny : tous, sauf
-          // celui qui évolue s'il en est un.
-          const normals = stock.normal - (isShiny ? 0 : 1);
+          const stock = stockOf(countBySpecies(err ? [] : individuals), speciesId, evolver);
+          // Les normaux qui peuvent être sacrifiés avant un shiny.
+          const normals = stock.sacrificeableNormal;
 
           const species = plan.species;
           // Le deuxième segment du customId désigne l'individu qui évolue.
@@ -278,6 +294,18 @@ export default {
                 : `**${species.name}** peut évoluer en **${plan.targets[0].name}**.`) +
                 `\nIl garde son sexe, sa ball et sa fertilité${isShiny ? ", et reste shiny" : ""}.`
             );
+
+          // Verrouillé : il évolue quand même — il ne quitte pas la boîte —,
+          // mais on le dit avant, et le clic demandera confirmation.
+          if (evolver.locked) {
+            embed.addFields({
+              name: "Verrouillé",
+              value:
+                `🛡️ #${pokemonId} est verrouillé. Il peut évoluer, il ne quitte pas ta boîte, ` +
+                `mais une confirmation te sera demandée.`,
+              inline: false,
+            });
+          }
 
           // Le coût de l'évolution ordinaire n'a sa place que si elle est
           // proposée : au-dessus d'un unique bouton « Pierre Feu → Pyroli
@@ -389,7 +417,8 @@ export default {
             embed.addFields({
               name: metamorph.name,
               value:
-                `**${fill.dittos}** ${metamorph.name}${shinyNote(fill.dittos, stock.dittoNormals)} ` +
+                `**${fill.dittos}** ${metamorph.name}` +
+                `${shinyNote(fill.dittos, stock.dittoFreeNormal)} ` +
                 `${fill.dittos > 1 ? "tiennent" : "tient"} lieu de **${fill.missing}** ` +
                 `sacrifice${fill.missing > 1 ? "s" : ""} manquant${fill.missing > 1 ? "s" : ""}, ` +
                 `les normaux d'abord` +
@@ -407,16 +436,24 @@ export default {
           // chiffres sont ceux de sacrificeFill, comme pour le bouton.
           if (!rows.length) {
             const metamorph = dittoSpecies();
-            const joker = metamorph && stock.total >= 2 ? sacrificeFill(plan, stock.total) : null;
+            const joker =
+              metamorph && stock.total >= 2
+                ? sacrificeFill(plan, { total: stock.total, free: stock.sacrificeable })
+                : null;
+            const dittosLocked = stock.dittos - stock.dittoFree;
             return interaction
               .editReply({
                 content: [
-                  `❌ ${evolutionShortage(plan, err ? null : stock.total)}`,
+                  `❌ ${evolutionShortage(plan, err ? null : stock)}`,
                   helpersHint(),
                   joker?.dittos
                     ? `Ou **${joker.dittos + 1}** ${metamorph.name} ` +
                       `(${joker.dittos} sacrifié${joker.dittos > 1 ? "s" : ""} + 1 qui reste), ` +
-                      `tu en as **${stock.dittos}**.`
+                      `tu en as **${stock.dittos}**` +
+                      (dittosLocked
+                        ? `, dont **${dittosLocked}** verrouillé${dittosLocked > 1 ? "s" : ""} 🛡️`
+                        : "") +
+                      "."
                     : null,
                 ]
                   .filter(Boolean)

@@ -132,6 +132,11 @@ h3 {
   color: var(--warning);
 }
 
+/* Le verrou d'un Pokémon : il ne part pas. */
+.icon-shield {
+  color: var(--accent);
+}
+
 .icon-pin,
 .icon-berry {
   color: var(--accent);
@@ -1187,6 +1192,19 @@ input[type="number"] {
   border-radius: inherit;
   background: transparent;
   cursor: pointer;
+}
+
+/* Un Pokémon verrouillé porte son bouclier dans un coin de sa case. */
+.pc-mon {
+  position: relative;
+}
+
+.pc-lock {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 14px;
+  height: 14px;
 }
 
 /* Les sprites ont une large marge transparente : agrandis, ils remplissent la

@@ -97,6 +97,18 @@ export function getAvailableSpecies(id) {
 
 export const isLegendary = (species) => species.isLegendary || species.isMythical;
 
+// Verrouillé d'office en arrivant dans une boîte — capture, parc, œuf,
+// échange, et une fois pour ceux d'avant le verrou : un shiny, un légendaire,
+// selon pokemon.lockByDefault. Le dresseur en décide ensuite avec /pk verrou.
+// Un Pokémon verrouillé ne part jamais : ni revente, ni échange, ni sacrifice.
+export function lockedByDefault(speciesId, isShiny) {
+  const config = getPokemonConfig().lockByDefault ?? {};
+  const species = getSpecies(speciesId);
+  return Boolean(
+    (isShiny && config.shiny) || (species && isLegendary(species) && config.legendary)
+  );
+}
+
 // ====================== SEXE ======================
 
 export const SEXES = {

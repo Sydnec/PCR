@@ -20,7 +20,7 @@
 // comprise, et le démarrage suivant recommence de zéro.
 import db from "../points-db.js";
 import { handleException, log } from "../utils.js";
-import { allSpeciesData, getSpecies, isGenderless, rollSex } from "./data.js";
+import { allSpeciesData, getSpecies, isGenderless, lockedByDefault, rollSex } from "./data.js";
 
 const all = (sql, params = []) =>
   new Promise((resolve, reject) =>
@@ -93,6 +93,7 @@ export async function runMigrations() {
   await migrateCollection();
   await migrateGenderless();
   await migratePc();
+  await migrateLock();
 }
 
 // ---------------------- 1. Individus ----------------------
@@ -224,5 +225,34 @@ async function migratePc() {
       )`
     );
     log("Boîte PC : place, surnom et noms de boîtes prêts.");
+  });
+}
+
+// ---------------------- 4. Verrou ----------------------
+
+// Un Pokémon verrouillé ne part jamais : ni revente, ni échange, ni sacrifice.
+// Les shiny et les légendaires le sont d'office à leur arrivée
+// (lockedByDefault) ; ceux qu'on possède déjà le deviennent ici, par la même
+// règle, une seule fois — ensuite, c'est le dresseur qui décide, et un
+// redémarrage ne doit pas reverrouiller ce qu'il a ouvert.
+async function migrateLock() {
+  await once("verrou", async () => {
+    await run("ALTER TABLE pokemon_owned ADD COLUMN locked INTEGER NOT NULL DEFAULT 0").catch(
+      (error) => {
+        if (!/duplicate column/i.test(error.message)) throw error;
+      }
+    );
+    const ids = (await all("SELECT id, species_id, is_shiny FROM pokemon_owned"))
+      .filter((row) => lockedByDefault(row.species_id, row.is_shiny))
+      .map((row) => row.id);
+    // Par paquets : SQLite borne le nombre de paramètres d'une requête.
+    for (let start = 0; start < ids.length; start += 500) {
+      const chunk = ids.slice(start, start + 500);
+      await run(
+        `UPDATE pokemon_owned SET locked = 1 WHERE id IN (${chunk.map(() => "?").join(", ")})`,
+        chunk
+      );
+    }
+    log(`Verrou : ${ids.length} Pokémon shiny ou légendaires verrouillés d'office.`);
   });
 }

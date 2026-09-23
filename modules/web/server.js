@@ -350,7 +350,9 @@ export function startWebServer(bot) {
 
   const server = http.createServer((req, res) => {
     handle(req, res, bot).catch((error) => {
-      if (error instanceof HttpError) return send(res, error.status, { error: error.message });
+      if (error instanceof HttpError) {
+        return send(res, error.status, { ...error.details, error: error.message });
+      }
       handleException(`API web, ${req.method} ${req.url} :`, error);
       send(res, 500, { error: "Erreur interne." });
     });

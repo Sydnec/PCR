@@ -35,13 +35,22 @@ soit au jeu, et Discord continue d'afficher le nom de l'espèce.
 Avoir capturé un Pokémon ne suffit pas à le garder au Pokédex, il faut le posséder. Il reste donc
 **toujours au moins un individu de chaque espèce**, shiny ou non : une entrée de Pokédex est une
 espèce. Aucun n'est réservé pour autant : n'importe lequel peut partir, même le plus ancien, tant
-qu'il n'est pas le dernier. Avec un Salamèche et un Salamèche shiny, l'un ou l'autre peut partir ;
-le dernier est marqué 📌 dans `/pk boite`.
+qu'il n'est pas le dernier. Avec un Salamèche et un Salamèche shiny, l'un ou l'autre peut partir.
+
+## Le verrou
+
+Pour qu'un Pokémon précis ne parte jamais, on le **verrouille** : `/pk verrou <espece> <individu>`,
+ou le bouton « Verrouiller » de sa fiche sur le [site](../site.md#boîte-pc). Verrouillé, il ne se
+revend pas, ne s'échange pas et n'est jamais sacrifié ; il peut encore évoluer, après une
+confirmation, et pondre. Les **shiny et les légendaires arrivent verrouillés** — capture, parc,
+œuf, échange —, et ceux qu'on avait déjà l'ont été une fois, à la mise à jour
+(`pokemon.lockByDefault` : `shiny`, `legendary`). Il est marqué 🛡️ dans `/pk boite` et dans les
+listes des commandes.
 
 ## Qui part quand on cède
 
 Quand le bot choisit lui-même, il cède ce qui vaut le moins : les **normaux avant les shiny**, puis
-les **stériles**, puis **les plus récents**.
+les **stériles**, puis **les plus récents** — et jamais un verrouillé.
 
 - **Revente** : un individu précis, ou `quantite` normaux de l'espèce choisis par le bot. Un shiny
   se choisit, il ne part jamais dans le lot.
@@ -49,8 +58,10 @@ les **stériles**, puis **les plus récents**.
   fertilité, shiny. Les **sacrifices**, de n'importe quel sexe et de n'importe quelle variante, sont
   choisis par le bot et disparaissent.
 - **Échange** : un individu précis de chaque côté, fertilité comprise — qui reçoit une femelle
-  fertile doit pouvoir compter dessus : si elle pond entre-temps, l'échange échoue. L'individu
-  change de dresseur sans cesser d'être lui-même.
+  fertile doit pouvoir compter dessus : si elle pond ou est verrouillée entre-temps, l'échange
+  échoue. L'individu change de dresseur sans cesser d'être lui-même : numéro, shiny, ball,
+  fertilité, sexe et surnom le suivent. Il arrive avec la date de l'échange, à la première case
+  libre du PC, et verrouillé s'il est shiny ou légendaire.
 
 ## Migration
 
