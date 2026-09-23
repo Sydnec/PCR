@@ -1310,5 +1310,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "chore",
+      "name": "Passage à Node.js 24",
+      "description": "Le bot tourne désormais sur Node.js 24.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-23T10:30:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    }
+  ]
 }

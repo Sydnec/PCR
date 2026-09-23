@@ -60,7 +60,7 @@ Le projet inclut un script CLI puissant, **`pcr`**, pour gérer tout le cycle de
 
 ### Prérequis
 
-- Node.js 18+
+- Node.js 24 (voir `.nvmrc`)
 - PM2 (`npm install -g pm2`)
 - Git
 
