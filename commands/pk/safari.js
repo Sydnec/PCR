@@ -1,12 +1,12 @@
-import { SlashCommandBuilder, MessageFlags } from "discord.js";
-import { handleException } from "../modules/utils.js";
-import { getPokemonConfig, getSafariConfig } from "../modules/pokemon/config.js";
-import { buildSafariView } from "../modules/pokemon/embeds.js";
+import { MessageFlags } from "discord.js";
+import { handleException } from "../../modules/utils.js";
+import { getPokemonConfig, getSafariConfig } from "../../modules/pokemon/config.js";
+import { buildSafariView } from "../../modules/pokemon/embeds.js";
 import {
   findFreeParkFor,
   resumeSession,
   startPaidSession,
-} from "../modules/pokemon/safari.js";
+} from "../../modules/pokemon/safari.js";
 
 // Entrée payante du parc safari. L'événement aléatoire, lui, est gratuit et
 // passe par le bouton de son message — cette commande sert à s'offrir une visite
@@ -16,11 +16,12 @@ import {
 // fermé derrière elle : son message n'a plus de bouton, la session, elle, court
 // encore.
 export default {
-  data: new SlashCommandBuilder()
-    .setName("safari")
-    .setDescription(
-      "Paie l'entrée du parc safari : 25 actions gratuites et des raretés boostées"
-    ),
+  describe: (sub) =>
+    sub
+      .setName("safari")
+      .setDescription(
+        "Paie l'entrée du parc safari : 25 actions gratuites et des raretés boostées"
+      ),
 
   async execute(interaction) {
     try {

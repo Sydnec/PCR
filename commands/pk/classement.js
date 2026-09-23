@@ -1,12 +1,13 @@
-import { SlashCommandBuilder, EmbedBuilder } from "discord.js";
-import { handleException } from "../modules/utils.js";
-import { getLeaderboard } from "../modules/pokemon/collection.js";
-import { dexSize } from "../modules/pokemon/data.js";
+import { EmbedBuilder } from "discord.js";
+import { handleException } from "../../modules/utils.js";
+import { getLeaderboard } from "../../modules/pokemon/collection.js";
+import { dexSize } from "../../modules/pokemon/data.js";
 
 export default {
-  data: new SlashCommandBuilder()
-    .setName("pokeclassement")
-    .setDescription("Classement des meilleurs dresseurs"),
+  describe: (sub) =>
+    sub
+      .setName("classement")
+      .setDescription("Classement des meilleurs dresseurs"),
 
   async execute(interaction) {
     try {

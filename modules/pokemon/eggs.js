@@ -120,17 +120,19 @@ export function getIncubatingEgg(userId, cb) {
 // Rend un parent stérile, et c'est ce geste qui le revendique : un UPDATE gardé
 // sur `sterile = 0`, dont RETURNING dit s'il a eu lieu. Deux pontes simultanées
 // ne peuvent donc pas se servir du même individu. On prend le plus récent des
-// individus fertiles du groupe. `sex IS ?` et non `=` : un Métamorph n'a pas de
-// sexe, et NULL = NULL n'est jamais vrai en SQL.
-function claimParent(userId, { speciesId, isShiny, sex }, cb) {
+// individus fertiles du groupe — ou l'individu désigné par `pokemonId`. `sex IS
+// ?` et non `=` : un Métamorph n'a pas de sexe, et NULL = NULL n'est jamais
+// vrai en SQL.
+function claimParent(userId, { speciesId, isShiny, sex, pokemonId = null }, cb) {
   db.get(
     `UPDATE pokemon_owned SET sterile = 1
       WHERE sterile = 0 AND id = (
         SELECT id FROM pokemon_owned
          WHERE user_id = ? AND species_id = ? AND is_shiny = ? AND sex IS ? AND sterile = 0
+           AND (? IS NULL OR id = ?)
          ORDER BY obtained_at DESC, id DESC LIMIT 1)
       RETURNING id`,
-    [userId, speciesId, isShiny ? 1 : 0, sex ?? null],
+    [userId, speciesId, isShiny ? 1 : 0, sex ?? null, pokemonId ?? null, pokemonId ?? null],
     (err, row) => cb(err, row?.id ?? null)
   );
 }
@@ -147,7 +149,8 @@ const releaseParents = (ids, cb = () => {}) =>
   );
 
 // Pond un œuf. Les deux parents sont des groupes { speciesId, isShiny, sex },
-// dans n'importe quel ordre : describeEgg distribue les rôles. Enchaînement
+// ou des individus précis (`pokemonId`, résolus par resolveSelector), dans
+// n'importe quel ordre : describeEgg distribue les rôles. Enchaînement
 // ordonné avec compensation, comme une fusion : le père, puis la mère, puis
 // l'œuf — et chaque étape rend ce que les précédentes ont pris si elle échoue.
 export function layEgg(userId, firstGroup, secondGroup, cb) {
@@ -175,22 +178,24 @@ export function layEgg(userId, firstGroup, secondGroup, cb) {
       });
     }
 
-    const noFertile = (species, sex) =>
+    const noFertile = (species, group) =>
       cb(null, {
         ok: false,
-        reason:
-          `Tu n'as pas de **${displayName(species, false, sex)}** fertile : chaque ` +
-          `Pokémon ne pond qu'une fois dans sa vie.`,
+        reason: group.pokemonId
+          ? `Le Pokémon #${group.pokemonId} ne peut plus pondre : chaque Pokémon ne pond ` +
+            `qu'une fois dans sa vie.`
+          : `Tu n'as pas de **${displayName(species, false, group.sex)}** fertile : chaque ` +
+            `Pokémon ne pond qu'une fois dans sa vie.`,
       });
 
     claimParent(userId, father, (err, fatherId) => {
       if (err) return cb(err);
-      if (!fatherId) return noFertile(fatherSpecies, father.sex);
+      if (!fatherId) return noFertile(fatherSpecies, father);
 
       claimParent(userId, mother, (err, motherId) => {
         if (err || !motherId) {
           return releaseParents([fatherId], () =>
-            err ? cb(err) : noFertile(motherSpecies, mother.sex)
+            err ? cb(err) : noFertile(motherSpecies, mother)
           );
         }
 
@@ -344,7 +349,7 @@ export function hatchDueEggs(client) {
   );
 }
 
-// L'état d'un œuf en couvaison, pour /oeuf voir et la confirmation de ponte.
+// L'état d'un œuf en couvaison, pour /pk oeuf voir et la confirmation de ponte.
 // Les colonnes father_* et mother_* tiennent les rôles de mâle et de femelle ;
 // un Métamorph y occupe celui qui restait, sans symbole puisqu'il n'a pas de
 // sexe.

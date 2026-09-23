@@ -56,7 +56,8 @@ export const displayName = (species, isShiny, sex = null) => {
 // Un groupe d'individus tel qu'une commande le désigne : « Pikachu ♀ », suivi
 // de sa fertilité quand elle compte — pour un échange ou une ponte, une femelle
 // stérile ne vaut pas une femelle fertile.
-export const describeGroup = (species, { isShiny, sex = null, fertile = null }) =>
+export const describeGroup = (species, { isShiny, sex = null, fertile = null, pokemonId = null }) =>
+  (pokemonId ? `#${pokemonId} ` : "") +
   displayName(species, isShiny, sex) +
   (fertile === null || fertile === undefined ? "" : fertile ? " (fertile)" : " (stérile)");
 
@@ -211,7 +212,7 @@ function chainLine(species, counts, { current = false, focusShiny = false } = {}
 }
 
 // Fiche d'une espèce : ce qu'elle est, ce qu'elle coûte à attraper, et où en est
-// le dresseur dans sa lignée. Elle sert /pokeinfo comme le bouton des
+// le dresseur dans sa lignée. Elle sert /pk info comme le bouton des
 // apparitions : « je l'ai déjà ? » n'est qu'un cas particulier de « parle-moi de
 // ce Pokémon », et deux réponses séparées auraient fini par diverger.
 export function buildSpeciesInfoEmbed(
@@ -271,7 +272,7 @@ export function buildSpeciesInfoEmbed(
   const legend = [
     chain.some(isEvolutionOnly) &&
       "\u{1F512} Introuvable à l'état sauvage : par fusion de doublons, ou par échange.",
-    chain.some(isEggOnly) && "\u{1F95A} Ne sort que d'un œuf : /oeuf, avec un couple de parents.",
+    chain.some(isEggOnly) && "\u{1F95A} Ne sort que d'un œuf : /pk oeuf pondre, avec un couple de parents.",
   ].filter(Boolean);
   if (legend.length) embed.setFooter({ text: legend.join("\n") });
   return embed;
@@ -480,28 +481,61 @@ const ORIGINS = {
 const shortDate = (ms) =>
   new Date(ms).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
 
+// Taper « # » ou un nombre dans une option qui désigne un Pokémon, c'est
+// demander un individu précis plutôt qu'un groupe.
+export const wantsIndividual = (query) => /^\s*(#|\d+\s*$)/.test(String(query ?? ""));
+
+// Les individus proposés pour cette saisie : ceux que `keep` accepte, dont
+// l'identifiant commence par les chiffres tapés, les plus récents d'abord.
+export function individualChoices(rows, query, keep = () => true) {
+  const digits = String(query ?? "").replace(/\D/g, "");
+  return rows
+    .filter((row) => keep(row) && String(row.id).startsWith(digits))
+    .sort((a, b) => b.id - a.id)
+    .slice(0, 25)
+    .map((row) => {
+      const species = getSpecies(row.species_id);
+      const ball = ballOf(row.ball);
+      return {
+        name:
+          `#${row.id} · ${species ? displayName(species, row.is_shiny, row.sex) : "?"}` +
+          (ball ? ` · ${ball.label}` : "") +
+          (row.sterile ? " · stérile" : "") +
+          (row.last ? " · dernier" : ""),
+        value: `#${row.id}`,
+      };
+    });
+}
+
 // Une ligne par individu : sexe, espèce, ball, date d'arrivée, et ce qui le
-// distingue des autres — l'exemplaire qu'on garde (📌), celui qui a déjà pondu.
+// distingue des autres — le dernier de son espèce (📌), celui qui a déjà pondu.
 function individualLine(row) {
   const species = getSpecies(row.species_id);
   const ball = ballOf(row.ball);
   const provenance = ball ? `${ball.emoji} ${ball.label}` : ORIGINS[row.origin] ?? "—";
   return (
-    `**${species ? displayName(species, row.is_shiny, row.sex) : `#${row.species_id}`}**` +
+    `\`#${row.id}\` **${species ? displayName(species, row.is_shiny, row.sex) : "?"}**` +
     ` · ${provenance}` +
     (row.origin === "echange" ? " · reçu en échange" : "") +
     ` · ${shortDate(row.obtained_at)}` +
-    (row.locked ? " · 📌 gardé" : "") +
+    (row.last ? " · 📌 dernier" : "") +
     (row.sterile ? " · stérile" : "")
   );
 }
 
+const boxPageSize = () => Math.max(1, Math.floor(getPokemonConfig().box?.pageSize ?? 15));
+export const boxPageCount = (total) => Math.max(1, Math.ceil(total / boxPageSize()));
+
 // La boîte d'un dresseur : ses Pokémon un par un, les plus récents d'abord, ou
-// seulement ceux d'une espèce. L'embed plafonne à 25 lignes ; le reste est
-// compté plutôt que tronqué au milieu d'une ligne.
-export function buildBoxEmbed(rows, { user, species = null, limit = 25 } = {}) {
+// seulement ceux d'une espèce, page par page. Chaque ligne commence par
+// l'identifiant qu'acceptent les commandes (#123). Une page hors limites
+// retombe sur la dernière : la boîte a pu se vider entre deux clics.
+export function buildBoxEmbed(rows, { user, species = null, page = 0 } = {}) {
   const sorted = [...rows].sort((a, b) => b.obtained_at - a.obtained_at || b.id - a.id);
-  const shown = sorted.slice(0, limit);
+  const pages = boxPageCount(sorted.length);
+  const current = Math.min(Math.max(0, page), pages - 1);
+  const size = boxPageSize();
+  const shown = sorted.slice(current * size, (current + 1) * size);
   const embed = new EmbedBuilder()
     .setTitle(
       `\u{1F4E6} Boîte de ${user.displayName ?? user.username}` +
@@ -519,10 +553,34 @@ export function buildBoxEmbed(rows, { user, species = null, limit = 25 } = {}) {
     .setDescription(shown.map(individualLine).join("\n"))
     .setFooter({
       text:
-        `${rows.length} Pokémon` +
-        (rows.length > shown.length ? ` · ${rows.length - shown.length} de plus non affichés` : "") +
-        " · 📌 l'exemplaire gardé ne se cède jamais",
+        `Page ${current + 1}/${pages} · ${rows.length} Pokémon · 📌 le dernier d'une espèce ` +
+        `ne peut pas partir · #numéro utilisable dans les commandes`,
     });
+}
+
+// Les boutons de page de la boîte. Le propriétaire et l'espèce filtrée voyagent
+// dans le customId : un redémarrage du bot n'y change rien.
+export function buildBoxRow(ownerId, speciesId, page, total) {
+  const pages = boxPageCount(total);
+  const current = Math.min(Math.max(0, page), pages - 1);
+  const id = (target) => `poke_box|${ownerId}|${speciesId ?? 0}|${target}`;
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(id((current - 1 + pages) % pages))
+      .setLabel("◀")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(pages <= 1),
+    new ButtonBuilder()
+      .setCustomId(`poke_box_noop|${ownerId}`)
+      .setLabel(`${current + 1}/${pages}`)
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(true),
+    new ButtonBuilder()
+      .setCustomId(id((current + 1) % pages))
+      .setLabel("▶")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(pages <= 1)
+  );
 }
 
 export function buildInventoryEmbed(rows, { user = null } = {}) {
@@ -721,6 +779,7 @@ export function buildTradeEmbed(trade, status = "PENDING") {
   const requested = getSpecies(trade.request_species_id);
   const side = (prefix, species) =>
     describeGroup(species, {
+      pokemonId: trade[`${prefix}_pokemon_id`] ?? null,
       isShiny: trade[`${prefix}_is_shiny`],
       sex: trade[`${prefix}_sex`] || null,
       fertile:
@@ -985,7 +1044,7 @@ function buildSafariRow(session, config) {
 }
 
 // Un éphémère se ferme d'un geste, et personne ne peut le rouvrir à la place de
-// son destinataire : le bouton du parc et /safari le refont, avec la visite là
+// son destinataire : le bouton du parc et /pk safari le refont, avec la visite là
 // où elle en était. Sans cette phrase, le dresseur croirait avoir perdu les
 // actions déjà jouées en retrouvant un plateau entamé.
 const SAFARI_RESUMED = "\u{1F3D5}\uFE0F Tu reprends ta visite là où tu l'avais laissée.";

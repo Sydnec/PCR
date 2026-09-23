@@ -45,7 +45,7 @@ que de le faire disparaître.
   dans son inventaire ne coûte rien : l'objet passe avant le solde, parce qu'un objet posé dans un
   sac ne doit pas dormir pendant qu'on prend la monnaie de son propriétaire. La Master Ball garde sa
   confirmation — elle ne coûte rien mais ne se retrouve pas. Le Ticket Safari suit la même règle
-  dans `/safari`, et il ignore le délai de 24 h : ce délai borne ce qu'on peut s'**acheter**.
+  dans `/pk safari`, et il ignore le délai de 24 h : ce délai borne ce qu'on peut s'**acheter**.
 - **Une ball offerte se rend en ball.** Battu à la milliseconde sur un Pokémon, on récupère l'objet,
   jamais sa valeur en points : la convertir en monnaie ferait d'un Pokémon disputé une petite
   imprimerie. Le lancer est alors journalisé à coût nul, ce qui garde honnête le total des points

@@ -14,19 +14,29 @@ le distingue des autres.
   [Œufs](oeufs.md)).
 - **Sa date d'arrivée** chez son dresseur actuel.
 
-`/boite [pokemon] [membre]` les montre un par un : les plus récents, ou ceux d'une espèce.
+`/pk boite [pokemon] [membre]` les montre un par un, page par page : les plus récents, ou ceux
+d'une espèce.
 
-## L'exemplaire gardé
+## Le numéro
 
-Avoir capturé un Pokémon ne suffit pas à le garder au Pokédex, il faut le posséder. **Le plus ancien
-individu de chaque entrée** (espèce + variante, un shiny comptant à part) est donc verrouillé : 📌
-dans `/boite`. Aucune revente, fusion ni échange ne peut le prendre.
+Chaque Pokémon a un **numéro** (`#123`), affiché en tête de sa ligne dans `/pk boite`. Il ne
+change jamais, même quand le Pokémon évolue ou change de dresseur. Taper `#123` dans une commande
+qui désigne un Pokémon — `/pk echange`, `/pk oeuf pondre`, `/pk revendre pokemon`, `/pk evolution`
+— vise ce Pokémon précis plutôt qu'un groupe ; l'autocomplétion propose les numéros dès qu'on tape
+`#`.
+
+## Toujours au moins un
+
+Avoir capturé un Pokémon ne suffit pas à le garder au Pokédex, il faut le posséder. Il reste donc
+**toujours au moins un individu de chaque entrée** (espèce + variante, un shiny comptant à part).
+Aucun n'est réservé pour autant : n'importe lequel peut partir, même le plus ancien, tant qu'il
+n'est pas le dernier. Le dernier est marqué 📌 dans `/pk boite`.
 
 ## Qui part quand on cède
 
 On choisit un **groupe** — espèce, variante et sexe, plus la fertilité pour un échange — et le bot
-choisit l'individu : jamais l'exemplaire gardé, les **stériles d'abord**, puis **les plus récents**.
-On cède ce qui vaut le moins.
+choisit l'individu : les **stériles d'abord**, puis **les plus récents**. On cède ce qui vaut le
+moins. Pour céder un individu précis, on donne son numéro.
 
 - **Revente** : par espèce et sexe (`Pikachu ♀`).
 - **Fusion** : le sexe choisi est celui de l'individu qui **évolue** ; il garde son sexe, sa ball et

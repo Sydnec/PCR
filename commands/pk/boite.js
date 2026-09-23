@@ -1,36 +1,37 @@
-import { SlashCommandBuilder, MessageFlags } from "discord.js";
-import { handleException } from "../modules/utils.js";
-import { getIndividuals } from "../modules/pokemon/collection.js";
-import { getSpecies } from "../modules/pokemon/data.js";
-import { buildBoxEmbed } from "../modules/pokemon/embeds.js";
+import { MessageFlags } from "discord.js";
+import { handleException } from "../../modules/utils.js";
+import { getIndividuals } from "../../modules/pokemon/collection.js";
+import { getSpecies } from "../../modules/pokemon/data.js";
+import { buildBoxEmbed, buildBoxRow } from "../../modules/pokemon/embeds.js";
 
 // La boîte : les Pokémon d'un dresseur un par un, avec ce qui les distingue —
-// sexe, ball de capture, date d'arrivée, fertilité, et l'exemplaire qu'on garde.
+// sexe, ball de capture, date d'arrivée, fertilité, et le dernier d'une espèce.
 // Le Pokédex compte des espèces ; ici, on regarde des individus.
 export default {
-  data: new SlashCommandBuilder()
-    .setName("boite")
-    .setDescription("Tes Pokémon un par un : sexe, ball, date, fertilité")
-    .addStringOption((option) =>
-      option
-        .setName("pokemon")
-        .setDescription("Seulement cette espèce (les plus récents sinon)")
-        .setRequired(false)
-        .setAutocomplete(true)
-    )
-    .addUserOption((option) =>
-      option.setName("membre").setDescription("La boîte d'un autre dresseur").setRequired(false)
-    ),
+  describe: (sub) =>
+    sub
+      .setName("boite")
+      .setDescription("Tes Pokémon un par un : sexe, ball, date, fertilité")
+      .addStringOption((option) =>
+        option
+          .setName("pokemon")
+          .setDescription("Seulement cette espèce (les plus récents sinon)")
+          .setRequired(false)
+          .setAutocomplete(true)
+      )
+      .addUserOption((option) =>
+        option.setName("membre").setDescription("La boîte d'un autre dresseur").setRequired(false)
+      ),
 
-  // Les espèces présentes dans la boîte visée. getUser() ne marche pas pendant
-  // l'autocomplétion — Discord n'envoie pas les objets résolus — d'où la
-  // valeur brute de l'option, comme dans /echange.
+    // Les espèces présentes dans la boîte visée. getUser() ne marche pas pendant
+    // l'autocomplétion — Discord n'envoie pas les objets résolus — d'où la
+    // valeur brute de l'option, comme dans /echange.
   async autocomplete(interaction) {
     const targetId = interaction.options.get("membre")?.value ?? interaction.user.id;
     const needle = String(interaction.options.getFocused() || "").toLowerCase();
     getIndividuals(String(targetId), async (err, rows) => {
       if (err) {
-        handleException("Autocomplétion de /boite :", err);
+        handleException("Autocomplétion de /pk boite :", err);
         return interaction.respond([]).catch(() => {});
       }
       const counts = new Map();
@@ -69,7 +70,8 @@ export default {
         const shown = species ? rows.filter((row) => row.species_id === species.id) : rows;
         interaction
           .reply({
-            embeds: [buildBoxEmbed(shown, { user, species })],
+            embeds: [buildBoxEmbed(shown, { user, species, page: 0 })],
+            components: [buildBoxRow(user.id, species?.id, 0, shown.length)],
             flags: MessageFlags.Ephemeral,
           })
           .catch(() => {});

@@ -1,27 +1,28 @@
-import { SlashCommandBuilder, MessageFlags } from "discord.js";
-import { handleException } from "../modules/utils.js";
+import { MessageFlags } from "discord.js";
+import { handleException } from "../../modules/utils.js";
 import {
   evolutionChain,
   getAvailableSpecies,
   searchByName,
-} from "../modules/pokemon/data.js";
-import { getOwnedVariantsFor } from "../modules/pokemon/collection.js";
-import { buildSpeciesInfoEmbed } from "../modules/pokemon/embeds.js";
+} from "../../modules/pokemon/data.js";
+import { getOwnedVariantsFor } from "../../modules/pokemon/collection.js";
+import { buildSpeciesInfoEmbed } from "../../modules/pokemon/embeds.js";
 
 // La fiche est construite par embeds.js, exactement comme celle du bouton
 // « Infos du Pokémon » des apparitions : une seule mise en forme, donc une
 // commande et un bouton qui ne peuvent pas répondre deux choses différentes.
 export default {
-  data: new SlashCommandBuilder()
-    .setName("pokeinfo")
-    .setDescription("Fiche d'un Pokémon : type, rareté, difficulté et lignée évolutive")
-    .addStringOption((option) =>
-      option
-        .setName("pokemon")
-        .setDescription("Le Pokémon à consulter")
-        .setRequired(true)
-        .setAutocomplete(true)
-    ),
+  describe: (sub) =>
+    sub
+      .setName("info")
+      .setDescription("Fiche d'un Pokémon : type, rareté, difficulté et lignée évolutive")
+      .addStringOption((option) =>
+        option
+          .setName("pokemon")
+          .setDescription("Le Pokémon à consulter")
+          .setRequired(true)
+          .setAutocomplete(true)
+      ),
 
   async autocomplete(interaction) {
     const query = interaction.options.getFocused();
@@ -52,7 +53,7 @@ export default {
           // Une collection illisible ne doit pas priver le dresseur de la
           // fiche : getOwnedVariantsFor rend des compteurs à zéro, et la lignée
           // s'affiche simplement sans ses pastilles de possession.
-          if (err) handleException("Lecture de la collection pour /pokeinfo :", err);
+          if (err) handleException("Lecture de la collection pour /pk info :", err);
           interaction
             .reply({
               embeds: [buildSpeciesInfoEmbed(species, { owned })],

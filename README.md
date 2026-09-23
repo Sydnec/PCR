@@ -20,15 +20,16 @@ PCR est un bot Discord modulaire conçu pour animer et gérer la communauté. Il
 
 Un jeu de capture de Pokémon — 1ʳᵉ génération, la 2ᵉ prête à s'ouvrir d'une commande — qui sert de
 **puits à points** : chaque lancer de ball débite des points, que la capture réussisse ou non.
-→ **[Documentation du jeu](docs/pokemon/README.md)**
+Toutes ses commandes vivent sous `/pk`. → **[Documentation du jeu](docs/pokemon/README.md)**
 
 - [Capture & Pokédex](docs/pokemon/capture.md) — apparitions, balls, shiny, fiche d'espèce.
-- [Individus](docs/pokemon/individus.md) — sexe, ball de capture, fertilité, `/boite`.
+- [Individus](docs/pokemon/individus.md) — sexe, ball de capture, fertilité, `/pk boite`.
 - [Œufs](docs/pokemon/oeufs.md) — la seule façon d'obtenir les bébés.
 - [Objets](docs/pokemon/objets.md) — ce que tiennent les Pokémon, balls offertes, pierres.
 - [Loterie](docs/pokemon/loterie.md) — un tirage par jour et par dresseur.
 - [Revente](docs/pokemon/revente.md) — doublons et objets contre des points.
 - [Parc Safari](docs/pokemon/safari.md) — l'événement où les actions ne coûtent rien.
+- [API web](docs/api.md) — pour la future interface, éteinte tant qu'elle n'est pas configurée.
 
 ### 💰 Économie & Pot commun
 
@@ -149,11 +150,14 @@ Pour plus de détails sur la configuration CI/CD, voir [CICD.md](./CICD.md).
 ```
 .
 ├── commands/       # Commandes Slash Discord (ecaflip, poll, safe-place...)
+│   ├── admin/      # Sous-commandes de /admin
+│   └── pk/         # Sous-commandes de /pk (le jeu Pokémon)
 ├── docs/           # Documentation détaillée (Pokémon, économie, configuration, administration)
 ├── events/         # Événements Discord (client, guild, interactions...)
 ├── functions/      # Handlers (timers, events, commands...)
 ├── modules/        # Modules partagés (DB, Utils, Regex, Economy...)
-│   └── pokemon/    # Système de capture (données, spawns, capture, collection)
+│   ├── pokemon/    # Système de capture (données, spawns, capture, collection)
+│   └── web/        # API de l'interface web (connexion Discord, routes)
 ├── scripts/        # Scripts ponctuels (génération du dataset Pokémon)
 ├── pcr             # Script CLI de gestion
 ├── CICD.md         # Documentation du déploiement

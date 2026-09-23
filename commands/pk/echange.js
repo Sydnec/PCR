@@ -1,15 +1,21 @@
-import { SlashCommandBuilder, MessageFlags } from "discord.js";
-import { handleException } from "../modules/utils.js";
+import { MessageFlags } from "discord.js";
+import { handleException } from "../../modules/utils.js";
 import {
   countGroup,
   createTrade,
-  decodeEntry,
   getIndividuals,
   groupIndividuals,
+  resolveSelector,
   setTradeMessage,
-} from "../modules/pokemon/collection.js";
-import { getSpecies, tradeEvolutionTarget } from "../modules/pokemon/data.js";
-import { buildTradeEmbed, buildTradeRow, describeGroup } from "../modules/pokemon/embeds.js";
+} from "../../modules/pokemon/collection.js";
+import { getSpecies, tradeEvolutionTarget } from "../../modules/pokemon/data.js";
+import {
+  buildTradeEmbed,
+  buildTradeRow,
+  describeGroup,
+  individualChoices,
+  wantsIndividual,
+} from "../../modules/pokemon/embeds.js";
 
 // Discord n'autorise pas de liste vide accompagnée d'un message : une
 // proposition inerte est le seul moyen d'expliquer pourquoi il n'y a rien à
@@ -18,7 +24,7 @@ const HINT_VALUE = "0:0";
 const hint = (interaction, name) =>
   interaction.respond([{ name, value: HINT_VALUE }]).catch(() => {});
 
-// Le premier exemplaire de chaque entrée reste au Pokédex : on ne peut céder
+// Il reste toujours au moins un exemplaire de chaque entrée : on ne peut céder
 // que ce qu'on a en plus. acceptTrade tient la règle ; ce chiffre ne sert qu'à
 // ne proposer et n'accepter que des échanges qui ont une chance d'aboutir.
 const spareIn = (userId, group) =>
@@ -36,6 +42,12 @@ function respondWithOwned(interaction, userId, query, emptyLabel) {
       return interaction.respond([]).catch(() => {});
     }
     const needle = query.toLowerCase();
+    // « #123 » : un individu précis, jamais le dernier de son espèce.
+    if (wantsIndividual(query)) {
+      const individuals = individualChoices(rows, query, (row) => !row.last);
+      if (!individuals.length && emptyLabel) return hint(interaction, emptyLabel);
+      return interaction.respond(individuals).catch(() => {});
+    }
     const choices = groupIndividuals(rows, { bySex: true, byFertility: true })
       .map((group) => {
         const species = getSpecies(group.speciesId);
@@ -64,29 +76,30 @@ function respondWithOwned(interaction, userId, query, emptyLabel) {
 }
 
 export default {
-  data: new SlashCommandBuilder()
-    .setName("echange")
-    .setDescription("Propose un échange de Pokémon à un autre dresseur")
-    .addUserOption((option) =>
-      option
-        .setName("membre")
-        .setDescription("Le dresseur à qui proposer l'échange")
-        .setRequired(true)
-    )
-    .addStringOption((option) =>
-      option
-        .setName("je_donne")
-        .setDescription("Le Pokémon que tu proposes")
-        .setRequired(true)
-        .setAutocomplete(true)
-    )
-    .addStringOption((option) =>
-      option
-        .setName("je_recois")
-        .setDescription("Le Pokémon que tu demandes en échange")
-        .setRequired(true)
-        .setAutocomplete(true)
-    ),
+  describe: (sub) =>
+    sub
+      .setName("echange")
+      .setDescription("Propose un échange de Pokémon à un autre dresseur")
+      .addUserOption((option) =>
+        option
+          .setName("membre")
+          .setDescription("Le dresseur à qui proposer l'échange")
+          .setRequired(true)
+      )
+      .addStringOption((option) =>
+        option
+          .setName("je_donne")
+          .setDescription("Le Pokémon que tu proposes (ou #numéro d'un Pokémon précis)")
+          .setRequired(true)
+          .setAutocomplete(true)
+      )
+      .addStringOption((option) =>
+        option
+          .setName("je_recois")
+          .setDescription("Le Pokémon que tu demandes (ou #numéro d'un Pokémon précis)")
+          .setRequired(true)
+          .setAutocomplete(true)
+      ),
 
   async autocomplete(interaction) {
     const focused = interaction.options.getFocused(true);
@@ -117,15 +130,37 @@ export default {
       interaction,
       interaction.user.id,
       focused.value,
-      "Tu n'as aucun doublon à échanger : ton premier exemplaire reste au Pokédex"
+      "Tu n'as aucun doublon à échanger : un exemplaire de chaque Pokémon reste"
     );
   },
 
   async execute(interaction) {
     try {
       const target = interaction.options.getUser("membre");
-      const offer = decodeEntry(interaction.options.getString("je_donne"));
-      const request = decodeEntry(interaction.options.getString("je_recois"));
+      // Chaque côté est un groupe ou un individu précis (#123) ; un individu se
+      // résout chez son propriétaire — le sien pour ce qu'on donne, celui du
+      // destinataire pour ce qu'on demande.
+      const resolve = (ownerId, raw) =>
+        new Promise((ok, fail) =>
+          resolveSelector(ownerId, raw, (err, selector) => (err ? fail(err) : ok(selector)))
+        );
+      let offer, request;
+      try {
+        [offer, request] = await Promise.all([
+          resolve(interaction.user.id, interaction.options.getString("je_donne")),
+          resolve(target.id, interaction.options.getString("je_recois")),
+        ]);
+      } catch (err) {
+        handleException("Lecture des Pokémon pour /pk echange :", err);
+        return interaction.reply({
+          content: "❌ Erreur base de données.",
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      const refus = offer.error ?? request.error;
+      if (refus) {
+        return interaction.reply({ content: `❌ ${refus}`, flags: MessageFlags.Ephemeral });
+      }
 
       if (target.id === interaction.user.id) {
         return interaction.reply({
@@ -159,7 +194,7 @@ export default {
           spareIn(target.id, request),
         ]);
       } catch (err) {
-        handleException("Lecture des collections pour /echange :", err);
+        handleException("Lecture des collections pour /pk echange :", err);
         return interaction.reply({
           content: "❌ Erreur base de données.",
           flags: MessageFlags.Ephemeral,
@@ -169,7 +204,7 @@ export default {
         return interaction.reply({
           content:
             `❌ Tu n'as pas de doublon de **${describeGroup(offered, offer)}** : ` +
-            `le premier exemplaire de chaque Pokémon reste dans ton Pokédex, seuls les ` +
+            `il reste toujours au moins un exemplaire de chaque Pokémon, seuls les ` +
             `doublons s'échangent.`,
           flags: MessageFlags.Ephemeral,
         });
@@ -178,8 +213,8 @@ export default {
         return interaction.reply({
           content:
             `❌ <@${target.id}> n'a pas de doublon de ` +
-            `**${describeGroup(requested, request)}** à échanger : son premier ` +
-            `exemplaire reste dans son Pokédex.`,
+            `**${describeGroup(requested, request)}** à échanger : il lui en reste ` +
+            `toujours au moins un.`,
           flags: MessageFlags.Ephemeral,
         });
       }
@@ -198,6 +233,8 @@ export default {
           requestIsShiny: request.isShiny,
           requestSex: request.sex,
           requestFertile: request.fertile,
+          offerPokemonId: offer.pokemonId,
+          requestPokemonId: request.pokemonId,
           channelId: interaction.channelId,
         },
         async (err, tradeId) => {
@@ -219,6 +256,8 @@ export default {
             request_is_shiny: request.isShiny ? 1 : 0,
             request_sex: request.sex,
             request_fertile: request.fertile === null ? null : request.fertile ? 1 : 0,
+            offer_pokemon_id: offer.pokemonId,
+            request_pokemon_id: request.pokemonId,
           };
 
           const message = await interaction.editReply({

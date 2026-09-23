@@ -307,9 +307,9 @@ const db = new sqlite3.Database(dbPath, (err) => {
     // - `origin` : comment le dresseur actuel l'a obtenu (capture, safari,
     //   evolution, echange, oeuf, migration).
     // - `sterile` : un individu ne pond qu'un œuf dans sa vie.
-    // - `obtained_at` : depuis quand ce dresseur le possède. Le plus ancien de
-    //   chaque entrée de Pokédex (espèce + variante) est celui qu'on garde :
-    //   aucune revente, fusion ni échange ne peut le prendre.
+    // - `obtained_at` : depuis quand ce dresseur le possède. Aucune revente,
+    //   fusion ni échange ne peut prendre le dernier individu d'une entrée de
+    //   Pokédex (espèce + variante) : il en reste toujours au moins un.
     db.run(
       `CREATE TABLE IF NOT EXISTS pokemon_owned (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -395,7 +395,15 @@ const db = new sqlite3.Database(dbPath, (err) => {
         // Chaque côté désigne un groupe d'individus : espèce, variante, sexe et
         // fertilité. NULL — les offres d'avant les individus — veut dire
         // « n'importe lequel ».
-        const columns = ["offer_sex TEXT", "offer_fertile INTEGER", "request_sex TEXT", "request_fertile INTEGER"];
+        // Ou un individu précis, désigné par son identifiant (#123).
+        const columns = [
+          "offer_sex TEXT",
+          "offer_fertile INTEGER",
+          "request_sex TEXT",
+          "request_fertile INTEGER",
+          "offer_pokemon_id INTEGER",
+          "request_pokemon_id INTEGER",
+        ];
         for (const column of columns) {
           db.run(`ALTER TABLE pokemon_trades ADD COLUMN ${column}`, (err) => {
             if (err && !err.message.includes("duplicate column")) {
@@ -553,7 +561,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
 
     // Un parc est l'événement public : le message à bouton, sa fenêtre
     // d'ouverture, et la pause de spawn qu'il déclenche. Une entrée payante
-    // (/safari) n'en crée pas : elle ouvre directement une session.
+    // (/pk safari) n'en crée pas : elle ouvre directement une session.
     // reserved_for porte les parcs offerts à un dresseur précis par un
     // administrateur : même message, même bouton, mais un seul ayant droit.
     db.run(
@@ -636,7 +644,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
               }
               // Une entrée gratuite par dresseur et par parc. park_id NULL (entrée
               // payante) échappe à l'index : SQLite traite chaque NULL comme distinct,
-              // donc les /safari successifs restent possibles.
+              // donc les /pk safari successifs restent possibles.
               db.run(
                 `CREATE UNIQUE INDEX IF NOT EXISTS idx_pokemon_safari_session_park
                    ON pokemon_safari_sessions(park_id, user_id) WHERE park_id IS NOT NULL`,

@@ -31,9 +31,9 @@ visite. C'est le seul contenu Pokémon où les actions ne coûtent rien.
   plancher d'une heure pour qui entre juste avant — 25 actions ne se jouent pas en dix minutes.
 - **La visite se reprend** : l'éphémère se ferme d'un geste et personne ne peut le rouvrir à la
   place de son destinataire. Le bouton *« Entrer dans le parc »* le refait donc, avec la partie là
-  où elle en était, et `/safari` fait de même — y compris une fois le parc fermé, quand son message
+  où elle en était, et `/pk safari` fait de même — y compris une fois le parc fermé, quand son message
   n'a plus de bouton mais que la session court encore. Aucune action perdue, aucun point débité.
-- **Entrée payante** : `/safari` ouvre une visite hors événement pour **5 000 points**, avec un
+- **Entrée payante** : `/pk safari` ouvre une visite hors événement pour **5 000 points**, avec un
   cooldown de 24 h. Si un parc gratuit attend le dresseur, la commande le lui dit au lieu de
   débiter. Sans parc derrière elle, cette visite-là dure le plancher : une heure.
 - **Partage du bilan** : la visite est privée de bout en bout, donc son bilan aussi. Un bouton

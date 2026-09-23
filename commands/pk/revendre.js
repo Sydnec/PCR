@@ -1,15 +1,19 @@
-import { SlashCommandBuilder, MessageFlags } from "discord.js";
-import { handleException } from "../modules/utils.js";
-import { getPokemonConfig } from "../modules/pokemon/config.js";
+import { MessageFlags } from "discord.js";
+import { handleException } from "../../modules/utils.js";
+import { getPokemonConfig } from "../../modules/pokemon/config.js";
 import {
-  decodeEntry,
   getIndividuals,
   groupIndividuals,
-} from "../modules/pokemon/collection.js";
-import { getSpecies } from "../modules/pokemon/data.js";
-import { getInventory, getItem, itemSellValue } from "../modules/pokemon/items.js";
-import { pokemonSellValue, sellItem, sellPokemon } from "../modules/pokemon/sell.js";
-import { displayName } from "../modules/pokemon/embeds.js";
+  resolveSelector,
+} from "../../modules/pokemon/collection.js";
+import { getSpecies } from "../../modules/pokemon/data.js";
+import { getInventory, getItem, itemSellValue } from "../../modules/pokemon/items.js";
+import { pokemonSellValue, sellItem, sellPokemon } from "../../modules/pokemon/sell.js";
+import {
+  displayName,
+  individualChoices,
+  wantsIndividual,
+} from "../../modules/pokemon/embeds.js";
 
 // Revendre ce qu'on a en trop. Deux sous-commandes parce que ce sont deux
 // marchandises, mais un seul verbe : le dresseur n'a pas à savoir que les
@@ -63,47 +67,49 @@ const respond = (interaction, choices) =>
     .catch(() => {});
 
 export default {
-  data: new SlashCommandBuilder()
-    .setName("revendre")
-    .setDescription("Revend ce que tu as en trop contre des points")
-    .addSubcommand((sub) =>
-      sub
-        .setName("pokemon")
-        .setDescription("Revend des doublons — un exemplaire est toujours conservé")
-        .addStringOption((option) =>
-          option
-            .setName("pokemon")
-            .setDescription("Le doublon à revendre")
-            .setRequired(true)
-            .setAutocomplete(true)
-        )
-        .addIntegerOption((option) =>
-          option
-            .setName("quantite")
-            .setDescription("Combien en revendre (1 par défaut)")
-            .setRequired(false)
-            .setMinValue(1)
-        )
-    )
-    .addSubcommand((sub) =>
-      sub
-        .setName("objet")
-        .setDescription("Revend un objet de ton inventaire")
-        .addStringOption((option) =>
-          option
-            .setName("objet")
-            .setDescription("L'objet à revendre")
-            .setRequired(true)
-            .setAutocomplete(true)
-        )
-        .addIntegerOption((option) =>
-          option
-            .setName("quantite")
-            .setDescription("Combien en revendre (1 par défaut)")
-            .setRequired(false)
-            .setMinValue(1)
-        )
-    ),
+  group: true,
+  describe: (group) =>
+    group
+      .setName("revendre")
+      .setDescription("Revend ce que tu as en trop contre des points")
+      .addSubcommand((sub) =>
+        sub
+          .setName("pokemon")
+          .setDescription("Revend des doublons — un exemplaire est toujours conservé")
+          .addStringOption((option) =>
+            option
+              .setName("pokemon")
+              .setDescription("Le doublon à revendre (ou #numéro d'un Pokémon précis)")
+              .setRequired(true)
+              .setAutocomplete(true)
+          )
+          .addIntegerOption((option) =>
+            option
+              .setName("quantite")
+              .setDescription("Combien en revendre (1 par défaut)")
+              .setRequired(false)
+              .setMinValue(1)
+          )
+      )
+      .addSubcommand((sub) =>
+        sub
+          .setName("objet")
+          .setDescription("Revend un objet de ton inventaire")
+          .addStringOption((option) =>
+            option
+              .setName("objet")
+              .setDescription("L'objet à revendre")
+              .setRequired(true)
+              .setAutocomplete(true)
+          )
+          .addIntegerOption((option) =>
+            option
+              .setName("quantite")
+              .setDescription("Combien en revendre (1 par défaut)")
+              .setRequired(false)
+              .setMinValue(1)
+          )
+      ),
 
   async autocomplete(interaction) {
     const query = String(interaction.options.getFocused() || "").toLowerCase();
@@ -122,6 +128,22 @@ export default {
               value: row.item_key,
             }))
             .filter((choice) => choice.name.toLowerCase().includes(query))
+        );
+      });
+    }
+
+    // « #123 » : un individu précis, pourvu qu'il se revende et ne soit pas le
+    // dernier de son espèce.
+    if (wantsIndividual(query)) {
+      return getIndividuals(interaction.user.id, (err, rows) => {
+        if (err) return interaction.respond([]).catch(() => {});
+        respond(
+          interaction,
+          individualChoices(
+            rows,
+            query,
+            (row) => !row.last && pokemonSellValue(getSpecies(row.species_id), row.is_shiny) > 0
+          )
         );
       });
     }
@@ -195,13 +217,16 @@ export default {
 
       if (isItem) return sellItem(interaction.user.id, raw, quantity, done);
 
-      const { speciesId, isShiny, sex } = decodeEntry(raw);
-      if (!getSpecies(speciesId)) {
-        return interaction
-          .editReply({ content: "❌ Choisis une proposition dans la liste d'autocomplétion." })
-          .catch(() => {});
-      }
-      sellPokemon(interaction.user.id, { speciesId, isShiny, sex }, quantity, done);
+      resolveSelector(interaction.user.id, raw, (err, selector) => {
+        if (err) return done(err);
+        if (selector.error) return done(null, { ok: false, reason: selector.error });
+        if (!getSpecies(selector.speciesId)) {
+          return interaction
+            .editReply({ content: "❌ Choisis une proposition dans la liste d'autocomplétion." })
+            .catch(() => {});
+        }
+        sellPokemon(interaction.user.id, selector, quantity, done);
+      });
     } catch (error) {
       handleException(error);
     }

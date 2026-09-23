@@ -2,7 +2,7 @@
 
 # 🎰 Loterie
 
-`/loterie` offre **un tirage par dresseur et par jour**. Sept fois sur dix il donne quelque
+`/pk loterie` offre **un tirage par dresseur et par jour**. Sept fois sur dix il donne quelque
 chose, et **un gain sur deux est une ou deux Poké Balls, ou une Super Ball** : le tirage doit se
 sentir généreux sans l'être, d'où beaucoup de petits lots et très peu de gros.
 

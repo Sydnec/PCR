@@ -1,22 +1,23 @@
-import { SlashCommandBuilder, MessageFlags } from "discord.js";
-import { handleException } from "../modules/utils.js";
-import { getPokemonConfig } from "../modules/pokemon/config.js";
-import { getInventory } from "../modules/pokemon/items.js";
-import { buildInventoryEmbed } from "../modules/pokemon/embeds.js";
+import { MessageFlags } from "discord.js";
+import { handleException } from "../../modules/utils.js";
+import { getPokemonConfig } from "../../modules/pokemon/config.js";
+import { getInventory } from "../../modules/pokemon/items.js";
+import { buildInventoryEmbed } from "../../modules/pokemon/embeds.js";
 
 // L'inventaire d'un dresseur. Réponse privée, comme le Pokédex : ce qu'on a en
 // poche regarde d'abord son propriétaire, et un inventaire vide n'a pas à
 // s'afficher devant tout le salon.
 export default {
-  data: new SlashCommandBuilder()
-    .setName("inventaire")
-    .setDescription("Affiche les objets que tu as trouvés")
-    .addUserOption((option) =>
-      option
-        .setName("membre")
-        .setDescription("Le dresseur dont tu veux voir l'inventaire")
-        .setRequired(false)
-    ),
+  describe: (sub) =>
+    sub
+      .setName("inventaire")
+      .setDescription("Affiche les objets que tu as trouvés")
+      .addUserOption((option) =>
+        option
+          .setName("membre")
+          .setDescription("Le dresseur dont tu veux voir l'inventaire")
+          .setRequired(false)
+      ),
 
   async execute(interaction) {
     try {
