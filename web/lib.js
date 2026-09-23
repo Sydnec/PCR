@@ -20,6 +20,9 @@ export async function api(path, { method = "GET", body } = {}) {
     data = null;
   }
   if (!response.ok) {
+    // Session expirée ou accès retiré : le site repasse sur la connexion, quelle
+    // que soit la page (app.js), au lieu d'accumuler les refus en silence.
+    if (response.status === 401) window.dispatchEvent(new Event("session-perdue"));
     const error = new Error(data?.error ?? `Le serveur a répondu ${response.status}.`);
     error.status = response.status;
     throw error;

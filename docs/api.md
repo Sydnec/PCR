@@ -17,7 +17,7 @@ La mise en ligne pas à pas est dans [site.md](site.md#mise-en-ligne). Les varia
 - `WEB_PORT` — port d'écoute, sur `127.0.0.1` (`WEB_HOST` pour changer : l'IP locale si le
   proxy est sur une autre machine) ;
 - `WEB_BASE_URL` — adresse publique du site, sans barre finale ;
-- `DISCORD_CLIENT_SECRET` — avec `CLIENT_ID` et `GUILD_ID`, déjà présents ;
+- `DISCORD_CLIENT_SECRET` — avec `CLIENT_ID`, `GUILD_ID` et `DEFAULT_ROLE_ID`, déjà présents ;
 - `WEB_SESSION_SECRET` — au moins 32 caractères aléatoires. Le changer déconnecte tout le monde.
 
 Réglages à chaud (`/admin config`) : `web.sessionHours` (168), `web.writesPerMinute` (60),
@@ -26,7 +26,9 @@ Réglages à chaud (`/admin config`) : `web.sessionHours` (168), `web.writesPerM
 ## Connexion
 
 Le compte web **est** le compte Discord (portée `identify` seulement), et seuls les membres du
-serveur obtiennent une session.
+serveur qui portent le rôle `DEFAULT_ROLE_ID` obtiennent une session. C'est revérifié à chaque
+requête connectée, par le cache du bot : un membre parti ou privé du rôle reçoit un `401` qui
+efface sa session. Si Discord ne répond pas, c'est un `502`, et la session reste.
 
 | Route | Effet |
 |---|---|

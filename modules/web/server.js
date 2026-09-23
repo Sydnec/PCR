@@ -11,7 +11,8 @@
 // Sécurité, en couches :
 // - l'identité vient de Discord (OAuth2), la session est un jeton signé
 //   (session.js), en cookie HttpOnly et SameSite=Lax ;
-// - seuls les membres du serveur (GUILD_ID) obtiennent une session ;
+// - seuls les membres du serveur (GUILD_ID) qui portent le rôle par défaut
+//   (DEFAULT_ROLE_ID) entrent, et c'est revérifié à chaque requête ;
 // - une écriture exige un corps JSON et, s'il est fourni, un en-tête Origin égal
 //   à WEB_BASE_URL : un formulaire d'un autre site ne peut produire ni l'un ni
 //   l'autre ;
@@ -19,6 +20,7 @@
 //   trace de pile dans les réponses.
 import http from "http";
 import crypto from "crypto";
+import { RESTJSONErrorCodes } from "discord.js";
 import { handleException, log } from "../utils.js";
 import { getConfig } from "../config.js";
 import { HttpError, routes } from "./api.js";
@@ -41,6 +43,7 @@ let listening = false;
 // L'adresse publique du site pour /pk web, ou null s'il n'est pas en ligne.
 export const siteUrl = () => (listening ? baseUrl() : null);
 const secureCookies = () => baseUrl().startsWith("https://");
+const clearSession = () => serializeCookie(SESSION_COOKIE, "", { maxAgeSeconds: 0, secure: secureCookies() });
 
 // Les chemins déclarés dans api.js (« /api/users/:userId/box ») deviennent des
 // expressions régulières une fois pour toutes, avec leurs paramètres nommés.
@@ -130,15 +133,27 @@ function allowWrite(userId) {
   return true;
 }
 
-// Un visiteur n'obtient une session que s'il est membre du serveur. C'est le
-// bot qui répond, il connaît déjà la liste.
-async function isGuildMember(bot, userId) {
+// Le site est réservé aux membres du serveur qui portent le rôle par défaut,
+// celui que reçoit tout membre à son arrivée : un invité temporaire, ou un
+// membre à qui on l'a retiré, reste dehors. Rend null si l'accès est accordé,
+// sinon la raison du refus : « membre » ou « role ». Exportée : /pk web ne
+// donne pas le lien à qui serait refusé.
+//
+// C'est le bot qui répond : son cache suit arrivées, départs et rôles en direct
+// (intention GuildMembers), donc seul un membre absent du cache coûte un appel
+// à Discord. Seul « membre inconnu » vaut refus ; toute autre erreur remonte,
+// pour qu'une panne de Discord ne passe pas pour une porte fermée.
+export async function siteAccessDenial(bot, userId) {
+  const guild = await bot.guilds.fetch(process.env.GUILD_ID);
+  let member;
   try {
-    const guild = await bot.guilds.fetch(process.env.GUILD_ID);
-    return Boolean(await guild.members.fetch(userId));
-  } catch {
-    return false;
+    member = await guild.members.fetch(userId);
+  } catch (error) {
+    const unknown = [RESTJSONErrorCodes.UnknownMember, RESTJSONErrorCodes.UnknownUser];
+    if (unknown.includes(error?.code)) return "membre";
+    throw error;
   }
+  return member.roles.cache.has(process.env.DEFAULT_ROLE_ID) ? null : "role";
 }
 
 // Après connexion, on ne renvoie que vers une page du site : un chemin relatif,
@@ -181,7 +196,14 @@ async function callback(req, res, url, bot) {
     handleException("Connexion web par Discord :", error);
     return fail("discord");
   }
-  if (!(await isGuildMember(bot, user.id))) return fail("membre");
+  let denial;
+  try {
+    denial = await siteAccessDenial(bot, user.id);
+  } catch (error) {
+    handleException("Connexion web, lecture du membre :", error);
+    return fail("discord");
+  }
+  if (denial) return fail(denial);
 
   const hours = Math.max(1, Number(webConfig()?.sessionHours) || 168);
   const session = signToken(user, hours * 3600 * 1000);
@@ -213,9 +235,7 @@ async function handle(req, res, bot) {
     return callback(req, res, url, bot);
   }
   if (method === "POST" && url.pathname === "/api/auth/logout") {
-    return send(res, 204, undefined, {
-      "Set-Cookie": serializeCookie(SESSION_COOKIE, "", { maxAgeSeconds: 0, secure: secureCookies() }),
-    });
+    return send(res, 204, undefined, { "Set-Cookie": clearSession() });
   }
 
   const { route, params, allowed } = match(method, url.pathname);
@@ -226,6 +246,22 @@ async function handle(req, res, bot) {
   const session = verifyToken(parseCookies(req.headers.cookie)[SESSION_COOKIE]);
   const user = session ? { id: session.id, username: session.username, avatar: session.avatar } : null;
   if (route.auth && !user) throw new HttpError(401, "Connexion requise.");
+  // La session dit qui l'on est, pas qu'on a encore le droit d'entrer : un
+  // membre parti ou privé du rôle perd l'accès tout de suite, sans attendre
+  // l'expiration de son jeton. Sa session est effacée, et le site le renvoie à
+  // la connexion, qui lui dira pourquoi.
+  if (route.auth) {
+    let denial;
+    try {
+      denial = await siteAccessDenial(bot, user.id);
+    } catch (error) {
+      handleException("API web, lecture du membre :", error);
+      throw new HttpError(502, "Discord ne répond pas, réessaie dans un instant.");
+    }
+    if (denial) {
+      return send(res, 401, { error: "Tu n'as plus accès au site." }, { "Set-Cookie": clearSession() });
+    }
+  }
 
   let body = {};
   if (route.write) {
@@ -259,8 +295,14 @@ export function startWebServer(bot) {
 
   // Sans ces réglages, la connexion ne peut pas marcher : mieux vaut ne pas
   // démarrer que servir une API où personne ne peut entrer.
-  const missing = ["WEB_BASE_URL", "WEB_SESSION_SECRET", "DISCORD_CLIENT_SECRET", "CLIENT_ID", "GUILD_ID"]
-    .filter((name) => !process.env[name]);
+  const missing = [
+    "WEB_BASE_URL",
+    "WEB_SESSION_SECRET",
+    "DISCORD_CLIENT_SECRET",
+    "CLIENT_ID",
+    "GUILD_ID",
+    "DEFAULT_ROLE_ID",
+  ].filter((name) => !process.env[name]);
   if (missing.length) {
     return handleException(`API web non démarrée, variables manquantes : ${missing.join(", ")}`);
   }
