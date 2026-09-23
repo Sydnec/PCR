@@ -51,6 +51,7 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
 | `GET /api/users/:userId/box` 🔒 | `{ total, page, pages, pageSize, items }` |
 | `GET /api/users/:userId/inventory` 🔒 | `{ items: [{ key, label, emoji, description, count }] }` |
 | `GET /api/me/egg` 🔒 | `{ egg }` ou `{ egg: null }` |
+| `GET /api/me/lineage/:speciesId` 🔒 | `{ lineage }` — la lignée et ce que le dresseur possède de chaque maillon |
 | `GET /api/spawn` 🔒 | `{ refreshSeconds, cooldownSeconds, pausedUntil, spawn, last, drops }` — l'apparition du salon |
 
 `/box` accepte `page` (à partir de 0), `pageSize` (1 à 200, 50 par défaut), `species`, `sex`
@@ -66,10 +67,13 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
 `sellValue` / `sellValueShiny` (prix de revente, 0 si invendable), ses évolutions, ses
 illustrations (`sprite`, `spriteShiny`) et ses petites images (`icon`, `iconShiny`).
 
-`spawn` vaut `null` sans apparition ; sinon il porte l'espèce, la rareté, la difficulté
+Balls et objets portent leur `emoji` (Discord) et `image` (PokéAPI, ou `null`).
+
+`spawn` vaut `null` sans apparition ; sinon il porte l'espèce, son `sex`, la rareté, la difficulté
 (`{ level, label }`, `level` de 0 à 5), ce que le dresseur en a déjà (`owned`, normal et shiny),
 sa lignée (`lineage` : chaque maillon avec son stade et ce qu'il en possède, comme la fiche
-Discord), les balls (`price`, `probability`, `free` = balls offertes) et le journal des derniers
+Discord), les balls (`price`, `probability`, `free` = balls offertes, `usable` = en poche ou
+payable avec le solde) et le journal des derniers
 lancers (`throws`, avec le pseudo et l'avatar du serveur). L'objet tenu reste
 secret. `last` est le dernier Pokémon parti (`CAUGHT` ou `FLED`), `drops` les objets au sol, et
 `pausedUntil` la fin d'un parc safari qui suspend les apparitions.

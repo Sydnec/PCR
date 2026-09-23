@@ -562,15 +562,25 @@ export function evolve(userId, group, chosenTargetId, helperKey, cb) {
   // Étape 1 : les exemplaires. `plan.duplicates` peut valoir zéro si une aide
   // couvre tout : il n'y a alors rien à réserver, seulement à vérifier qu'il
   // reste bien un Pokémon du sexe demandé à faire évoluer.
+  //
+  // Un individu désigné (#id) évolue lui-même : son sexe n'est pas une
+  // condition, seulement celui qu'il se trouve avoir, et le rappeler ferait
+  // croire qu'il faut en trouver un autre. On dit alors ce qu'il faut autour
+  // de lui.
+  const name = `${plan.species.name}${isShiny ? " shiny" : ""}`;
+  const others = plan.duplicates - 1;
   const manque = () =>
     cb(null, {
       ok: false,
-      reason:
-        `Il te faut **${plan.required}** exemplaires de ${plan.species.name} ` +
-        `(${plan.duplicates} consommés + 1 conservé)` +
-        (sex && plan.duplicates > 0
-          ? `, dont un ${sex === "F" ? "femelle" : "mâle"} pour évoluer.`
-          : "."),
+      reason: pokemonId
+        ? `Il te faut **${plan.required}** ${name} pour faire évoluer #${pokemonId} : lui, ` +
+          (others > 0 ? `${others} autre${others > 1 ? "s" : ""} consommé${others > 1 ? "s" : ""} ` : "") +
+          `et 1 conservé.`
+        : `Il te faut **${plan.required}** exemplaires de ${name} ` +
+          `(${plan.duplicates} consommés + 1 conservé)` +
+          (sex && plan.duplicates > 0
+            ? `, dont un ${sex === "F" ? "femelle" : "mâle"} pour évoluer.`
+            : "."),
     });
 
   if (plan.duplicates <= 0) {
@@ -601,7 +611,6 @@ export function evolve(userId, group, chosenTargetId, helperKey, cb) {
       });
     }
     if (!evolvers.length) return manque();
-    const others = plan.duplicates - 1;
     if (others <= 0) return prendreAide(evolvers, rendre(evolvers));
     reserveDuplicates(userId, { speciesId, isShiny }, others, (err, rest) => {
       if (err || !rest.length) {

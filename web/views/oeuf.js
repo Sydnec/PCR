@@ -1,5 +1,6 @@
 // L'œuf : celui qui couve, ou de quoi en pondre un — comme /pk oeuf voir et
 // /pk oeuf pondre.
+import { icon } from "../icons.js";
 import { api, dateTimeFr, fmt, h, pokemonName, progressBar, toast } from "../lib.js";
 
 export async function render(ctx) {
@@ -22,7 +23,7 @@ function incubating(ctx, egg) {
   return h(
     "div",
     { class: "egg" },
-    h("div", { class: "egg-shell", "aria-hidden": "true" }, "🥚"),
+    icon("egg", { className: "egg-shell" }),
     h(
       "p",
       {},

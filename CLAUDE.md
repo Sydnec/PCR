@@ -61,7 +61,10 @@ d'écrire et en reprendre le style : en cas de doute, c'est le code existant qui
 - **Site** (`web/`) : fichiers statiques sans compilation ni dépendance, servis par le bot. Il
   affiche ce que renvoie l'API et lui confie chaque action, sans recalculer de règle. Le DOM se
   construit avec `h()` (`web/lib.js`), jamais avec `innerHTML`. Rien en ligne : la politique de
-  sécurité refuse scripts et attributs `style` en ligne (passer par `element.style`). Tester dans
+  sécurité refuse scripts et attributs `style` en ligne (passer par `element.style`). Style
+  minimaliste : pas de cartes ni d'ombres, seuls boutons, champs et fenêtres ont un contour. Des
+  images plutôt que des emojis : pictogrammes SVG (`web/icons.js`), images d'objets PokéAPI (leur
+  `sprite` dans la configuration) ; seuls les emoji du serveur Discord restent. Tester dans
   Chromium sur une copie du dépôt, avec un faux Discord, en clair et en sombre, et à 390 px de large.
 - **Aucun nombre en dur** : prix, poids, taux et durées vivent dans `modules/config.js`
   (`DEFAULTS`) et `config.json`, relus à l'exécution. Ce qui s'affiche se calcule avec les mêmes

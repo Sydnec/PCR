@@ -78,13 +78,35 @@ const POKEMON = {
     // nu ne marcherait que sur le bouton. Un emoji unicode ordinaire reste une
     // valeur valide, ce qui laisse de quoi dépanner depuis /admin config si le
     // bot perd l'accès au serveur qui les héberge.
+    //
+    // `sprite` nomme l'image de l'objet dans le dépôt de PokéAPI : le site la
+    // montre là où Discord n'a qu'un emoji ordinaire (voir itemImageUrl).
     balls: {
-      poke: { label: "Poké Ball", emoji: "<:pokeball:1551325915160514690>", price: 150, multiplier: 1 },
-      super: { label: "Super Ball", emoji: "<:superball:1551325951361679411>", price: 400, multiplier: 2 },
-      hyper: { label: "Hyper Ball", emoji: "<:hyperball:1551326031431077898>", price: 1000, multiplier: 4 },
+      poke: {
+        label: "Poké Ball",
+        emoji: "<:pokeball:1551325915160514690>",
+        sprite: "poke-ball",
+        price: 150,
+        multiplier: 1,
+      },
+      super: {
+        label: "Super Ball",
+        emoji: "<:superball:1551325951361679411>",
+        sprite: "great-ball",
+        price: 400,
+        multiplier: 2,
+      },
+      hyper: {
+        label: "Hyper Ball",
+        emoji: "<:hyperball:1551326031431077898>",
+        sprite: "ultra-ball",
+        price: 1000,
+        multiplier: 4,
+      },
       master: {
         label: "Master Ball",
         emoji: "<:masterball:1551326387455926432>",
+        sprite: "master-ball",
         price: 50000,
         multiplier: 255,
         guaranteed: true,
@@ -164,6 +186,7 @@ const POKEMON = {
     super_bonbon: {
       label: "Super Bonbon",
       emoji: "🍬",
+      sprite: "rare-candy",
       description: "Trois d'entre eux tiennent lieu d'un exemplaire manquant dans une fusion.",
       sellValue: 300,
       dropWeight: 120,
@@ -179,6 +202,7 @@ const POKEMON = {
     pierre_feu: {
       label: "Pierre Feu",
       emoji: "🔥",
+      sprite: "fire-stone",
       description: "Fait évoluer un Évoli en Pyroli : un exemplaire suffit, et c'est gratuit.",
       sellValue: 500,
       dropWeight: 30,
@@ -187,6 +211,7 @@ const POKEMON = {
     pierre_foudre: {
       label: "Pierre Foudre",
       emoji: "⚡",
+      sprite: "thunder-stone",
       description: "Fait évoluer un Évoli en Voltali : un exemplaire suffit, et c'est gratuit.",
       sellValue: 500,
       dropWeight: 30,
@@ -195,6 +220,7 @@ const POKEMON = {
     pierre_eau: {
       label: "Pierre Eau",
       emoji: "💧",
+      sprite: "water-stone",
       description: "Fait évoluer un Évoli en Aquali : un exemplaire suffit, et c'est gratuit.",
       sellValue: 500,
       dropWeight: 30,
@@ -203,6 +229,7 @@ const POKEMON = {
     pepite: {
       label: "Pépite",
       emoji: "💎",
+      sprite: "nugget",
       description: "Ça brille, et ça ne sert qu'à ça : se revendre.",
       sellValue: 2000,
       dropWeight: 20,
@@ -210,6 +237,7 @@ const POKEMON = {
     ticket_safari: {
       label: "Ticket Safari",
       emoji: "🎟️",
+      sprite: "pass",
       description: "Une entrée pour le parc safari. Elle s'utilise, elle ne se monnaie pas.",
       dropWeight: 8,
     },
@@ -270,7 +298,7 @@ const POKEMON = {
     actionsPerSession: 25,
     entryPrice: 5000,
     entryCooldownHours: 24,
-    ball: { label: "Safari Ball", emoji: "\u{1F7E2}", multiplier: 1.5 },
+    ball: { label: "Safari Ball", emoji: "\u{1F7E2}", sprite: "safari-ball", multiplier: 1.5 },
     // Multiplicatif et cumulable, mais plafonné : deux appâts atteignent le
     // plafond, le troisième est une action gaspillée. C'est là qu'est le choix.
     baitMultiplier: 2,

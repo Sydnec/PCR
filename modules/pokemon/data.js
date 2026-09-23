@@ -142,6 +142,13 @@ const ICON_BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/spri
 export const iconUrl = (species, isShiny) =>
   `${ICON_BASE}/${isShiny ? "shiny/" : ""}${species.id}.png`;
 
+// L'image d'un objet ou d'une ball dans le même dépôt, d'après le nom que lui
+// donne la configuration (`sprite`) ; null sans nom, et le site retombe alors
+// sur l'emoji.
+const ITEM_BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items";
+export const itemImageUrl = (sprite) =>
+  typeof sprite === "string" && /^[a-z0-9-]+$/.test(sprite) ? `${ITEM_BASE}/${sprite}.png` : null;
+
 // Les couleurs des types, en « #rrggbb » : celles des embeds, pour que le site
 // colore un type comme Discord.
 const hexColor = (color) => `#${color.toString(16).padStart(6, "0")}`;
@@ -268,6 +275,7 @@ export function rollSafariEncounter(safariConfig) {
     species,
     isShiny: Math.floor(Math.random() * safariConfig.shinyOdds) === 0,
     catchRate: species.catchRate,
+    sex: rollSex(species),
   };
 }
 

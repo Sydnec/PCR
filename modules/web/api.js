@@ -29,6 +29,7 @@ import {
   getSpecies,
   iconUrl,
   isEggOnly,
+  itemImageUrl,
   isEvolutionOnly,
   isGenderless,
   isLegendary,
@@ -197,47 +198,69 @@ async function trainerOf(bot, userId) {
   }
 }
 
+// La lignée d'une espèce et ce que le dresseur possède de chaque maillon : la
+// fiche du bouton « Infos du Pokémon », lue par les mêmes fonctions.
+async function lineageJson(userId, species) {
+  const chain = species ? evolutionChain(species) : [];
+  const owned = await promise((cb) =>
+    getOwnedVariantsFor(userId, chain.map((link) => link.id), cb)
+  );
+  return chain.map((link) => ({
+    speciesId: link.id,
+    stage: link.stage,
+    owned: owned.get(link.id) ?? { normal: 0, shiny: 0 },
+  }));
+}
+
+// Une ball ou un objet tel que le site l'affiche : son emoji Discord, et son
+// image quand la configuration lui en donne une.
+const withImage = (entry) => ({ ...entry, image: itemImageUrl(entry.sprite) });
+
 // Une apparition, avec ce qu'en voit chaque dresseur : les chances de chaque
 // ball, calculées comme sur l'annonce Discord, et la fiche du bouton « Infos du
-// Pokémon » — ce qu'il possède de chaque maillon de la lignée, lu par la même
-// fonction. L'objet tenu reste secret jusqu'à la fin, comme sur Discord.
+// Pokémon ». L'objet tenu reste secret jusqu'à la fin, comme sur Discord.
 async function spawnJson(ctx, spawn) {
   const config = getPokemonConfig();
   const species = getSpecies(spawn.species_id);
-  const chain = species ? evolutionChain(species) : [];
-  const [throws, inventory, owned] = await Promise.all([
+  const [throws, inventory, lineage, balance] = await Promise.all([
     promise((cb) => recentThrows(spawn.id, config.spawn.throwLogSize, cb)),
     promise((cb) => getInventory(ctx.user.id, cb)),
-    promise((cb) => getOwnedVariantsFor(ctx.user.id, chain.map((link) => link.id), cb)),
+    lineageJson(ctx.user.id, species),
+    promise((cb) => getBalance(ctx.user.id, cb)),
   ]);
   const stock = new Map(inventory.map((row) => [row.item_key, row.count]));
-  const counts = (id) => owned.get(id) ?? { normal: 0, shiny: 0 };
   return {
     id: spawn.id,
     speciesId: spawn.species_id,
     shiny: Boolean(spawn.is_shiny),
+    sex: spawn.sex ?? null,
     rarity: spawn.rarity,
     rarityLabel: RARITIES[spawn.rarity]?.label ?? null,
     // Figée à l'apparition, comme le taux de capture qui la fonde.
     difficulty: difficultyOf(spawn.catch_rate),
     throwCount: spawn.throw_count,
     spawnedAt: spawn.spawned_at,
-    owned: counts(spawn.species_id),
-    lineage: chain.map((link) => ({
-      speciesId: link.id,
-      stage: link.stage,
-      owned: counts(link.id),
-    })),
-    balls: probabilitiesByBall(spawn.catch_rate).map((ball) => ({
-      key: ball.key,
-      label: ball.label,
-      emoji: ball.emoji,
-      price: ball.price,
-      probability: ball.probability,
-      guaranteed: Boolean(ball.guaranteed),
-      // Les balls offertes partent avant les points, comme sur Discord.
-      free: stock.get(getBallItem(ball.key)?.key) ?? 0,
-    })),
+    owned: lineage.find((link) => link.speciesId === spawn.species_id)?.owned ?? {
+      normal: 0,
+      shiny: 0,
+    },
+    lineage,
+    balls: probabilitiesByBall(spawn.catch_rate).map((ball) => {
+      // Les balls offertes partent avant les points, comme sur Discord : une
+      // ball en poche se lance quel que soit le solde.
+      const free = stock.get(getBallItem(ball.key)?.key) ?? 0;
+      return {
+        key: ball.key,
+        label: ball.label,
+        emoji: ball.emoji,
+        image: itemImageUrl(ball.sprite),
+        price: ball.price,
+        probability: ball.probability,
+        guaranteed: Boolean(ball.guaranteed),
+        free,
+        usable: free > 0 || balance >= ball.price,
+      };
+    }),
     throws: await Promise.all(
       throws.map(async (row) => ({
         trainer: await trainerOf(ctx.bot, row.user_id),
@@ -267,7 +290,7 @@ export const routes = [
         promise((cb) => getBallStock(ctx.user.id, cb)),
         promise((cb) => getIncubatingEgg(ctx.user.id, cb)),
       ]);
-      return { user: ctx.user, balance, balls, egg: eggJson(egg) };
+      return { user: ctx.user, balance, balls: balls.map(withImage), egg: eggJson(egg) };
     },
   },
 
@@ -290,16 +313,18 @@ export const routes = [
     method: "GET",
     path: "/api/catalogue",
     handler: async () => ({
-      balls: [...getBalls(), getSafariConfig().ball].map(({ key, label, emoji }) => ({
+      balls: [...getBalls(), getSafariConfig().ball].map(({ key, label, emoji, sprite }) => ({
         key,
         label,
         emoji,
+        image: itemImageUrl(sprite),
       })),
       types: typeColors(),
       items: getItems().map((item) => ({
         key: item.key,
         label: item.label,
         emoji: item.emoji,
+        image: itemImageUrl(item.sprite),
         description: item.description ?? null,
       })),
     }),
@@ -315,6 +340,19 @@ export const routes = [
         ...speciesJson(species),
         chain: evolutionChain(species).map((link) => link.id),
       };
+    },
+  },
+
+  // La lignée d'une espèce avec ce qu'en possède le dresseur connecté : la
+  // fiche d'un Pokémon de la boîte ou du Pokédex, comme sur l'onglet Capture.
+  {
+    method: "GET",
+    path: "/api/me/lineage/:speciesId",
+    auth: true,
+    handler: async (ctx) => {
+      const species = getAvailableSpecies(ctx.params.speciesId);
+      if (!species) throw new HttpError(404, "Espèce inconnue.");
+      return { lineage: await lineageJson(ctx.user.id, species) };
     },
   },
 
@@ -376,6 +414,7 @@ export const routes = [
             key: row.item_key,
             label: item?.label ?? row.item_key,
             emoji: item?.emoji ?? null,
+            image: itemImageUrl(item?.sprite),
             description: item?.description ?? null,
             count: row.count,
           };
@@ -439,6 +478,7 @@ export const routes = [
               id: last.id,
               speciesId: last.species_id,
               shiny: Boolean(last.is_shiny),
+              sex: last.sex ?? null,
               status: last.status,
               caughtBy: last.caught_by ? await trainerOf(ctx.bot, last.caught_by) : null,
               ball: last.caught_ball,
@@ -452,6 +492,7 @@ export const routes = [
             itemKey: drop.item_key,
             label: item?.label ?? drop.item_key,
             emoji: item?.emoji ?? null,
+            image: itemImageUrl(item?.sprite),
             droppedAt: drop.dropped_at,
           };
         }),
@@ -505,7 +546,8 @@ export const routes = [
       const claimed = await promise((cb) => claimDrop(ctx.user.id, dropId, cb));
       if (!claimed) throw new HttpError(409, "💨 Trop tard, quelqu'un a été plus rapide !");
       announceDropClaim(ctx.bot, claimed.drop, claimed.item, ctx.user.id);
-      return { item: { key: claimed.item.key, label: claimed.item.label, emoji: claimed.item.emoji } };
+      const { key, label, emoji, sprite } = claimed.item;
+      return { item: { key, label, emoji, image: itemImageUrl(sprite) } };
     },
   },
 

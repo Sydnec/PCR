@@ -27,6 +27,8 @@
   avec confirmation obligatoire). Les probabilités suivent la formule officielle de la génération 3,
   à partir du taux de capture réel de chaque espèce.
 - **Shiny** (~1/500) comptant comme une entrée de Pokédex distincte.
+- **Le sexe se voit dès l'apparition** : l'annonce le montre (« Un Pikachu ♀ sauvage apparaît ! »),
+  et c'est celui qu'aura l'individu capturé. Même chose pour les rencontres du parc safari.
 - **Chaque capture est un individu** : son sexe est tiré selon l'espèce, et la ball qui l'a emporté
   reste attachée à lui (voir [Individus](individus.md)).
 - **🔒 Espèces hors pool** : celles dont le poids d'apparition est nul dans le pool sauvage **et**

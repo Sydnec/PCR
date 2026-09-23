@@ -1,5 +1,5 @@
 // Le sac : le solde et les objets, comme /pk inventaire.
-import { api, emoji, fmt, h } from "../lib.js";
+import { api, fmt, h, itemIcon } from "../lib.js";
 
 export async function render(ctx) {
   const { items } = await api("/api/users/me/inventory");
@@ -21,7 +21,7 @@ export async function render(ctx) {
             h(
               "li",
               { class: "item" },
-              h("span", { class: "item-icon" }, emoji(item.emoji, item.label)),
+              h("span", { class: "item-icon" }, itemIcon(item)),
               h(
                 "span",
                 { class: "item-text" },
