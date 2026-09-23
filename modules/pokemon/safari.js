@@ -10,7 +10,7 @@
 //
 // Ici les actions sont gratuites : le parc n'est pas un puits à points, c'est la
 // contrepartie du malus d'apparition infligé aux évolutions et aux légendaires.
-// Seule l'entrée payante (/safari) débite quelque chose.
+// Seule l'entrée payante (/pk safari) débite quelque chose.
 import db from "../points-db.js";
 import { addPoints, getBalance, spendPoints } from "../economy.js";
 import { handleException, log } from "../utils.js";
@@ -74,7 +74,7 @@ function getPark(parkId, cb) {
 
 // Un parc ouvert où ce dresseur peut encore entrer gratuitement : l'événement
 // public, ou un parc qui lui est réservé. Payer l'entrée alors qu'une visite
-// offerte l'attend serait une mauvaise surprise, et /safari s'en sert pour
+// offerte l'attend serait une mauvaise surprise, et /pk safari s'en sert pour
 // rediriger vers le bouton plutôt que de débiter.
 // Un parc réservé passe en premier : c'est un cadeau nominatif, il serait absurde
 // de le laisser expirer au profit de l'événement public.
@@ -209,7 +209,7 @@ function expireStaleSessions(userId, cb) {
 // La visite en cours d'un dresseur, rencontre comprise et prête à réafficher.
 // Fermer l'éphémère est un geste banal — sur mobile il suffit de le balayer — et
 // il ne doit pas coûter une visite : tant que la session est ouverte, le bouton
-// du parc comme /safari la rouvrent au lieu de refuser l'entrée.
+// du parc comme /pk safari la rouvrent au lieu de refuser l'entrée.
 //
 // La garde sur expires_at double celle d'expireStaleSessions : si l'UPDATE
 // d'expiration a échoué, mieux vaut ne rien rouvrir que de servir un plateau
@@ -350,7 +350,7 @@ export function enterPark(userId, parkId, cb) {
 // La clé de l'objet qui ouvre le parc, s'il en existe un au catalogue.
 const TICKET = "ticket_safari";
 
-// Entrée par /safari : un ticket s'il y en a un dans l'inventaire, des points
+// Entrée par /pk safari : un ticket s'il y en a un dans l'inventaire, des points
 // sinon.
 //
 // Le ticket passe avant le solde, comme une ball offerte avant les points, et il

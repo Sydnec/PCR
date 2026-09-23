@@ -48,12 +48,17 @@ function journal(userId, speciesId, isShiny, quantity, points) {
 
 // `sex` restreint la vente à un sexe, NULL à n'importe lequel. Parmi les
 // candidats, reserveDuplicates prend les stériles puis les plus récents : on
-// revend ce qui vaut le moins, jamais l'individu qu'on garde.
-export function sellPokemon(userId, { speciesId, isShiny, sex = null }, quantity, cb) {
+// revend ce qui vaut le moins, et jamais le dernier d'une espèce. `pokemonId`
+// désigne un individu précis, qui se vend seul.
+export function sellPokemon(userId, { speciesId, isShiny, sex = null, pokemonId = null }, quantity, cb) {
   const species = getSpecies(speciesId);
   if (!species) return cb(null, { ok: false, reason: "Espèce inconnue." });
   if (!Number.isInteger(quantity) || quantity <= 0) {
     return cb(null, { ok: false, reason: "Il faut revendre au moins un exemplaire." });
+  }
+
+  if (pokemonId && quantity !== 1) {
+    return cb(null, { ok: false, reason: `Le Pokémon #${pokemonId} se revend seul : quantité 1.` });
   }
 
   const unit = pokemonSellValue(species, isShiny);
@@ -63,8 +68,16 @@ export function sellPokemon(userId, { speciesId, isShiny, sex = null }, quantity
   const points = unit * quantity;
 
   const name = `${species.name}${isShiny ? " ✨" : ""}${sex ? ` ${sexSymbol(sex)}` : ""}`;
-  reserveDuplicates(userId, { speciesId, isShiny, sex }, quantity, (err, reserved) => {
+  reserveDuplicates(userId, { speciesId, isShiny, sex, pokemonId }, quantity, (err, reserved) => {
     if (err) return cb(err);
+    if (!reserved.length && pokemonId) {
+      return cb(null, {
+        ok: false,
+        reason:
+          `Le Pokémon #${pokemonId} ne peut pas être revendu : c'est ton dernier de son ` +
+          `espèce, ou il n'est plus à toi.`,
+      });
+    }
     if (!reserved.length) {
       // Le refus est le même quelle qu'en soit la cause — pas assez
       // d'exemplaires, ou juste celui qu'on garde — donc on relit pour le dire
@@ -74,8 +87,8 @@ export function sellPokemon(userId, { speciesId, isShiny, sex = null }, quantity
           ok: false,
           reason:
             `Tu as **${owned}** ${name}, dont **${spare}** revendable${spare > 1 ? "s" : ""} : ` +
-            `impossible d'en revendre **${quantity}**. Le premier exemplaire de chaque ` +
-            `Pokémon est toujours conservé.`,
+            `impossible d'en revendre **${quantity}**. Il reste toujours au moins un ` +
+            `exemplaire de chaque Pokémon.`,
         })
       );
     }

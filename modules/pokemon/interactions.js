@@ -32,6 +32,7 @@ import {
   describeEvolution,
   evolve,
   getCollection,
+  getIndividuals,
   getOwnedVariantsFor,
   getTrade,
   resolveTradeAs,
@@ -40,6 +41,8 @@ import {
   buildBallRow,
   buildDexEmbed,
   buildDexRow,
+  buildBoxEmbed,
+  buildBoxRow,
   buildDropEmbed,
   buildSafariRecapEmbed,
   buildSafariView,
@@ -133,7 +136,7 @@ function askMasterBallConfirmation(interaction, spawnId, { panel = false } = {})
 
 // Répond en privé au cliqueur, ce qu'un embed public ne peut pas faire : un
 // message Discord est identique pour tous ses lecteurs. La fiche est celle de
-// /pokeinfo, à ceci près qu'elle épouse l'apparition d'où vient le clic — sa
+// /pk info, à ceci près qu'elle épouse l'apparition d'où vient le clic — sa
 // variante shiny et son taux de capture figé.
 //
 // Le solde suit dans un second embed : les deux questions qu'on se pose devant
@@ -239,19 +242,53 @@ function showDexPage(interaction, targetUserId, page) {
   });
 }
 
+// ---------------------- Boîte ----------------------
+
+// La page demandée de la boîte, relue en base à chaque clic : ce qui a été
+// capturé, vendu ou échangé entre-temps apparaît tel quel.
+function showBoxPage(interaction, ownerId, speciesId, page) {
+  getIndividuals(ownerId, async (err, rows) => {
+    if (err) {
+      handleException("Lecture de la boîte :", err);
+      return ephemeral(interaction, "❌ Impossible de lire la boîte.");
+    }
+    let owner = { username: "Dresseur inconnu", id: ownerId };
+    try {
+      owner = await interaction.client.users.fetch(ownerId);
+    } catch (error) {
+      // Dresseur parti du serveur : on affiche quand même sa boîte.
+    }
+    const species = speciesId ? getSpecies(speciesId) : null;
+    const shown = species ? rows.filter((row) => row.species_id === species.id) : rows;
+    await interaction
+      .update({
+        embeds: [buildBoxEmbed(shown, { user: owner, species, page })],
+        components: [buildBoxRow(ownerId, species?.id, page, shown.length)],
+      })
+      .catch(() => {});
+  });
+}
+
 // ---------------------- Évolution ----------------------
 
 // Le deuxième segment des boutons d'évolution porte la variante et le sexe de
 // l'individu qui évolue : « 1F » pour une femelle shiny, « 0 » pour n'importe
 // quel sexe — le format d'avant, que les anciens boutons portent encore.
-const parseVariant = (raw) => ({
-  isShiny: String(raw).startsWith("1"),
-  sex: ["M", "F"].includes(String(raw).slice(1)) ? String(raw).slice(1) : null,
-});
+// « #123 » désigne un individu précis.
+const parseVariant = (raw) =>
+  String(raw).startsWith("#")
+    ? { pokemonId: Number(String(raw).slice(1)) || null }
+    : {
+        isShiny: String(raw).startsWith("1"),
+        sex: ["M", "F"].includes(String(raw).slice(1)) ? String(raw).slice(1) : null,
+      };
 
 function runEvolution(interaction, speciesId, variant, chosenTargetId, helperKey = null) {
-  const { isShiny, sex } = variant;
-  const group = { speciesId, isShiny, sex };
+  // Un individu désigné se résout dans evolve, qui lit sur lui espèce, variante
+  // et sexe — et vérifie qu'il appartient bien à celui qui clique.
+  const group = variant.pokemonId
+    ? { pokemonId: variant.pokemonId }
+    : { speciesId, isShiny: variant.isShiny, sex: variant.sex };
   evolve(interaction.user.id, group, chosenTargetId, helperKey, (err, result) => {
     if (err) {
       handleException(err);
@@ -281,8 +318,8 @@ function runEvolution(interaction, speciesId, variant, chosenTargetId, helperKey
     interaction
       .update({
         content:
-          `✨ Félicitations ! Ton **${displayName(source, isShiny, result.evolved?.sex)}** a ` +
-          `évolué en **${displayName(result.target, isShiny, result.evolved?.sex)}** ! ` +
+          `✨ Félicitations ! Ton **${displayName(source, result.isShiny, result.evolved?.sex)}** a ` +
+          `évolué en **${displayName(result.target, result.isShiny, result.evolved?.sex)}** ! ` +
           `(${paye.join(", ")})`,
         embeds: [],
         components: [],
@@ -304,7 +341,11 @@ function showEvolutionChoices(interaction, speciesId, variant) {
     row.addComponents(
       new ButtonBuilder()
         .setCustomId(
-          `poke_evo_pick|${speciesId}|${variant.isShiny ? 1 : 0}${variant.sex ?? ""}|${target.id}`
+          `poke_evo_pick|${speciesId}|` +
+            (variant.pokemonId
+              ? `#${variant.pokemonId}`
+              : `${variant.isShiny ? 1 : 0}${variant.sex ?? ""}`) +
+            `|${target.id}`
         )
         .setLabel(target.name)
         .setStyle(ButtonStyle.Primary)
@@ -603,6 +644,9 @@ export async function handlePokemonButton(interaction) {
 
     case "poke_dex":
       return showDexPage(interaction, args[0], Number(args[1]));
+
+    case "poke_box":
+      return showBoxPage(interaction, args[0], Number(args[1]) || null, Number(args[2]) || 0);
 
     // Le cinquième segment, facultatif, est l'objet qui aide la fusion : une
     // pierre impose alors sa cible, un bonbon remplace un exemplaire manquant.

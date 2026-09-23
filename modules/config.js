@@ -111,6 +111,7 @@ const POKEMON = {
     hatchMessages: 200,
   },
   pokedex: { pageSize: 30 },
+  box: { pageSize: 15 },
   // Catalogue des objets. L'inventaire ne stocke qu'une clé et un compteur :
   // c'est ici que la clé prend un nom et une icône, réglables à chaud comme ceux
   // des balls. L'effet, lui, vit dans le code de la fonctionnalité qui consomme
@@ -298,6 +299,14 @@ export const DEFAULTS = {
     default: 300,
   },
   pokemon: POKEMON,
+  // L'API de l'interface web (modules/web). Elle ne démarre que si WEB_PORT est
+  // défini ; ces réglages ne jouent qu'ensuite.
+  web: {
+    // Durée d'une session avant qu'il faille se reconnecter par Discord.
+    sessionHours: 168,
+    // Garde-fou contre une boucle ou un script, par dresseur.
+    writesPerMinute: 30,
+  },
   // Pot commun : chacun cotise une part de sa fortune, et la cagnotte repart en
   // parts égales. Un impôt sur le capital, en somme — les gros soldes financent,
   // tout le monde reçoit la même chose.
@@ -460,6 +469,7 @@ const BOUNDS = {
   // Diviseur : embeds.js fait Math.ceil(dexSize() / pageSize), donc 0 donne un
   // Pokédex au nombre de pages infini et vide.
   "pokemon.pokedex.pageSize": { min: 1 },
+  "pokemon.box.pageSize": { min: 1, max: 25 },
   // Math.floor(Math.random() * odds) === 0 : à 0, tout devient shiny.
   "pokemon.spawn.shinyOdds": { min: 1 },
   "pokemon.safari.shinyOdds": { min: 1 },

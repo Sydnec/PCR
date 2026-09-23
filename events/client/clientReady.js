@@ -3,6 +3,7 @@ import { checkAndAnnounceNewRelease } from '../../modules/changelog-notifier.js'
 import db from '../../modules/db.js';
 import { rehydratePokemon } from '../../modules/pokemon/spawn.js';
 import { sweepSafari } from '../../modules/pokemon/safari.js';
+import { startWebServer } from '../../modules/web/server.js';
 
 const name = 'clientReady';
 const once = true;
@@ -44,6 +45,10 @@ async function execute(bot) {
     // Même chose côté parc safari : une session ou un parc laissés ouverts par
     // un arrêt brutal bloqueraient leurs index uniques respectifs.
     sweepSafari(bot);
+
+    // L'API de l'interface web, si WEB_PORT est défini. Elle démarre une fois
+    // le bot prêt : c'est lui qui vérifie qu'un visiteur est membre du serveur.
+    startWebServer(bot);
 
     // Remplir la BDD avec les événements passés avant le 29/08/2025 à 00:28
     import('../../modules/db.js').then(mod => {

@@ -8,7 +8,7 @@ génération 2 (voir [Générations](README.md#générations)).
 
 - **Seules les familles qui ont un bébé pondent**, et l'œuf donne toujours ce bébé : un Bulbizarre
   ne pond rien.
-- `/oeuf pondre <parent1> <parent2>` : un **mâle** et une **femelle** fertiles de la même famille —
+- `/pk oeuf pondre <parent1> <parent2>` : un **mâle** et une **femelle** fertiles de la même famille —
   Pikachu ♂ et Raichu ♀ donnent un Pichu. **Métamorph**, qui n'a pas de sexe, **remplace l'un des
   deux parents, quel que soit le sexe de l'autre** — jamais les deux. C'est la seule façon de faire
   pondre Kicklee, Tygnon et Kapoera (tous mâles), ou Lippoutou (toujours femelle). Une fois le
@@ -18,7 +18,7 @@ génération 2 (voir [Générations](README.md#générations)).
 - **Éclosion au premier des deux seuils** : **5 jours**, ou **200 messages** de son propriétaire —
   comme des pas dans le jeu. Le bébé naît avec un sexe, peut être shiny comme une apparition
   sauvage, et s'annonce dans le salon des apparitions.
-- `/oeuf voir` : l'œuf en cours et ce qu'il lui manque.
+- `/pk oeuf voir` : l'œuf en cours et ce qu'il lui manque.
 
 Réglages : `pokemon.eggs` (`enabled`, `hatchHours`, `hatchMessages`). Les seuils sont figés à la
 ponte : les retoucher ne change que les œufs suivants.

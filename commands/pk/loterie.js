@@ -1,8 +1,8 @@
-import { SlashCommandBuilder, MessageFlags } from "discord.js";
-import { handleException } from "../modules/utils.js";
-import { getPokemonConfig } from "../modules/pokemon/config.js";
-import { play } from "../modules/pokemon/lottery.js";
-import { buildLotteryEmbed } from "../modules/pokemon/embeds.js";
+import { MessageFlags } from "discord.js";
+import { handleException } from "../../modules/utils.js";
+import { getPokemonConfig } from "../../modules/pokemon/config.js";
+import { play } from "../../modules/pokemon/lottery.js";
+import { buildLotteryEmbed } from "../../modules/pokemon/embeds.js";
 
 // Le tirage quotidien. Réponse privée, comme l'inventaire, le solde et la
 // revente : tout ce qui ne concerne que la poche d'un dresseur reste dans son
@@ -13,9 +13,10 @@ import { buildLotteryEmbed } from "../modules/pokemon/embeds.js";
 // commande, elle s'affiche dans le même embed que les deux autres issues, avec
 // l'heure du prochain tirage.
 export default {
-  data: new SlashCommandBuilder()
-    .setName("loterie")
-    .setDescription("Tente ta chance : un tirage par jour, un lot ou rien"),
+  describe: (sub) =>
+    sub
+      .setName("loterie")
+      .setDescription("Tente ta chance : un tirage par jour, un lot ou rien"),
 
   async execute(interaction) {
     try {

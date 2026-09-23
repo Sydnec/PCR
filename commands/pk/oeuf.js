@@ -1,14 +1,19 @@
-import { SlashCommandBuilder, MessageFlags } from "discord.js";
-import { handleException } from "../modules/utils.js";
-import { getPokemonConfig } from "../modules/pokemon/config.js";
+import { MessageFlags } from "discord.js";
+import { handleException } from "../../modules/utils.js";
+import { getPokemonConfig } from "../../modules/pokemon/config.js";
 import {
   decodeEntry,
   encodeEntry,
   getIndividuals,
   groupIndividuals,
-} from "../modules/pokemon/collection.js";
-import { getSpecies } from "../modules/pokemon/data.js";
-import { displayName } from "../modules/pokemon/embeds.js";
+  resolveSelector,
+} from "../../modules/pokemon/collection.js";
+import { getSpecies } from "../../modules/pokemon/data.js";
+import {
+  displayName,
+  individualChoices,
+  wantsIndividual,
+} from "../../modules/pokemon/embeds.js";
 import {
   babyFamilies,
   babyOf,
@@ -18,7 +23,7 @@ import {
   getIncubatingEgg,
   isDitto,
   layEgg,
-} from "../modules/pokemon/eggs.js";
+} from "../../modules/pokemon/eggs.js";
 
 // Discord n'autorise pas de liste vide accompagnée d'un message : une
 // proposition inerte est le seul moyen d'expliquer pourquoi il n'y a rien à
@@ -36,14 +41,35 @@ function respondWithParents(interaction, query, partnerValue) {
   if (!babyFamilies().length) {
     return hint(interaction, "Aucun bébé n'existe encore : les œufs arrivent avec la génération 2");
   }
-  const partner = partnerValue ? decodeEntry(partnerValue) : null;
-  const partnerSpecies = partner ? getSpecies(partner.speciesId) : null;
-
   getIndividuals(interaction.user.id, async (err, rows) => {
     if (err) {
-      handleException("Autocomplétion de /oeuf :", err);
+      handleException("Autocomplétion de /pk oeuf :", err);
       return interaction.respond([]).catch(() => {});
     }
+    // L'autre parent peut être un groupe ou un individu (#123) : dans les deux
+    // cas, seuls comptent son espèce et son sexe.
+    const partnerEntry = partnerValue ? decodeEntry(partnerValue) : null;
+    const partnerRow = partnerEntry?.pokemonId
+      ? rows.find((row) => row.id === partnerEntry.pokemonId)
+      : null;
+    const partner = partnerRow
+      ? { speciesId: partnerRow.species_id, sex: partnerRow.sex }
+      : partnerEntry;
+    const partnerSpecies = partner ? getSpecies(partner.speciesId) : null;
+    const compatible = (species, sex) =>
+      !partnerSpecies ||
+      !describeEgg({ species: partnerSpecies, sex: partner.sex }, { species, sex }).error;
+
+    // « #123 » : un individu précis, fertile et compatible.
+    if (wantsIndividual(query)) {
+      const individuals = individualChoices(rows, query, (row) => {
+        const species = getSpecies(row.species_id);
+        return !row.sterile && canBreed(species) && compatible(species, row.sex);
+      });
+      if (!individuals.length) return hint(interaction, "Aucun Pokémon fertile avec ce numéro");
+      return interaction.respond(individuals).catch(() => {});
+    }
+
     const needle = query.toLowerCase();
     const choices = groupIndividuals(
       rows.filter((row) => !row.sterile),
@@ -51,16 +77,7 @@ function respondWithParents(interaction, query, partnerValue) {
     )
       .map((group) => {
         const species = getSpecies(group.speciesId);
-        if (!canBreed(species)) return null;
-        if (
-          partnerSpecies &&
-          describeEgg(
-            { species: partnerSpecies, sex: partner.sex },
-            { species, sex: group.sex }
-          ).error
-        ) {
-          return null;
-        }
+        if (!canBreed(species) || !compatible(species, group.sex)) return null;
         return {
           name:
             `${displayName(species, group.isShiny, group.sex)} ×${group.count} — ` +
@@ -83,31 +100,33 @@ function respondWithParents(interaction, query, partnerValue) {
 }
 
 export default {
-  data: new SlashCommandBuilder()
-    .setName("oeuf")
-    .setDescription("Fait pondre un couple de Pokémon pour obtenir un bébé")
-    .addSubcommand((sub) =>
-      sub
-        .setName("pondre")
-        .setDescription(
-          "Un mâle et une femelle d'une famille à bébé — Métamorph remplace l'un des deux"
-        )
-        .addStringOption((option) =>
-          option
-            .setName("parent1")
-            .setDescription("Un parent de la famille, ou un Métamorph")
-            .setRequired(true)
-            .setAutocomplete(true)
-        )
-        .addStringOption((option) =>
-          option
-            .setName("parent2")
-            .setDescription("Son partenaire : l'autre sexe de la même famille, ou un Métamorph")
-            .setRequired(true)
-            .setAutocomplete(true)
-        )
-    )
-    .addSubcommand((sub) => sub.setName("voir").setDescription("Où en est ton œuf")),
+  group: true,
+  describe: (group) =>
+    group
+      .setName("oeuf")
+      .setDescription("Fait pondre un couple de Pokémon pour obtenir un bébé")
+      .addSubcommand((sub) =>
+        sub
+          .setName("pondre")
+          .setDescription(
+            "Un mâle et une femelle d'une famille à bébé — Métamorph remplace l'un des deux"
+          )
+          .addStringOption((option) =>
+            option
+              .setName("parent1")
+              .setDescription("Un parent de la famille, ou un Métamorph (ou #numéro)")
+              .setRequired(true)
+              .setAutocomplete(true)
+          )
+          .addStringOption((option) =>
+            option
+              .setName("parent2")
+              .setDescription("Son partenaire : l'autre sexe de la famille, un Métamorph (ou #numéro)")
+              .setRequired(true)
+              .setAutocomplete(true)
+          )
+      )
+      .addSubcommand((sub) => sub.setName("voir").setDescription("Où en est ton œuf")),
 
   async autocomplete(interaction) {
     const focused = interaction.options.getFocused(true);
@@ -142,7 +161,7 @@ export default {
                 ? { embeds: [buildEggEmbed(egg)], flags: MessageFlags.Ephemeral }
                 : {
                     content:
-                      "Tu ne couves aucun œuf. `/oeuf pondre` avec un mâle et une femelle " +
+                      "Tu ne couves aucun œuf. `/pk oeuf pondre` avec un mâle et une femelle " +
                       "fertiles d'une famille qui a un bébé, ou l'un des deux et un Métamorph.",
                     flags: MessageFlags.Ephemeral,
                   }
@@ -154,16 +173,31 @@ export default {
       // Une valeur tapée à la main contourne l'autocomplétion : layEgg revalide
       // tout — famille, sexes, fertilité —, et c'est la base qui dit si un
       // individu du groupe demandé existe vraiment.
-      const first = decodeEntry(interaction.options.getString("parent1"));
-      const second = decodeEntry(interaction.options.getString("parent2"));
-      if (!getSpecies(first.speciesId) || !getSpecies(second.speciesId)) {
-        return interaction.reply({
-          content: "❌ Choisis une proposition dans la liste d'autocomplétion.",
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+      const resolve = (raw) =>
+        new Promise((ok, fail) =>
+          resolveSelector(interaction.user.id, raw, (err, selector) =>
+            err ? fail(err) : ok(selector)
+          )
+        );
+      let first, second;
+      try {
+        [first, second] = await Promise.all([
+          resolve(interaction.options.getString("parent1")),
+          resolve(interaction.options.getString("parent2")),
+        ]);
+      } catch (err) {
+        handleException("Lecture des parents pour /pk oeuf :", err);
+        return interaction.editReply({ content: "❌ Erreur base de données." }).catch(() => {});
+      }
+      const refus =
+        first.error ??
+        second.error ??
+        (!getSpecies(first.speciesId) || !getSpecies(second.speciesId)
+          ? "Choisis une proposition dans la liste d'autocomplétion."
+          : null);
+      if (refus) return interaction.editReply({ content: `❌ ${refus}` }).catch(() => {});
+
       layEgg(interaction.user.id, first, second, (err, result) => {
         if (err) {
           handleException("Ponte d'un œuf :", err);

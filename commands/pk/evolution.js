@@ -1,21 +1,24 @@
 import {
-  SlashCommandBuilder,
   MessageFlags,
   EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
 } from "discord.js";
-import { handleException } from "../modules/utils.js";
+import { handleException } from "../../modules/utils.js";
 import {
-  decodeEntry,
   describeEvolution,
   getIndividuals,
   groupIndividuals,
-} from "../modules/pokemon/collection.js";
-import { embedColor, getSpecies, spriteUrl } from "../modules/pokemon/data.js";
-import { getInventory, getItem } from "../modules/pokemon/items.js";
-import { displayName } from "../modules/pokemon/embeds.js";
+  resolveSelector,
+} from "../../modules/pokemon/collection.js";
+import { embedColor, getSpecies, spriteUrl } from "../../modules/pokemon/data.js";
+import { getInventory, getItem } from "../../modules/pokemon/items.js";
+import {
+  displayName,
+  individualChoices,
+  wantsIndividual,
+} from "../../modules/pokemon/embeds.js";
 
 // Discord n'autorise pas de liste vide accompagnée d'un message : une
 // proposition inerte est le seul moyen d'expliquer pourquoi il n'y a rien à
@@ -41,8 +44,8 @@ function usableHelpers(userId, cb) {
 
 // Ce qu'un groupe (espèce, variante, sexe) permet de payer. L'entrée entière
 // fournit les doublons, quel que soit leur sexe ; le groupe fournit l'individu
-// qui évolue, et celui-là ne peut pas être l'exemplaire qu'on garde — sauf si
-// une aide couvre tous les doublons, auquel cas rien n'est retiré.
+// qui évolue. Le seul interdit est d'emmener le dernier de l'entrée, et
+// `required` compte déjà l'exemplaire qui reste.
 // `stock` : { total, count, spare } — l'entrée, puis le groupe.
 const canPay = (plan, stock) =>
   !plan.error &&
@@ -69,16 +72,19 @@ function evolutionPaths(speciesId, stock, helpers) {
   return paths;
 }
 
-// Le stock d'un groupe : l'entrée entière et, dedans, le groupe du sexe choisi.
-function stockOf(rows, speciesId, isShiny, sex) {
+// Le stock d'un groupe : l'entrée entière et, dedans, le groupe du sexe choisi
+// — ou le seul individu désigné par son identifiant.
+function stockOf(rows, speciesId, isShiny, sex, pokemonId = null) {
   const entry = rows.filter(
     (row) => row.species_id === speciesId && Boolean(row.is_shiny) === Boolean(isShiny)
   );
-  const group = entry.filter((row) => !sex || row.sex === sex);
+  const group = entry.filter((row) =>
+    pokemonId ? row.id === pokemonId : !sex || row.sex === sex
+  );
   return {
     total: entry.length,
     count: group.length,
-    spare: group.filter((row) => !row.locked).length,
+    spare: Math.min(group.length, Math.max(0, entry.length - 1)),
   };
 }
 
@@ -116,19 +122,39 @@ function listEvolvable(userId, cb) {
 }
 
 export default {
-  data: new SlashCommandBuilder()
-    .setName("evolution")
-    .setDescription("Fait évoluer un Pokémon en sacrifiant des doublons")
-    .addStringOption((option) =>
-      option
-        .setName("pokemon")
-        .setDescription("Le Pokémon à faire évoluer")
-        .setRequired(true)
-        .setAutocomplete(true)
-    ),
+  describe: (sub) =>
+    sub
+      .setName("evolution")
+      .setDescription("Fait évoluer un Pokémon en sacrifiant des doublons")
+      .addStringOption((option) =>
+        option
+          .setName("pokemon")
+          .setDescription("Le Pokémon à faire évoluer (ou #numéro d'un Pokémon précis)")
+          .setRequired(true)
+          .setAutocomplete(true)
+      ),
 
   async autocomplete(interaction) {
     const query = interaction.options.getFocused().toLowerCase();
+    // « #123 » : un individu précis, qui peut évoluer et n'est pas le dernier de
+    // son espèce. Les chiffres du coût se vérifient ensuite, sur l'écran de fusion.
+    if (wantsIndividual(query)) {
+      return getIndividuals(interaction.user.id, (err, rows) => {
+        if (err) return interaction.respond([]).catch(() => {});
+        const choices = individualChoices(
+          rows,
+          query,
+          (row) => !row.last && !describeEvolution(row.species_id).error
+        );
+        interaction
+          .respond(
+            choices.length
+              ? choices
+              : [{ name: "Aucun Pokémon de ce numéro ne peut évoluer", value: HINT_VALUE }]
+          )
+          .catch(() => {});
+      });
+    }
     listEvolvable(interaction.user.id, async (err, entries, incomplete) => {
       if (err) {
         handleException("Autocomplétion d'évolution :", err);
@@ -175,7 +201,15 @@ export default {
 
   async execute(interaction) {
     try {
-      const { speciesId, isShiny, sex } = decodeEntry(interaction.options.getString("pokemon"));
+      const selector = await new Promise((resolve, reject) =>
+        resolveSelector(interaction.user.id, interaction.options.getString("pokemon"), (err, s) =>
+          err ? reject(err) : resolve(s)
+        )
+      );
+      if (selector.error) {
+        return interaction.reply({ content: `\u274C ${selector.error}`, flags: MessageFlags.Ephemeral });
+      }
+      const { speciesId, isShiny, sex, pokemonId } = selector;
       if (!getSpecies(speciesId)) {
         return interaction.reply({
           content:
@@ -203,17 +237,20 @@ export default {
         // d'autant plus vrai depuis que les objets le font entrer dans cet
         // écran avec un exemplaire de moins que le minimum.
         getIndividuals(interaction.user.id, (err, individuals) => {
-        if (err) handleException("Lecture de la collection pour /evolution :", err);
-        const stock = stockOf(err ? [] : individuals, speciesId, isShiny, sex);
+        if (err) handleException("Lecture de la collection pour /pk evolution :", err);
+        const stock = stockOf(err ? [] : individuals, speciesId, isShiny, sex, pokemonId);
         const owned = stock.total;
 
         const species = plan.species;
         // Variante et sexe voyagent ensemble dans le deuxième segment du
         // customId : « 1F » pour une femelle shiny, « 0 » pour n'importe quel
-        // sexe — le format d'avant, que les anciens boutons portent encore.
-        const suffix = `${isShiny ? 1 : 0}${sex ?? ""}`;
+        // sexe — le format d'avant, que les anciens boutons portent encore —,
+        // ou « #123 » pour un individu précis.
+        const suffix = pokemonId ? `#${pokemonId}` : `${isShiny ? 1 : 0}${sex ?? ""}`;
         const embed = new EmbedBuilder()
-          .setTitle(`Évolution de ${displayName(species, isShiny, sex)}`)
+          .setTitle(
+            `Évolution de ${pokemonId ? `#${pokemonId} ` : ""}${displayName(species, isShiny, sex)}`
+          )
           .setColor(embedColor(species, isShiny))
           .setThumbnail(spriteUrl(species, isShiny))
           .setDescription(
@@ -305,12 +342,9 @@ export default {
           return interaction
             .editReply({
               content:
-                (owned >= plan.required && sex
-                  ? `❌ Ton seul **${displayName(species, isShiny, sex)}** est l'exemplaire ` +
-                    `que tu gardes : choisis un autre sexe, ou attrape-en un deuxième.`
-                  : `❌ Il te faut **${plan.required}** exemplaires de **${species.name}**` +
-                    `${isShiny ? " ✨" : ""} pour cette fusion, tu en as **${owned}**.\n` +
-                    `Trois 🍬 Super Bonbons peuvent tenir lieu d'un exemplaire manquant.`),
+                `❌ Il te faut **${plan.required}** exemplaires de **${species.name}**` +
+                `${isShiny ? " ✨" : ""} pour cette fusion, tu en as **${owned}**.\n` +
+                `Trois 🍬 Super Bonbons peuvent tenir lieu d'un exemplaire manquant.`,
             })
             .catch(() => {});
         }
