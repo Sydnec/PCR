@@ -330,9 +330,8 @@ async function updateThreadList(guild) {
 	for (const [, message] of fetched) {
 		await message.delete();
 	}
-	let listMessage;
 	for (const msg of messages) {
-		listMessage = await channel.send(msg);
+		await channel.send(msg);
 	}
 }
 function splitMessage(text, maxLength = 2000) {

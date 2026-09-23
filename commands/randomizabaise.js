@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, MessageFlags } from "discord.js";
+import { SlashCommandBuilder } from "discord.js";
 import { handleException } from "../modules/utils.js";
 import { fetchRoleMembers } from "../modules/members.js";
 import dotenv from "dotenv";

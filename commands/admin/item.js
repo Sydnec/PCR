@@ -107,7 +107,6 @@ export default {
       let failures = 0;
       for (const member of members) {
         try {
-          // eslint-disable-next-line no-await-in-loop
           const ok = await (quantity > 0
             ? donner(member.id, key, quantity, source)
             : retirer(member.id, key, -quantity, source));

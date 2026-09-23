@@ -1,0 +1,31 @@
+name: CodeQL
+
+# Analyse de sécurité du code (injections, XSS, redirections ouvertes…), sur
+# chaque PR vers main et chaque semaine pour les nouvelles règles. Ses alertes
+# s'affichent dans l'onglet Security du dépôt.
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    - cron: "17 4 * * 1"
+
+jobs:
+  analyze:
+    # Jamais sur le runner auto-hébergé : le dépôt est public, et une PR venue
+    # d'un fork n'a rien à exécuter sur la machine du bot.
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-and-quality
+
+      - uses: github/codeql-action/analyze@v3

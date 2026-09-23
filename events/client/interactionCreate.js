@@ -1,5 +1,5 @@
 import { handleException, log } from '../../modules/utils.js';
-import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, MessageFlags, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, MessageFlags, StringSelectMenuBuilder, StringSelectMenuOptionBuilder} from 'discord.js';
 import pointsDb from '../../modules/points-db.js';
 import { addPoints, getBalance, spendPoints } from '../../modules/economy.js';
 import { handlePokemonButton } from '../../modules/pokemon/interactions.js';
@@ -692,7 +692,9 @@ async function execute(interaction, bot) {
                             try {
                                 const originalMessage = await interaction.channel.messages.fetch(messageId);
                                 if (originalMessage) await originalMessage.edit({ components: [] });
-                            } catch (e) {}
+                            } catch (e) {
+                                // Message déjà supprimé : rien à retirer.
+                            }
                          }
                     });
                     });

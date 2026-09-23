@@ -5,6 +5,11 @@ on:
     tags:
       - "v*" # Se déclenche uniquement sur les tags de version (ex: v1.0.0)
 
+# Le déploiement tire le code avec les accès git du serveur : le jeton de
+# GitHub n'a besoin que de lire.
+permissions:
+  contents: read
+
 jobs:
   deploy:
     runs-on: self-hosted

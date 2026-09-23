@@ -69,6 +69,16 @@ try {
 
   bot.login(process.env.DISCORD_TOKEN);
 
+  // node-cron 4 écrit ses avertissements (exécution manquée, boucle
+  // d'événements en retard) et les erreurs des tâches dans la console : on les
+  // fait passer par la journalisation du bot.
+  const cronLogger = {
+    debug: () => {},
+    info: () => {},
+    warn: (message) => log(`⚠️ Tâche planifiée : ${message}`),
+    error: (error) => handleException("Tâche planifiée :", error),
+  };
+
   // Planification défensive : node-cron lève sur une expression absente ou
   // invalide. Comme tous les cron étaient enregistrés à la suite, une seule
   // variable d'environnement manquante interrompait la séquence et privait le
@@ -80,7 +90,7 @@ try {
     if (!cron.validate(expression)) {
       return handleException(`Expression cron invalide pour ${name} : ${expression}`);
     }
-    cron.schedule(expression, task);
+    cron.schedule(expression, task, { name, logger: cronLogger });
   };
 
   schedule(process.env.ADVENT_CRON_TIMER, "calendrier de l'avent", () => {
@@ -98,30 +108,30 @@ try {
   // }
 
   // Vérifier les rappels toutes les minutes
-  cron.schedule("* * * * *", () => {
+  schedule("* * * * *", "rappels", () => {
     bot.handleRemindersOnTimer();
   });
 
   // Faire fuir les Pokémon dont la durée de vie est écoulée. Indépendant de
   // l'activité du serveur, sinon un salon silencieux ne les délogerait jamais.
-  cron.schedule("* * * * *", () => {
+  schedule("* * * * *", "fuite des Pokémon", () => {
     bot.handlePokemonFleeOnTimer();
   });
 
   // Éclosion des œufs arrivés à échéance. Le seuil de messages, lui, se vérifie
   // au fil des messages de chaque propriétaire.
-  cron.schedule("* * * * *", () => {
+  schedule("* * * * *", "éclosion des œufs", () => {
     bot.handleEggHatchOnTimer();
   });
 
   // Tirage horaire d'ouverture du parc safari, et fermeture de ce qui a expiré.
-  cron.schedule("0 * * * *", () => {
+  schedule("0 * * * *", "parc safari", () => {
     bot.handleSafariParkOnTimer();
   });
 
   // Pot commun. Le tick est horaire, l'échéance réelle vit en base : la
   // périodicité se règle depuis config.json sans redémarrage.
-  cron.schedule("0 * * * *", () => {
+  schedule("0 * * * *", "pot commun", () => {
     bot.handleRedistributionOnTimer();
   });
 

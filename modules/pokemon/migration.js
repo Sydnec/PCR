@@ -127,7 +127,6 @@ async function migrateCollection() {
       const fallbackAt = row.first_caught_at ?? row.last_caught_at ?? Date.now();
       for (let i = 0; i < row.count; i++) {
         const capture = known[i];
-        // eslint-disable-next-line no-await-in-loop
         await run(
           `INSERT INTO pokemon_owned
              (user_id, species_id, is_shiny, sex, ball, origin, sterile, obtained_at)

@@ -20,16 +20,20 @@ function secret() {
 const signature = (payload) =>
   crypto.createHmac("sha256", secret()).update(payload).digest("base64url");
 
-// Un jeton `payload.signature`, valable `ttlMs` millisecondes.
-export function signToken(data, ttlMs) {
-  const payload = encode(JSON.stringify({ ...data, exp: Date.now() + ttlMs }));
+// Un jeton `payload.signature`, valable `ttlMs` millisecondes, pour un usage
+// (`use`) : la session, ou l'état d'une connexion OAuth. Les deux sont signés
+// par le même secret ; sans l'usage dans la signature, le jeton d'état que
+// n'importe qui obtient en ouvrant /api/auth/login passait pour une session.
+export function signToken(data, ttlMs, use) {
+  const payload = encode(JSON.stringify({ ...data, use, exp: Date.now() + ttlMs }));
   return `${payload}.${signature(payload)}`;
 }
 
-// Les données du jeton, ou null s'il est absent, falsifié ou expiré. La
-// comparaison de signatures se fait à temps constant : une comparaison
-// ordinaire s'arrête au premier caractère différent, et ce délai se mesure.
-export function verifyToken(token) {
+// Les données du jeton, ou null s'il est absent, falsifié, expiré ou fait pour
+// un autre usage. La comparaison de signatures se fait à temps constant : une
+// comparaison ordinaire s'arrête au premier caractère différent, et ce délai
+// se mesure.
+export function verifyToken(token, use) {
   if (typeof token !== "string" || !token.includes(".")) return null;
   const [payload, sig] = token.split(".");
   const expected = Buffer.from(signature(payload));
@@ -37,7 +41,7 @@ export function verifyToken(token) {
   if (given.length !== expected.length || !crypto.timingSafeEqual(given, expected)) return null;
   try {
     const data = JSON.parse(decode(payload));
-    return Number(data.exp) > Date.now() ? data : null;
+    return data.use === use && Number(data.exp) > Date.now() ? data : null;
   } catch {
     return null;
   }
@@ -49,7 +53,14 @@ export function parseCookies(header = "") {
     const index = part.indexOf("=");
     if (index < 0) continue;
     const name = part.slice(0, index).trim();
-    if (name) cookies[name] = decodeURIComponent(part.slice(index + 1).trim());
+    if (!name) continue;
+    // Un « % » mal formé ferait lever decodeURIComponent, et chaque requête
+    // finirait en erreur 500 : un cookie illisible est un cookie absent.
+    try {
+      cookies[name] = decodeURIComponent(part.slice(index + 1).trim());
+    } catch {
+      // Ignoré : il n'arrive pas dans `cookies`.
+    }
   }
   return cookies;
 }

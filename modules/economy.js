@@ -141,7 +141,6 @@ async function applyMovementsNow(movements) {
   try {
     for (const { userId, amount } of movements) {
       if (!amount) continue;
-      // eslint-disable-next-line no-await-in-loop
       const err = await new Promise((resolve) => addPoints(userId, amount, resolve));
       if (err) {
         failures++;

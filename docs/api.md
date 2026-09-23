@@ -21,14 +21,17 @@ La mise en ligne pas à pas est dans [site.md](site.md#mise-en-ligne). Les varia
 - `WEB_SESSION_SECRET` — au moins 32 caractères aléatoires. Le changer déconnecte tout le monde.
 
 Réglages à chaud (`/admin config`) : `web.sessionHours` (168), `web.writesPerMinute` (60),
-`web.spawnRefreshSeconds` (5, de 2 à 60).
+`web.spawnRefreshSeconds` (5, de 2 à 60), `web.accessDenialCacheSeconds` (60, de 0 à 3 600).
 
 ## Connexion
 
 Le compte web **est** le compte Discord (portée `identify` seulement), et seuls les membres du
 serveur qui portent le rôle `DEFAULT_ROLE_ID` obtiennent une session. C'est revérifié à chaque
 requête connectée, par le cache du bot : un membre parti ou privé du rôle reçoit un `401` qui
-efface sa session. Si Discord ne répond pas, c'est un `502`, et la session reste.
+efface sa session. Si Discord ne répond pas, c'est un `502`, et la session reste. Un membre parti
+n'étant plus dans le cache, son refus est retenu `web.accessDenialCacheSeconds` pour ne pas
+interroger Discord à chaque requête : s'il revient sur le serveur, il entre au plus tard après ce
+délai. Rendre le rôle à un membre présent prend effet aussitôt.
 
 | Route | Effet |
 |---|---|
@@ -146,6 +149,7 @@ exemplaire, solde insuffisant…), `413` corps trop gros, `415` corps non JSON, 
 ## Sécurité
 
 - Sessions : jetons signés HMAC-SHA256, rien en mémoire ni en base ; comparaison à temps constant.
+  Chaque jeton porte son usage (session ou état OAuth) : l'un ne passe pas pour l'autre.
 - `state` OAuth2 signé, lié au navigateur, valable 10 minutes.
 - Écritures : corps JSON obligatoire, `Origin` vérifié quand il est présent, 16 Ko maximum, limite
   par minute et par dresseur.

@@ -347,6 +347,10 @@ export const DEFAULTS = {
     // Garde-fou contre une boucle ou un script, par dresseur. Le parc safari et
     // le rangement du PC enchaînent les clics : de quoi jouer vite, pas plus.
     writesPerMinute: 60,
+    // Le refus d'accès d'un membre parti est retenu ce temps-là, pour ne pas
+    // interroger Discord à chaque requête d'une session encore valable. Un
+    // membre qui revient sur le serveur entre au plus tard après ce délai.
+    accessDenialCacheSeconds: 60,
     // Cadence à laquelle l'onglet Capture relit l'apparition en cours : assez
     // vif pour suivre une course, assez lent pour ne pas marteler le serveur à
     // chaque onglet ouvert.
@@ -525,6 +529,7 @@ const BOUNDS = {
   "pokemon.pc.nicknameLength": { min: 1, max: 24 },
   // À 0, chaque onglet ouvert relirait l'apparition en boucle.
   "web.spawnRefreshSeconds": { min: 2, max: 60 },
+  "web.accessDenialCacheSeconds": { min: 0, max: 3600 },
   // Math.floor(Math.random() * odds) === 0 : à 0, tout devient shiny.
   "pokemon.spawn.shinyOdds": { min: 1 },
   "pokemon.safari.shinyOdds": { min: 1 },

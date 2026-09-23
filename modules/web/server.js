@@ -33,6 +33,7 @@ const SESSION_COOKIE = "pcr_session";
 const STATE_COOKIE = "pcr_oauth_state";
 const MAX_BODY_BYTES = 16 * 1024;
 const STATE_TTL_MS = 10 * 60 * 1000;
+const SNOWFLAKE = /^\d{17,20}$/;
 
 const webConfig = () => getConfig().web;
 const baseUrl = () => String(process.env.WEB_BASE_URL || "").replace(/\/+$/, "");
@@ -150,16 +151,35 @@ function allowWrite(userId) {
 // (intention GuildMembers), donc seul un membre absent du cache coûte un appel
 // à Discord. Seul « membre inconnu » vaut refus ; toute autre erreur remonte,
 // pour qu'une panne de Discord ne passe pas pour une porte fermée.
+//
+// Un membre parti n'est plus dans le cache : chacune de ses requêtes coûterait
+// un appel à Discord, et une session encore valable suffirait à les enchaîner.
+// Ce refus-là est donc retenu `web.accessDenialCacheSeconds`. Un membre privé du
+// rôle, lui, est dans le cache : son refus ne coûte rien, et le retenir ne
+// ferait que retarder son retour quand on lui rend le rôle. En mémoire, et
+// c'est voulu : ce n'est pas un état de jeu, et le perdre ne coûte qu'un appel.
+const denials = new Map();
+
 export async function siteAccessDenial(bot, userId) {
+  const now = Date.now();
+  const cached = denials.get(userId);
+  if (cached && cached.until > now) return cached.reason;
+
   const guild = await bot.guilds.fetch(process.env.GUILD_ID);
   let member;
   try {
     member = await guild.members.fetch(userId);
   } catch (error) {
     const unknown = [RESTJSONErrorCodes.UnknownMember, RESTJSONErrorCodes.UnknownUser];
-    if (unknown.includes(error?.code)) return "membre";
-    throw error;
+    if (!unknown.includes(error?.code)) throw error;
+    const seconds = Math.max(0, Number(webConfig()?.accessDenialCacheSeconds) || 0);
+    if (seconds) {
+      for (const [id, entry] of denials) if (entry.until <= now) denials.delete(id);
+      denials.set(userId, { reason: "membre", until: now + seconds * 1000 });
+    }
+    return "membre";
   }
+  denials.delete(userId);
   return member.roles.cache.has(process.env.DEFAULT_ROLE_ID) ? null : "role";
 }
 
@@ -173,7 +193,11 @@ const safeReturnPath = (value) =>
 
 function login(req, res, url) {
   const state = crypto.randomBytes(16).toString("hex");
-  const token = signToken({ state, back: safeReturnPath(url.searchParams.get("back")) }, STATE_TTL_MS);
+  const token = signToken(
+    { state, back: safeReturnPath(url.searchParams.get("back")) },
+    STATE_TTL_MS,
+    "oauth-state"
+  );
   redirect(res, authorizeUrl(state), [
     serializeCookie(STATE_COOKIE, token, {
       maxAgeSeconds: STATE_TTL_MS / 1000,
@@ -184,7 +208,7 @@ function login(req, res, url) {
 
 async function callback(req, res, url, bot) {
   const cookies = parseCookies(req.headers.cookie);
-  const expected = verifyToken(cookies[STATE_COOKIE]);
+  const expected = verifyToken(cookies[STATE_COOKIE], "oauth-state");
   const clearState = serializeCookie(STATE_COOKIE, "", { maxAgeSeconds: 0, secure: secureCookies() });
   // Un échec renvoie sur l'accueil du site, qui l'explique : le visiteur est
   // dans un navigateur, pas devant un client d'API, et une page de JSON brut ne
@@ -213,7 +237,7 @@ async function callback(req, res, url, bot) {
   if (denial) return fail(denial);
 
   const hours = Math.max(1, Number(webConfig()?.sessionHours) || 168);
-  const session = signToken(user, hours * 3600 * 1000);
+  const session = signToken(user, hours * 3600 * 1000, "session");
   log(`Web : connexion de ${user.username} (${user.id})`);
   redirect(res, `${baseUrl()}${expected.back}`, [
     clearState,
@@ -250,8 +274,10 @@ async function handle(req, res, bot) {
     return send(res, allowed ? 405 : 404, { error: allowed ? "Méthode non autorisée." : "Introuvable." });
   }
 
-  const session = verifyToken(parseCookies(req.headers.cookie)[SESSION_COOKIE]);
-  const user = session
+  const session = verifyToken(parseCookies(req.headers.cookie)[SESSION_COOKIE], "session");
+  // Un identifiant Discord, et rien d'autre : sans lui, guild.members.fetch()
+  // irait chercher la liste entière des membres.
+  const user = SNOWFLAKE.test(String(session?.id))
     ? { id: session.id, username: session.username, avatar: session.avatar, admin: isSiteAdmin(session.id) }
     : null;
   if (route.auth && !user) throw new HttpError(401, "Connexion requise.");

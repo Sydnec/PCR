@@ -19,7 +19,6 @@ import {
   percent,
   pokemonName,
   progressBar,
-  richText,
   toast,
 } from "../lib.js";
 import { safariOffer } from "../safari-offer.js";

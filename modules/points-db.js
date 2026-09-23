@@ -1,6 +1,6 @@
 import sqlite3 from "sqlite3";
 import path from "path";
-import { log, handleException } from "./utils.js";
+import { handleException } from "./utils.js";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -26,7 +26,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
         else {
             // Migration (add columns if not exists for old DBs)
             const addColumn = (colName, colType) => {
-                db.run(`ALTER TABLE points ADD COLUMN ${colName} ${colType}`, (err) => {
+                db.run(`ALTER TABLE points ADD COLUMN ${colName} ${colType}`, () => {
                     // Ignore duplicate column error
                 });
             }
@@ -114,7 +114,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
         if (err) handleException("Erreur création table bets :", err);
         else {
              // Migration for type
-             db.run(`ALTER TABLE bets ADD COLUMN is_estimation INTEGER DEFAULT 0`, (err) => {});
+             db.run(`ALTER TABLE bets ADD COLUMN is_estimation INTEGER DEFAULT 0`, () => {});
         }
       }
     );
@@ -148,7 +148,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
         if (err) handleException("Erreur création table bet_participations :", err);
         else {
              // Migration for prediction_value
-             db.run(`ALTER TABLE bet_participations ADD COLUMN prediction_value INTEGER`, (err) => {});
+             db.run(`ALTER TABLE bet_participations ADD COLUMN prediction_value INTEGER`, () => {});
         }
       }
     );

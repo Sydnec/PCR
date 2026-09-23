@@ -87,7 +87,12 @@ d'écrire et en reprendre le style : en cas de doute, c'est le code existant qui
 
 ### Avant de livrer
 
-- `npm run lint` (c'est ce que lance la CI).
+- `npm run lint` (ESLint), `npm run format:check` (Prettier sur `web/`, qui se formate avec
+  `npx prettier --write web/`) et `npm audit` : c'est ce que lance la CI, qui bloque aussi sur
+  une dépendance vulnérable. CodeQL analyse chaque PR.
+- **Revue de code** avant d'ouvrir la PR : passer le diff à `/code-review` et corriger ce qu'elle
+  confirme ; pour ce qui touche au site, à l'API ou à l'authentification, y ajouter
+  `/security-review`.
 - Pas de tests unitaires : tester le comportement sur une copie du dépôt dans le scratchpad, avec
   une base neuve (`points.db` se crée à la racine au premier import de `modules/points-db.js`),
   jamais sur le dépôt lui-même.

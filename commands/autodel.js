@@ -36,7 +36,7 @@ export default {
 				.setMaxValue(MAX_DAYS)
 		),
 
-	async execute(interaction, bot) {
+	async execute(interaction) {
 		await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 		try {
 			const messageLink = interaction.options.getString('lien');

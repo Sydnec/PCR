@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, MessageFlags } from "discord.js";
-import { handleException, log, autoAddEmojis } from "../modules/utils.js";
+import { handleException, autoAddEmojis } from "../modules/utils.js";
 import dotenv from "dotenv";
 dotenv.config(); // process.env.CONSTANT
 
@@ -43,7 +43,7 @@ export default {
         .setRequired(false)
     ),
 
-  async execute(interaction, bot) {
+  async execute(interaction) {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     const input = interaction.options.getString("question");
     const dayChoice = interaction.options.getString("jour");

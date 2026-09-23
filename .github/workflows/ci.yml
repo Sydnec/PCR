@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: ["main"]
 
+# Lecture seule : la CI vérifie, elle n'écrit rien dans le dépôt.
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -26,5 +30,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Les règles recommandées d'ESLint sur tout le code.
       - name: Lint
         run: npm run lint
+
+      # La mise en forme du site (web/), déjà entièrement passé par Prettier.
+      - name: Format
+        run: npm run format:check
+
+      # Une dépendance vulnérable (gravité haute ou critique) bloque la PR.
+      - name: Audit des dépendances
+        run: npm audit --audit-level=high
