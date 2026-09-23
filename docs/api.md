@@ -2,23 +2,23 @@
 
 # 🌐 API web
 
-L'API prépare l'interface web du jeu Pokémon. Elle tourne dans le même processus que le bot, sur
-la même base, et appelle **les mêmes fonctions que les commandes Discord** : le site et Discord ne
-peuvent pas se contredire, et tout ce que fait l'un reste faisable par l'autre.
+L'API du [site web](site.md). Elle tourne dans le même processus que le bot, sur la même base, et
+appelle **les mêmes fonctions que les commandes Discord** : le site et Discord ne peuvent pas se
+contredire, et tout ce que fait l'un reste faisable par l'autre.
 
-Elle est **éteinte par défaut** : rien ne démarre sans `WEB_PORT`.
+Elle est **éteinte par défaut** : rien ne démarre sans `WEB_PORT`. Le même serveur sert le site
+(`web/`) pour tout ce qui n'est pas sous `/api/`.
 
 ## Mise en service
 
-1. **Application Discord** (portail développeur → OAuth2) : noter le *Client Secret* et ajouter
-   la redirection `https://<site>/api/auth/callback`.
-2. **`.env`** (voir `.env.example`) :
-   - `WEB_PORT` — port d'écoute, sur `127.0.0.1` (`WEB_HOST` pour changer) ;
-   - `WEB_BASE_URL` — adresse publique du site, sans barre finale ;
-   - `DISCORD_CLIENT_SECRET` — avec `CLIENT_ID` et `GUILD_ID`, déjà présents ;
-   - `WEB_SESSION_SECRET` — au moins 32 caractères aléatoires. Le changer déconnecte tout le monde.
-3. **Reverse proxy** : servir le site et `/api/` sur la même origine, en HTTPS, et transmettre
-   `/api/` à `127.0.0.1:WEB_PORT`.
+La mise en ligne pas à pas est dans [site.md](site.md#mise-en-ligne). Les variables de `.env`
+(voir `.env.example`) :
+
+- `WEB_PORT` — port d'écoute, sur `127.0.0.1` (`WEB_HOST` pour changer : l'IP locale si le
+  proxy est sur une autre machine) ;
+- `WEB_BASE_URL` — adresse publique du site, sans barre finale ;
+- `DISCORD_CLIENT_SECRET` — avec `CLIENT_ID` et `GUILD_ID`, déjà présents ;
+- `WEB_SESSION_SECRET` — au moins 32 caractères aléatoires. Le changer déconnecte tout le monde.
 
 Réglages à chaud (`/admin config`) : `web.sessionHours` (168), `web.writesPerMinute` (30).
 
@@ -30,7 +30,7 @@ serveur obtiennent une session.
 | Route | Effet |
 |---|---|
 | `GET /api/auth/login?back=/page` | Redirige vers Discord ; revient ensuite sur `/page` (chemin du site uniquement). |
-| `GET /api/auth/callback` | Retour de Discord : pose le cookie de session (`pcr_session`, HttpOnly, SameSite=Lax). |
+| `GET /api/auth/callback` | Retour de Discord : pose le cookie de session (`pcr_session`, HttpOnly, SameSite=Lax). En cas d'échec, renvoie sur `/?connexion=expiree`, `refusee`, `discord` ou `membre`. |
 | `POST /api/auth/logout` | Efface la session. |
 
 ## Lecture
@@ -44,6 +44,7 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
 | `GET /api/me` 🔒 | `{ user, balance, balls, egg }` |
 | `GET /api/species` | `{ generation, species: [...] }` — espèces des générations ouvertes |
 | `GET /api/species/:id` | fiche + `chain` (lignée) |
+| `GET /api/catalogue` | `{ balls, items }` — clés, noms et emoji (`<:nom:id>` pour ceux du serveur) |
 | `GET /api/species/:id/evolution?targetId&helper` | coût d'une fusion : `{ targets, duplicates, required, points, helper }` |
 | `GET /api/users/:userId/pokedex` 🔒 | `{ dexSize, entries: [{ speciesId, shiny, count, firstCaughtAt }] }` |
 | `GET /api/users/:userId/box` 🔒 | `{ total, page, pages, pageSize, items }` |
@@ -59,7 +60,9 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
 ```
 
 `last` : dernier de son entrée, il ne peut pas partir. Une espèce porte `obtention` (`wild`,
-`evolution` ou `egg`), `femaleShare` (`null` si asexuée), ses évolutions et ses sprites.
+`evolution` ou `egg`), `femaleShare` (`null` si asexuée), `breeder` (parent possible d'un œuf),
+`sellValue` / `sellValueShiny` (prix de revente, 0 si invendable), ses évolutions, ses
+illustrations (`sprite`, `spriteShiny`) et ses petites images (`icon`, `iconShiny`).
 
 ## Actions 🔒
 
@@ -86,3 +89,4 @@ exemplaire, solde insuffisant…), `413` corps trop gros, `415` corps non JSON, 
 - Écritures : corps JSON obligatoire, `Origin` vérifié quand il est présent, 16 Ko maximum, limite
   par minute et par dresseur.
 - Le serveur n'écoute que `127.0.0.1` par défaut : il est fait pour vivre derrière le proxy.
+- Le site est servi avec une politique de sécurité stricte (voir [site.md](site.md#fonctionnement)).

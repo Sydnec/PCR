@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      name="description"
+      content="La boîte, le Pokédex et le sac des dresseurs du serveur PCR."
+    />
+    <title>PokéPCR</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/style.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/" data-link>
+        <img src="/favicon.svg" alt="" width="28" height="28" />
+        <span>PokéPCR</span>
+      </a>
+      <nav class="nav" id="nav" hidden>
+        <a href="/boite" data-link>Boîte</a>
+        <a href="/pokedex" data-link>Pokédex</a>
+        <a href="/sac" data-link>Sac</a>
+        <a href="/oeuf" data-link>Œuf</a>
+      </nav>
+      <div class="account" id="account"></div>
+    </header>
+    <main class="page" id="app">
+      <p class="loading">Chargement…</p>
+    </main>
+    <div class="toasts" id="toasts" aria-live="polite"></div>
+  </body>
+</html>

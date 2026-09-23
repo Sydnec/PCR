@@ -135,6 +135,13 @@ export function rarityOf(species) {
 export const spriteUrl = (species, isShiny) =>
   isShiny ? species.spriteShiny : species.sprite;
 
+// La petite image (96 px) du même dépôt, pour les grilles du site : une
+// illustration officielle pèse cent fois plus, et un Pokédex en affiche 251 d'un
+// coup. Le dépôt range les deux par numéro national, d'où une adresse calculée.
+const ICON_BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon";
+export const iconUrl = (species, isShiny) =>
+  `${ICON_BASE}/${isShiny ? "shiny/" : ""}${species.id}.png`;
+
 export function embedColor(species, isShiny) {
   if (isShiny) return 0xffd700;
   return TYPE_COLORS[species.types[0]] ?? 0x5865f2;

@@ -1293,5 +1293,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "feature",
+      "name": "Le site PokéPCR",
+      "description": "Première version du site pokepcr.simonbourlier.fr : ta boîte, ton Pokédex, ton sac et ton œuf dans le navigateur, avec revente, évolution et ponte. Connexion avec ton compte Discord.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-23T09:10:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    }
+  ]
 }

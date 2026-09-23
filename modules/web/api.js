@@ -24,6 +24,7 @@ import {
   evolutionTargets,
   getAvailableSpecies,
   getSpecies,
+  iconUrl,
   isEggOnly,
   isEvolutionOnly,
   isGenderless,
@@ -31,9 +32,10 @@ import {
   rarityOf,
   spriteUrl,
 } from "../pokemon/data.js";
-import { getIncubatingEgg, layEgg } from "../pokemon/eggs.js";
-import { getBallStock, getInventory, getItem, sortByCatalogue } from "../pokemon/items.js";
-import { sellPokemon } from "../pokemon/sell.js";
+import { getBalls, getSafariConfig } from "../pokemon/config.js";
+import { babyFamilies, canBreed, getIncubatingEgg, layEgg } from "../pokemon/eggs.js";
+import { getBallStock, getInventory, getItem, getItems, sortByCatalogue } from "../pokemon/items.js";
+import { pokemonSellValue, sellPokemon } from "../pokemon/sell.js";
 
 // Les fonctions du jeu sont à callbacks ; les routes, en promesses.
 const promise = (fn) =>
@@ -52,7 +54,9 @@ export class HttpError extends Error {
 const obtention = (species) =>
   isEggOnly(species) ? "egg" : isEvolutionOnly(species) ? "evolution" : "wild";
 
-function speciesJson(species) {
+// `families` se calcule une fois par requête, pas une fois par espèce (voir
+// babyOf).
+function speciesJson(species, families = babyFamilies()) {
   return {
     id: species.id,
     name: species.name,
@@ -67,10 +71,17 @@ function speciesJson(species) {
     femaleShare: isGenderless(species) ? null : species.genderRate / 8,
     catchRate: species.catchRate,
     obtention: obtention(species),
+    // Parent possible d'un œuf : de quoi proposer les bons candidats, la ponte
+    // tranchant de toute façon.
+    breeder: canBreed(species, families),
+    sellValue: pokemonSellValue(species, false),
+    sellValueShiny: pokemonSellValue(species, true),
     evolvesFrom: getAvailableSpecies(species.evolvesFrom)?.id ?? null,
     evolvesInto: evolutionTargets(species).map((target) => target.id),
     sprite: spriteUrl(species, false),
     spriteShiny: spriteUrl(species, true),
+    icon: iconUrl(species, false),
+    iconShiny: iconUrl(species, true),
   };
 }
 
@@ -178,9 +189,33 @@ export const routes = [
   {
     method: "GET",
     path: "/api/species",
+    handler: async () => {
+      const families = babyFamilies();
+      return {
+        generation: activeGeneration(),
+        species: allSpecies().map((species) => speciesJson(species, families)),
+      };
+    },
+  },
+
+  // Les noms et icônes des balls et des objets : de quoi afficher la ball d'un
+  // individu ou un objet sans rien recopier de la configuration. Les emoji sont
+  // ceux du serveur Discord, au format `<:nom:id>`.
+  {
+    method: "GET",
+    path: "/api/catalogue",
     handler: async () => ({
-      generation: activeGeneration(),
-      species: allSpecies().map(speciesJson),
+      balls: [...getBalls(), getSafariConfig().ball].map(({ key, label, emoji }) => ({
+        key,
+        label,
+        emoji,
+      })),
+      items: getItems().map((item) => ({
+        key: item.key,
+        label: item.label,
+        emoji: item.emoji,
+        description: item.description ?? null,
+      })),
     }),
   },
 
