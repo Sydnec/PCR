@@ -1189,5 +1189,26 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "chore",
+      "name": "La 2ᵉ génération est prête",
+      "description": "Ses 100 Pokémon sont en place, cachés : elle s'ouvrira d'une seule commande.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-23T07:10:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "enhancement",
+      "name": "/admin points et /admin item servent un membre ou tout un rôle",
+      "description": "/admin points-tous disparaît : /admin points et /admin item acceptent un membre ou un rôle, @everyone compris.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-23T07:10:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    }
+  ]
 }

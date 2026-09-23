@@ -48,10 +48,39 @@ coûts de fusion, et l'intégralité du parc safari dans `pokemon.safari`) viven
 bot**. Le curseur `capture.globalMultiplier` rend l'ensemble du jeu
 plus ou moins difficile tout en préservant la hiérarchie entre espèces.
 
+## Générations
+
+Le jeu tourne sur la **1ʳᵉ génération**, et la **2ᵉ est prête** : ses 100 espèces sont déjà dans
+les données, cachées. Pour l'ouvrir, une seule commande, sans release ni redémarrage :
+
+```
+/admin config pokemon.generation 2
+```
+
+Apparitions, parc safari, Pokédex (251 espèces), recherche, fiches, évolutions et échanges la
+prennent en compte immédiatement. Ce qu'elle change :
+
+- **Des lignées s'allongent** : Nosferalto → Nostenfer, Leveinard → Leuphorie, Évoli → Mentali et
+  Noctali, Ortide → Joliflor, et les bébés en amont (Pichu → Pikachu, Mélo, Toudoudou, Élekid,
+  Magby, Lippouti, Debugant → Kicklee, Tygnon ou Kapoera).
+- **Six nouvelles évolutions par échange**, dont la source est souvent de 1ʳᵉ génération : Onix →
+  Steelix, Insécateur → Cizayox, Hypocéan → Hyporoi, Ramoloss → Roigada, Têtarte → Tarpaud, Porygon
+  → Porygon2. Comme les quatre premières, elles n'apparaissent jamais à l'état sauvage (🔒).
+- **Six légendaires** de plus : Raikou, Entei, Suicune, Lugia, Ho-Oh et Celebi.
+- **Les raretés de la 1ʳᵉ génération ne bougent pas.** Un bébé est de stade 1, sa forme adulte
+  aussi : Pikachu reste commun et Raichu peu commun, là où compter Pichu en ferait un rare. La
+  fusion d'un bébé vers sa forme adulte a son propre tarif, `pokemon.evolution.1` (2 doublons et
+  250 points par défaut).
+
+Refermer une génération (`pokemon.generation 1`) cache ses espèces sans les retirer des
+collections ; elles réapparaissent à la réouverture.
+
 ## Données
 
-`modules/pokemon-gen1.json` est généré une fois par `npm run gen:pokemon` depuis le
-dataset PokéAPI et commité — la production ne fait aucun appel réseau.
+`modules/pokemon-data.json` contient toutes les espèces jusqu'à la dernière génération préparée.
+Il est généré par `npm run gen:pokemon` (`-- --gen N` pour préparer la génération N) depuis le
+dataset PokéAPI et commité — la production ne fait aucun appel réseau. Le plafond de
+`pokemon.generation` se lit dans ce fichier : préparer une génération, c'est le régénérer.
 
 ## Statistiques annuelles
 

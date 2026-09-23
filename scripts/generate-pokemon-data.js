@@ -1,6 +1,11 @@
 // Génère le dataset Pokémon utilisé par le système de capture.
 //
-// Usage : node scripts/generate-pokemon-data.js [--gen 1] [--csv-dir ./chemin]
+// Usage : node scripts/generate-pokemon-data.js [--gen 2] [--csv-dir ./chemin]
+//
+// --gen est la DERNIÈRE génération incluse : le fichier contient toutes les
+// espèces jusqu'à elle, et le bot n'en montre que celles des générations
+// activées (`pokemon.generation`). Préparer une génération, c'est donc
+// régénérer ce fichier ; l'ouvrir aux joueurs, c'est un réglage à chaud.
 //
 // Les données proviennent du dataset CSV officiel de PokéAPI, servi par
 // raw.githubusercontent.com (pokeapi.co lui-même est bloqué par certains proxys).
@@ -39,7 +44,7 @@ const argOf = (flag) => {
   return index !== -1 ? process.argv[index + 1] : null;
 };
 
-const GENERATION = argOf("--gen") || "1";
+const GENERATION = Number(argOf("--gen") || 2);
 const CSV_DIR = argOf("--csv-dir");
 
 // Parseur CSV minimal : gère les champs entre guillemets et les guillemets doublés.
@@ -132,8 +137,8 @@ async function main() {
     }
   }
 
-  // pokemon_types référence les formes ; en génération 1 l'id de forme par
-  // défaut est égal à l'id d'espèce, ce qui suffit ici.
+  // pokemon_types référence les formes ; l'id de la forme par défaut est égal
+  // à l'id d'espèce, ce qui suffit ici.
   const typesBySpecies = new Map();
   for (const row of pokemonTypeRows) {
     const id = Number(row.pokemon_id);
@@ -144,7 +149,10 @@ async function main() {
   }
 
   // Espèces obtenues par échange : elles ne doivent jamais apparaître à l'état
-  // sauvage, seule la fusion de doublons y donne accès.
+  // sauvage, seules la fusion de doublons et l'échange y donnent accès. La
+  // génération 2 en ajoute six, dont la source est souvent de génération 1
+  // (Onix, Insécateur, Hypocéan, Ramoloss, Têtard, Porygon) : c'est la cible
+  // qui porte le marqueur, et elle reste cachée tant que sa génération l'est.
   const tradeEvolutions = new Set();
   for (const row of evolutionRows) {
     if (row.evolution_trigger_id === TRADE_TRIGGER) {
@@ -153,25 +161,28 @@ async function main() {
   }
 
   const inGeneration = (id) =>
-    species.has(id) && species.get(id).generation_id === GENERATION;
+    species.has(id) && Number(species.get(id).generation_id) <= GENERATION;
+  const isBaby = (id) => species.get(id).is_baby === "1";
 
   const preEvolutionOf = (id) => {
     const raw = species.get(id).evolves_from_species_id;
     return raw ? Number(raw) : null;
   };
 
-  // Le stade se calcule en remontant la chaîne, mais en s'arrêtant dès qu'on
-  // sort de la génération ciblée. Sans ce garde-fou, 11 Pokémon de génération 1
-  // (Pikachu <- Pichu, Ronflex <- Goinfrex, Leveinard <- Ptiravi...) seraient
-  // classés en stade 2 ou 3 à cause de bébés introduits plus tard, et
-  // deviendraient ultra-rares à tort.
+  // Le stade se calcule en remontant la chaîne, sans compter les bébés et en
+  // s'arrêtant dès qu'on sort des générations incluses. Sans ce garde-fou, 11
+  // Pokémon de génération 1 (Pikachu <- Pichu, Ronflex <- Goinfrex, Leveinard
+  // <- Ptiravi...) seraient classés en stade 2 ou 3 à cause de bébés introduits
+  // plus tard, et deviendraient ultra-rares à tort — et ouvrir la génération 2
+  // rebattrait les raretés de la première. Le stade ne dépend donc jamais des
+  // générations activées : un bébé est de stade 1, sa forme adulte aussi.
   const stageOf = (id) => {
     let stage = 1;
     let current = id;
     while (true) {
       const previous = preEvolutionOf(current);
       if (previous === null || !inGeneration(previous)) return stage;
-      stage++;
+      if (!isBaby(previous)) stage++;
       current = previous;
     }
   };
@@ -187,7 +198,7 @@ async function main() {
   }
 
   const dataset = {
-    generation: Number(GENERATION),
+    maxGeneration: GENERATION,
     generatedAt: new Date().toISOString().slice(0, 10),
     source: "PokéAPI CSV dataset (github.com/PokeAPI/pokeapi, data/v2/csv)",
     species: ids.map((id) => {
@@ -202,6 +213,7 @@ async function main() {
         stage: stageOf(id),
         isLegendary: row.is_legendary === "1",
         isMythical: row.is_mythical === "1",
+        isBaby: isBaby(id),
         tradeEvolution: tradeEvolutions.has(id),
         types: (typesBySpecies.get(id) || []).filter(Boolean),
         evolvesFrom: previous !== null && inGeneration(previous) ? previous : null,
@@ -212,10 +224,7 @@ async function main() {
     }),
   };
 
-  const outputPath = path.join(
-    __dirname,
-    `../modules/pokemon-gen${GENERATION}.json`
-  );
+  const outputPath = path.join(__dirname, "../modules/pokemon-data.json");
   fs.writeFileSync(outputPath, JSON.stringify(dataset, null, 2) + "\n");
 
   const byStage = dataset.species.reduce((acc, s) => {
@@ -229,6 +238,9 @@ async function main() {
   console.log(`   Stades : ${JSON.stringify(byStage)}`);
   console.log(`   Légendaires : ${legendaries.map((s) => s.name).join(", ")}`);
   console.log(`   Évolutions par échange : ${trades.map((s) => s.name).join(", ")}`);
+  console.log(
+    `   Bébés : ${dataset.species.filter((s) => s.isBaby).map((s) => s.name).join(", ")}`
+  );
 }
 
 main().catch((error) => {

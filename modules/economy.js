@@ -132,7 +132,7 @@ async function applyMovementsNow(movements) {
   if (beginError) {
     // On continue quand même — les mouvements valent mieux que rien — mais sans
     // prétendre à l'atomicité, et en le disant. Message neutre : cette fonction
-    // sert aussi /admin points-tous, qui n'a rien à voir avec le pot commun.
+    // sert aussi /admin points sur un rôle, qui n'a rien à voir avec le pot commun.
     handleException("Transaction refusée, mouvements appliqués un à un :", beginError);
   }
 

@@ -32,6 +32,11 @@ const overridePath = path.join(__dirname, "../config.local.json");
 
 const POKEMON = {
   enabled: true,
+  // Dernière génération jouable. Le jeu de données en contient davantage
+  // (modules/pokemon-data.json, régénéré à l'avance) : ouvrir la suivante se
+  // fait d'une commande, `/admin config pokemon.generation 2`, sans release ni
+  // redémarrage. La refermer cache ses espèces sans les retirer des collections.
+  generation: 1,
   spawn: {
     messagesPerSpawn: 40,
     minDelayMinutes: 60,
@@ -83,6 +88,10 @@ const POKEMON = {
     },
   },
   evolution: {
+    // Le stade 1 n'est la cible que d'un bébé (Pichu → Pikachu, à partir de la
+    // génération 2) : sa forme adulte est aussi commune que lui, d'où un tarif
+    // plus doux que celui des vraies évolutions.
+    1: { duplicates: 2, points: 250 },
     2: { duplicates: 5, points: 500 },
     3: { duplicates: 10, points: 2000 },
     branchChoicePoints: 1000,
@@ -413,6 +422,19 @@ export function readConfigValue(path) {
 
 // ====================== ÉCRITURE ======================
 
+// La dernière génération que contient le jeu de données Pokémon. Lue une fois,
+// et sans faire tomber le bot si le fichier manque : data.js, qui en dépend
+// vraiment, s'en chargera bien assez tôt.
+function datasetMaxGeneration() {
+  try {
+    const file = path.join(__dirname, "pokemon-data.json");
+    return JSON.parse(fs.readFileSync(file, "utf8")).maxGeneration;
+  } catch (error) {
+    handleException("Lecture du jeu de données Pokémon :", error);
+    return undefined;
+  }
+}
+
 // Bornes des réglages dont une faute de frappe ne se rattrape pas. Le type seul
 // ne protège de rien : `contributionPercent: 50` est un nombre parfaitement
 // valide, et couperait en deux la fortune de tout le monde à l'échéance
@@ -426,6 +448,10 @@ const BOUNDS = {
   // Math.floor(Math.random() * odds) === 0 : à 0, tout devient shiny.
   "pokemon.spawn.shinyOdds": { min: 1 },
   "pokemon.safari.shinyOdds": { min: 1 },
+  // On n'ouvre que ce que le jeu de données contient. Le plafond est lu dans le
+  // fichier plutôt qu'écrit ici : préparer la génération suivante, c'est
+  // régénérer ce fichier, et rien d'autre ne doit avoir à suivre.
+  "pokemon.generation": { min: 1, max: datasetMaxGeneration() },
 };
 
 // Plancher déduit du défaut : un réglage dont la valeur par défaut est positive

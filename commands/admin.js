@@ -2,7 +2,6 @@ import { PermissionFlagsBits, SlashCommandBuilder, MessageFlags } from "discord.
 import { handleException, isAdmin } from "../modules/utils.js";
 
 import points from "./admin/points.js";
-import pointsTous from "./admin/points-tous.js";
 import item from "./admin/item.js";
 import config from "./admin/config.js";
 import configVoir from "./admin/config-voir.js";
@@ -22,7 +21,6 @@ import restart from "./admin/restart.js";
 // commande, n'existe plus qu'ici.
 const SUBCOMMANDS = [
   points,
-  pointsTous,
   item,
   config,
   configVoir,

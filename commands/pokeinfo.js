@@ -2,7 +2,7 @@ import { SlashCommandBuilder, MessageFlags } from "discord.js";
 import { handleException } from "../modules/utils.js";
 import {
   evolutionChain,
-  getSpecies,
+  getAvailableSpecies,
   searchByName,
 } from "../modules/pokemon/data.js";
 import { getOwnedVariantsFor } from "../modules/pokemon/collection.js";
@@ -35,7 +35,8 @@ export default {
 
   async execute(interaction) {
     try {
-      const species = getSpecies(interaction.options.getString("pokemon"));
+      // Une saisie tapée à la main peut viser une génération encore fermée.
+      const species = getAvailableSpecies(interaction.options.getString("pokemon"));
       if (!species) {
         return interaction.reply({
           content: "❌ Pokémon inconnu.",
