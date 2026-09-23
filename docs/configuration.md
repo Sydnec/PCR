@@ -8,7 +8,8 @@ Les réglages se lisent en empilant trois sources, chacune écrasant la précéd
    type de sa valeur par défaut impose celui qu'on peut écrire. Il sert aussi de repli : un fichier
    illisible ne fait jamais tomber le bot.
 2. **`config.json`** — le réglage versionné, celui qu'on décide en revue de code.
-3. **`config.local.json`** — ce qu'écrit `/admin config` depuis Discord, **ignoré par git**.
+3. **`config.local.json`** — ce qu'écrit `/admin config` depuis Discord (ou l'[administration du
+   site](site.md#administration)), **ignoré par git**.
 
 La troisième couche n'est pas un détail d'implémentation. `config.json` est suivi par git, et le
 déploiement enchaîne `git checkout main && git pull` sous `set -e` : une commande qui écrirait

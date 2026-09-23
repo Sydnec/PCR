@@ -543,14 +543,18 @@ const BOUNDS = {
 // ball.multiplier en dessous de son défaut. Le zéro aussi est légitime presque
 // partout : un poids de stade à 0 exclut ce stade, un prix d'entrée à 0 rend le
 // parc gratuit. Les vrais pièges sont nommés un par un dans BOUNDS.
-function checkBounds(key, value, fallback) {
+function boundsOf(key, fallback) {
   const bounds = BOUNDS[key] ?? {};
-  const min = bounds.min ?? (fallback >= 0 ? 0 : undefined);
+  return { min: bounds.min ?? (fallback >= 0 ? 0 : undefined), max: bounds.max };
+}
+
+function checkBounds(key, value, fallback) {
+  const { min, max } = boundsOf(key, fallback);
   if (min !== undefined && value < min) {
     return `\`${value}\` est en dessous du minimum autorisé (${min}).`;
   }
-  if (bounds.max !== undefined && value > bounds.max) {
-    return `\`${value}\` dépasse le maximum autorisé (${bounds.max}).`;
+  if (max !== undefined && value > max) {
+    return `\`${value}\` dépasse le maximum autorisé (${max}).`;
   }
   return null;
 }
@@ -667,6 +671,31 @@ export function listConfigEntries(query = "") {
     ...entry,
     current: descend(config, entry.path.split(".")),
   }));
+}
+
+// La configuration en arbre, pour l'administration du site : chaque branche avec
+// ses réglages, chaque réglage avec son type, sa valeur courante, sa valeur par
+// défaut et, pour un nombre, les bornes que writeConfigValue fera respecter —
+// le formulaire s'en sert, l'écriture reste seule juge. Même schéma que
+// /admin config-voir (DEFAULTS), et la config lue une seule fois.
+export function configTree() {
+  const build = (defaults, current, prefix) =>
+    Object.entries(defaults).map(([key, fallback]) => {
+      const path = prefix ? `${prefix}.${key}` : key;
+      const value = isPlainObject(current) ? current[key] : undefined;
+      if (isPlainObject(fallback)) return { key, path, children: build(fallback, value, path) };
+      const type = typeOf(fallback);
+      return {
+        key,
+        path,
+        type,
+        current: value,
+        fallback,
+        modified: JSON.stringify(value) !== JSON.stringify(fallback),
+        ...(type === "nombre" ? boundsOf(path, fallback) : {}),
+      };
+    });
+  return build(DEFAULTS, getConfig(), "");
 }
 
 // Les 25 propositions d'autocomplétion, prêtes pour interaction.respond().

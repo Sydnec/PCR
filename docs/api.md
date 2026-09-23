@@ -44,7 +44,7 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
 | Route | Réponse |
 |---|---|
 | `GET /api/health` | `{ ok, generation }` |
-| `GET /api/me` 🔒 | `{ user, balance, balls, egg }` |
+| `GET /api/me` 🔒 | `{ user, balance, balls, egg }` — `user.admin` pour `SYDNEC_USER_ID` |
 | `GET /api/species` | `{ generation, species: [...] }` — espèces des générations ouvertes |
 | `GET /api/species/:id` | fiche + `chain` (lignée) |
 | `GET /api/catalogue` | `{ balls, items, types }` — clés, noms et emoji (`<:nom:id>` pour ceux du serveur), couleur de chaque type |
@@ -57,6 +57,7 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
 | `GET /api/spawn` 🔒 | `{ refreshSeconds, cooldownSeconds, pausedUntil, wallet, safari, spawn, last, drops }` — l'apparition du salon |
 | `GET /api/safari` 🔒 | `{ offer, visit }` — ce que le dresseur peut faire du parc, et sa visite en cours (`null` sinon) |
 | `GET /api/me/pc` 🔒 | `{ slotsPerBox, columns, maxBoxes, boxNameLength, nicknameLength, boxes, pokemon }` — la boîte PC |
+| `GET /api/admin/config` 🔑 | `{ status, tree }` — la configuration en arbre |
 
 `/box` accepte `page` (à partir de 0), `pageSize` (1 à 200, 50 par défaut), `species`, `sex`
 (`M`, `F` ou `none`), `fertile` et `shiny` (`true`/`false`). Un individu :
@@ -99,6 +100,12 @@ Dans la boîte PC, `boxes` liste `{ box, name, custom, defaultName }` et chaque 
 individu avec sa case, `pos` (boîte = `pos / slotsPerBox`). Un Pokémon sans place reçoit la
 première libre à la lecture.
 
+🔑 : réservé à `SYDNEC_USER_ID` (`403` pour tout autre), vérifié à chaque requête. L'arbre liste
+chaque branche (`{ key, path, children }`) et chaque réglage (`{ key, path, type, current, fallback,
+modified }`, plus `min` / `max` pour un nombre) ; `status` signale une surcharge illisible, comme
+`/admin config-voir`. `value` est la saisie brute : un nombre, `true` / `false`, du texte, une liste
+séparée par des virgules.
+
 ## Actions 🔒
 
 Corps en JSON (`Content-Type: application/json`). Un Pokémon se désigne par `{ "pokemonId": 123 }`
@@ -117,6 +124,7 @@ ou par un groupe `{ "speciesId": 25, "isShiny": false, "sex": "F" }` — les deu
 | `POST /api/me/pc/move` | `{ pokemonId, pos }` | la boîte PC relue — l'occupant de la case prend l'ancienne place |
 | `POST /api/me/pc/boxes/:box/name` | `{ name }` | `{ name, custom }` — vide : nom par défaut |
 | `POST /api/me/pokemon/:id/nickname` | `{ nickname }` | `{ nickname }` — vide : plus de surnom |
+| `POST /api/admin/config` 🔑 | `{ path, value }` | `{ path, before, after }` — comme `/admin config` |
 
 Un lancer répond toujours `200` : un raté ou un « trop tard » sont des issues du jeu, pas des
 erreurs. `status` vaut `miss`, `catch`, `void` (battu, remboursé), `gone`, `cooldown`,

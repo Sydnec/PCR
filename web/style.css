@@ -48,6 +48,12 @@
   box-sizing: border-box;
 }
 
+/* `hidden` l'emporte sur les `display` des classes (.button, .nav…) : un
+   élément masqué par le script doit l'être vraiment. */
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   background: var(--bg);
@@ -176,10 +182,6 @@ h3 {
   gap: 4px;
 }
 
-.nav[hidden] {
-  display: none;
-}
-
 .nav a {
   padding: 6px 12px;
   border-radius: 999px;
@@ -283,7 +285,8 @@ h3 {
 
 select,
 input[type="search"],
-input[type="text"] {
+input[type="text"],
+input[type="number"] {
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -1320,6 +1323,112 @@ input[type="text"] {
   font-weight: 400;
 }
 
+/* ---------- Administration ---------- */
+
+/* Un arbre : chaque branche se déplie, ses enfants décalés le long d'un filet. */
+.config-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.config-branch > summary {
+  display: flex;
+  list-style: none;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.config-branch > summary:hover {
+  background: var(--surface-2);
+}
+
+.config-branch > summary::before {
+  content: "›";
+  display: inline-block;
+  width: 0.8em;
+  color: var(--muted);
+  transition: transform 0.15s;
+}
+
+.config-branch[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+/* Le chevron remplace le triangle du navigateur. */
+.config-branch > summary::-webkit-details-marker {
+  display: none;
+}
+
+.config-children {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-left: 13px;
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
+}
+
+.config-key {
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.config-leaf {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  align-items: center;
+  gap: 4px 12px;
+  padding: 4px 8px;
+  border-left: 3px solid transparent;
+  border-radius: 8px;
+}
+
+.config-leaf:hover {
+  background: var(--surface-2);
+}
+
+/* Un réglage qui n'a plus sa valeur par défaut : repéré d'un trait. */
+.config-modified {
+  border-left-color: var(--accent);
+}
+
+.config-label {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.config-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.config-control input[type="text"],
+.config-control input[type="number"] {
+  flex: 1;
+  min-width: 0;
+}
+
+.config-control input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.config-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+
 /* ---------- Notifications ---------- */
 
 .toasts {
@@ -1390,6 +1499,15 @@ input[type="text"] {
 /* ---------- Petits écrans ---------- */
 
 @media (max-width: 640px) {
+  .config-leaf {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .config-children {
+    margin-left: 6px;
+    padding-left: 8px;
+  }
+
   .topbar {
     padding: 10px 16px;
   }
