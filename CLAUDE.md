@@ -16,7 +16,9 @@ n'est donc terminée que lorsqu'elle est **mergée dans `main`** :
    `type` (`feature` / `fix` / `enhancement` / `chore`), `name`, `description` (texte destiné aux
    joueurs), `announce` (annoncé sur Discord ou non), `author: "Sydnec"`, `commit: "pending"`,
    `timestamp`, `branch`. `name` et `description` restent **concis** : une ou deux phrases qui
-   disent ce qui change pour les joueurs, sans justification ni détail technique.
+   disent ce qui change pour les joueurs, sans justification ni détail technique. Tout ce qui ne
+   concerne que le site web part avec `announce: false` : les annonces Discord ne parlent que du
+   jeu sur Discord.
 3. Mettre à jour la doc si le comportement visible change : la page concernée dans `docs/`, et le
    résumé du `README.md` s'il ne dit plus vrai. Le README reste un sommaire : le détail va dans
    `docs/`.

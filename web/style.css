@@ -14,6 +14,7 @@
   --female: #d2427a;
   --shiny: #b88900;
   --danger: #c0271f;
+  --success-text: #1f7a45;
   --radius: 12px;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.05), 0 2px 10px rgb(0 0 0 / 0.05);
   color-scheme: light dark;
@@ -34,6 +35,7 @@
     --female: #ff7fae;
     --shiny: #f3c53a;
     --danger: #ff6b61;
+    --success-text: #4cc27f;
     --shadow: none;
   }
 }
@@ -569,54 +571,166 @@ input[type="search"] {
   gap: 16px;
 }
 
-.spawn {
+/* Le Pokémon au centre, le journal sur le côté. */
+.capture-layout {
   display: grid;
-  grid-template-columns: minmax(200px, 300px) 1fr;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  align-items: start;
+  gap: 20px;
+}
+
+.capture-aside {
+  position: sticky;
+  top: 76px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.capture-aside:empty {
+  display: none;
+}
+
+.spawn {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 24px;
-  padding: 20px;
+  gap: 12px;
+  padding: 24px;
   border: 1px solid var(--border);
   border-radius: 16px;
-  background: var(--surface);
+  /* Un halo de la couleur du premier type derrière le Pokémon. */
+  background:
+    radial-gradient(
+      circle at 50% 30%,
+      color-mix(in srgb, var(--glow, transparent) 26%, transparent),
+      transparent 55%
+    ),
+    var(--surface);
   box-shadow: var(--shadow);
+  text-align: center;
 }
 
 .spawn-shiny {
   border-color: var(--shiny);
-  background: linear-gradient(
-    160deg,
-    color-mix(in srgb, var(--shiny) 14%, var(--surface)),
-    var(--surface) 55%
-  );
+}
+
+.spawn p {
+  margin: 0;
 }
 
 .spawn-art {
-  width: 100%;
-  max-width: 300px;
+  width: min(320px, 100%);
   aspect-ratio: 1;
   object-fit: contain;
+  filter: drop-shadow(0 8px 16px rgb(0 0 0 / 0.18));
 }
 
-.spawn-side {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.spawn-title {
+  font-size: 1.5rem;
 }
 
-.spawn-side p {
-  margin: 0;
+.spawn-dex {
+  margin-top: -8px !important;
+}
+
+.spawn-owned {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-weight: 600;
+}
+
+.spawn-owned.has {
+  color: var(--success-text);
 }
 
 .chips {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 6px;
+}
+
+/* Pastille colorée : teinte de fond et bordure dérivées de --chip, pour rester
+   lisible en clair comme en sombre. */
+.chip-color {
+  border: 1px solid color-mix(in srgb, var(--chip, var(--muted)) 55%, transparent);
+  background: color-mix(in srgb, var(--chip, var(--muted)) 22%, var(--surface));
+}
+
+.chip-color::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--chip, var(--muted));
+}
+
+/* Les mêmes repères que les pastilles de rareté sur Discord. */
+.rarity-COMMUN {
+  --chip: #9aa0a6;
+}
+
+.rarity-PEU_COMMUN {
+  --chip: #3ba55c;
+}
+
+.rarity-RARE {
+  --chip: #3b82f6;
+}
+
+.rarity-LEGENDAIRE {
+  --chip: #f59e0b;
+}
+
+/* Du vert au violet, du plus facile au plus dur. */
+.difficulty-0 {
+  --chip: #22c55e;
+}
+
+.difficulty-1 {
+  --chip: #84cc16;
+}
+
+.difficulty-2 {
+  --chip: #eab308;
+}
+
+.difficulty-3 {
+  --chip: #f97316;
+}
+
+.difficulty-4 {
+  --chip: #ef4444;
+}
+
+.difficulty-5 {
+  --chip: #a855f7;
+}
+
+.wallet {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wallet-ball {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
 }
 
 .balls {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
+  width: 100%;
+  max-width: 640px;
 }
 
 .ball {
@@ -631,9 +745,13 @@ input[type="search"] {
   color: var(--text);
   font: inherit;
   cursor: pointer;
+  transition:
+    transform 0.1s ease,
+    border-color 0.1s ease;
 }
 
 .ball:hover:not(:disabled) {
+  transform: translateY(-2px);
   border-color: var(--accent);
 }
 
@@ -657,20 +775,28 @@ input[type="search"] {
   font-weight: 600;
 }
 
-.ball-meta {
+.ball-meta,
+.ball-odds {
   color: var(--muted);
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
+}
+
+.ball-odds {
+  font-weight: 600;
+}
+
+.confirm,
+.throw-panel {
+  width: 100%;
+  max-width: 640px;
+  text-align: left;
 }
 
 .confirm {
   display: flex;
   flex-direction: column;
   gap: 10px;
-}
-
-.confirm p {
-  margin: 0;
 }
 
 .confirm-actions {
@@ -697,13 +823,94 @@ input[type="search"] {
   border-left-color: var(--danger);
 }
 
+/* La lignée, stade par stade, comme la fiche Discord. */
+.lineage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.lineage h3 {
+  margin: 0;
+}
+
+.lineage-stages {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 20px;
+}
+
+.lineage-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Les formes d'un même stade (les évolutions d'Évoli) se rangent en grille
+   plutôt qu'en une colonne interminable. */
+.lineage-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  max-width: 380px;
+}
+
+.lineage-label {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.lineage-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 110px;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+}
+
+.lineage-link .sprite {
+  width: 72px;
+  height: 72px;
+  filter: brightness(0);
+  opacity: 0.2;
+}
+
+.lineage-link.has .sprite {
+  filter: none;
+  opacity: 1;
+}
+
+.lineage-link.current {
+  border-color: var(--border);
+  background: var(--surface-2);
+}
+
+.lineage-name {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
 .spawn-empty {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 12px;
-  padding: 20px;
+  padding: 32px 20px;
   border: 1px dashed var(--border);
   border-radius: 16px;
+  text-align: center;
 }
 
 .spawn-empty p {
@@ -712,8 +919,9 @@ input[type="search"] {
 
 .last-spawn {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 4px;
 }
 
 .journal,
@@ -721,6 +929,10 @@ input[type="search"] {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
 }
 
 .journal h3,
@@ -731,7 +943,7 @@ input[type="search"] {
 .throws {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -743,24 +955,32 @@ input[type="search"] {
   gap: 8px;
 }
 
+.throws li.throw-won {
+  font-weight: 700;
+}
+
 .throws .avatar {
   width: 22px;
   height: 22px;
+}
+
+.throw-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .drop {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
-  padding: 10px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
+  gap: 8px;
 }
 
 .drop-text {
   flex: 1;
+  min-width: 140px;
 }
 
 /* ---------- Sac ---------- */
@@ -891,6 +1111,29 @@ input[type="search"] {
   color: #fff;
 }
 
+/* ---------- Silhouettes ---------- */
+
+/* Une silhouette noire disparaît sur fond sombre : on l'y dessine en clair. */
+@media (prefers-color-scheme: dark) {
+  .card-missing .sprite,
+  .artwork-missing,
+  .lineage-link:not(.has) .sprite {
+    filter: brightness(0) invert(1);
+  }
+}
+
+/* ---------- Écrans moyens ---------- */
+
+@media (max-width: 900px) {
+  .capture-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .capture-aside {
+    position: static;
+  }
+}
+
 /* ---------- Petits écrans ---------- */
 
 @media (max-width: 640px) {
@@ -935,20 +1178,14 @@ input[type="search"] {
   }
 
   .spawn {
-    grid-template-columns: 1fr;
-    justify-items: center;
     padding: 16px;
   }
 
   .spawn-art {
-    max-width: 220px;
-  }
-
-  .spawn-side {
-    width: 100%;
+    width: min(220px, 100%);
   }
 
   .balls {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

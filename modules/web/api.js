@@ -11,6 +11,7 @@ import { getBalance } from "../economy.js";
 import {
   getCollection,
   getIndividuals,
+  getOwnedVariantsFor,
   resolveSelector,
   evolve,
   describeEvolution,
@@ -21,7 +22,7 @@ import {
   activeGeneration,
   allSpecies,
   dexSize,
-  difficultyLabel,
+  difficultyOf,
   evolutionChain,
   evolutionTargets,
   getAvailableSpecies,
@@ -34,6 +35,7 @@ import {
   probabilitiesByBall,
   rarityOf,
   spriteUrl,
+  typeColors,
 } from "../pokemon/data.js";
 import { getBalls, getPokemonConfig, getSafariConfig } from "../pokemon/config.js";
 import { announceDropClaim, claimDrop, getOpenDrops } from "../pokemon/drops.js";
@@ -196,29 +198,36 @@ async function trainerOf(bot, userId) {
 }
 
 // Une apparition, avec ce qu'en voit chaque dresseur : les chances de chaque
-// ball, calculées comme sur l'annonce Discord, et ce qu'il en a déjà. L'objet
-// tenu reste secret jusqu'à la fin, comme sur Discord.
+// ball, calculées comme sur l'annonce Discord, et la fiche du bouton « Infos du
+// Pokémon » — ce qu'il possède de chaque maillon de la lignée, lu par la même
+// fonction. L'objet tenu reste secret jusqu'à la fin, comme sur Discord.
 async function spawnJson(ctx, spawn) {
   const config = getPokemonConfig();
-  const [throws, inventory, collection] = await Promise.all([
+  const species = getSpecies(spawn.species_id);
+  const chain = species ? evolutionChain(species) : [];
+  const [throws, inventory, owned] = await Promise.all([
     promise((cb) => recentThrows(spawn.id, config.spawn.throwLogSize, cb)),
     promise((cb) => getInventory(ctx.user.id, cb)),
-    promise((cb) => getCollection(ctx.user.id, cb)),
+    promise((cb) => getOwnedVariantsFor(ctx.user.id, chain.map((link) => link.id), cb)),
   ]);
   const stock = new Map(inventory.map((row) => [row.item_key, row.count]));
-  const owned = (shiny) =>
-    collection.find((row) => row.species_id === spawn.species_id && Boolean(row.is_shiny) === shiny)
-      ?.count ?? 0;
+  const counts = (id) => owned.get(id) ?? { normal: 0, shiny: 0 };
   return {
     id: spawn.id,
     speciesId: spawn.species_id,
     shiny: Boolean(spawn.is_shiny),
     rarity: spawn.rarity,
     rarityLabel: RARITIES[spawn.rarity]?.label ?? null,
-    difficulty: difficultyLabel(spawn.catch_rate),
+    // Figée à l'apparition, comme le taux de capture qui la fonde.
+    difficulty: difficultyOf(spawn.catch_rate),
     throwCount: spawn.throw_count,
     spawnedAt: spawn.spawned_at,
-    owned: { normal: owned(false), shiny: owned(true) },
+    owned: counts(spawn.species_id),
+    lineage: chain.map((link) => ({
+      speciesId: link.id,
+      stage: link.stage,
+      owned: counts(link.id),
+    })),
     balls: probabilitiesByBall(spawn.catch_rate).map((ball) => ({
       key: ball.key,
       label: ball.label,
@@ -286,6 +295,7 @@ export const routes = [
         label,
         emoji,
       })),
+      types: typeColors(),
       items: getItems().map((item) => ({
         key: item.key,
         label: item.label,

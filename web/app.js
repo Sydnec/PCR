@@ -37,6 +37,8 @@ const ctx = {
   me: null,
   species: new Map(),
   balls: new Map(),
+  // Couleur de chaque type, celle des embeds Discord.
+  types: {},
   refreshMe,
   navigate,
 };
@@ -183,6 +185,7 @@ async function boot() {
   ]);
   for (const entry of species.species) ctx.species.set(entry.id, entry);
   for (const ball of catalogue.balls) ctx.balls.set(ball.key, ball);
+  ctx.types = catalogue.types ?? {};
   await render();
 }
 

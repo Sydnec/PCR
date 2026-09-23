@@ -45,7 +45,7 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
 | `GET /api/me` 🔒 | `{ user, balance, balls, egg }` |
 | `GET /api/species` | `{ generation, species: [...] }` — espèces des générations ouvertes |
 | `GET /api/species/:id` | fiche + `chain` (lignée) |
-| `GET /api/catalogue` | `{ balls, items }` — clés, noms et emoji (`<:nom:id>` pour ceux du serveur) |
+| `GET /api/catalogue` | `{ balls, items, types }` — clés, noms et emoji (`<:nom:id>` pour ceux du serveur), couleur de chaque type |
 | `GET /api/species/:id/evolution?targetId&helper` | coût d'une fusion : `{ targets, duplicates, required, points, helper }` |
 | `GET /api/users/:userId/pokedex` 🔒 | `{ dexSize, entries: [{ speciesId, shiny, count, firstCaughtAt }] }` |
 | `GET /api/users/:userId/box` 🔒 | `{ total, page, pages, pageSize, items }` |
@@ -66,9 +66,11 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
 `sellValue` / `sellValueShiny` (prix de revente, 0 si invendable), ses évolutions, ses
 illustrations (`sprite`, `spriteShiny`) et ses petites images (`icon`, `iconShiny`).
 
-`spawn` vaut `null` sans apparition ; sinon il porte l'espèce, la rareté, la difficulté, ce que
-le dresseur en a déjà (`owned`), les balls (`price`, `probability`, `free` = balls offertes) et le
-journal des derniers lancers (`throws`, avec le pseudo et l'avatar du serveur). L'objet tenu reste
+`spawn` vaut `null` sans apparition ; sinon il porte l'espèce, la rareté, la difficulté
+(`{ level, label }`, `level` de 0 à 5), ce que le dresseur en a déjà (`owned`, normal et shiny),
+sa lignée (`lineage` : chaque maillon avec son stade et ce qu'il en possède, comme la fiche
+Discord), les balls (`price`, `probability`, `free` = balls offertes) et le journal des derniers
+lancers (`throws`, avec le pseudo et l'avatar du serveur). L'objet tenu reste
 secret. `last` est le dernier Pokémon parti (`CAUGHT` ou `FLED`), `drops` les objets au sol, et
 `pausedUntil` la fin d'un parc safari qui suspend les apparitions.
 
