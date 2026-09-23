@@ -27,5 +27,14 @@ jobs:
         with:
           languages: javascript-typescript
           queries: security-and-quality
+          # Le site n'a aucun mot de passe : l'identité vient de Discord. La
+          # règle prend pour un mot de passe le jeton de session, qu'on signe
+          # et vérifie par HMAC-SHA256 avec un secret d'au moins 32 caractères
+          # (modules/web/session.js) — l'outil qu'il faut, là où un hachage
+          # lent n'aurait aucun sens.
+          config: |
+            query-filters:
+              - exclude:
+                  id: js/insufficient-password-hash
 
       - uses: github/codeql-action/analyze@v3
