@@ -109,12 +109,28 @@ export function pokemonName(species, shiny = false, sex = null) {
   );
 }
 
-// Les messages du jeu sont écrits pour Discord : on retire le gras Markdown.
-const plain = (text) => String(text).replace(/\*\*|`/g, "");
+// Un message du jeu, écrit pour Discord : le gras (**…**) et les emoji du
+// serveur (<:nom:id>) y sont rendus comme là-bas, le reste reste du texte. On
+// découpe la chaîne, on ne l'interprète jamais comme du HTML.
+export function richText(text) {
+  const nodes = [];
+  String(text)
+    .split("\n")
+    .forEach((line, index) => {
+      if (index) nodes.push(h("br"));
+      for (const part of line.split(/(\*\*[^*]+\*\*|<a?:\w+:\d+>)/)) {
+        if (!part) continue;
+        if (/^\*\*[^*]+\*\*$/.test(part)) nodes.push(h("strong", {}, part.slice(2, -2)));
+        else if (/^<a?:\w+:\d+>$/.test(part)) nodes.push(emoji(part));
+        else nodes.push(part.replace(/`/g, ""));
+      }
+    });
+  return nodes;
+}
 
 export function toast(message, kind = "info") {
   const box = document.getElementById("toasts");
-  const item = h("div", { class: `toast toast-${kind}`, role: "status" }, plain(message));
+  const item = h("div", { class: `toast toast-${kind}`, role: "status" }, richText(message));
   box.append(item);
   setTimeout(() => item.remove(), 5000);
 }
@@ -177,5 +193,5 @@ export function progressBar(percent) {
 }
 
 export function errorBox(error) {
-  return h("div", { class: "notice error" }, plain(error.message));
+  return h("div", { class: "notice error" }, richText(error.message));
 }

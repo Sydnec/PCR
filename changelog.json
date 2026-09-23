@@ -1320,6 +1320,16 @@
       "commit": "pending",
       "timestamp": "2026-09-23T10:30:00.000Z",
       "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "feature",
+      "name": "Capturer depuis le site",
+      "description": "Le site pokepcr.simonbourlier.fr montre en direct le Pokémon qui apparaît sur Discord : lance-lui tes balls et ramasse ce qu'il laisse tomber, comme dans le salon.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-23T11:00:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
     }
   ]
 }

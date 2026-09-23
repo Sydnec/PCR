@@ -38,7 +38,8 @@ d'écrire et en reprendre le style : en cas de doute, c'est le code existant qui
   diverger : `creditSpecies` (nouvel individu), `reserveDuplicates` / `restoreDuplicates` (retrait
   d'individus d'un groupe, et remise à l'identique), `getIndividuals` / `groupIndividuals`
   (lecture), `grantItem` / `consumeItem` (inventaire), `spendPoints` / `addPoints` (points),
-  `displayName`, `encodeEntry` / `decodeEntry`, `buildBalanceEmbed`.
+  `displayName`, `encodeEntry` / `decodeEntry`, `buildBalanceEmbed`, `startThrow` / `resolveThrow` /
+  `throwMessage` (un lancer de ball, depuis Discord comme depuis le site).
 - **Pas d'état de jeu en mémoire** : tout vit en base, pour que les boutons répondent encore après
   un redémarrage.
 - **Jamais « lire puis écrire »** : un retrait, un débit ou une revendication est un `UPDATE` /

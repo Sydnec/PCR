@@ -27,6 +27,15 @@ export function getDrop(dropId, cb) {
   db.get("SELECT * FROM pokemon_drops WHERE id = ?", [dropId], cb);
 }
 
+// Les objets qui attendent encore d'être ramassés, les plus récents d'abord.
+export function getOpenDrops(cb) {
+  db.all(
+    "SELECT * FROM pokemon_drops WHERE status = 'OPEN' ORDER BY id DESC",
+    [],
+    (err, rows) => cb(err, rows ?? [])
+  );
+}
+
 // Pose l'objet par terre et l'annonce. L'annonce est best-effort : un salon
 // injoignable ne doit pas empêcher la ligne d'exister, mais un objet dont
 // personne ne voit le message n'a aucun intérêt — on le referme donc plutôt que
@@ -137,4 +146,19 @@ export function claimDrop(userId, dropId, cb) {
       });
     }
   );
+}
+
+// Un objet ramassé ailleurs que par son bouton — depuis le site — doit quand
+// même disparaître du salon : sinon le bouton resterait là, et le premier qui
+// cliquerait apprendrait qu'il n'y a plus rien. Sur Discord, le clic réécrit
+// lui-même le message. Au mieux : un message supprimé n'annule pas le ramassage.
+export async function announceDropClaim(client, drop, item, userId) {
+  if (!client || !drop?.channel_id || !drop?.message_id) return;
+  try {
+    const channel = await client.channels.fetch(drop.channel_id);
+    const message = await channel.messages.fetch(drop.message_id);
+    await message.edit({ embeds: [buildDropEmbed(item, { claimedBy: userId })], components: [] });
+  } catch (error) {
+    log(`Message de l'objet au sol #${drop.id} introuvable, ramassage non affiché`);
+  }
 }

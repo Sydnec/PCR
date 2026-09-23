@@ -10,6 +10,7 @@ import {
   h,
   openDialog,
   pokemonName,
+  richText,
   toast,
 } from "../lib.js";
 
@@ -297,7 +298,7 @@ function evolveAction(ctx, item, species, done) {
         `et un reste. Coût : ${fmt(plan.points)} pts.`;
       button.disabled = false;
     } catch (error) {
-      cost.textContent = error.message.replace(/\*\*/g, "");
+      cost.replaceChildren(...richText(error.message));
     }
   }
 

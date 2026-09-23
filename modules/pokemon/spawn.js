@@ -31,6 +31,24 @@ export function getSpawn(spawnId, cb) {
   db.get("SELECT * FROM pokemon_spawns WHERE id = ?", [spawnId], cb);
 }
 
+// Le dernier Pokémon parti, capturé ou enfui : ce qu'on montre tant que le
+// suivant n'est pas arrivé.
+export function getLastEndedSpawn(cb) {
+  db.get(
+    "SELECT * FROM pokemon_spawns WHERE status != 'ACTIVE' ORDER BY id DESC LIMIT 1",
+    [],
+    (err, row) => cb(err, row ?? null)
+  );
+}
+
+// Jusqu'à quand les apparitions sont suspendues (un parc safari occupe le
+// salon), en millisecondes ; 0 quand elles ne le sont pas.
+export function getSpawnPause(cb) {
+  db.get("SELECT spawn_paused_until FROM pokemon_state WHERE id = 1", [], (err, row) =>
+    cb(err, row?.spawn_paused_until ?? 0)
+  );
+}
+
 // Qui a lancé quoi sur ce spawn, et combien de points y ont brûlé.
 //
 // Deux agrégats en une requête, et ils ne comptent pas la même chose : les
@@ -71,7 +89,9 @@ export function spendingBreakdown(spawnId, cb) {
   );
 }
 
-function recentThrows(spawnId, limit, cb) {
+// Les derniers lancers d'un spawn, du plus ancien au plus récent : le journal
+// de l'annonce Discord, et celui du site.
+export function recentThrows(spawnId, limit, cb) {
   db.all(
     `SELECT user_id, ball, result FROM pokemon_throws
       WHERE spawn_id = ? AND result != 'VOID'

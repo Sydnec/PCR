@@ -306,6 +306,10 @@ export const DEFAULTS = {
     sessionHours: 168,
     // Garde-fou contre une boucle ou un script, par dresseur.
     writesPerMinute: 30,
+    // Cadence à laquelle l'onglet Capture relit l'apparition en cours : assez
+    // vif pour suivre une course, assez lent pour ne pas marteler le serveur à
+    // chaque onglet ouvert.
+    spawnRefreshSeconds: 5,
   },
   // Pot commun : chacun cotise une part de sa fortune, et la cagnotte repart en
   // parts égales. Un impôt sur le capital, en somme — les gros soldes financent,
@@ -470,6 +474,8 @@ const BOUNDS = {
   // Pokédex au nombre de pages infini et vide.
   "pokemon.pokedex.pageSize": { min: 1 },
   "pokemon.box.pageSize": { min: 1, max: 25 },
+  // À 0, chaque onglet ouvert relirait l'apparition en boucle.
+  "web.spawnRefreshSeconds": { min: 2, max: 60 },
   // Math.floor(Math.random() * odds) === 0 : à 0, tout devient shiny.
   "pokemon.spawn.shinyOdds": { min: 1 },
   "pokemon.safari.shinyOdds": { min: 1 },
