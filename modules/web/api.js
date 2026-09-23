@@ -15,6 +15,7 @@ import {
   resolveSelector,
   evolve,
   describeEvolution,
+  DITTO_HELPER,
 } from "../pokemon/collection.js";
 import { isFinalThrow, resolveThrow, startThrow, throwMessage } from "../pokemon/capture.js";
 import {
@@ -834,9 +835,12 @@ export const routes = [
           sex: evolved?.sex ?? null,
           shiny: isShiny,
         },
-        duplicatesSpent: plan.duplicates,
+        // Les Métamorph qui ont comblé la fusion sont comptés à part : ce ne
+        // sont pas des doublons de l'espèce.
+        duplicatesSpent: plan.duplicates - (plan.ditto?.copies ?? 0),
+        dittosSpent: plan.ditto?.dittos ?? 0,
         pointsSpent: plan.points,
-        helper: plan.helper ? plan.helper.item.key : null,
+        helper: plan.helper ? plan.helper.item.key : plan.ditto ? DITTO_HELPER : null,
       }));
     },
   },

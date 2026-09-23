@@ -24,15 +24,12 @@ import {
   evolutionChain,
   getAvailableSpecies,
   getSpecies,
+  isDitto,
   spriteUrl,
 } from "./data.js";
 import { creditSpecies } from "./collection.js";
 import { displayName } from "./embeds.js";
 import { resolveChannel } from "./spawn.js";
-
-// Métamorph, retrouvé par son identifiant de PokéAPI plutôt que par un numéro
-// écrit ici : le dataset est la seule source.
-export const isDitto = (species) => species?.slug === "ditto";
 
 // Les familles qui ont un bébé jouable, et leurs parents possibles : toute la
 // lignée sauf le bébé lui-même, qui ne pond pas. Recalculé à chaque appel,

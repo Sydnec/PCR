@@ -1508,6 +1508,16 @@
       "commit": "pending",
       "timestamp": "2026-09-23T20:00:00.000Z",
       "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "feature",
+      "name": "Métamorph, joker des fusions",
+      "description": "Dans /pk evolution, des Métamorph de la même variante peuvent remplacer les exemplaires qui manquent pour faire évoluer un Pokémon ; il en reste toujours un.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-24T10:00:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
     }
   ]
 }

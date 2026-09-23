@@ -63,6 +63,11 @@ export function activeGeneration() {
 export const isAvailable = (species, generation = activeGeneration()) =>
   Boolean(species) && species.generation <= generation;
 
+// Métamorph, retrouvé par son identifiant de PokéAPI plutôt que par un numéro
+// écrit ici : le dataset est la seule source. Il remplace un parent d'œuf et
+// comble les exemplaires manquants d'une fusion.
+export const isDitto = (species) => species?.slug === "ditto";
+
 // Les espèces jouables, dans l'ordre du Pokédex. C'est la porte de tout ce qui
 // énumère — apparitions, recherche, Pokédex, tables de poids — donc aucune
 // espèce d'une génération fermée ne peut s'y glisser.
@@ -71,6 +76,9 @@ export function allSpecies() {
   return dataset.species.filter((species) => isAvailable(species, generation));
 }
 export const dexSize = () => allSpecies().length;
+
+// Métamorph s'il fait partie des générations ouvertes, sinon null.
+export const dittoSpecies = () => allSpecies().find(isDitto) ?? null;
 
 // Toutes les espèces du fichier, générations fermées comprises. Réservé à ce qui
 // doit traiter les données sans égard au jeu en cours — une migration, par

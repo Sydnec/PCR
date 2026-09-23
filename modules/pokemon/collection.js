@@ -9,6 +9,7 @@ import { addPoints, spendPoints } from "../economy.js";
 import { handleException } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
 import {
+  dittoSpecies,
   evolutionTargets,
   getSpecies,
   rollSex,
@@ -375,6 +376,25 @@ export function describeHelper(helperKey, speciesId) {
   return { helper: { item, copies, quantity, freePoints, target: target ? Number(target) : null } };
 }
 
+// Métamorph, joker des fusions. Ce n'est pas un objet mais un Pokémon, d'où une
+// clé d'aide à part : il ne sert que si on le demande (il sert aussi aux œufs),
+// et seulement de la même variante que l'espèce qui évolue — un shiny pour un
+// shiny, sans quoi il deviendrait un raccourci vers les évolutions shiny.
+export const DITTO_HELPER = "metamorph";
+
+// Ce que prend une fusion comblée par Métamorph, pour qui possède `entryCount`
+// exemplaires de l'espèce : celui qui évolue et celui qui garde l'entrée sont
+// de vrais exemplaires, les autres doublons aussi tant qu'il y en a, et
+// Métamorph comble le reste. Son dernier individu reste, comme celui de toute
+// entrée : la réservation le garantit.
+export function dittoFill(plan, entryCount) {
+  const perCopy = Math.max(1, Math.round(Number(getPokemonConfig().evolution.dittosPerCopy) || 1));
+  const others = Math.max(0, plan.duplicates - 1);
+  const real = Math.min(others, Math.max(0, entryCount - 2));
+  const copies = others - real;
+  return { real, copies, dittos: copies * perCopy };
+}
+
 // Décrit ce que coûte une évolution, sans rien modifier.
 // `chosenTargetId` non nul sur une lignée à embranchement (Évoli) déclenche le
 // tarif « choix », plus cher que le tirage au sort.
@@ -463,7 +483,9 @@ export function evolve(userId, group, chosenTargetId, helperKey, cb) {
     });
   }
   const { speciesId, isShiny, sex = null, pokemonId = null } = group;
-  const plan = describeEvolution(speciesId, chosenTargetId, helperKey);
+  // Métamorph n'est pas un objet : il passe par sa propre réservation, plus bas.
+  const ditto = helperKey === DITTO_HELPER;
+  const plan = describeEvolution(speciesId, chosenTargetId, ditto ? null : helperKey);
   if (plan.error) return cb(null, { ok: false, reason: plan.error });
 
   const target =
@@ -480,15 +502,18 @@ export function evolve(userId, group, chosenTargetId, helperKey, cb) {
     // délesté de tout et sans rien — exactement ce que cette cascade existe pour
     // empêcher, et la seule étape qui y échappait.
     const finir = (rendreTout) => {
+      // Les exemplaires que Métamorph a remplacés ne sont pas partis : le
+      // journal ne compte que les vrais doublons de l'espèce.
+      const doublons = plan.duplicates - (plan.ditto?.copies ?? 0);
       const journal = (evolved) =>
         db.run(
           `INSERT INTO pokemon_fusions
              (user_id, from_species_id, to_species_id, is_shiny, duplicates_spent, points_spent, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [userId, speciesId, target.id, isShiny ? 1 : 0, plan.duplicates, plan.points, Date.now()],
+          [userId, speciesId, target.id, isShiny ? 1 : 0, doublons, plan.points, Date.now()],
           (err) => {
             if (err) handleException("Journal de fusion :", err);
-            recordFusion({ userId, duplicates: plan.duplicates, points: plan.points });
+            recordFusion({ userId, duplicates: doublons, points: plan.points });
             cb(null, { ok: true, target, plan, evolved, isShiny: Boolean(isShiny) });
           }
         );
@@ -603,6 +628,73 @@ export function evolve(userId, group, chosenTargetId, helperKey, cb) {
       suite();
     });
 
+  // Métamorph comble ce qui manque : les vrais doublons d'abord, puis des
+  // Métamorph de la même variante pour le reste (dittoFill). Le comptage ne
+  // fait que dimensionner les retraits ; chacun reste gardé, et si le stock a
+  // bougé entre-temps, il échoue et tout ce qui a été pris revient.
+  const completerAvecMetamorph = (evolvers) => {
+    const metamorph = dittoSpecies();
+    if (!metamorph) {
+      return rendre(evolvers)(() =>
+        cb(null, { ok: false, reason: "Métamorph n'est pas disponible dans cette génération." })
+      );
+    }
+    getOwned(userId, speciesId, isShiny, (err, owned) => {
+      if (err) return rendre(evolvers)(() => cb(err));
+      // `owned` ne compte plus l'individu qui évolue, déjà réservé.
+      const fill = dittoFill(plan, owned + 1);
+      const prendreDoublons = (suite) =>
+        fill.real > 0
+          ? reserveDuplicates(userId, { speciesId, isShiny }, fill.real, suite)
+          : suite(null, []);
+      prendreDoublons((err, doublons) => {
+        // Le comptage vient d'avoir lieu : un retrait qui échoue ici veut dire
+        // que le stock a bougé entre-temps, pas qu'il manque des exemplaires —
+        // Métamorph était là pour ça.
+        if (err || doublons.length < fill.real) {
+          return rendre(evolvers)(() =>
+            err
+              ? cb(err)
+              : cb(null, {
+                  ok: false,
+                  reason: `Ton stock de ${name} a changé entre-temps : relance la fusion.`,
+                })
+          );
+        }
+        const pris = [...evolvers, ...doublons];
+        // Assez de doublons, finalement : Métamorph reste dans la boîte.
+        if (!fill.dittos) return prendreAide(pris, rendre(pris));
+        reserveDuplicates(
+          userId,
+          { speciesId: metamorph.id, isShiny },
+          fill.dittos,
+          (err, metamorphs) => {
+            if (err || !metamorphs.length) {
+              return rendre(pris)(() => (err ? cb(err) : manqueMetamorph(metamorph, fill)));
+            }
+            plan.ditto = { copies: fill.copies, dittos: fill.dittos };
+            const reserved = [...pris, ...metamorphs];
+            prendreAide(reserved, rendre(reserved));
+          }
+        );
+      });
+    });
+  };
+
+  // Le refus donne les chiffres ; une lecture ratée les omet plutôt que
+  // d'annoncer un faux zéro.
+  const manqueMetamorph = (metamorph, fill) =>
+    getOwned(userId, metamorph.id, isShiny, (err, owned) =>
+      cb(null, {
+        ok: false,
+        reason:
+          `Il te faut **${fill.dittos + 1}** ${metamorph.name}${isShiny ? " shiny" : ""} ` +
+          `pour compléter cette fusion (${fill.dittos} consommé${fill.dittos > 1 ? "s" : ""} ` +
+          `+ 1 conservé)` +
+          (err ? "." : `, tu en as **${owned}**.`),
+      })
+    );
+
   // L'individu qui évolue d'abord, du sexe demandé ; puis le reste de la
   // facture, sans condition de sexe. Deux réservations, donc deux gardes : si
   // la seconde échoue, la première est rendue avant de dire ce qui manque.
@@ -618,6 +710,7 @@ export function evolve(userId, group, chosenTargetId, helperKey, cb) {
     }
     if (!evolvers.length) return manque();
     if (others <= 0) return prendreAide(evolvers, rendre(evolvers));
+    if (ditto) return completerAvecMetamorph(evolvers);
     reserveDuplicates(userId, { speciesId, isShiny }, others, (err, rest) => {
       if (err || !rest.length) {
         return rendre(evolvers)(() => (err ? cb(err) : manque()));

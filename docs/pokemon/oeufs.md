@@ -12,7 +12,8 @@ génération 2 (voir [Générations](README.md#générations)).
   Pikachu ♂ et Raichu ♀ donnent un Pichu. **Métamorph**, qui n'a pas de sexe, **remplace l'un des
   deux parents, quel que soit le sexe de l'autre** — jamais les deux. C'est la seule façon de faire
   pondre Kicklee, Tygnon et Kapoera (tous mâles), ou Lippoutou (toujours femelle). Une fois le
-  premier parent choisi, l'autocomplétion ne propose que ses partenaires possibles.
+  premier parent choisi, l'autocomplétion ne propose que ses partenaires possibles. Métamorph sert
+  aussi de joker dans les fusions (voir [`/pk evolution`](README.md#commandes)).
 - **Les parents restent**, mais **chacun ne pond qu'une fois dans sa vie** : il devient stérile.
 - **Un seul œuf à la fois** par dresseur.
 - **Éclosion au premier des deux seuils** : **5 jours**, ou **200 messages** de son propriétaire —

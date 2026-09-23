@@ -8,7 +8,7 @@ import {
   groupIndividuals,
   resolveSelector,
 } from "../../modules/pokemon/collection.js";
-import { getSpecies } from "../../modules/pokemon/data.js";
+import { getSpecies, isDitto } from "../../modules/pokemon/data.js";
 import {
   displayName,
   individualChoices,
@@ -21,7 +21,6 @@ import {
   canBreed,
   describeEgg,
   getIncubatingEgg,
-  isDitto,
   layEgg,
 } from "../../modules/pokemon/eggs.js";
 

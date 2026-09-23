@@ -28,6 +28,7 @@ import {
 } from "./safari.js";
 import { evolutionChain, getSpecies } from "./data.js";
 import {
+  DITTO_HELPER,
   acceptTrade,
   describeEvolution,
   evolve,
@@ -304,15 +305,21 @@ function runEvolution(interaction, speciesId, variant, chosenTargetId, helperKey
 
     const source = getSpecies(speciesId);
     const aide = result.plan.helper;
+    // Les Métamorph consommés comptent parmi les exemplaires de la fusion : on
+    // les sépare des vrais doublons pour dire ce qui est parti.
+    const metamorphs = result.plan.ditto?.dittos ?? 0;
+    const doublons = result.plan.duplicates - (result.plan.ditto?.copies ?? 0);
     const paye = [
-      `-${result.plan.duplicates} doublon${result.plan.duplicates > 1 ? "s" : ""}`,
+      `-${doublons} doublon${doublons > 1 ? "s" : ""}`,
+      metamorphs ? `-${metamorphs} Métamorph` : null,
       aide ? `-${aide.quantity} ${aide.item.label}` : null,
       result.plan.points > 0 ? `-${result.plan.points} points` : null,
     ].filter(Boolean);
 
     log(
       `Fusion : ${interaction.user.id} transforme ${source.name} en ${result.target.name}` +
-        ` (${result.plan.duplicates} doublons, ${result.plan.points} pts` +
+        ` (${doublons} doublons, ${result.plan.points} pts` +
+        `${metamorphs ? `, ${metamorphs}× Métamorph` : ""}` +
         `${aide ? `, ${aide.quantity}× ${aide.item.label}` : ""})`
     );
     interaction
@@ -328,7 +335,7 @@ function runEvolution(interaction, speciesId, variant, chosenTargetId, helperKey
   });
 }
 
-function showEvolutionChoices(interaction, speciesId, variant) {
+function showEvolutionChoices(interaction, speciesId, variant, helperKey = null) {
   const plan = describeEvolution(speciesId);
   if (plan.error) {
     return interaction
@@ -345,7 +352,8 @@ function showEvolutionChoices(interaction, speciesId, variant) {
             (variant.pokemonId
               ? `#${variant.pokemonId}`
               : `${variant.isShiny ? 1 : 0}${variant.sex ?? ""}`) +
-            `|${target.id}`
+            `|${target.id}` +
+            (helperKey ? `|${helperKey}` : "")
         )
         .setLabel(target.name)
         .setStyle(ButtonStyle.Primary)
@@ -355,7 +363,9 @@ function showEvolutionChoices(interaction, speciesId, variant) {
   const cost = describeEvolution(speciesId, plan.targets[0].id).points;
   interaction
     .update({
-      content: `🎯 Choisis l'évolution (**${cost}** points, ${plan.duplicates} doublons) :`,
+      content:
+        `🎯 Choisis l'évolution (**${cost}** points, ${plan.duplicates} doublons` +
+        `${helperKey ? ", Métamorph en renfort" : ""}) :`,
       embeds: [],
       components: [row],
     })
@@ -653,18 +663,30 @@ export async function handlePokemonButton(interaction) {
     case "poke_evo": {
       const [speciesId, variant, mode, helper] = args;
       if (mode === "choose") {
-        return showEvolutionChoices(interaction, Number(speciesId), parseVariant(variant));
+        return showEvolutionChoices(
+          interaction,
+          Number(speciesId),
+          parseVariant(variant),
+          helper === DITTO_HELPER ? helper : null
+        );
       }
       return runEvolution(interaction, Number(speciesId), parseVariant(variant), null, helper ?? null);
     }
 
-    // Pas d'aide ici, et ce n'est pas un oubli : choisir sa cible et utiliser un
-    // objet sont deux chemins distincts. Une pierre impose déjà sa forme — c'est
-    // précisément ce qui en fait le moyen de choisir son Évoli sans payer le
-    // supplément — et un bonbon laisse le hasard trancher.
+    // Pas d'objet ici, et ce n'est pas un oubli : choisir sa cible et utiliser
+    // un objet sont deux chemins distincts. Une pierre impose déjà sa forme —
+    // c'est précisément ce qui en fait le moyen de choisir son Évoli sans payer
+    // le supplément — et un bonbon laisse le hasard trancher. Métamorph, lui, ne
+    // fait que remplacer des exemplaires : il se combine avec le choix.
     case "poke_evo_pick": {
-      const [speciesId, variant, targetId] = args;
-      return runEvolution(interaction, Number(speciesId), parseVariant(variant), Number(targetId));
+      const [speciesId, variant, targetId, helper] = args;
+      return runEvolution(
+        interaction,
+        Number(speciesId),
+        parseVariant(variant),
+        Number(targetId),
+        helper === DITTO_HELPER ? helper : null
+      );
     }
 
     case "poke_safari_enter":
