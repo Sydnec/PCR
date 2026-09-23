@@ -1502,7 +1502,7 @@
     {
       "type": "chore",
       "name": "Sécurité du site et des dépendances",
-      "description": "Mises à jour de sécurité du bot et du site. Il faudra se reconnecter une fois au site après la mise à jour.",
+      "description": "Mises à jour de sécurité du bot et du site.",
       "announce": false,
       "author": "Sydnec",
       "commit": "pending",
