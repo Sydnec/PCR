@@ -1,7 +1,64 @@
 {
-  "version": "1.13.5",
-  "lastUpdated": "2026-09-22T18:28:07.876Z",
+  "version": "1.14.0",
+  "lastUpdated": "2026-09-23T07:56:54.940Z",
   "releases": [
+    {
+      "version": "1.14.0",
+      "date": "2026-09-23",
+      "title": "Release 1.14.0",
+      "features": [
+        {
+          "type": "chore",
+          "name": "La 2ᵉ génération est prête",
+          "description": "Ses 100 Pokémon sont en place, cachés : elle s'ouvrira d'une seule commande.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-23T07:10:00.000Z",
+          "branch": "claude/adoring-darwin-4o541o"
+        },
+        {
+          "type": "enhancement",
+          "name": "/admin points et /admin item servent un membre ou tout un rôle",
+          "description": "/admin points-tous disparaît : /admin points et /admin item acceptent un membre ou un rôle, @everyone compris.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-23T07:10:00.000Z",
+          "branch": "claude/adoring-darwin-4o541o"
+        },
+        {
+          "type": "enhancement",
+          "name": "Les évolutions apparaissent plus souvent",
+          "description": "Les stades 2 et 3 sortent plus souvent, à l'état sauvage comme au parc : un stade 3 deux fois plus qu'avant.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-23T08:00:00.000Z",
+          "branch": "claude/adoring-darwin-4o541o"
+        },
+        {
+          "type": "feature",
+          "name": "Chaque Pokémon a son sexe et sa ball",
+          "description": "Tes Pokémon sont désormais des individus : chacun a un sexe (sauf les espèces asexuées) et garde la ball qui l'a capturé. /boite les montre un par un.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-23T08:00:00.000Z",
+          "branch": "claude/adoring-darwin-4o541o"
+        },
+        {
+          "type": "feature",
+          "name": "Les œufs",
+          "description": "Dès l'ouverture de la 2ᵉ génération, /oeuf fait pondre un mâle et une femelle d'une famille à bébé — ou l'un des deux et un Métamorph — pour obtenir ce bébé. L'œuf éclot en 5 jours ou 200 messages, et chaque parent ne pond qu'une fois.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-23T08:00:00.000Z",
+          "branch": "claude/adoring-darwin-4o541o"
+        }
+      ]
+    },
     {
       "version": "1.13.5",
       "date": "2026-09-22",
@@ -1189,56 +1246,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "chore",
-      "name": "La 2ᵉ génération est prête",
-      "description": "Ses 100 Pokémon sont en place, cachés : elle s'ouvrira d'une seule commande.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-23T07:10:00.000Z",
-      "branch": "claude/adoring-darwin-4o541o"
-    },
-    {
-      "type": "enhancement",
-      "name": "/admin points et /admin item servent un membre ou tout un rôle",
-      "description": "/admin points-tous disparaît : /admin points et /admin item acceptent un membre ou un rôle, @everyone compris.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-23T07:10:00.000Z",
-      "branch": "claude/adoring-darwin-4o541o"
-    },
-    {
-      "type": "enhancement",
-      "name": "Les évolutions apparaissent plus souvent",
-      "description": "Les stades 2 et 3 sortent plus souvent, à l'état sauvage comme au parc : un stade 3 deux fois plus qu'avant.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-23T08:00:00.000Z",
-      "branch": "claude/adoring-darwin-4o541o"
-    },
-    {
-      "type": "feature",
-      "name": "Chaque Pokémon a son sexe et sa ball",
-      "description": "Tes Pokémon sont désormais des individus : chacun a un sexe (sauf les espèces asexuées) et garde la ball qui l'a capturé. /boite les montre un par un.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-23T08:00:00.000Z",
-      "branch": "claude/adoring-darwin-4o541o"
-    },
-    {
-      "type": "feature",
-      "name": "Les œufs",
-      "description": "Dès l'ouverture de la 2ᵉ génération, /oeuf fait pondre un mâle et une femelle d'une famille à bébé — ou l'un des deux et un Métamorph — pour obtenir ce bébé. L'œuf éclot en 5 jours ou 200 messages, et chaque parent ne pond qu'une fois.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-23T08:00:00.000Z",
-      "branch": "claude/adoring-darwin-4o541o"
-    }
-  ]
+  "pending": []
 }
