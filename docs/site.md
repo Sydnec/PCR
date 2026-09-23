@@ -3,8 +3,11 @@
 # 🖥️ Site web
 
 Première ébauche de l'interface web du jeu Pokémon, sur **pokepcr.simonbourlier.fr**. Il suffit de
-se connecter avec son compte Discord ; seuls les membres du serveur entrent. `/pk web` en donne le
-lien, en réponse privée (ou dit que le site n'est pas en ligne).
+se connecter avec son compte Discord ; seuls les membres du serveur qui portent le **rôle par
+défaut** (`DEFAULT_ROLE_ID`, celui que reçoit tout nouveau membre) entrent. Un membre qui perd ce
+rôle, ou quitte le serveur, perd l'accès aussitôt, sans attendre la fin de sa session. `/pk web`
+en donne le lien, en réponse privée (ou dit que le site n'est pas en ligne, ou qu'il est réservé
+à ce rôle).
 
 | Page | Contenu |
 |---|---|

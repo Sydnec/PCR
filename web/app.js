@@ -30,6 +30,7 @@ const LOGIN_ERRORS = {
   refusee: "Connexion annulée sur Discord.",
   discord: "Discord n'a pas confirmé la connexion, réessaie.",
   membre: "Le site est réservé aux membres du serveur Discord.",
+  role: "Ton compte Discord n'a pas le rôle du serveur qui donne accès au site.",
 };
 
 const app = document.getElementById("app");
@@ -177,6 +178,15 @@ document.addEventListener("click", (event) => {
   navigate(link.getAttribute("href"));
 });
 window.addEventListener("popstate", render);
+
+// Une requête a répondu 401 alors qu'on se croyait connecté : la session a
+// expiré, ou le rôle qui donne accès au site a été retiré.
+window.addEventListener("session-perdue", () => {
+  if (!ctx.me) return;
+  ctx.me = null;
+  renderAccount();
+  render();
+});
 
 async function boot() {
   const [, species, catalogue] = await Promise.all([
