@@ -32,7 +32,8 @@ que soit la porte. L'annonce du salon suit : le journal des lancers et la captur
 comme d'habitude. La Master Ball demande une confirmation, comme sur Discord.
 
 La page relit l'apparition toutes les `web.spawnRefreshSeconds` (5 par défaut), seulement quand
-elle est ouverte et visible. Les apparitions naissent toujours de l'activité du salon Discord.
+elle est ouverte et visible, et avec elle le solde et les balls en poche : des points gagnés sur
+Discord s'affichent sans recharger. Changer de page relit aussi le solde. Les apparitions naissent toujours de l'activité du salon Discord.
 
 ## Parc safari
 
