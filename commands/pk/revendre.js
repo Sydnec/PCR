@@ -1,20 +1,24 @@
 import { MessageFlags } from "discord.js";
 import { handleException } from "../../modules/utils.js";
 import { getPokemonConfig } from "../../modules/pokemon/config.js";
-import { getIndividuals, resolveIndividual } from "../../modules/pokemon/collection.js";
+import {
+  countBySpecies,
+  getIndividuals,
+  resolveIndividual,
+} from "../../modules/pokemon/collection.js";
 import { getSpecies } from "../../modules/pokemon/data.js";
 import { getInventory, getItem, itemSellValue } from "../../modules/pokemon/items.js";
 import { pokemonSellValue, sellItem, sellPokemon } from "../../modules/pokemon/sell.js";
-import { displayName, individualChoices } from "../../modules/pokemon/embeds.js";
+import {
+  HINT_VALUE,
+  displayName,
+  individualChoices,
+  respondHint,
+} from "../../modules/pokemon/embeds.js";
 
 // Revendre ce qu'on a en trop. Deux sous-commandes parce que ce sont deux
 // marchandises, mais un seul verbe : le dresseur n'a pas à savoir que les
 // Pokémon et les objets vivent dans deux tables.
-//
-// Discord n'autorise pas de liste d'autocomplétion vide accompagnée d'un
-// message : une proposition inerte est le seul moyen d'expliquer pourquoi il n'y
-// a rien à vendre. Sa valeur ne correspond à rien, donc execute() la refuse.
-const HINT_VALUE = "—";
 
 const points = (value) => value.toLocaleString("fr-FR");
 
@@ -22,28 +26,21 @@ const points = (value) => value.toLocaleString("fr-FR");
 const sellable = (row) => pokemonSellValue(getSpecies(row.species_id), row.is_shiny) > 0;
 
 // Les espèces dont on a des Pokémon à revendre : tout sauf un individu de
-// chaque espèce, shiny ou non, puisque le dernier ne se vend jamais. Le prix
-// affiché est celui d'un normal — ce que vend la commande sans individu —, ou
-// celui d'un shiny quand il n'y a que des shiny à vendre.
+// chaque espèce, shiny ou non, puisque le dernier ne se vend jamais. `spare`
+// compte ce que vend la commande sans individu — des normaux seulement — et
+// `shinies` les shiny revendables, qui se choisissent un par un.
 function listSellableSpecies(userId, cb) {
   getIndividuals(userId, (err, rows) => {
     if (err) return cb(err, []);
-    const bySpecies = new Map();
-    for (const row of rows) {
-      const entry = bySpecies.get(row.species_id) ?? { total: 0, sellable: 0, normals: 0 };
-      entry.total++;
-      if (sellable(row)) {
-        entry.sellable++;
-        if (!row.is_shiny) entry.normals++;
-      }
-      bySpecies.set(row.species_id, entry);
-    }
     const list = [];
-    for (const [speciesId, { total, sellable: count, normals }] of bySpecies) {
+    for (const [speciesId, { total, normal, shiny }] of countBySpecies(rows)) {
       const species = getSpecies(speciesId);
-      const spare = Math.min(count, total - 1);
-      if (!species || spare < 1) continue;
-      list.push({ species, spare, unit: pokemonSellValue(species, normals === 0) });
+      if (!species || total < 2) continue;
+      const unit = pokemonSellValue(species, false);
+      const shinyUnit = pokemonSellValue(species, true);
+      const spare = unit > 0 ? Math.min(normal, total - 1) : 0;
+      const shinies = shinyUnit > 0 ? shiny : 0;
+      if (spare > 0 || shinies > 0) list.push({ species, spare, unit, shinies, shinyUnit });
     }
     // Les plus chers d'abord : c'est ce qu'on cherche en ouvrant la liste.
     list.sort((a, b) => b.unit * b.spare - a.unit * a.spare);
@@ -151,12 +148,13 @@ export default {
     if (interaction.options.getFocused(true).name === "individu") {
       const species = getSpecies(Number(interaction.options.get("espece")?.value));
       if (!species) {
-        return interaction
-          .respond([{ name: "⚠️ Choisis d'abord l'espèce dans l'option « espece »", value: HINT_VALUE }])
-          .catch(() => {});
+        return respondHint(interaction, "⚠️ Choisis d'abord l'espèce dans l'option « espece »");
       }
       return getIndividuals(interaction.user.id, (err, rows) => {
-        if (err) return interaction.respond([]).catch(() => {});
+        if (err) {
+          handleException("Autocomplétion de revente :", err);
+          return interaction.respond([]).catch(() => {});
+        }
         respond(
           interaction,
           individualChoices(
@@ -179,7 +177,11 @@ export default {
           .map((row) => ({
             // Le nombre de doublons ET le prix unitaire : ce sont les deux
             // chiffres dont on a besoin pour choisir la quantité juste après.
-            name: `${row.species.name} — ${row.spare} en trop, ${points(row.unit)} pts pièce`,
+            name:
+              row.spare > 0
+                ? `${row.species.name} — ${row.spare} en trop, ${points(row.unit)} pts pièce` +
+                  (row.shinies ? ", ✨ au choix" : "")
+                : `${row.species.name} — ✨ au choix, ${points(row.shinyUnit)} pts pièce`,
             value: String(row.species.id),
           }))
           .filter((choice) => choice.name.toLowerCase().includes(query))

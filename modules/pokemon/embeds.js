@@ -484,6 +484,14 @@ const shortDate = (ms) =>
 
 // Taper « # » ou un nombre dans une option qui désigne un Pokémon, c'est
 // demander un individu précis plutôt qu'un groupe.
+// Une proposition inerte : Discord n'autorise pas de liste vide accompagnée
+// d'un message, c'est le seul moyen d'expliquer pourquoi il n'y a rien à
+// choisir. `value` ne doit désigner ni une espèce ni un individu, pour
+// qu'execute() la refuse.
+export const HINT_VALUE = "—";
+export const respondHint = (interaction, name, value = HINT_VALUE) =>
+  interaction.respond([{ name, value }]).catch(() => {});
+
 export const wantsIndividual = (query) => /^\s*(#|\d+\s*$)/.test(String(query ?? ""));
 
 // Les individus proposés pour cette saisie : ceux que `keep` accepte, dont

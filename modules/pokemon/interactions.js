@@ -285,10 +285,12 @@ const parseVariant = (raw) =>
       };
 
 function runEvolution(interaction, speciesId, variant, chosenTargetId, helperKey = null) {
-  // Un individu désigné se résout dans evolve, qui lit sur lui espèce, variante
-  // et sexe — et vérifie qu'il appartient bien à celui qui clique.
+  // L'espèce du bouton voyage avec l'individu : la réservation ne le prend que
+  // s'il est encore de cette espèce, et à celui qui clique. Un second clic sur
+  // un Pokémon qui vient d'évoluer est donc refusé, au lieu de le faire
+  // évoluer une seconde fois à un tarif qu'on ne lui a pas montré.
   const group = variant.pokemonId
-    ? { pokemonId: variant.pokemonId }
+    ? { pokemonId: variant.pokemonId, speciesId }
     : { speciesId, isShiny: variant.isShiny, sex: variant.sex };
   evolve(interaction.user.id, group, chosenTargetId, helperKey, (err, result) => {
     if (err) {
@@ -307,10 +309,11 @@ function runEvolution(interaction, speciesId, variant, chosenTargetId, helperKey
     const aide = result.plan.helper;
     // Ce qui a été sacrifié : des exemplaires de l'espèce, et les Métamorph qui
     // ont comblé le reste, comptés à part.
-    const { sacrifices, dittos: metamorphs } = result.spent;
+    const { sacrifices, dittos: metamorphs, shinies } = result.spent;
     const paye = [
       sacrifices ? `-${sacrifices} ${source.name}` : null,
       metamorphs ? `-${metamorphs} Métamorph` : null,
+      shinies ? `dont ${shinies} ✨` : null,
       aide ? `-${aide.quantity} ${aide.item.label}` : null,
       result.plan.points > 0 ? `-${result.plan.points} points` : null,
     ].filter(Boolean);

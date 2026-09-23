@@ -142,6 +142,20 @@ export function resolveIndividual(ownerId, speciesValue, value, cb) {
   });
 }
 
+// Les individus comptés par espèce : `total`, dont `normal` et `shiny`. Une
+// entrée de Pokédex est une espèce, et ce qu'elle peut céder se lit ici : tout
+// sauf un.
+export function countBySpecies(rows) {
+  const counts = new Map();
+  for (const row of rows) {
+    const entry = counts.get(row.species_id) ?? { total: 0, normal: 0, shiny: 0 };
+    entry.total++;
+    entry[row.is_shiny ? "shiny" : "normal"]++;
+    counts.set(row.species_id, entry);
+  }
+  return counts;
+}
+
 // Regroupe des individus par espèce et variante, et au besoin par sexe et
 // fertilité. `spare` compte ceux qu'on peut céder : tous ceux du groupe, dans
 // la limite de ce que l'espèce peut perdre en gardant un exemplaire. Les
@@ -169,12 +183,9 @@ export function groupIndividuals(rows, { bySex = false, byFertility = false } = 
     group.count++;
     if (!row.sterile) group.fertileCount++;
   }
-  const speciesSize = new Map();
-  for (const row of rows) {
-    speciesSize.set(row.species_id, (speciesSize.get(row.species_id) ?? 0) + 1);
-  }
+  const bySpecies = countBySpecies(rows);
   for (const group of groups.values()) {
-    group.spare = Math.min(group.count, speciesSize.get(group.speciesId) - 1);
+    group.spare = Math.min(group.count, bySpecies.get(group.speciesId).total - 1);
   }
   return [...groups.values()];
 }
@@ -185,10 +196,10 @@ export function countGroup(userId, group, cb) {
   getIndividuals(userId, (err, rows) => {
     if (err) return cb(err, { owned: 0, spare: 0 });
     const matching = rows.filter((row) => matchesGroup(row, group));
-    const entry = rows.filter((row) => row.species_id === Number(group.speciesId));
+    const total = countBySpecies(rows).get(Number(group.speciesId))?.total ?? 0;
     cb(null, {
       owned: matching.length,
-      spare: Math.min(matching.length, Math.max(0, entry.length - 1)),
+      spare: Math.min(matching.length, Math.max(0, total - 1)),
     });
   });
 }
@@ -512,9 +523,11 @@ export function describeEvolution(speciesId, chosenTargetId = null, helperKey = 
 // prend d'abord ce qui est le plus probable de manquer, pour que le cas courant
 // (« il te manque un exemplaire ») ne déplace rien du tout.
 //
-// `group.pokemonId` désigne l'individu qui évolue ; espèce, variante et sexe se
-// lisent alors sur lui. Un groupe sans identifiant — les boutons d'avant le
-// choix de l'individu — en fait évoluer un du sexe et de la variante demandés.
+// `group.pokemonId` désigne l'individu qui évolue ; sans `speciesId`, son espèce
+// se lit sur lui. Avec, c'est l'espèce attendue : la réservation ne le prend
+// que s'il l'a encore, ce qui refuse un second clic sur un Pokémon qui vient
+// d'évoluer. Un groupe sans identifiant — les boutons d'avant le choix de
+// l'individu — en fait évoluer un du sexe et de la variante demandés.
 export function evolve(userId, group, chosenTargetId, helperKey, cb) {
   if (group.pokemonId && !group.speciesId) {
     return resolveSelector(userId, encodeIndividual(group.pokemonId), (err, selector) => {
@@ -674,12 +687,12 @@ export function evolve(userId, group, chosenTargetId, helperKey, cb) {
       return cb(null, {
         ok: false,
         reason:
-          `Le Pokémon #${pokemonId} ne peut pas évoluer : c'est ton dernier ${name}, ` +
-          `ou il n'est plus à toi.`,
+          `Le Pokémon #${pokemonId} ne peut pas évoluer : ce n'est plus un de tes ${name}, ` +
+          `ou c'est le dernier.`,
       });
     }
     if (!evolvers.length) return manque();
-    const sansSacrifice = { sacrifices: 0, dittos: 0 };
+    const sansSacrifice = { sacrifices: 0, dittos: 0, shinies: 0 };
     if (plan.sacrifices <= 0) return prendreAide(evolvers, sansSacrifice, rendre(evolvers));
 
     compter((err, owned) => {
@@ -703,7 +716,17 @@ export function evolve(userId, group, chosenTargetId, helperKey, cb) {
           fill.dittos,
           () => manqueMetamorph(metamorph, fill),
           (reserved) =>
-            prendreAide(reserved, { sacrifices: fill.real, dittos: fill.dittos }, rendre(reserved))
+            prendreAide(
+              reserved,
+              {
+                sacrifices: fill.real,
+                dittos: fill.dittos,
+                // Les normaux partent d'abord ; un shiny sacrifié ne se
+                // rattrape pas, le message le dit.
+                shinies: reserved.slice(1).filter((row) => row.is_shiny).length,
+              },
+              rendre(reserved)
+            )
         )
       );
     });

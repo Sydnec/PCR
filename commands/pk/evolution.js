@@ -8,6 +8,7 @@ import {
 import { handleException } from "../../modules/utils.js";
 import {
   DITTO_HELPER,
+  countBySpecies,
   describeEvolution,
   evolutionShortage,
   getIndividuals,
@@ -16,15 +17,15 @@ import {
 } from "../../modules/pokemon/collection.js";
 import { dittoSpecies, embedColor, getSpecies, spriteUrl } from "../../modules/pokemon/data.js";
 import { getInventory, getItem, getItems } from "../../modules/pokemon/items.js";
-import { displayName, individualChoices } from "../../modules/pokemon/embeds.js";
+import {
+  HINT_VALUE,
+  displayName,
+  individualChoices,
+  respondHint as hint,
+} from "../../modules/pokemon/embeds.js";
 
-// Discord n'autorise pas de liste vide accompagnée d'un message : une
-// proposition inerte est le seul moyen d'expliquer pourquoi il n'y a rien à
-// choisir. Sa valeur ne désigne ni une espèce ni un individu, donc execute()
-// la refuse.
-const HINT_VALUE = "—";
-const hint = (interaction, name) =>
-  interaction.respond([{ name, value: HINT_VALUE }]).catch(() => {});
+const pts = (value) => value.toLocaleString("fr-FR");
+const NO_ENTRY = { total: 0, normal: 0, shiny: 0 };
 
 // Les objets d'évolution que ce dresseur a en assez grand nombre pour s'en
 // servir. Trois bonbons ou rien : deux ne remplacent pas deux tiers d'un
@@ -81,19 +82,23 @@ function evolutionPaths(speciesId, stock, helpers) {
   return paths;
 }
 
-// Les Métamorph du dresseur, toutes variantes : ils ne servent de sacrifice que
-// pour les autres espèces, et se comptent une fois pour toute la liste.
-function dittoCount(rows) {
+// Le stock d'une espèce, lu dans les comptes de countBySpecies : ses
+// individus, shiny compris, et les Métamorph — toutes variantes — qui peuvent
+// combler les sacrifices qui manquent.
+function stockOf(counts, speciesId) {
+  const entry = counts.get(speciesId) ?? NO_ENTRY;
   const metamorph = dittoSpecies();
-  return metamorph ? rows.filter((row) => row.species_id === metamorph.id).length : 0;
+  const dittos = (metamorph && counts.get(metamorph.id)) || NO_ENTRY;
+  return { ...entry, dittos: dittos.total, dittoNormals: dittos.normal };
 }
 
-// Le stock d'une espèce : ses individus, shiny compris, et les Métamorph qui
-// peuvent combler les sacrifices qui manquent.
-const stockOf = (rows, speciesId, dittos) => ({
-  total: rows.filter((row) => row.species_id === speciesId).length,
-  dittos,
-});
+// Combien de shiny partiraient parmi `count` sacrifices, quand `normals`
+// normaux peuvent partir avant eux : un shiny sacrifié ne se rattrape pas,
+// l'écran le dit avant le clic.
+const shinyNote = (count, normals) => {
+  const shinies = Math.max(0, count - Math.max(0, normals));
+  return shinies > 0 ? `, dont **${shinies}** ✨ faute de normaux` : "";
+};
 
 // Espèces que ce dresseur possède : celles qu'il peut faire évoluer — par ses
 // propres moyens ou avec un objet — et celles qui pourraient évoluer mais dont
@@ -105,24 +110,18 @@ function listEvolvable(userId, cb) {
     if (err) return cb(err, [], []);
     getIndividuals(userId, (err, rows) => {
       if (err) return cb(err, [], []);
-      const counts = new Map();
-      for (const row of rows) {
-        const entry = counts.get(row.species_id) ?? { count: 0, shiny: 0 };
-        entry.count++;
-        if (row.is_shiny) entry.shiny++;
-        counts.set(row.species_id, entry);
-      }
-      const dittos = dittoCount(rows);
+      const counts = countBySpecies(rows);
       const evolvable = [];
       const incomplete = [];
-      for (const [speciesId, { count, shiny }] of counts) {
-        const paths = evolutionPaths(speciesId, { total: count, dittos }, helpers);
+      for (const speciesId of counts.keys()) {
+        const stock = stockOf(counts, speciesId);
+        const paths = evolutionPaths(speciesId, stock, helpers);
         if (paths.length) {
-          evolvable.push({ speciesId, count, shiny });
+          evolvable.push({ speciesId, count: stock.total, shiny: stock.shiny });
           continue;
         }
         const plan = describeEvolution(speciesId);
-        if (!plan.error) incomplete.push({ speciesId, count, plan });
+        if (!plan.error) incomplete.push({ speciesId, count: stock.total, plan });
       }
       // Les plus proches du seuil d'abord : ce sont les plus utiles à afficher.
       incomplete.sort((a, b) => b.count - a.count);
@@ -176,7 +175,10 @@ export default {
       const species = getSpecies(Number(interaction.options.get("espece")?.value));
       if (!species) return hint(interaction, "⚠️ Choisis d'abord l'espèce dans l'option « espece »");
       return getIndividuals(interaction.user.id, (err, rows) => {
-        if (err) return interaction.respond([]).catch(() => {});
+        if (err) {
+          handleException("Autocomplétion d'évolution :", err);
+          return interaction.respond([]).catch(() => {});
+        }
         const choices = individualChoices(
           rows.filter((row) => row.species_id === species.id),
           query,
@@ -255,8 +257,10 @@ export default {
         // évolution qu'il ne peut pas payer n'a pas à lui être proposée.
         getIndividuals(interaction.user.id, (err, individuals) => {
           if (err) handleException("Lecture de la collection pour /pk evolution :", err);
-          const lus = err ? [] : individuals;
-          const stock = stockOf(lus, speciesId, dittoCount(lus));
+          const stock = stockOf(countBySpecies(err ? [] : individuals), speciesId);
+          // Les normaux qui peuvent être sacrifiés avant un shiny : tous, sauf
+          // celui qui évolue s'il en est un.
+          const normals = stock.normal - (isShiny ? 0 : 1);
 
           const species = plan.species;
           // Le deuxième segment du customId désigne l'individu qui évolue.
@@ -284,11 +288,11 @@ export default {
               name: "Coût",
               value:
                 (sacrifices > 0
-                  ? `**${sacrifices}** ${species.name} sacrifié${sacrifices > 1 ? "s" : ""}, ` +
-                    `shiny ou non — les normaux partent d'abord —`
+                  ? `**${sacrifices}** ${species.name} sacrifié${sacrifices > 1 ? "s" : ""}` +
+                    `${shinyNote(sacrifices, normals) || ", les normaux d'abord"},`
                   : "Aucun sacrifice") +
-                ` et **${plan.points}** points. Il t'en faut **${plan.required}** en tout : ` +
-                `celui qui évolue, ses sacrifices et un qui reste.`,
+                ` et **${pts(plan.points)}** points. Il t'en faut **${plan.required}** en ` +
+                `tout, shiny ou non : celui qui évolue, ses sacrifices et un qui reste.`,
               inline: false,
             });
           }
@@ -301,13 +305,13 @@ export default {
             normale.addComponents(
               new ButtonBuilder()
                 .setCustomId(`poke_evo|${speciesId}|${suffix}|random`)
-                .setLabel(`Évolution aléatoire (${plan.points} pts)`)
+                .setLabel(`Évolution aléatoire (${pts(plan.points)} pts)`)
                 .setEmoji("\u{1F3B2}")
                 .setStyle(ButtonStyle.Primary),
               new ButtonBuilder()
                 .setCustomId(`poke_evo|${speciesId}|${suffix}|choose`)
                 .setLabel(
-                  `Choisir l'évolution (${describeEvolution(speciesId, plan.targets[0].id).points} pts)`
+                  `Choisir l'évolution (${pts(describeEvolution(speciesId, plan.targets[0].id).points)} pts)`
                 )
                 .setEmoji("\u{1F3AF}")
                 .setStyle(ButtonStyle.Secondary)
@@ -316,7 +320,7 @@ export default {
             normale.addComponents(
               new ButtonBuilder()
                 .setCustomId(`poke_evo|${speciesId}|${suffix}|random`)
-                .setLabel(`Faire évoluer (${plan.points} pts)`)
+                .setLabel(`Faire évoluer (${pts(plan.points)} pts)`)
                 .setEmoji("✨")
                 .setStyle(ButtonStyle.Success)
             );
@@ -332,7 +336,7 @@ export default {
             const aide = describeEvolution(speciesId, null, helper.key);
             if (!canPay(aide, stock)) continue;
             const cible = aide.target ? ` → ${aide.target.name}` : "";
-            const prix = aide.points > 0 ? `${aide.points} pts` : "gratuit";
+            const prix = aide.points > 0 ? `${pts(aide.points)} pts` : "gratuit";
             aides.addComponents(
               new ButtonBuilder()
                 .setCustomId(`poke_evo|${speciesId}|${suffix}|random|${helper.key}`)
@@ -342,7 +346,8 @@ export default {
             );
             lignes.push(
               `${helper.emoji} **${helper.evolution.quantity}× ${helper.label}**` +
-                `${cible} — ${aide.required} exemplaire${aide.required > 1 ? "s" : ""} requis, ${prix}`
+                `${cible} — ${aide.required} exemplaire${aide.required > 1 ? "s" : ""} requis` +
+                `${shinyNote(aide.sacrifices, normals)}, ${prix}`
             );
           }
           if (aides.components.length) {
@@ -368,26 +373,28 @@ export default {
                 .setStyle(ButtonStyle.Secondary);
             if (plan.branching) {
               joker.addComponents(
-                bouton("random", `${fill.dittos}× ${metamorph.name} · hasard (${plan.points} pts)`),
+                bouton("random", `${fill.dittos}× ${metamorph.name} · hasard (${pts(plan.points)} pts)`),
                 bouton(
                   "choose",
                   `${fill.dittos}× ${metamorph.name} · choisir ` +
-                    `(${describeEvolution(speciesId, plan.targets[0].id).points} pts)`
+                    `(${pts(describeEvolution(speciesId, plan.targets[0].id).points)} pts)`
                 )
               );
             } else {
               joker.addComponents(
-                bouton("random", `${fill.dittos}× ${metamorph.name} (${plan.points} pts)`)
+                bouton("random", `${fill.dittos}× ${metamorph.name} (${pts(plan.points)} pts)`)
               );
             }
             rows.push(joker);
             embed.addFields({
               name: metamorph.name,
               value:
-                `**${fill.dittos}** ${metamorph.name} ${fill.dittos > 1 ? "tiennent" : "tient"} ` +
-                `lieu de **${fill.missing}** sacrifice${fill.missing > 1 ? "s" : ""} ` +
-                `manquant${fill.missing > 1 ? "s" : ""}, shiny ou non — les normaux partent ` +
-                `d'abord. Tu en as **${stock.dittos}**, un reste toujours.`,
+                `**${fill.dittos}** ${metamorph.name}${shinyNote(fill.dittos, stock.dittoNormals)} ` +
+                `${fill.dittos > 1 ? "tiennent" : "tient"} lieu de **${fill.missing}** ` +
+                `sacrifice${fill.missing > 1 ? "s" : ""} manquant${fill.missing > 1 ? "s" : ""}, ` +
+                `les normaux d'abord` +
+                `${fill.real ? ` ; **${fill.real}** ${species.name}${shinyNote(fill.real, normals)} partent aussi` : ""}. ` +
+                `Tu en as **${stock.dittos}**, un reste toujours.`,
               inline: false,
             });
           }

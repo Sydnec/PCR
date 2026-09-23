@@ -48,6 +48,15 @@ function incubating(ctx, egg) {
       h("p", { class: "small" }, `Temps : éclosion au plus tard ${dateTimeFr(egg.hatchAt)}`),
       progressBar(elapsed)
     ),
+    egg.shinyParents > 0
+      ? h(
+          "p",
+          { class: "small" },
+          icon("sparkle", { label: "Shiny" }),
+          ` ${egg.shinyParents > 1 ? "Ses deux parents sont shiny" : "Un parent shiny"} : ` +
+            `chances de shiny ×${fmt(egg.shinyFactor)}.`
+        )
+      : null,
     h(
       "p",
       { class: "muted small" },

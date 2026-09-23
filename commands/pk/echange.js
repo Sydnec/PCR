@@ -1,6 +1,7 @@
 import { MessageFlags } from "discord.js";
 import { handleException } from "../../modules/utils.js";
 import {
+  countBySpecies,
   countGroup,
   createTrade,
   getIndividuals,
@@ -13,15 +14,8 @@ import {
   buildTradeRow,
   describeGroup,
   individualChoices,
+  respondHint as hint,
 } from "../../modules/pokemon/embeds.js";
-
-// Discord n'autorise pas de liste vide accompagnée d'un message : une
-// proposition inerte est le seul moyen d'expliquer pourquoi il n'y a rien à
-// choisir. Sa valeur ne désigne ni une espèce ni un individu, donc execute()
-// la refuse.
-const HINT_VALUE = "—";
-const hint = (interaction, name) =>
-  interaction.respond([{ name, value: HINT_VALUE }]).catch(() => {});
 
 // Il reste toujours au moins un Pokémon de chaque espèce : on ne peut céder
 // que ce qu'on a en plus. acceptTrade tient la règle ; ce chiffre ne sert qu'à
@@ -38,13 +32,11 @@ function respondWithSpecies(interaction, userId, query, emptyLabel) {
       handleException("Autocomplétion d'échange :", err);
       return interaction.respond([]).catch(() => {});
     }
-    const counts = new Map();
-    for (const row of rows) counts.set(row.species_id, (counts.get(row.species_id) ?? 0) + 1);
     const needle = query.toLowerCase();
-    const choices = [...counts]
-      .map(([speciesId, count]) => {
+    const choices = [...countBySpecies(rows)]
+      .map(([speciesId, { total }]) => {
         const species = getSpecies(speciesId);
-        if (!species || count < 2) return null;
+        if (!species || total < 2) return null;
         // Les quatre évolutions par échange se déclarent ici plutôt que dans un
         // message d'aide que personne ne lit : c'est l'instant exact où on
         // choisit ce qu'on donne. Le filtre portant sur le libellé, taper
@@ -52,7 +44,7 @@ function respondWithSpecies(interaction, userId, query, emptyLabel) {
         const evolved = tradeEvolutionTarget(species);
         return {
           name:
-            `${species.name} ×${count - 1} en trop` +
+            `${species.name} ×${total - 1} en trop` +
             (evolved ? ` — évolue en ${evolved.name}` : ""),
           value: String(speciesId),
         };
@@ -76,7 +68,10 @@ function respondWithIndividuals(interaction, userId, speciesOption, query) {
     return hint(interaction, `⚠️ Choisis d'abord l'espèce dans l'option « ${speciesOption} »`);
   }
   getIndividuals(userId, (err, rows) => {
-    if (err) return interaction.respond([]).catch(() => {});
+    if (err) {
+      handleException("Autocomplétion d'échange :", err);
+      return interaction.respond([]).catch(() => {});
+    }
     const choices = individualChoices(
       rows.filter((row) => row.species_id === species.id),
       query,
