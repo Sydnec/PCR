@@ -8,7 +8,13 @@ import db from "../points-db.js";
 import { addPoints, spendPoints } from "../economy.js";
 import { handleException } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
-import { evolutionTargets, getSpecies, rollSex, tradeEvolutionTarget } from "./data.js";
+import {
+  evolutionTargets,
+  getSpecies,
+  rollSex,
+  sexAfterEvolution,
+  tradeEvolutionTarget,
+} from "./data.js";
 import { consumeItem, getItem, grantItem } from "./items.js";
 import { recordFusion, recordTrade } from "./stats.js";
 
@@ -414,14 +420,20 @@ export function evolve(userId, group, chosenTargetId, helperKey, cb) {
       // shiny puisque rien d'autre ne change.
       const [evolver] = reserved;
       if (evolver) {
-        return restoreDuplicates([{ ...evolver, species_id: target.id }], (err) => {
+        const evolved = {
+          ...evolver,
+          species_id: target.id,
+          sex: sexAfterEvolution(target, evolver.sex),
+        };
+        return restoreDuplicates([evolved], (err) => {
           if (err) return rendreTout(() => cb(err));
-          journal({ id: evolver.id, sex: evolver.sex });
+          journal({ id: evolved.id, sex: evolved.sex });
         });
       }
       // Rien de réservé : une aide couvre tous les exemplaires. La forme évoluée
       // est un nouvel individu, du sexe demandé.
-      creditSpecies(userId, target.id, isShiny, { origin: "evolution", sex }, (err, created) => {
+      const options = { origin: "evolution", sex: sexAfterEvolution(target, sex) };
+      creditSpecies(userId, target.id, isShiny, options, (err, created) => {
         if (err) return rendreTout(() => cb(err));
         journal(created);
       });
@@ -672,10 +684,18 @@ export function acceptTrade(tradeId, cb) {
             const now = Date.now();
             const [mine] = offered;
             const [theirs] = requested;
-            const arrivals = [
-              { ...mine, user_id: trade.to_user_id, species_id: tradedForm(mine.species_id) },
-              { ...theirs, user_id: trade.from_user_id, species_id: tradedForm(theirs.species_id) },
-            ].map((row) => ({ ...row, origin: "echange", obtained_at: now }));
+            const arrive = (row, userId) => {
+              const species = getSpecies(tradedForm(row.species_id));
+              return {
+                ...row,
+                user_id: userId,
+                species_id: species.id,
+                sex: sexAfterEvolution(species, row.sex),
+                origin: "echange",
+                obtained_at: now,
+              };
+            };
+            const arrivals = [arrive(mine, trade.to_user_id), arrive(theirs, trade.from_user_id)];
 
             restoreDuplicates(arrivals, (err) => {
               if (err) {

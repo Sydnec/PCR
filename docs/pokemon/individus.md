@@ -7,7 +7,7 @@ le distingue des autres.
 
 - **Un sexe**, tiré à l'arrivée selon la proportion des jeux : Nidoran♀ et Lippoutou sont toujours
   femelles, Kicklee et Tygnon toujours mâles, Évoli mâle sept fois sur huit. Les espèces asexuées des
-  jeux (Magnéti, les légendaires, Métamorph…) tirent à pile ou face : ici, tout Pokémon a un sexe.
+  jeux (Magnéti, Stari, Porygon, Métamorph, les légendaires…) n'en ont pas ici non plus.
 - **La ball de capture**, mémorisée pour de bon — y compris la Safari Ball du parc. Un Pokémon éclos
   d'un œuf n'en a pas.
 - **La fertilité** : un individu ne pond qu'un œuf dans sa vie, puis il devient stérile (voir
@@ -37,6 +37,6 @@ On cède ce qui vaut le moins.
 ## Migration
 
 Au premier démarrage, chaque compteur de l'ancienne collection devient autant d'individus. Le sexe
-est tiré comme pour une capture ; la ball est retrouvée dans l'historique des captures (apparitions
+est tiré comme pour une capture (aucun pour une espèce asexuée) ; la ball est retrouvée dans l'historique des captures (apparitions
 et parc), du plus ancien au plus récent. Ce que l'historique n'explique pas — évolutions, échanges —
 reste marqué « ball inconnue ». L'ancienne table est conservée telle quelle, en sauvegarde.

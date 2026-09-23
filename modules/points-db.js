@@ -299,6 +299,9 @@ const db = new sqlite3.Database(dbPath, (err) => {
     // dire qu'un Pikachu est une femelle, qu'il a été pris à l'Hyper Ball, ni
     // qu'il a déjà pondu : tout ce qui distingue deux individus vit ici.
     //
+    // - `sex` : M, F, ou NULL pour une espèce asexuée des jeux (Magnéti,
+    //   Métamorph, les légendaires…). La définition doit rester identique à
+    //   celle que reconstruit migration.js.
     // - `ball` : la ball de capture (clé de la config, ou « safari »), NULL
     //   quand il n'y en a pas eu — éclos d'un œuf — ou qu'on ne la sait plus.
     // - `origin` : comment le dresseur actuel l'a obtenu (capture, safari,
@@ -313,7 +316,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
         user_id TEXT NOT NULL,
         species_id INTEGER NOT NULL,
         is_shiny INTEGER NOT NULL DEFAULT 0,
-        sex TEXT NOT NULL CHECK (sex IN ('M', 'F')),
+        sex TEXT CHECK (sex IN ('M', 'F')),
         ball TEXT,
         origin TEXT NOT NULL,
         sterile INTEGER NOT NULL DEFAULT 0,
@@ -326,11 +329,11 @@ const db = new sqlite3.Database(dbPath, (err) => {
              ON pokemon_owned(user_id, species_id, is_shiny)`,
           (err) => {
             if (err) handleException("Erreur création index pokemon_owned_entry :", err);
-            // La migration part d'ici, une fois la table là. Import dynamique :
-            // elle a besoin de cette base, qui ne peut pas l'importer en tête
-            // sans cycle.
+            // Les migrations partent d'ici, une fois la table là. Import
+            // dynamique : elles ont besoin de cette base, qui ne peut pas les
+            // importer en tête sans cycle.
             import("./pokemon/migration.js")
-              .then(({ migrateCollection }) => migrateCollection())
+              .then(({ runMigrations }) => runMigrations())
               .catch((error) => handleException("Migration de la collection :", error));
           }
         );

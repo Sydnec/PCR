@@ -14,6 +14,7 @@ import {
   babyOf,
   buildEggEmbed,
   canBreed,
+  describeEgg,
   getIncubatingEgg,
   isDitto,
   layEgg,
@@ -26,18 +27,18 @@ const HINT_VALUE = "0:0";
 const hint = (interaction, name) =>
   interaction.respond([{ name, value: HINT_VALUE }]).catch(() => {});
 
-const ROLES = {
-  male: { sex: "M", empty: "Tu n'as aucun mâle fertile qui puisse pondre" },
-  femelle: { sex: "F", empty: "Tu n'as aucune femelle fertile qui puisse pondre" },
-};
-
-// Les parents possibles pour un rôle : les individus fertiles du bon sexe,
-// d'une famille qui a un bébé, ou Métamorph. Groupés par espèce et variante —
-// lequel pond importe peu, tant qu'il est fertile.
-function respondWithParents(interaction, role, query) {
+// Les parents possibles : les individus fertiles d'une famille qui a un bébé,
+// de n'importe quel sexe, et Métamorph. Groupés par espèce, variante et sexe —
+// lequel pond importe peu, tant qu'il est fertile. Quand l'autre parent est
+// déjà choisi, seuls ses partenaires possibles restent : un Pikachu ♂ ne se voit
+// proposer que des femelles de sa famille et des Métamorph.
+function respondWithParents(interaction, query, partnerValue) {
   if (!babyFamilies().length) {
     return hint(interaction, "Aucun bébé n'existe encore : les œufs arrivent avec la génération 2");
   }
+  const partner = partnerValue ? decodeEntry(partnerValue) : null;
+  const partnerSpecies = partner ? getSpecies(partner.speciesId) : null;
+
   getIndividuals(interaction.user.id, async (err, rows) => {
     if (err) {
       handleException("Autocomplétion de /oeuf :", err);
@@ -45,23 +46,38 @@ function respondWithParents(interaction, role, query) {
     }
     const needle = query.toLowerCase();
     const choices = groupIndividuals(
-      rows.filter((row) => row.sex === role.sex && !row.sterile),
+      rows.filter((row) => !row.sterile),
       { bySex: true }
     )
       .map((group) => {
         const species = getSpecies(group.speciesId);
         if (!canBreed(species)) return null;
-        const baby = babyOf(species);
+        if (
+          partnerSpecies &&
+          describeEgg(
+            { species: partnerSpecies, sex: partner.sex },
+            { species, sex: group.sex }
+          ).error
+        ) {
+          return null;
+        }
         return {
           name:
-            `${displayName(species, group.isShiny, role.sex)} ×${group.count} — ` +
-            (isDitto(species) ? "remplace n'importe quel parent" : `donne ${baby.name}`),
-          value: encodeEntry(group.speciesId, group.isShiny, role.sex),
+            `${displayName(species, group.isShiny, group.sex)} ×${group.count} — ` +
+            (isDitto(species) ? "remplace n'importe quel parent" : `donne ${babyOf(species).name}`),
+          value: encodeEntry(group.speciesId, group.isShiny, group.sex),
         };
       })
       .filter((choice) => choice && choice.name.toLowerCase().includes(needle))
       .slice(0, 25);
-    if (!choices.length) return hint(interaction, role.empty);
+    if (!choices.length) {
+      return hint(
+        interaction,
+        partnerSpecies
+          ? "Aucun partenaire fertile pour ce parent"
+          : "Tu n'as aucun Pokémon fertile qui puisse pondre"
+      );
+    }
     await interaction.respond(choices).catch(() => {});
   });
 }
@@ -74,19 +90,19 @@ export default {
       sub
         .setName("pondre")
         .setDescription(
-          "Un mâle et une femelle de la même famille — Métamorph remplace l'un des deux"
+          "Un mâle et une femelle d'une famille à bébé — Métamorph remplace l'un des deux"
         )
         .addStringOption((option) =>
           option
-            .setName("male")
-            .setDescription("Le père (ou un Métamorph mâle)")
+            .setName("parent1")
+            .setDescription("Un parent de la famille, ou un Métamorph")
             .setRequired(true)
             .setAutocomplete(true)
         )
         .addStringOption((option) =>
           option
-            .setName("femelle")
-            .setDescription("La mère (ou un Métamorph femelle)")
+            .setName("parent2")
+            .setDescription("Son partenaire : l'autre sexe de la même famille, ou un Métamorph")
             .setRequired(true)
             .setAutocomplete(true)
         )
@@ -95,9 +111,12 @@ export default {
 
   async autocomplete(interaction) {
     const focused = interaction.options.getFocused(true);
-    const role = ROLES[focused.name];
-    if (!role) return interaction.respond([]).catch(() => {});
-    return respondWithParents(interaction, role, String(focused.value || ""));
+    const other = focused.name === "parent1" ? "parent2" : "parent1";
+    return respondWithParents(
+      interaction,
+      String(focused.value || ""),
+      interaction.options.getString(other) || null
+    );
   },
 
   async execute(interaction) {
@@ -124,7 +143,7 @@ export default {
                 : {
                     content:
                       "Tu ne couves aucun œuf. `/oeuf pondre` avec un mâle et une femelle " +
-                      "fertiles d'une famille qui a un bébé.",
+                      "fertiles d'une famille qui a un bébé, ou l'un des deux et un Métamorph.",
                     flags: MessageFlags.Ephemeral,
                   }
             )
@@ -133,11 +152,11 @@ export default {
       }
 
       // Une valeur tapée à la main contourne l'autocomplétion : layEgg revalide
-      // tout — famille, fertilité, sexe du rôle —, le sexe venant du rôle et
-      // jamais de la saisie.
-      const father = decodeEntry(interaction.options.getString("male"));
-      const mother = decodeEntry(interaction.options.getString("femelle"));
-      if (!getSpecies(father.speciesId) || !getSpecies(mother.speciesId)) {
+      // tout — famille, sexes, fertilité —, et c'est la base qui dit si un
+      // individu du groupe demandé existe vraiment.
+      const first = decodeEntry(interaction.options.getString("parent1"));
+      const second = decodeEntry(interaction.options.getString("parent2"));
+      if (!getSpecies(first.speciesId) || !getSpecies(second.speciesId)) {
         return interaction.reply({
           content: "❌ Choisis une proposition dans la liste d'autocomplétion.",
           flags: MessageFlags.Ephemeral,
@@ -145,7 +164,7 @@ export default {
       }
 
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-      layEgg(interaction.user.id, father, mother, (err, result) => {
+      layEgg(interaction.user.id, first, second, (err, result) => {
         if (err) {
           handleException("Ponte d'un œuf :", err);
           return interaction
