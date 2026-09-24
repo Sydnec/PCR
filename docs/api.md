@@ -62,6 +62,7 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
 | `GET /api/safari` 🔒 | `{ offer, visit }` — ce que le dresseur peut faire du parc, et sa visite en cours (`null` sinon) |
 | `GET /api/me/pc` 🔒 | `{ slotsPerBox, columns, maxBoxes, boxNameLength, nicknameLength, boxes, pokemon }` — la boîte PC |
 | `GET /api/admin/config` 🔑 | `{ status, tree }` — la configuration en arbre |
+| `GET /api/admin/points?days` 🔑 | `{ from, to, times, trainers: [{ id, name, balance, values }] }` — la courbe des soldes : `values[i]` est le solde à `times[i]` (240 intervalles ; avant son premier mouvement, le solde d'avant, 0 pour un nouveau venu), du plus riche au plus pauvre. `days` (1 à 3650) borne la période ; sans lui, tout le journal |
 
 `/box` accepte `page` (à partir de 0), `pageSize` (1 à 200, 50 par défaut), `species`, `sex`
 (`M`, `F` ou `none`), `fertile` et `shiny` (`true`/`false`). Un individu :

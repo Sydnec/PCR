@@ -25,3 +25,13 @@ même chose.
 - **Réglages** (modifiables à chaud via `/admin config`) : `redistribution.enabled`,
   `redistribution.intervalHours` (168 par défaut), `redistribution.contributionPercent` (5, borné
   entre 0 et 100 — une faute de frappe y serait irréversible).
+
+## Journal des points
+
+Chaque mouvement de solde laisse une ligne dans `points_log` (dresseur, mouvement, solde après,
+date) : messages, paris, lancers, parc, évolutions, pot commun, `/admin points`. Ce sont des
+déclencheurs SQLite sur la table des points qui l'écrivent, dans la transaction du mouvement : aucun
+chemin ne peut l'oublier, et un mouvement annulé n'y laisse rien. Les soldes d'avant le journal y
+entrent d'une ligne de départ, au premier démarrage.
+
+Le journal alimente la [courbe des points](site.md#administration) de la page Admin du site.

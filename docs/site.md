@@ -74,7 +74,18 @@ une espèce (`/boite?species=25`) et en surligne les exemplaires.
 
 ## Administration
 
-Pour `SYDNEC_USER_ID` seulement, un onglet **Admin** montre la configuration du bot en arbre : les
+Pour `SYDNEC_USER_ID` seulement, un onglet **Admin** montre la courbe des points puis la
+configuration.
+
+**Points.** La courbe des soldes, lue dans le [journal des points](economie.md#journal-des-points),
+sur 24 h, 7, 30 ou 90 jours, ou depuis le début du journal. Les dresseurs se cochent un à un, du
+plus riche au plus pauvre (un filtre et « Tout cocher / Tout décocher » agissent sur ceux qu'il
+montre) : **Somme** additionne leurs soldes en une courbe — tout le monde coché, ce sont les points
+en circulation —, **Séparées** trace une courbe par dresseur, huit au plus, chacune gardant sa
+couleur quand les autres vont et viennent. Survoler (ou toucher) la courbe donne la valeur de
+chacun à cet instant ; un tableau reprend les valeurs en chiffres.
+
+**Configuration.** La configuration du bot en arbre : les
 branches se déplient, chaque réglage montre sa valeur courante et, s'il en a changé, sa valeur par
 défaut. Un filtre cherche dans les chemins (`shiny`, `price`…), et « Modifiés seulement » ne garde
 que ce qui s'écarte des défauts. Un réglage s'enregistre par le même chemin que `/admin config`,

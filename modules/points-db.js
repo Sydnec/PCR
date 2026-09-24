@@ -22,7 +22,8 @@ const db = new sqlite3.Database(dbPath, (err) => {
         last_reset_date TEXT
       )`,
       (err) => {
-        if (err) handleException("Erreur création table points :", err);
+        if (err) return handleException("Erreur création table points :", err);
+        createPointsLog();
       }
     );
 
@@ -619,5 +620,55 @@ const db = new sqlite3.Database(dbPath, (err) => {
     );
   }
 });
+
+// Journal des soldes : une ligne par mouvement, qui alimente la courbe des
+// points de la page d'administration. Ce sont des déclencheurs qui l'écrivent,
+// et non les appelants : le solde bouge à une dizaine d'endroits (messages,
+// paris, lancers, pot commun, /admin points…), et un mouvement oublié fausserait
+// la courbe sans que rien ne le signale. Le déclencheur partage en outre la
+// transaction du mouvement : l'un n'existe jamais sans l'autre.
+//
+// `balance` est le solde après le mouvement, pour que la courbe se lise sans
+// refaire les sommes depuis le début. Chaque solde antérieur au journal reçoit
+// une ligne de départ, à `delta` 0 : sans elle, la courbe d'un dresseur
+// inactif resterait vide.
+function createPointsLog() {
+  const now = "CAST(ROUND((julianday('now') - 2440587.5) * 86400000) AS INTEGER)";
+  const statements = [
+    `CREATE TABLE IF NOT EXISTS points_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id TEXT NOT NULL,
+      delta INTEGER NOT NULL,
+      balance INTEGER NOT NULL,
+      created_at INTEGER NOT NULL
+    )`,
+    "CREATE INDEX IF NOT EXISTS idx_points_log_user ON points_log(user_id, created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_points_log_time ON points_log(created_at)",
+    `CREATE TRIGGER IF NOT EXISTS points_log_insert AFTER INSERT ON points
+     BEGIN
+       INSERT INTO points_log (user_id, delta, balance, created_at)
+       VALUES (NEW.user_id, COALESCE(NEW.balance, 0), COALESCE(NEW.balance, 0), ${now});
+     END`,
+    `CREATE TRIGGER IF NOT EXISTS points_log_update AFTER UPDATE OF balance ON points
+     WHEN NEW.balance IS NOT OLD.balance
+     BEGIN
+       INSERT INTO points_log (user_id, delta, balance, created_at)
+       VALUES (NEW.user_id, COALESCE(NEW.balance, 0) - COALESCE(OLD.balance, 0),
+               COALESCE(NEW.balance, 0), ${now});
+     END`,
+    `INSERT INTO points_log (user_id, delta, balance, created_at)
+     SELECT user_id, 0, COALESCE(balance, 0), ${now} FROM points
+      WHERE NOT EXISTS (SELECT 1 FROM points_log WHERE points_log.user_id = points.user_id)`,
+  ];
+  // Dans l'ordre : chaque étape a besoin de la précédente.
+  const next = ([sql, ...rest]) => {
+    if (!sql) return;
+    db.run(sql, (err) => {
+      if (err) return handleException("Erreur création du journal des points :", err);
+      next(rest);
+    });
+  };
+  next(statements);
+}
 
 export default db;

@@ -8,6 +8,7 @@
 // Les réponses sont en JSON, en camelCase, et ne portent que des données : le
 // texte à afficher reste l'affaire de l'interface.
 import { getBalance } from "../economy.js";
+import { getPointsHistory } from "../points-history.js";
 import {
   getCollection,
   getIndividuals,
@@ -87,7 +88,7 @@ import {
 } from "../pokemon/spawn.js";
 import { configOverrideStatus, configTree, getConfig, writeConfigValue } from "../config.js";
 import { handleException, log } from "../utils.js";
-import { pseudo } from "../pseudo.js";
+import { pseudo, pseudos } from "../pseudo.js";
 
 // Les fonctions du jeu sont à callbacks ; les routes, en promesses.
 const promise = (fn) =>
@@ -963,6 +964,35 @@ export const routes = [
     auth: true,
     admin: true,
     handler: async () => ({ status: configOverrideStatus(), tree: configTree() }),
+  },
+
+  // La courbe des soldes, lue dans le journal des points : tous les dresseurs
+  // d'un coup, du plus riche au plus pauvre, pour que cocher et décocher sur la
+  // page se fasse sans nouvelle requête. `days` borne la période ; sans lui,
+  // tout le journal.
+  {
+    method: "GET",
+    path: "/api/admin/points",
+    auth: true,
+    admin: true,
+    handler: async (ctx) => {
+      const days = intParam(ctx.query.days, null, { min: 1, max: 3650 });
+      const since = days ? Date.now() - days * 24 * 3600 * 1000 : null;
+      const { from, to, times, series } = await promise((cb) => getPointsHistory({ since }, cb));
+      // pseudo() lit le cache des membres avant Discord, et se souvient des partis.
+      const names = await pseudos(...series.map((entry) => entry.userId));
+      return {
+        from,
+        to,
+        times,
+        trainers: series.map((entry, index) => ({
+          id: entry.userId,
+          name: names[index],
+          balance: entry.balance,
+          values: entry.values,
+        })),
+      };
+    },
   },
 
   // Modifier un réglage : writeConfigValue, comme /admin config, avec les mêmes

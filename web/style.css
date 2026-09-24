@@ -20,6 +20,17 @@
   --warning: #b45309;
   --radius: 12px;
   --chip-tint: 26%;
+  /* Les couleurs des courbes, dans cet ordre et jamais recyclées : huit teintes
+     qui restent distinctes deux à deux, daltonisme compris. Quatre sont pâles
+     sur le fond clair : la légende et le tableau des valeurs prennent le relais. */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #4a3aa7;
+  --series-8: #e34948;
   color-scheme: light dark;
 }
 
@@ -41,6 +52,15 @@
     --success-text: #4cc27f;
     --warning: #f59e0b;
     --chip-tint: 34%;
+    /* Les mêmes teintes, choisies pour le fond sombre. */
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+    --series-7: #9085e9;
+    --series-8: #e66767;
   }
 }
 
@@ -1524,6 +1544,228 @@ input[type="number"] {
   align-items: center;
   gap: 6px;
   color: var(--muted);
+}
+
+.admin-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.admin-section h2 {
+  font-size: 1.1rem;
+}
+
+.admin-section > p {
+  margin: 0;
+}
+
+/* ---------- Courbes ---------- */
+
+.series-1 {
+  --line: var(--series-1);
+}
+.series-2 {
+  --line: var(--series-2);
+}
+.series-3 {
+  --line: var(--series-3);
+}
+.series-4 {
+  --line: var(--series-4);
+}
+.series-5 {
+  --line: var(--series-5);
+}
+.series-6 {
+  --line: var(--series-6);
+}
+.series-7 {
+  --line: var(--series-7);
+}
+.series-8 {
+  --line: var(--series-8);
+}
+
+.chart {
+  position: relative;
+}
+
+.chart-svg {
+  display: block;
+  overflow: visible;
+  /* Un doigt qui glisse de côté promène le réticule ; de haut en bas, il fait
+     défiler la page. */
+  touch-action: pan-y;
+}
+
+/* Le contour ne sert qu'au clavier : un toucher ne l'allume pas. */
+.chart-svg:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.chart-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.chart-tick,
+.chart-label {
+  fill: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-label {
+  fill: var(--text);
+}
+
+.chart-line {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.chart-cross {
+  stroke: var(--muted);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+/* Un anneau du fond autour du point : il se détache du trait qu'il marque. */
+.chart-dot {
+  fill: var(--line);
+  stroke: var(--bg);
+  stroke-width: 2;
+}
+
+.chart-tip {
+  position: absolute;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 260px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.chart-tip-time {
+  color: var(--muted);
+}
+
+.chart-tip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.chart-tip-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Le trait d'une série, dans une légende ou une bulle. */
+.line-key {
+  display: inline-block;
+  flex: none;
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--line);
+}
+
+/* ---------- Points ---------- */
+
+.points-summary {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.points-summary:empty {
+  display: none;
+}
+
+.points-chart {
+  min-height: 280px;
+  transition: opacity 0.15s;
+}
+
+/* Une autre période se charge : l'ancienne courbe reste, en retrait. */
+.points-chart.refreshing {
+  opacity: 0.5;
+}
+
+.points-table > summary {
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.points-table-scroll {
+  overflow-x: auto;
+}
+
+.points-table .rules-table {
+  width: auto;
+  max-width: none;
+  white-space: nowrap;
+}
+
+.points-table .rules-table th,
+.points-table .rules-table td {
+  padding-right: 24px;
+}
+
+.points-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.points-row {
+  display: grid;
+  grid-template-columns: auto 14px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.points-row:hover {
+  background: var(--surface-2);
+}
+
+.points-row input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.points-key {
+  display: inline-flex;
+}
+
+.points-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.points-balance {
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---------- Notifications ---------- */
