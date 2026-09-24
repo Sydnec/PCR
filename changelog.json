@@ -1673,7 +1673,7 @@
     {
       "type": "feature",
       "name": "/pk doublons",
-      "description": "Nouvelle commande /pk doublons : les Pokémon que tu (ou un autre dresseur) as en plusieurs exemplaires, et combien peuvent s'échanger.",
+      "description": "Nouvelle commande /pk doublons : les Pokémon qu'un dresseur a en plusieurs exemplaires, et combien peuvent s'échanger. Avec une espèce, elle liste les dresseurs qui l'ont en double.",
       "announce": true,
       "author": "Sydnec",
       "commit": "pending",

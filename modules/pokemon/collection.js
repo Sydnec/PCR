@@ -192,6 +192,30 @@ export function listDuplicates(rows) {
     .sort((a, b) => a.speciesId - b.speciesId);
 }
 
+// L'inverse : les dresseurs qui ont `speciesId` en double, ceux qui peuvent en
+// céder le plus d'abord. Chaque ligne est celle de listDuplicates pour ce
+// dresseur, avec son `userId` : la même marge, calculée au même endroit.
+export function getSpeciesDuplicates(speciesId, cb) {
+  db.all(
+    "SELECT * FROM pokemon_owned WHERE species_id = ?",
+    [Number(speciesId)],
+    (err, rows) => {
+      if (err) return cb(err, []);
+      const byUser = new Map();
+      for (const row of rows || []) {
+        byUser.set(row.user_id, [...(byUser.get(row.user_id) ?? []), row]);
+      }
+      const list = [];
+      for (const [userId, own] of byUser) {
+        const [entry] = listDuplicates(own);
+        if (entry) list.push({ userId, ...entry });
+      }
+      list.sort((a, b) => b.spare - a.spare || b.total - a.total);
+      cb(null, list);
+    }
+  );
+}
+
 // Regroupe des individus par espèce et variante, et au besoin par sexe et
 // fertilité. `spare` compte ceux qu'on peut céder : ceux du groupe qui ne sont
 // pas verrouillés, dans la limite de ce que l'espèce peut perdre en gardant un

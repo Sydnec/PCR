@@ -36,6 +36,7 @@ import {
   getCollection,
   getIndividuals,
   getOwnedVariantsFor,
+  getSpeciesDuplicates,
   getTrade,
   listDuplicates,
   resolveTradeAs,
@@ -49,6 +50,8 @@ import {
   buildDropEmbed,
   buildDuplicatesEmbed,
   buildDuplicatesRow,
+  buildSpeciesDuplicatesEmbed,
+  buildSpeciesDuplicatesRow,
   buildSafariRecapEmbed,
   buildSafariView,
   buildSpeciesInfoEmbed,
@@ -292,6 +295,24 @@ function showDuplicatesPage(interaction, ownerId, page) {
       .update({
         embeds: [buildDuplicatesEmbed(list, { user: owner, page })],
         components: [buildDuplicatesRow(ownerId, page, list.length)],
+      })
+      .catch(() => {});
+  });
+}
+
+// L'inverse, qui a cette espèce en double : relu à chaque clic lui aussi.
+function showSpeciesDuplicatesPage(interaction, speciesId, page) {
+  const species = getSpecies(speciesId);
+  if (!species) return ephemeral(interaction, "❌ Espèce inconnue.");
+  getSpeciesDuplicates(species.id, (err, list) => {
+    if (err) {
+      handleException("Lecture des doublons d'une espèce :", err);
+      return ephemeral(interaction, "❌ Impossible de lire les doublons.");
+    }
+    interaction
+      .update({
+        embeds: [buildSpeciesDuplicatesEmbed(species, list, { page })],
+        components: [buildSpeciesDuplicatesRow(species.id, page, list.length)],
       })
       .catch(() => {});
   });
@@ -720,6 +741,9 @@ export async function handlePokemonButton(interaction) {
 
     case "poke_dup":
       return showDuplicatesPage(interaction, args[0], Number(args[1]) || 0);
+
+    case "poke_dupsp":
+      return showSpeciesDuplicatesPage(interaction, Number(args[0]), Number(args[1]) || 0);
 
     // Le cinquième segment, facultatif, est l'objet qui aide l'évolution : une
     // pierre impose alors sa cible, un bonbon remplace un sacrifice manquant.
