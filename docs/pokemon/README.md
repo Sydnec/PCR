@@ -32,16 +32,16 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
   difficulté, répartition mâle/femelle, et la lignée évolutive stade par stade avec ce que le
   dresseur en a déjà.
 - `/pk evolution <espece> [individu]` : fait évoluer un Pokémon de l'espèce. L'individu est
-  facultatif : sans lui, le bot choisit le moins précieux — un normal avant un shiny, puis un
-  stérile, puis le plus récent — et jamais un verrouillé. Celui qui évolue reste lui-même : même
-  numéro, même ball, même sexe, même fertilité, shiny s'il l'était, et verrouillé s'il l'était — un
-  verrouillé évolue après une confirmation, s'il est choisi. Les autres Pokémon de
-  l'évolution sont des **sacrifices** : des exemplaires de l'espèce, shiny ou non (les normaux
-  partent d'abord), jamais un verrouillé, et il en reste toujours un. Avec un Salamèche et un Salamèche
-  shiny, on peut faire évoluer le shiny avec des bonbons ou des Métamorph : le normal garde
-  l'entrée. Les lignées à embranchement (Évoli) peuvent évoluer au hasard, ou vers une cible
-  choisie pour plus cher. La commande ne propose que les chemins réellement praticables, objets
-  d'évolution compris.
+  facultatif : sans lui, le bot prend les sacrifices parmi les moins précieux — les normaux avant
+  les shiny, puis les stériles, puis les plus récents —, fait évoluer le suivant, et ne touche
+  jamais à un verrouillé. Celui qui évolue reste lui-même : même numéro, même ball, même sexe,
+  même fertilité, shiny s'il l'était, et verrouillé s'il l'était — un verrouillé évolue après une
+  confirmation, s'il est choisi. Les autres Pokémon de l'évolution sont des **sacrifices** : des
+  exemplaires de l'espèce, shiny ou non (les normaux partent d'abord), jamais un verrouillé, et il
+  en reste toujours un. Avec un Salamèche et un Salamèche shiny, on peut faire évoluer le shiny
+  avec des bonbons ou des Métamorph : le normal garde l'entrée. Les lignées à embranchement (Évoli)
+  peuvent évoluer au hasard, ou vers une cible choisie pour plus cher. La commande ne propose que
+  les chemins réellement praticables, objets d'évolution compris.
   **Métamorph sert de joker** : quand il manque des sacrifices, un bouton propose de les remplacer
   par des Métamorph, shiny ou non (les normaux d'abord), un par sacrifice
   (`pokemon.evolution.dittosPerCopy`). Les exemplaires de l'espèce partent d'abord, et il reste

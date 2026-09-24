@@ -55,9 +55,10 @@ les **stériles**, puis **les plus récents** — et jamais un verrouillé.
 
 - **Revente** : un individu précis, ou `quantite` normaux de l'espèce choisis par le bot. Un shiny
   se choisit, il ne part jamais dans le lot.
-- **Évolution** : on choisit l'individu qui **évolue**, ou on laisse le bot prendre le moins
-  précieux, jamais un verrouillé ; il reste lui-même — numéro, ball, sexe, fertilité, shiny. Les **sacrifices**, de n'importe quel sexe et de n'importe quelle variante, sont
-  choisis par le bot et disparaissent.
+- **Évolution** : on choisit l'individu qui **évolue**, ou on laisse le bot faire : il prend
+  d'abord les sacrifices, puis fait évoluer le suivant dans le même ordre, jamais un verrouillé.
+  Celui qui évolue reste lui-même — numéro, ball, sexe, fertilité, shiny. Les **sacrifices**, de
+  n'importe quel sexe et de n'importe quelle variante, sont choisis par le bot et disparaissent.
 - **Échange** : un individu précis de chaque côté, fertilité comprise — qui reçoit une femelle
   fertile doit pouvoir compter dessus : si elle pond ou est verrouillée entre-temps, l'échange
   échoue. L'individu change de dresseur sans cesser d'être lui-même : numéro, shiny, ball,

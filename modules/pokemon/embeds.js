@@ -46,7 +46,7 @@ function genderLine(species) {
   if (share === null) return "Asexué";
   const pct = (value) =>
     `${(value * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %`;
-  return `♂ ${pct(1 - share)} · ♀ ${pct(share)}`;
+  return `${sexSymbol("M")} ${pct(1 - share)} · ${sexSymbol("F")} ${pct(share)}`;
 }
 
 // Un instant rendu par Discord dans le fuseau de celui qui lit. Il ne s'affiche

@@ -1629,7 +1629,7 @@
     {
       "type": "enhancement",
       "name": "Évolution sans choisir l'individu",
-      "description": "Dans /pk evolution, l'individu devient facultatif : sans lui, le bot fait évoluer le moins précieux de l'espèce, jamais un verrouillé.",
+      "description": "Dans /pk evolution, l'individu devient facultatif : sans lui, le bot choisit en gardant tes Pokémon les plus précieux, et ne touche jamais aux verrouillés.",
       "announce": true,
       "author": "Sydnec",
       "commit": "pending",
@@ -1649,7 +1649,7 @@
     {
       "type": "enhancement",
       "name": "Répartition des sexes dans /pk info",
-      "description": "La fiche de /pk info (et le bouton « Infos du Pokémon ») donne la part de mâles et de femelles de l'espèce, comme le site.",
+      "description": "La fiche de /pk info (et le bouton « Infos du Pokémon ») donne la part de mâles et de femelles de l'espèce.",
       "announce": true,
       "author": "Sydnec",
       "commit": "pending",

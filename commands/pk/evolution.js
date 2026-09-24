@@ -13,6 +13,7 @@ import {
   evolutionShortage,
   getIndividuals,
   resolveIndividual,
+  resolveSpecies,
   sacrificeFill,
 } from "../../modules/pokemon/collection.js";
 import { dittoSpecies, embedColor, getSpecies, spriteUrl } from "../../modules/pokemon/data.js";
@@ -50,14 +51,17 @@ function usableHelpers(userId, cb) {
 // et `required` compte déjà celui qui reste. Les sacrifices, eux, ne se
 // prennent que parmi ceux qui ne sont pas verrouillés.
 const canPay = (plan, stock) =>
-  !plan.error && stock.total >= plan.required && stock.sacrificeable >= plan.sacrifices;
+  !plan.error &&
+  stock.evolvable &&
+  stock.total >= plan.required &&
+  stock.sacrificeable >= plan.sacrifices;
 
 // Métamorph en renfort, ou null : seulement quand les exemplaires ne suffisent
 // pas, que l'espèce a de quoi évoluer tout en gardant son entrée, et qu'il reste
 // un Métamorph après l'évolution. `sacrificeFill` dit combien il en faut — la
 // même fonction qu'evolve, qui tranche à la fin.
 function dittoPath(plan, stock) {
-  if (plan.error || canPay(plan, stock) || stock.total < 2) return null;
+  if (plan.error || !stock.evolvable || canPay(plan, stock) || stock.total < 2) return null;
   const fill = sacrificeFill(plan, { total: stock.total, free: stock.sacrificeable });
   if (!fill.dittos || stock.dittos < fill.dittos + 1 || stock.dittoFree < fill.dittos) {
     return null;
@@ -87,35 +91,35 @@ function evolutionPaths(speciesId, stock, helpers) {
   return paths;
 }
 
+// Celui qui évolue quand l'option « individu » est vide : le bot le prend parmi
+// les libres, après les sacrifices, qui ont le premier choix (evolve).
+const AUTO = { auto: true };
+
 // Le stock d'une espèce, lu dans les comptes de countBySpecies : ses
 // individus, shiny compris, et les Métamorph — toutes variantes — qui peuvent
 // combler les sacrifices qui manquent. `sacrificeable` compte ceux qui peuvent
 // être sacrifiés : ni verrouillés, ni `evolver`, celui qui évolue. Sans
 // `evolver` (la liste des espèces), on suppose le cas le plus favorable : un
-// verrouillé qui évolue laisse tous les autres libres.
+// verrouillé qui évolue laisse tous les autres libres. Avec AUTO, celui qui
+// évolue est un libre, et les sacrifices passent avant lui : tous les normaux
+// libres leur restent. `evolvable` est faux quand le bot n'a aucun libre à
+// faire évoluer.
 function stockOf(counts, speciesId, evolver = null) {
   const entry = counts.get(speciesId) ?? NO_ENTRY;
   const metamorph = dittoSpecies();
   const dittos = (metamorph && counts.get(metamorph.id)) || NO_ENTRY;
-  const evolverFree = evolver ? !evolver.locked : entry.free === entry.total;
-  const evolverFreeNormal = evolver ? evolverFree && !evolver.is_shiny : false;
+  const auto = evolver === AUTO;
+  const evolverFree = auto || (evolver ? !evolver.locked : entry.free === entry.total);
+  const evolverFreeNormal = evolver && !auto ? evolverFree && !evolver.is_shiny : false;
   return {
     ...entry,
+    evolvable: !auto || entry.free > 0,
     sacrificeable: Math.max(0, entry.free - (evolverFree ? 1 : 0)),
     sacrificeableNormal: Math.max(0, entry.freeNormal - (evolverFreeNormal ? 1 : 0)),
     dittos: dittos.total,
     dittoFree: dittos.free,
     dittoFreeNormal: dittos.freeNormal,
   };
-}
-
-// Celui que le bot fera évoluer quand l'option « individu » est vide, tel que
-// stockOf le lit : jamais un verrouillé, et un normal tant qu'il en reste un —
-// l'ordre de reserveDuplicates, qui le choisira au clic. null quand aucun n'est
-// libre : le bot ne fait pas évoluer un verrouillé, il faut le choisir.
-function autoEvolver(counts, speciesId) {
-  const entry = counts.get(speciesId) ?? NO_ENTRY;
-  return entry.free ? { locked: 0, is_shiny: entry.freeNormal ? 0 : 1 } : null;
 }
 
 // Combien de shiny partiraient parmi `count` sacrifices, quand `normals`
@@ -186,7 +190,7 @@ export default {
       .addStringOption((option) =>
         option
           .setName("individu")
-          .setDescription("Un Pokémon précis — sans lui, le bot choisit, jamais un verrouillé")
+          .setDescription("Un Pokémon précis — sinon le bot choisit, jamais un verrouillé")
           .setRequired(false)
           .setAutocomplete(true)
       ),
@@ -256,15 +260,16 @@ export default {
       // celui qui évolue au clic.
       const espece = interaction.options.getString("espece");
       const chosen = interaction.options.getString("individu");
+      const bySpecies = resolveSpecies(espece);
       const selector = chosen
         ? await new Promise((resolve, reject) =>
             resolveIndividual(interaction.user.id, espece, chosen, (err, s) =>
               err ? reject(err) : resolve(s)
             )
           )
-        : getSpecies(Number(espece))
-          ? { speciesId: Number(espece), pokemonId: null }
-          : { error: "Choisis l'espèce dans la liste d'autocomplétion." };
+        : bySpecies.error
+          ? bySpecies
+          : { speciesId: bySpecies.species.id, pokemonId: null };
       if (selector.error) {
         return interaction.reply({ content: `❌ ${selector.error}`, flags: MessageFlags.Ephemeral });
       }
@@ -291,25 +296,19 @@ export default {
           const counts = countBySpecies(err ? [] : individuals);
           const species = plan.species;
           const entry = counts.get(speciesId) ?? NO_ENTRY;
-
-          // Tous verrouillés : le bot n'en prendra aucun, il faut le désigner.
-          if (!pokemonId && entry.total && !entry.free) {
-            return interaction
-              .editReply({
-                content:
-                  `❌ Tes **${entry.total}** ${species.name} sont verrouillés 🛡️ : le bot n'en ` +
-                  `fait jamais évoluer un de lui-même. Choisis-le dans l'option « individu », ` +
-                  `une confirmation te sera demandée.`,
-              })
-              .catch(() => {});
-          }
-
-          const evolver = pokemonId ? selector.row : autoEvolver(counts, speciesId);
+          const evolver = pokemonId ? selector.row : AUTO;
           const stock = stockOf(counts, speciesId, evolver);
           // Les normaux qui peuvent être sacrifiés avant un shiny.
           const normals = stock.sacrificeableNormal;
-          const isShiny = Boolean(evolver?.is_shiny);
+          // Sans individu, on ne sait pas encore lequel évoluera : l'écran
+          // montre l'espèce, pas une variante.
+          const isShiny = Boolean(pokemonId && evolver.is_shiny);
           const sex = pokemonId ? selector.sex : null;
+          // Le bot ne fait jamais évoluer un verrouillé : ce qu'un verrouillé
+          // désigné permettrait, pour le dire au lieu de laisser croire
+          // l'évolution hors de portée, ou plus chère qu'elle ne l'est.
+          const lockedStock = stockOf(counts, speciesId, { locked: 1 });
+          const lockedHelps = !pokemonId && entry.free < entry.total;
 
           // Le deuxième segment du customId désigne l'individu qui évolue, ou
           // « * » : le bot le choisit au clic, parmi ceux qui restent alors.
@@ -331,9 +330,9 @@ export default {
                 : `**${species.name}** peut évoluer en **${plan.targets[0].name}**.`) +
                 (pokemonId
                   ? `\nIl garde son sexe, sa ball et sa fertilité${isShiny ? ", et reste shiny" : ""}.`
-                  : `\nLe bot choisit celui qui évolue, le moins précieux d'abord : un normal ` +
-                    `avant un shiny, puis un stérile, puis le plus récent — jamais un verrouillé. ` +
-                    `Pour en choisir un, remplis l'option « individu ».`)
+                  : `\nLe bot choisit : les sacrifices parmi les moins précieux, puis celui qui ` +
+                    `évolue parmi les suivants — jamais un verrouillé. Pour en choisir un, ` +
+                    `remplis l'option « individu ».`)
             );
 
           // Verrouillé : il évolue quand même — il ne quitte pas la boîte —,
@@ -476,13 +475,19 @@ export default {
           // exemplaires de l'espèce, celui qui évolue et celui qui reste. Ses
           // chiffres sont ceux de sacrificeFill, comme pour le bouton.
           if (!rows.length) {
-            // Sans individu, le bot ne prend qu'un libre : si un verrouillé
-            // pouvait évoluer à sa place, on le dit plutôt que de laisser
-            // croire que l'évolution est hors de portée.
             const lockedCould =
-              !pokemonId &&
-              entry.free < entry.total &&
-              evolutionPaths(speciesId, stockOf(counts, speciesId, { locked: 1 }), helpers).length;
+              lockedHelps && evolutionPaths(speciesId, lockedStock, helpers).length > 0;
+            // Aucun libre : le seul chemin passe par un verrouillé désigné.
+            if (lockedCould && !entry.free) {
+              return interaction
+                .editReply({
+                  content:
+                    `❌ Tes **${pts(entry.total)}** ${species.name} sont verrouillés 🛡️ : le bot ` +
+                    `n'en fait jamais évoluer un de lui-même. Choisis celui qui évolue dans ` +
+                    `l'option « individu » : une confirmation te sera demandée.`,
+                })
+                .catch(() => {});
+            }
             const metamorph = dittoSpecies();
             const joker =
               metamorph && stock.total >= 2
@@ -512,6 +517,18 @@ export default {
                   .join("\n"),
               })
               .catch(() => {});
+          }
+
+          // Un Métamorph ou un objet est proposé là où un verrouillé désigné
+          // évoluerait sans eux : le dire avant qu'on les dépense.
+          if (lockedHelps && canPay(plan, lockedStock) && !canPay(plan, stock)) {
+            embed.addFields({
+              name: "Verrouillés",
+              value:
+                `🛡️ Un de tes ${species.name} verrouillés peut évoluer sans objet ni ` +
+                `${dittoSpecies()?.name ?? "Métamorph"} : choisis-le dans l'option « individu ».`,
+              inline: false,
+            });
           }
 
           interaction.editReply({ embeds: [embed], components: rows }).catch(() => {});
