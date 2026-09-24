@@ -127,12 +127,16 @@ async function announceCharm(userId, { generation, item, count }) {
   }
 }
 
-// Aligne les rôles de charme d'un membre sur ce qu'il porte : un rôle par
-// charme, s'il a le rôle Pokémon, aucun sinon. `member` évite de le relire
-// quand l'appelant l'a déjà (guildMemberUpdate).
-export function syncCharmRoles(userId, { member = null } = {}) {
+// Règle les rôles de charme d'un membre. L'inventaire fait foi dans un sens :
+// sans le charme, jamais son rôle. Dans l'autre, le rôle Pokémon décide à ses
+// changements, pas en permanence : un porteur qui l'a reçoit le rôle du charme,
+// un porteur qui vient de le quitter (`leftPokemonRole`) le perd, et un porteur
+// sans rôle Pokémon à qui un modérateur a donné celui du charme le garde — il
+// a demandé ces pings-là, et pas les autres. `member` évite de le relire quand
+// l'appelant l'a déjà (guildMemberUpdate).
+export function syncCharmRoles(userId, { member = null, leftPokemonRole = false } = {}) {
   getCharms(userId, async (err, charms) => {
-    // Une lecture ratée ne retire rien : mieux vaut un rôle de trop un moment
+    // Une lecture ratée ne touche à rien : mieux vaut un rôle de trop un moment
     // qu'un porteur privé de son ping.
     if (err) return handleException("Lecture des Charmes Chroma :", err);
     try {
@@ -140,15 +144,20 @@ export function syncCharmRoles(userId, { member = null } = {}) {
         member ?? (await (await bot?.guilds.fetch(process.env.GUILD_ID))?.members.fetch(userId));
       if (!target) return;
       const pokemonRole = process.env.POKEMON_ROLE_ID;
-      const wantsPings = Boolean(pokemonRole) && target.roles.cache.has(pokemonRole);
+      const hasPokemonRole = Boolean(pokemonRole) && target.roles.cache.has(pokemonRole);
       for (const item of getItems().filter((entry) => entry.charm)) {
         const generation = Number(item.charm.generation);
         const roleId = charmRoleId(generation);
         if (!roleId) continue;
-        const should = wantsPings && charms.includes(generation);
+        const holds = charms.includes(generation);
         const has = target.roles.cache.has(roleId);
-        if (should && !has) await target.roles.add(roleId, "Charme Chroma");
-        if (!should && has) await target.roles.remove(roleId, "Plus de Charme Chroma ou de rôle Pokémon");
+        if (holds && hasPokemonRole && !has) await target.roles.add(roleId, "Charme Chroma");
+        if (has && (!holds || leftPokemonRole)) {
+          await target.roles.remove(
+            roleId,
+            holds ? "Rôle Pokémon retiré" : "Pas de Charme Chroma de cette génération"
+          );
+        }
       }
     } catch (error) {
       // Parti du serveur : il n'y a plus de rôle à régler.
@@ -159,8 +168,9 @@ export function syncCharmRoles(userId, { member = null } = {}) {
 }
 
 // Au démarrage : les charmes que la vérification n'aurait pas encore donnés
-// (dresseurs complets avant son arrivée), puis les rôles — ceux des porteurs,
-// et ceux qu'un membre aurait sans y avoir droit.
+// (dresseurs complets avant son arrivée), puis les rôles — ceux des porteurs
+// qui ont le rôle Pokémon, et ceux qu'un membre aurait sans le charme. Un
+// porteur sans rôle Pokémon garde celui du charme qu'un modérateur lui a donné.
 export function repairCharms(client) {
   setCharmClient(client);
   db.all("SELECT DISTINCT user_id FROM pokemon_owned", [], async (err, rows) => {

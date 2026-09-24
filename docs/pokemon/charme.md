@@ -24,6 +24,7 @@ shiny** parmi les Pokémon de cette génération (`pokemon.shinyCharm.multiplier
 - **Les rôles** : `SHINY_CHARM_ROLE_ID_1`, `SHINY_CHARM_ROLE_ID_2` (`.env`). Le bot donne celui
   de sa génération aux porteurs qui ont le rôle Pokémon (`POKEMON_ROLE_ID`), et le retire à qui
   quitte ce dernier : ne pas vouloir des pings du jeu, c'est ne pas vouloir ceux du charme non plus.
-  L'inventaire fait foi, le rôle n'en est que le reflet : le bot le répare au démarrage et à chaque
-  changement de rôle. Sans ces variables, le charme joue quand même, sans rôle ni ping. Le bot doit
-  pouvoir gérer ces rôles (placés sous le sien).
+  Un modérateur peut le donner à la main à un porteur sans rôle Pokémon qui le demande : il le
+  garde. Sans le charme, en revanche, jamais son rôle — l'inventaire fait foi, et le bot répare
+  les rôles au démarrage et à chaque changement. Sans ces variables, le charme joue quand même,
+  sans rôle ni ping. Le bot doit pouvoir gérer ces rôles (placés sous le sien).
