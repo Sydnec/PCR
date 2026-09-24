@@ -9,7 +9,9 @@ import { getConfig } from "../config.js";
 import { getBalls, getPokemonConfig, getSafariConfig } from "./config.js";
 import {
   RARITIES,
+  activeGeneration,
   allSpecies,
+  charmMultiplier,
   difficultyOf,
   dittoSpecies,
   itemImageUrl,
@@ -21,6 +23,7 @@ import {
   tradeEvolutionTarget,
 } from "./data.js";
 import {
+  getCharmItem,
   getItems,
   itemDropWeight,
   itemLot,
@@ -31,6 +34,7 @@ import { getLotteryConfig } from "./lottery.js";
 import { describeEvolution } from "./collection.js";
 import { pokemonSellValue } from "./sell.js";
 import { eggShinyFactor } from "./eggs.js";
+import { charmSpecies } from "./charms.js";
 
 // La part de chaque rareté dans un tirage d'apparition (sauvage ou parc), et
 // combien d'espèces elle compte.
@@ -217,6 +221,17 @@ export function describeRules(bot) {
       heldItemChance: config.spawn.heldItemChance,
       itemDropChance: config.spawn.itemDropChance,
       rarities: rarityShares(config.spawn),
+    },
+    // Un charme par génération ouverte : combien d'espèces il demande.
+    charm: {
+      multiplier: charmMultiplier(),
+      generations: Array.from({ length: activeGeneration() }, (_, index) => index + 1)
+        .filter((generation) => getCharmItem(generation))
+        .map((generation) => ({
+          generation,
+          label: getCharmItem(generation).label,
+          required: charmSpecies(generation).length,
+        })),
     },
     capture: {
       cooldownSeconds: config.capture.throwCooldownSeconds,

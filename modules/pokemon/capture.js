@@ -16,12 +16,13 @@ import { handleException, log } from "../utils.js";
 import { pseudo } from "../pseudo.js";
 import { getBall, getPokemonConfig } from "./config.js";
 import { creditSpecies } from "./collection.js";
-import { consumeItem, getBallItem, getItem, grantItem } from "./items.js";
+import { consumeItem, getBallItem, getCharmItem, getItem, grantItem } from "./items.js";
 import { dropItem, leavesItemBehind } from "./drops.js";
-import { catchProbability, getSpecies } from "./data.js";
+import { catchProbability, charmFactor, getSpecies } from "./data.js";
 import { buildBallRow, displayName } from "./embeds.js";
-import { finalizeCaughtSpawn, refreshSpawnEmbed } from "./spawn.js";
+import { finalizeCaughtSpawn, getSpawn, refreshSpawnEmbed } from "./spawn.js";
 import { recordSpawnEnd, recordThrow } from "./stats.js";
+import { getCharms } from "./charms.js";
 
 // Anti-spam. Entièrement synchrone, donc atomique dans la boucle d'événements :
 // l'écriture a lieu avant le moindre await, aucun entrelacement possible.
@@ -199,7 +200,7 @@ export function resolveThrow(client, userId, spawnId, ballKey, { requireItem = f
   const ball = getBall(ballKey);
   if (!ball) return cb(null, { status: "unknown-ball" });
 
-  db.get("SELECT * FROM pokemon_spawns WHERE id = ?", [spawnId], (err, spawn) => {
+  getSpawn(spawnId, (err, spawn) => {
     if (err) {
       handleException("Lecture du spawn :", err);
       return cb(null, { status: "error" });
@@ -292,11 +293,6 @@ export function resolveThrow(client, userId, spawnId, ballKey, { requireItem = f
             probability,
             result: "CATCH",
           });
-          recordSpawnEnd(spawn, species, {
-            caughtBy: userId,
-            ball: ball.label,
-            probability,
-          });
           // La ball qui l'a emportée reste attachée à l'individu, pour de bon,
           // et il a le sexe que l'annonce montrait.
           const options = { ball: ball.key, origin: "capture", sex: spawn.sex };
@@ -305,60 +301,92 @@ export function resolveThrow(client, userId, spawnId, ballKey, { requireItem = f
           // bouton « Ramasser » apparaît juste en dessous.
           const held = getItem(spawn.held_item);
           const dropped = Boolean(held) && leavesItemBehind();
-          creditSpecies(userId, spawn.species_id, spawn.is_shiny, options, (err, caught) => {
-            if (err) handleException("Crédit de la collection :", err);
-            finalizeCaughtSpawn(client, spawnId, userId, ball.key, { dropped });
-            pseudo(userId).then((name) =>
-              log(
-                `Capture : ${name} attrape ${species.name}${spawn.is_shiny ? " ✨" : ""} ` +
-                  `(spawn #${spawnId}, ${ball.key})`
-              )
-            );
-
-            // L'objet tenu suit le Pokémon dans le sac de celui qui l'attrape.
-            // Le crédit est au mieux : une capture réussie ne se défait pas
-            // parce qu'un objet n'a pas pu être rangé, et l'échec est bruyant
-            // dans les logs plutôt que silencieux pour le dresseur.
-            const caughtOutcome = (heldOutcome) =>
-              cb(null, {
-                status: "catch",
-                ball,
-                payment,
-                species,
-                spawn,
-                probability,
-                caught,
-                held: heldOutcome,
-              });
-
-            if (!held) return caughtOutcome(null);
-
-            // Il le lâche parfois au lieu de le céder : l'objet tombe alors au
-            // sol, et c'est une seconde course — ouverte à tous les autres, pas
-            // à celui qui vient de gagner la première (claimDrop).
-            if (dropped) {
-              // Posé au sol, il n'est plus pour le capteur : si le dépôt échoue,
-              // l'objet lui revient plutôt que de se perdre pour tout le monde.
-              dropItem(client, { spawn, itemKey: held.key }, (err, dropId) => {
-                if (dropId) return;
-                grantItem(userId, held.key, 1, { source: `capture:${spawnId}` }, (err) => {
-                  if (err) handleException("Remise d'un objet qui n'a pas pu tomber :", err);
+          // Il brille pour son vainqueur si c'est un shiny pour tout le salon, ou
+          // s'il ne brillait que pour les porteurs du Charme Chroma de sa
+          // génération et que le vainqueur en est un. Une lecture ratée le
+          // laisse tel que tout le salon le voyait : normal.
+          const withCharm = (next) =>
+            spawn.is_shiny || !spawn.charm_shiny
+              ? next(false)
+              : getCharms(userId, (err, charms) => {
+                  if (err) handleException("Lecture des Charmes Chroma :", err);
+                  next(charmFactor(species, err ? [] : charms) > 1);
                 });
-              });
-              return caughtOutcome({ item: held, dropped: true });
-            }
-
-            grantItem(userId, held.key, 1, { source: `capture:${spawnId}` }, (err) => {
-              if (err) {
-                handleException("Remise de l'objet tenu :", err);
-                return caughtOutcome(null);
-              }
-              pseudo(userId).then((name) =>
-                log(`Butin : ${name} récupère ${held.label} (spawn #${spawnId})`)
-              );
-              caughtOutcome({ item: held, dropped: false });
+          // Brillant pour son vainqueur, l'apparition l'est désormais tout court :
+          // la ligne dit ce qui a été attrapé — annonce, dernier Pokémon du site
+          // et statistiques la lisent telle quelle.
+          const markShiny = (charmed, next) =>
+            charmed
+              ? db.run("UPDATE pokemon_spawns SET is_shiny = 1 WHERE id = ?", [spawnId], (err) => {
+                  if (err) handleException("Capture shiny du Charme Chroma :", err);
+                  next();
+                })
+              : next();
+          withCharm((charmed) => markShiny(charmed, () => {
+            const shiny = Boolean(spawn.is_shiny) || charmed;
+            recordSpawnEnd({ ...spawn, is_shiny: shiny ? 1 : 0 }, species, {
+              caughtBy: userId,
+              ball: ball.label,
+              probability,
             });
-          });
+            creditSpecies(userId, spawn.species_id, shiny, options, (err, caught) => {
+              if (err) handleException("Crédit de la collection :", err);
+              finalizeCaughtSpawn(client, spawnId, userId, ball.key, { dropped, charmed });
+              pseudo(userId).then((name) =>
+                log(
+                  `Capture : ${name} attrape ${species.name}` +
+                    `${shiny ? " ✨" : ""}${charmed ? " (Charme Chroma)" : ""} ` +
+                    `(spawn #${spawnId}, ${ball.key})`
+                )
+              );
+
+              // L'objet tenu suit le Pokémon dans le sac de celui qui l'attrape.
+              // Le crédit est au mieux : une capture réussie ne se défait pas
+              // parce qu'un objet n'a pas pu être rangé, et l'échec est bruyant
+              // dans les logs plutôt que silencieux pour le dresseur.
+              const caughtOutcome = (heldOutcome) =>
+                cb(null, {
+                  status: "catch",
+                  ball,
+                  payment,
+                  species,
+                  spawn,
+                  probability,
+                  caught,
+                  shiny,
+                  charmed,
+                  held: heldOutcome,
+                });
+
+              if (!held) return caughtOutcome(null);
+
+              // Il le lâche parfois au lieu de le céder : l'objet tombe alors au
+              // sol, et c'est une seconde course — ouverte à tous les autres, pas
+              // à celui qui vient de gagner la première (claimDrop).
+              if (dropped) {
+                // Posé au sol, il n'est plus pour le capteur : si le dépôt échoue,
+                // l'objet lui revient plutôt que de se perdre pour tout le monde.
+                dropItem(client, { spawn, itemKey: held.key }, (err, dropId) => {
+                  if (dropId) return;
+                  grantItem(userId, held.key, 1, { source: `capture:${spawnId}` }, (err) => {
+                    if (err) handleException("Remise d'un objet qui n'a pas pu tomber :", err);
+                  });
+                });
+                return caughtOutcome({ item: held, dropped: true });
+              }
+
+              grantItem(userId, held.key, 1, { source: `capture:${spawnId}` }, (err) => {
+                if (err) {
+                  handleException("Remise de l'objet tenu :", err);
+                  return caughtOutcome(null);
+                }
+                pseudo(userId).then((name) =>
+                  log(`Butin : ${name} récupère ${held.label} (spawn #${spawnId})`)
+                );
+                caughtOutcome({ item: held, dropped: false });
+              });
+            });
+          }));
         }
       );
     });
@@ -411,9 +439,12 @@ export function throwMessage(outcome) {
         : dropped
           ? `\n${item.emoji} Il a lâché **${item.label}** en partant : il revient aux autres.`
           : `\n${item.emoji} Il tenait **${item.label}** !`;
+      // Un shiny du Charme Chroma : normal pour le salon, shiny pour lui.
+      const charm = outcome.charmed ? getCharmItem(outcome.species.generation) : null;
       return (
-        `🎉 Bravo ! **${displayName(outcome.species, outcome.spawn.is_shiny, outcome.caught?.sex)}** ` +
+        `🎉 Bravo ! **${displayName(outcome.species, outcome.shiny ?? outcome.spawn.is_shiny, outcome.caught?.sex)}** ` +
         `rejoint ton Pokédex ! (${mention})` +
+        (charm ? `\n${charm.emoji} Il brillait pour toi, grâce à ton **${charm.label}** !` : "") +
         butin
       );
     }

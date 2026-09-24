@@ -132,6 +132,11 @@ const POKEMON = {
   // d'office s'il est shiny ou légendaire ; /pk verrou change ça individu par
   // individu.
   lockByDefault: { shiny: true, legendary: true },
+  // Le Charme Chroma : compléter le Pokédex d'une génération — hors légendaires
+  // et fabuleux — donne l'objet de sa génération (`charm` dans le catalogue),
+  // et son porteur voit `multiplier` fois plus de shiny parmi les Pokémon de
+  // cette génération : apparitions, parc safari, œufs.
+  shinyCharm: { multiplier: 2 },
   // Les œufs, seule porte vers les bébés. Un couple de parents — un mâle et une
   // femelle de la famille, Métamorph pouvant tenir l'un des deux rôles — pond
   // un œuf qui éclot au premier des deux seuils : tant d'heures, ou tant de
@@ -269,6 +274,24 @@ const POKEMON = {
       ball: "master",
       description: "La capture garantie, offerte. Autant dire qu'elle ne se trouve pas.",
       dropWeight: 3,
+    },
+    // Les charmes ne tombent pas et ne se revendent pas : ils se gagnent en
+    // complétant un Pokédex, une fois pour toutes (modules/pokemon/charms.js).
+    charme_chroma_1: {
+      label: "Charme Chroma (1re gén.)",
+      emoji: "🌟",
+      sprite: "shiny-charm",
+      description:
+        "Pokédex de la 1re génération complété : chances de shiny doublées sur ses Pokémon.",
+      charm: { generation: 1 },
+    },
+    charme_chroma_2: {
+      label: "Charme Chroma (2e gén.)",
+      emoji: "🌟",
+      sprite: "shiny-charm",
+      description:
+        "Pokédex de la 2e génération complété : chances de shiny doublées sur ses Pokémon.",
+      charm: { generation: 2 },
     },
   },
   // Revente d'un doublon, par rareté. C'est une consolation, pas un commerce :

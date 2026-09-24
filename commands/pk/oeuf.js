@@ -21,6 +21,7 @@ import {
   buildEggEmbed,
   canBreed,
   describeEgg,
+  eggCharmFactor,
   getIncubatingEgg,
   layEgg,
 } from "../../modules/pokemon/eggs.js";
@@ -154,18 +155,21 @@ export default {
               .reply({ content: "❌ Erreur base de données.", flags: MessageFlags.Ephemeral })
               .catch(() => {});
           }
-          interaction
-            .reply(
-              egg
-                ? { embeds: [buildEggEmbed(egg)], flags: MessageFlags.Ephemeral }
-                : {
-                    content:
-                      "Tu ne couves aucun œuf. `/pk oeuf pondre` avec un mâle et une femelle " +
-                      "fertiles d'une famille qui a un bébé, ou l'un des deux et un Métamorph.",
-                    flags: MessageFlags.Ephemeral,
-                  }
-            )
-            .catch(() => {});
+          if (!egg) {
+            return interaction
+              .reply({
+                content:
+                  "Tu ne couves aucun œuf. `/pk oeuf pondre` avec un mâle et une femelle " +
+                  "fertiles d'une famille qui a un bébé, ou l'un des deux et un Métamorph.",
+                flags: MessageFlags.Ephemeral,
+              })
+              .catch(() => {});
+          }
+          eggCharmFactor(egg, (charm) =>
+            interaction
+              .reply({ embeds: [buildEggEmbed(egg, { charm })], flags: MessageFlags.Ephemeral })
+              .catch(() => {})
+          );
         });
       }
 
@@ -207,12 +211,14 @@ export default {
         if (!result.ok) {
           return interaction.editReply({ content: `❌ ${result.reason}` }).catch(() => {});
         }
-        interaction
-          .editReply({
-            content: "🥚 Un œuf ! Les deux parents ne pourront plus pondre.",
-            embeds: [buildEggEmbed(result.egg)],
-          })
-          .catch(() => {});
+        eggCharmFactor(result.egg, (charm) =>
+          interaction
+            .editReply({
+              content: "🥚 Un œuf ! Les deux parents ne pourront plus pondre.",
+              embeds: [buildEggEmbed(result.egg, { charm })],
+            })
+            .catch(() => {})
+        );
       });
     } catch (error) {
       handleException(error);

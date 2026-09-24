@@ -23,6 +23,7 @@ import {
   RARITIES,
   activeGeneration,
   allSpecies,
+  charmFactor,
   dexSize,
   difficultyOf,
   evolutionChain,
@@ -61,6 +62,7 @@ import {
 import {
   babyFamilies,
   canBreed,
+  eggCharmFactor,
   eggShinyFactor,
   getIncubatingEgg,
   layEgg,
@@ -68,6 +70,7 @@ import {
 import {
   getBallItem,
   getBallStock,
+  getCharmItem,
   getInventory,
   getItem,
   getItems,
@@ -75,6 +78,7 @@ import {
 } from "../pokemon/items.js";
 import { pokemonSellValue, sellPokemon } from "../pokemon/sell.js";
 import { describeRules } from "../pokemon/rules.js";
+import { getCharms } from "../pokemon/charms.js";
 import {
   getActiveSpawn,
   getLastEndedSpawn,
@@ -82,7 +86,7 @@ import {
   recentThrows,
 } from "../pokemon/spawn.js";
 import { configOverrideStatus, configTree, getConfig, writeConfigValue } from "../config.js";
-import { log } from "../utils.js";
+import { handleException, log } from "../utils.js";
 import { pseudo } from "../pseudo.js";
 
 // Les fonctions du jeu sont à callbacks ; les routes, en promesses.
@@ -153,7 +157,8 @@ function individualJson(row) {
   };
 }
 
-function eggJson(egg) {
+// `charm` : ce que le Charme Chroma du dresseur ajoute (eggCharmFactor).
+function eggJson(egg, charm = 1) {
   if (!egg) return null;
   return {
     id: egg.id,
@@ -168,7 +173,14 @@ function eggJson(egg) {
     // chances de shiny du bébé : le calcul du tirage, pas une copie.
     shinyParents: egg.shiny_parents ?? 0,
     shinyFactor: eggShinyFactor(egg.shiny_parents),
+    charmFactor: charm,
   };
+}
+
+// L'œuf et le facteur du Charme Chroma de son dresseur, lus ensemble.
+async function eggWithCharm(egg) {
+  if (!egg) return null;
+  return eggJson(egg, await new Promise((resolve) => eggCharmFactor(egg, resolve)));
 }
 
 // ---------------------- Paramètres ----------------------
@@ -270,16 +282,32 @@ async function walletJson(userId) {
 async function spawnJson(ctx, spawn, balance) {
   const config = getPokemonConfig();
   const species = getSpecies(spawn.species_id);
-  const [throws, inventory, lineage] = await Promise.all([
+  const [throws, inventory, lineage, charms] = await Promise.all([
     promise((cb) => recentThrows(spawn.id, config.spawn.throwLogSize, cb)),
     promise((cb) => getInventory(ctx.user.id, cb)),
     lineageJson(ctx.user.id, species),
+    // Une lecture ratée des charmes ne coûte pas la page : l'apparition
+    // s'affiche comme au salon, sans le charme.
+    promise((cb) =>
+      getCharms(ctx.user.id, (err, list) => {
+        if (err) handleException("Lecture des Charmes Chroma :", err);
+        cb(null, err ? [] : list);
+      })
+    ),
   ]);
   const stock = new Map(inventory.map((row) => [row.item_key, row.count]));
+  // Normal pour le salon, shiny pour les porteurs du Charme Chroma de sa
+  // génération : le visiteur qui en est un le voit briller, comme il
+  // l'attraperait.
+  const charm = spawn.charm_shiny ? getCharmItem(species?.generation) : null;
+  const mine = Boolean(charm) && charmFactor(species, charms) > 1;
   return {
     id: spawn.id,
     speciesId: spawn.species_id,
-    shiny: Boolean(spawn.is_shiny),
+    shiny: Boolean(spawn.is_shiny) || mine,
+    charm: charm
+      ? { label: charm.label, emoji: charm.emoji, image: itemImageUrl(charm.sprite), mine }
+      : null,
     sex: spawn.sex ?? null,
     rarity: spawn.rarity,
     rarityLabel: RARITIES[spawn.rarity]?.label ?? null,
@@ -418,7 +446,7 @@ export const routes = [
         walletJson(ctx.user.id),
         promise((cb) => getIncubatingEgg(ctx.user.id, cb)),
       ]);
-      return { user: ctx.user, ...wallet, egg: eggJson(egg) };
+      return { user: ctx.user, ...wallet, egg: await eggWithCharm(egg) };
     },
   },
 
@@ -565,7 +593,7 @@ export const routes = [
     path: "/api/me/egg",
     auth: true,
     handler: async (ctx) => ({
-      egg: eggJson(await promise((cb) => getIncubatingEgg(ctx.user.id, cb))),
+      egg: await eggWithCharm(await promise((cb) => getIncubatingEgg(ctx.user.id, cb))),
     }),
   },
 
@@ -833,7 +861,9 @@ export const routes = [
         message: throwMessage(outcome),
         final: isFinalThrow(outcome),
         remaining: outcome.remaining ?? null,
-        pokemon: outcome.caught ? { id: outcome.caught.id, sex: outcome.caught.sex } : null,
+        pokemon: outcome.caught
+          ? { id: outcome.caught.id, sex: outcome.caught.sex, shiny: Boolean(outcome.shiny) }
+          : null,
       };
     },
   },
@@ -917,7 +947,8 @@ export const routes = [
         resolveOwn(ctx.user.id, ctx.body.parent2, "parent2"),
       ]);
       const result = await promise((cb) => layEgg(ctx.user.id, first, second, cb));
-      return outcome(result, ({ egg }) => ({ egg: eggJson(egg) }));
+      if (!result.ok) return outcome(result);
+      return { egg: await eggWithCharm(result.egg) };
     },
   },
 

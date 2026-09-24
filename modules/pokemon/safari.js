@@ -27,6 +27,7 @@ import {
 import { creditSpecies, getOwnedVariants } from "./collection.js";
 import { consumeItem, getItem, getItemCount, grantItem } from "./items.js";
 import { resolveChannel } from "./spawn.js";
+import { getCharms } from "./charms.js";
 import { recordSafariCatch, recordSafariEntry } from "./stats.js";
 import { buildParkEmbed, buildParkRow } from "./embeds.js";
 
@@ -154,8 +155,16 @@ export function releaseShare(sessionId, cb = () => {}) {
 
 // ====================== RENCONTRES ======================
 
-function rollNextEncounter(sessionId, config, cb) {
-  const encounter = rollSafariEncounter(config);
+// La rencontre suivante, tirée aux chances de son visiteur : ses Charmes
+// Chroma jouent ici directement, la rencontre n'étant qu'à lui.
+function rollNextEncounter(session, config, cb) {
+  getCharms(session.user_id, (err, charms) => {
+    if (err) handleException("Lecture des Charmes Chroma :", err);
+    storeNextEncounter(session.id, rollSafariEncounter(config, err ? [] : charms), cb);
+  });
+}
+
+function storeNextEncounter(sessionId, encounter, cb) {
   if (!encounter) return cb(new Error("Aucune espèce disponible pour le parc safari."));
   db.run(
     `UPDATE pokemon_safari_sessions
@@ -274,8 +283,9 @@ function startSession(userId, { park = null, entryCost = 0 }, cb) {
   const now = Date.now();
   const parkId = park?.id ?? null;
 
-  expireStaleSessions(userId, () => {
-    const encounter = rollSafariEncounter(config);
+  expireStaleSessions(userId, () => getCharms(userId, (err, charms) => {
+    if (err) handleException("Lecture des Charmes Chroma :", err);
+    const encounter = rollSafariEncounter(config, err ? [] : charms);
     if (!encounter) {
       return cb(new Error("Aucune espèce disponible pour le parc safari."));
     }
@@ -319,7 +329,7 @@ function startSession(userId, { park = null, entryCost = 0 }, cb) {
         });
       }
     );
-  });
+  }));
 }
 
 // Entrée gratuite par le bouton du message de parc.
@@ -605,7 +615,7 @@ function resolveAction({ session, species, action, config }, cb) {
         // Le tirage se fait à la nervosité d'APRÈS la baie : c'est le fait de
         // manger qui met le Pokémon sur ses gardes.
         if (Math.random() < safariFleeChance(stacks, config)) {
-          return rollNextEncounter(session.id, config, (err) =>
+          return rollNextEncounter(session, config, (err) =>
             err ? cb(err) : done("BAIT_FLED", extra)
           );
         }
@@ -616,7 +626,7 @@ function resolveAction({ session, species, action, config }, cb) {
 
   if (action === "FLEE") {
     if (Math.random() < config.fleeFailChance) return done("FLEE_FAILED");
-    return rollNextEncounter(session.id, config, (err) =>
+    return rollNextEncounter(session, config, (err) =>
       err ? cb(err) : done("FLED")
     );
   }
@@ -626,7 +636,7 @@ function resolveAction({ session, species, action, config }, cb) {
     // qu'il a mangé : c'est le prix de l'appât, et ce qui empêche « appâter deux
     // fois » d'être le seul coup à jouer.
     if (Math.random() < safariFleeChance(session.encounter_bait, config)) {
-      return rollNextEncounter(session.id, config, (err) =>
+      return rollNextEncounter(session, config, (err) =>
         err ? cb(err) : done("MISS_FLED")
       );
     }
@@ -655,7 +665,7 @@ function resolveAction({ session, species, action, config }, cb) {
           [session.id],
           (err) => {
             if (err) handleException("Compteur de captures du parc safari :", err);
-            rollNextEncounter(session.id, config, (err) =>
+            rollNextEncounter(session, config, (err) =>
               err ? cb(err) : done("CATCH")
             );
           }

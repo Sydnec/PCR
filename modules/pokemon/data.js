@@ -264,6 +264,33 @@ export function probabilitiesByBall(catchRate) {
   }));
 }
 
+// ====================== SHINY ======================
+
+// Combien de fois plus de shiny voit un porteur du Charme Chroma.
+export const charmMultiplier = () =>
+  Math.max(1, Number(getPokemonConfig().shinyCharm?.multiplier) || 1);
+
+// Le rôle Discord du charme d'une génération, ou null tant qu'il n'est pas
+// configuré — ses pings attendent alors qu'il le soit. Ici plutôt que dans
+// charms.js : spawn.js en a besoin, et charms.js importe spawn.js.
+export const charmRoleId = (generation) =>
+  process.env[`SHINY_CHARM_ROLE_ID_${generation}`] || null;
+
+// Le facteur de shiny d'un dresseur pour une espèce : `charms` liste les
+// générations dont il porte le charme, et seul celui de la génération de
+// l'espèce compte.
+export const charmFactor = (species, charms = []) =>
+  charms.map(Number).includes(Number(species?.generation)) ? charmMultiplier() : 1;
+
+// Le shiny d'une apparition, commune à tout le salon : un seul nombre tiré. Sous
+// 1/odds, elle brille pour tout le monde ; entre 1/odds et multiplier/odds, pour
+// les seuls porteurs du charme de sa génération. Chaque porteur a ainsi
+// exactement `multiplier` fois plus de chances, et les autres, les mêmes.
+export function rollShiny(odds) {
+  const roll = Math.random() * Math.max(1, Number(odds) || 1);
+  return { shiny: roll < 1, charm: roll >= 1 && roll < charmMultiplier() };
+}
+
 // ====================== PARC SAFARI ======================
 
 // L'appât est multiplicatif et cumulable, mais plafonné : avec les réglages par
@@ -294,12 +321,16 @@ export function isSafariFinished(session) {
   return session.status !== "ACTIVE" || session.actions_left <= 0;
 }
 
-export function rollSafariEncounter(safariConfig) {
+// Une rencontre du parc est privée : le charme joue directement sur ses
+// chances. `charms` : les générations dont le visiteur porte le charme.
+export function rollSafariEncounter(safariConfig, charms = []) {
   const species = pickWeightedSpecies(safariConfig);
   if (!species) return null;
   return {
     species,
-    isShiny: Math.floor(Math.random() * safariConfig.shinyOdds) === 0,
+    isShiny:
+      Math.random() * Math.max(1, Number(safariConfig.shinyOdds) || 1) <
+      charmFactor(species, charms),
     catchRate: species.catchRate,
     sex: rollSex(species),
   };

@@ -167,6 +167,22 @@ export async function render(ctx) {
         " · ",
         ownedMark(spawn.owned, spawn.shiny)
       ),
+      // Il ne brille que pour les porteurs du Charme Chroma de sa génération :
+      // le salon le voit normal, et c'est au porteur qu'il faut le dire.
+      spawn.charm
+        ? h(
+            "p",
+            { class: "notice" },
+            itemIcon(spawn.charm),
+            h(
+              "span",
+              {},
+              spawn.charm.mine
+                ? `Il brille pour toi, grâce à ton ${spawn.charm.label} !`
+                : `Il brille pour les porteurs du ${spawn.charm.label}.`
+            )
+          )
+        : null,
       wallet(),
       balls(spawn),
       confirming ? confirmation(spawn) : null,

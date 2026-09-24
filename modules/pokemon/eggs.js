@@ -24,6 +24,7 @@ import { pseudo } from "../pseudo.js";
 import { getPokemonConfig } from "./config.js";
 import {
   allSpecies,
+  charmFactor,
   embedColor,
   evolutionChain,
   getAvailableSpecies,
@@ -34,6 +35,7 @@ import {
 import { creditSpecies } from "./collection.js";
 import { displayName } from "./embeds.js";
 import { resolveChannel } from "./spawn.js";
+import { getCharms } from "./charms.js";
 
 // Les familles qui ont un bébé jouable, et leurs parents possibles : toute la
 // lignée sauf le bébé lui-même, qui ne pond pas. Recalculé à chaque appel,
@@ -148,6 +150,16 @@ function claimParent(userId, { speciesId, isShiny, sex, pokemonId = null }, cb) 
 export function eggShinyFactor(shinyParents) {
   const multiplier = Math.max(1, Number(getPokemonConfig().eggs.shinyParentMultiplier) || 1);
   return multiplier ** Math.max(0, Number(shinyParents) || 0);
+}
+
+// Ce que le Charme Chroma de son dresseur ajoute aux chances de shiny d'un
+// œuf : son facteur s'il porte celui de la génération du bébé, 1 sinon. Le
+// tirage et l'affichage lisent ce même nombre ; une lecture ratée vaut 1.
+export function eggCharmFactor(egg, cb) {
+  getCharms(egg.user_id, (err, charms) => {
+    if (err) handleException("Lecture des Charmes Chroma :", err);
+    cb(charmFactor(getSpecies(egg.species_id), err ? [] : charms));
+  });
 }
 
 // Compensation : un parent revendiqué redevient fertile si la ponte échoue.
@@ -283,24 +295,27 @@ export function hatchEgg(eggId, cb) {
       db.get("SELECT * FROM pokemon_eggs WHERE id = ?", [eggId], (err, egg) => {
         if (err || !egg) return cb(err ?? new Error(`Œuf #${eggId} introuvable`));
         const species = getSpecies(egg.species_id);
-        // Les chances d'une apparition sauvage, multipliées par parent shiny.
+        // Les chances d'une apparition sauvage, multipliées par parent shiny,
+        // et par le Charme Chroma de son dresseur s'il le porte.
         const odds = Math.max(1, Number(getPokemonConfig().spawn.shinyOdds) || 1);
-        const isShiny = Math.random() * odds < eggShinyFactor(egg.shiny_parents);
-        creditSpecies(egg.user_id, species.id, isShiny, { origin: "oeuf" }, (err, born) => {
-          if (err) {
-            return db.run(
-              "UPDATE pokemon_eggs SET status = 'INCUBATING', hatched_at = NULL WHERE id = ?",
-              [eggId],
-              () => cb(err)
+        eggCharmFactor(egg, (charm) => {
+          const isShiny = Math.random() * odds < eggShinyFactor(egg.shiny_parents) * charm;
+          creditSpecies(egg.user_id, species.id, isShiny, { origin: "oeuf" }, (err, born) => {
+            if (err) {
+              return db.run(
+                "UPDATE pokemon_eggs SET status = 'INCUBATING', hatched_at = NULL WHERE id = ?",
+                [eggId],
+                () => cb(err)
+              );
+            }
+            db.run("UPDATE pokemon_eggs SET pokemon_id = ? WHERE id = ?", [born.id, eggId], (err) => {
+              if (err) handleException("Lien de l'œuf vers son bébé :", err);
+            });
+            pseudo(egg.user_id).then((name) =>
+              log(`Éclosion : ${name} obtient ${species.name}${isShiny ? " ✨" : ""} (œuf #${eggId})`)
             );
-          }
-          db.run("UPDATE pokemon_eggs SET pokemon_id = ? WHERE id = ?", [born.id, eggId], (err) => {
-            if (err) handleException("Lien de l'œuf vers son bébé :", err);
+            cb(null, { egg, species, isShiny, sex: born.sex });
           });
-          pseudo(egg.user_id).then((name) =>
-            log(`Éclosion : ${name} obtient ${species.name}${isShiny ? " ✨" : ""} (œuf #${eggId})`)
-          );
-          cb(null, { egg, species, isShiny, sex: born.sex });
         });
       });
     }
@@ -375,7 +390,8 @@ export function hatchDueEggs(client) {
 // Les colonnes father_* et mother_* tiennent les rôles de mâle et de femelle ;
 // un Métamorph y occupe celui qui restait, sans symbole puisqu'il n'a pas de
 // sexe.
-export function buildEggEmbed(egg) {
+// `charm` : le facteur du Charme Chroma de son dresseur (eggCharmFactor).
+export function buildEggEmbed(egg, { charm = 1 } = {}) {
   const baby = getSpecies(egg.species_id);
   const parentName = (id, sex) => {
     const species = getSpecies(id);
@@ -395,6 +411,12 @@ export function buildEggEmbed(egg) {
         (egg.shiny_parents > 0
           ? `\n\n✨ ${egg.shiny_parents > 1 ? "Ses deux parents sont shiny" : "Un parent shiny"} : ` +
             `chances de shiny ×${eggShinyFactor(egg.shiny_parents)}.`
+          : "") +
+        (charm > 1
+          ? `\n\n🌟 Ton Charme Chroma : chances de shiny ×${charm}` +
+            (egg.shiny_parents > 0
+              ? `, ×${eggShinyFactor(egg.shiny_parents) * charm} en tout.`
+              : ".")
           : "")
     );
 }

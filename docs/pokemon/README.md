@@ -7,6 +7,7 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
 
 - [Capture & Pokédex](capture.md) — apparitions, balls, shiny, fiche d'espèce.
 - [Individus](individus.md) — sexe, ball de capture, fertilité, `#numéro`, toujours un exemplaire.
+- [Charme Chroma](charme.md) — un Pokédex de génération complété, deux fois plus de shiny.
 - [Œufs](oeufs.md) — la seule façon d'obtenir les bébés.
 - [Objets](objets.md) — ce que tiennent les Pokémon, balls offertes, pierres.
 - [Loterie](loterie.md) — un tirage par jour et par dresseur.

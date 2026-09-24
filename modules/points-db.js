@@ -174,10 +174,23 @@ const db = new sqlite3.Database(dbPath, (err) => {
         ended_at INTEGER,
         flees_at INTEGER,
         held_item TEXT,
-        sex TEXT
+        sex TEXT,
+        charm_shiny INTEGER NOT NULL DEFAULT 0
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_spawns :", err);
+        // TEMPORAIRE — à retirer une fois déployé : la colonne du Charme Chroma
+        // (l'apparition brille pour ses porteurs) manque aux bases créées
+        // avant elle. Sur une base à jour, SQLite refuse l'ajout d'une colonne
+        // déjà là, et c'est attendu.
+        db.run(
+          "ALTER TABLE pokemon_spawns ADD COLUMN charm_shiny INTEGER NOT NULL DEFAULT 0",
+          (err) => {
+            if (err && !/duplicate column/i.test(err.message)) {
+              handleException("Erreur ajout colonne charm_shiny :", err);
+            }
+          }
+        );
         // Garantie au niveau base : jamais deux spawns actifs en même temps.
         db.run(
           `CREATE UNIQUE INDEX IF NOT EXISTS idx_pokemon_spawn_active
