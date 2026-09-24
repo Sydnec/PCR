@@ -2,9 +2,10 @@
 //
 // Un Pokémon sur quelques-uns tient un objet. En temps normal il part avec celui
 // qui l'attrape ; une fois sur cinq il le lâche par terre, et là c'est une
-// seconde course — ouverte à tout le monde, y compris à ceux qui n'ont pas lancé
-// une seule ball. C'est aussi la seule chose qu'un Pokémon enfui laisse derrière
-// lui, ce qui donne une raison de suivre une apparition qu'on sait perdue.
+// seconde course — ouverte à tous les autres, y compris à ceux qui n'ont pas
+// lancé une seule ball, mais pas à celui qui vient de gagner la première. C'est
+// aussi la seule chose qu'un Pokémon enfui laisse derrière lui, ce qui donne une
+// raison de suivre une apparition qu'on sait perdue.
 //
 // Même doctrine que le reste : l'objet au sol est une ligne en base, sa
 // revendication un UPDATE gardé dont on inspecte this.changes. Deux clics
@@ -113,14 +114,37 @@ function reopen(dropId, cb) {
 
 // Revendication atomique. Rend la définition de l'objet au vainqueur, et null à
 // tous les autres : « quelqu'un a été plus rapide » n'est pas une erreur.
+// Rend { ok, reason } comme les autres actions du jeu, et en cas de succès
+// l'objet au sol et sa définition.
 export function claimDrop(userId, dropId, cb) {
+  // Celui qui a capturé le Pokémon n'a pas droit à ce qu'il a lâché : la garde
+  // est dans le WHERE, avec le statut, pour qu'aucun clic ne passe entre deux.
   db.run(
     `UPDATE pokemon_drops SET status = 'CLAIMED', claimed_by = ?, claimed_at = ?
-      WHERE id = ? AND status = 'OPEN'`,
-    [userId, Date.now(), dropId],
+      WHERE id = ? AND status = 'OPEN'
+        AND NOT EXISTS (
+          SELECT 1 FROM pokemon_spawns s
+           WHERE s.id = pokemon_drops.spawn_id AND s.caught_by = ?)`,
+    [userId, Date.now(), dropId, userId],
     function (err) {
       if (err) return cb(err, null);
-      if (this.changes !== 1) return cb(null, null);
+      if (this.changes !== 1) {
+        // Relu seulement pour dire pourquoi : déjà ramassé, ou pas pour lui.
+        return db.get(
+          `SELECT d.status, s.caught_by FROM pokemon_drops d
+             LEFT JOIN pokemon_spawns s ON s.id = d.spawn_id
+            WHERE d.id = ?`,
+          [dropId],
+          (err, row) =>
+            cb(err, {
+              ok: false,
+              reason:
+                row?.status === "OPEN" && row.caught_by === userId
+                  ? "🙅 Tu viens de le capturer : ce qu'il a lâché revient aux autres."
+                  : "💨 Trop tard, quelqu'un a été plus rapide !",
+            })
+        );
+      }
 
       getDrop(dropId, (err, drop) => {
         if (err || !drop) return cb(err ?? new Error(`Objet au sol introuvable : ${dropId}`), null);
@@ -144,7 +168,7 @@ export function claimDrop(userId, dropId, cb) {
           pseudo(userId).then((name) =>
             log(`Objet au sol #${dropId} ramassé par ${name} (${item.label})`)
           );
-          cb(null, { drop, item });
+          cb(null, { ok: true, drop, item });
         });
       });
     }

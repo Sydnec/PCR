@@ -410,7 +410,8 @@ export function refreshSpawnEmbed(client, spawnId, { immediate = false } = {}) {
 }
 
 // Édition finale après une capture : embed de victoire, boutons retirés.
-export function finalizeCaughtSpawn(client, spawnId, winnerId, ballKey) {
+// `dropped` : il a lâché son objet en partant, au lieu de le céder.
+export function finalizeCaughtSpawn(client, spawnId, winnerId, ballKey, { dropped = false } = {}) {
   if (pendingRefreshes.has(spawnId)) {
     clearTimeout(pendingRefreshes.get(spawnId));
     pendingRefreshes.delete(spawnId);
@@ -428,7 +429,7 @@ export function finalizeCaughtSpawn(client, spawnId, winnerId, ballKey) {
         const message = await channel.messages.fetch(spawn.message_id);
         await message.edit({
           content: null,
-          embeds: [buildCaughtEmbed(spawn, species, winnerId, ballKey, spending)],
+          embeds: [buildCaughtEmbed(spawn, species, winnerId, ballKey, spending, { dropped })],
           components: [],
         });
       } catch (error) {

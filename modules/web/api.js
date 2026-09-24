@@ -836,7 +836,7 @@ export const routes = [
       const dropId = Number(ctx.params.dropId);
       if (!Number.isInteger(dropId) || dropId <= 0) throw new HttpError(400, "Objet invalide.");
       const claimed = await promise((cb) => claimDrop(ctx.user.id, dropId, cb));
-      if (!claimed) throw new HttpError(409, "💨 Trop tard, quelqu'un a été plus rapide !");
+      if (!claimed.ok) throw new HttpError(409, claimed.reason);
       announceDropClaim(ctx.bot, claimed.drop, claimed.item, ctx.user.id);
       const { key, label, emoji, sprite } = claimed.item;
       return { item: { key, label, emoji, image: itemImageUrl(sprite) } };

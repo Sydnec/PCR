@@ -207,9 +207,7 @@ function handleDropClaim(interaction, dropId) {
       handleException("Ramassage d'un objet au sol :", err);
       return ephemeral(interaction, "❌ Erreur base de données.");
     }
-    if (!claimed) {
-      return ephemeral(interaction, "💨 Trop tard, quelqu'un a été plus rapide !");
-    }
+    if (!claimed.ok) return ephemeral(interaction, claimed.reason);
 
     log(`Ramassage : ${pseudoOf(interaction)} prend ${claimed.item.label}`);
     interaction
