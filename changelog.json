@@ -1645,6 +1645,16 @@
       "commit": "pending",
       "timestamp": "2026-09-24T10:30:00.000Z",
       "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "enhancement",
+      "name": "Répartition des sexes dans /pk info",
+      "description": "La fiche de /pk info (et le bouton « Infos du Pokémon ») donne la part de mâles et de femelles de l'espèce, comme le site.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-24T11:00:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
     }
   ]
 }

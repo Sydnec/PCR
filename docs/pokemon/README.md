@@ -29,7 +29,8 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
   suivre l'œuf (voir [Œufs](oeufs.md)).
 - `/pk classement` : classement des dresseurs par espèces distinctes.
 - `/pk info <pokemon>` : la même fiche que le bouton des apparitions — type, rareté,
-  difficulté, et la lignée évolutive stade par stade avec ce que le dresseur en a déjà.
+  difficulté, répartition mâle/femelle, et la lignée évolutive stade par stade avec ce que le
+  dresseur en a déjà.
 - `/pk evolution <espece> [individu]` : fait évoluer un Pokémon de l'espèce. L'individu est
   facultatif : sans lui, le bot choisit le moins précieux — un normal avant un shiny, puis un
   stérile, puis le plus récent — et jamais un verrouillé. Celui qui évolue reste lui-même : même

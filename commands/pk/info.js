@@ -15,7 +15,7 @@ export default {
   describe: (sub) =>
     sub
       .setName("info")
-      .setDescription("Fiche d'un Pokémon : type, rareté, difficulté et lignée évolutive")
+      .setDescription("Fiche d'un Pokémon : type, rareté, difficulté, sexes et lignée évolutive")
       .addStringOption((option) =>
         option
           .setName("pokemon")

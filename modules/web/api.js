@@ -27,6 +27,7 @@ import {
   difficultyOf,
   evolutionChain,
   evolutionTargets,
+  femaleShare,
   getAvailableSpecies,
   getSpecies,
   iconUrl,
@@ -118,7 +119,7 @@ function speciesJson(species, families = babyFamilies()) {
     legendary: isLegendary(species),
     baby: Boolean(species.isBaby),
     genderless: isGenderless(species),
-    femaleShare: isGenderless(species) ? null : species.genderRate / 8,
+    femaleShare: femaleShare(species),
     catchRate: species.catchRate,
     obtention: obtention(species),
     // Parent possible d'un œuf : de quoi proposer les bons candidats, la ponte

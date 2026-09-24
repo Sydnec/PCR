@@ -14,6 +14,7 @@ import {
   difficultyLabel,
   embedColor,
   evolutionChain,
+  femaleShare,
   getSpecies,
   isEggOnly,
   isEvolutionOnly,
@@ -36,6 +37,17 @@ const formatPercent = (probability) => {
   if (percent >= 1) return `${percent.toFixed(1)} %`;
   return `${percent.toFixed(2)} %`;
 };
+
+// La répartition des sexes d'une espèce, celle que tire rollSex : des
+// huitièmes, donc au plus une décimale (87,5 %). « Asexué » pour Magnéti,
+// Métamorph ou les légendaires.
+function genderLine(species) {
+  const share = femaleShare(species);
+  if (share === null) return "Asexué";
+  const pct = (value) =>
+    `${(value * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %`;
+  return `♂ ${pct(1 - share)} · ♀ ${pct(share)}`;
+}
 
 // Un instant rendu par Discord dans le fuseau de celui qui lit. Il ne s'affiche
 // que dans une description ou une valeur de champ — jamais dans un titre ni un
@@ -240,7 +252,9 @@ export function buildSpeciesInfoEmbed(
           difficultyLabel(catchRate) +
           (ball ? `\n${ball.emoji} ${formatPercent(ball.probability)}` : ""),
         inline: true,
-      }
+      },
+      // Seul sur sa ligne : les stades qui suivent en occupent une à eux.
+      { name: "Sexe", value: genderLine(species), inline: false }
     );
 
   // Un champ par stade : la rangée se lit de gauche à droite comme la lignée
