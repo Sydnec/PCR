@@ -1,7 +1,24 @@
 {
-  "version": "1.15.4",
-  "lastUpdated": "2026-09-24T08:08:55.836Z",
+  "version": "1.15.5",
+  "lastUpdated": "2026-09-24T09:17:36.411Z",
   "releases": [
+    {
+      "version": "1.15.5",
+      "date": "2026-09-24",
+      "title": "Release 1.15.5",
+      "features": [
+        {
+          "type": "feature",
+          "name": "Charme Chroma",
+          "description": "Complète le Pokédex d'une génération (hors légendaires : 146 espèces pour la 1re) et reçois son Charme Chroma : deux fois plus de shiny parmi ses Pokémon, en apparition, au parc safari et dans les œufs. Certaines apparitions ne brillent que pour les porteurs, qui sont mentionnés.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-24T14:00:00.000Z",
+          "branch": "claude/adoring-darwin-4o541o"
+        }
+      ]
+    },
     {
       "version": "1.15.4",
       "date": "2026-09-24",
@@ -1696,16 +1713,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "feature",
-      "name": "Charme Chroma",
-      "description": "Complète le Pokédex d'une génération (hors légendaires : 146 espèces pour la 1re) et reçois son Charme Chroma : deux fois plus de shiny parmi ses Pokémon, en apparition, au parc safari et dans les œufs. Certaines apparitions ne brillent que pour les porteurs, qui sont mentionnés.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-24T14:00:00.000Z",
-      "branch": "claude/adoring-darwin-4o541o"
-    }
-  ]
+  "pending": []
 }
