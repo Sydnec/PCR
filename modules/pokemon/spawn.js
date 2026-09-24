@@ -7,7 +7,14 @@
 import db from "../points-db.js";
 import { handleException, log } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
-import { getSpecies, pickWeightedSpecies, rarityOf, rollSex } from "./data.js";
+import {
+  charmRoleId,
+  getSpecies,
+  pickWeightedSpecies,
+  rarityOf,
+  rollSex,
+  rollShiny,
+} from "./data.js";
 import { rollHeldItem } from "./items.js";
 import { dropItem, leavesItemBehind } from "./drops.js";
 import {
@@ -200,10 +207,11 @@ export async function doSpawn(client, options = {}) {
       return releaseSpawnSlot();
     }
 
-    const isShiny =
-      forceShiny !== null
-        ? forceShiny
-        : Math.floor(Math.random() * config.spawn.shinyOdds) === 0;
+    // Un seul tirage : shiny pour tout le salon, ou pour les seuls porteurs du
+    // Charme Chroma de sa génération (rollShiny). Un shiny forcé par
+    // l'administration l'est pour tout le monde.
+    const { shiny: isShiny, charm } =
+      forceShiny !== null ? { shiny: forceShiny, charm: false } : rollShiny(config.spawn.shinyOdds);
 
     getActiveSpawn(async (err, previous) => {
       if (err) {
@@ -213,7 +221,8 @@ export async function doSpawn(client, options = {}) {
 
       // L'ancien doit passer en FLED AVANT l'insertion : l'index unique partiel
       // refuserait un second ACTIVE.
-      const insertNew = () => createSpawn(client, channel, species, isShiny, announcement, ping, previous);
+      const insertNew = () =>
+        createSpawn(client, channel, species, { isShiny, charm }, announcement, ping, previous);
 
       if (!previous) return insertNew();
 
@@ -248,7 +257,7 @@ export function rollFleeDeadline(spawnedAt, spawnConfig) {
   return spawnedAt + (low + Math.random() * span) * 60 * 1000;
 }
 
-function createSpawn(client, channel, species, isShiny, announcement, ping, previous) {
+function createSpawn(client, channel, species, { isShiny, charm }, announcement, ping, previous) {
   const now = Date.now();
   const rarity = rarityOf(species);
   const fleesAt = Math.round(rollFleeDeadline(now, getPokemonConfig().spawn));
@@ -261,9 +270,21 @@ function createSpawn(client, channel, species, isShiny, announcement, ping, prev
 
   db.run(
     `INSERT INTO pokemon_spawns
-       (species_id, is_shiny, catch_rate, rarity, channel_id, spawned_at, flees_at, held_item, sex)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [species.id, isShiny ? 1 : 0, species.catchRate, rarity, channel.id, now, fleesAt, heldItem, sex],
+       (species_id, is_shiny, catch_rate, rarity, channel_id, spawned_at, flees_at, held_item, sex,
+        charm_shiny)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      species.id,
+      isShiny ? 1 : 0,
+      species.catchRate,
+      rarity,
+      channel.id,
+      now,
+      fleesAt,
+      heldItem,
+      sex,
+      charm ? 1 : 0,
+    ],
     async function (err) {
       if (err) {
         handleException("Insertion du spawn :", err);
@@ -279,14 +300,21 @@ function createSpawn(client, channel, species, isShiny, announcement, ping, prev
         throw_count: 0,
         held_item: heldItem,
         sex,
+        charm_shiny: charm ? 1 : 0,
       };
 
       const shouldPing =
         ping !== null
           ? ping
           : isShiny || getPokemonConfig().spawn.pingRarities.includes(rarity);
-      const roleId = process.env.POKEMON_ROLE_ID;
-      const content = shouldPing && roleId ? `<@&${roleId}>` : undefined;
+      // Le rôle du jeu pour les raretés, et celui du charme de sa génération
+      // quand il brille pour ses porteurs : ceux-là ont aussi le rôle du jeu,
+      // qui n'en veut pas n'a ni l'un ni l'autre.
+      const roles = [
+        shouldPing ? process.env.POKEMON_ROLE_ID : null,
+        charm ? charmRoleId(species.generation) : null,
+      ].filter(Boolean);
+      const content = roles.length ? roles.map((roleId) => `<@&${roleId}>`).join(" ") : undefined;
 
       try {
         const message = await channel.send({
@@ -313,7 +341,8 @@ function createSpawn(client, channel, species, isShiny, announcement, ping, prev
         recordSpawn(spawn, species);
 
         log(
-          `Spawn #${spawnId} : ${species.name}${isShiny ? " ✨" : ""} (${rarity}, rate ${species.catchRate})`
+          `Spawn #${spawnId} : ${species.name}${isShiny ? " ✨" : charm ? " ✨ (Charme Chroma)" : ""} ` +
+            `(${rarity}, rate ${species.catchRate})`
         );
 
         if (previous) endSpawnAsFled(client, previous);
@@ -410,8 +439,15 @@ export function refreshSpawnEmbed(client, spawnId, { immediate = false } = {}) {
 }
 
 // Édition finale après une capture : embed de victoire, boutons retirés.
-// `dropped` : il a lâché son objet en partant, au lieu de le céder.
-export function finalizeCaughtSpawn(client, spawnId, winnerId, ballKey, { dropped = false } = {}) {
+// `dropped` : il a lâché son objet en partant, au lieu de le céder. `charmed` :
+// il brillait pour son vainqueur, porteur du Charme Chroma.
+export function finalizeCaughtSpawn(
+  client,
+  spawnId,
+  winnerId,
+  ballKey,
+  { dropped = false, charmed = false } = {}
+) {
   if (pendingRefreshes.has(spawnId)) {
     clearTimeout(pendingRefreshes.get(spawnId));
     pendingRefreshes.delete(spawnId);
@@ -429,7 +465,9 @@ export function finalizeCaughtSpawn(client, spawnId, winnerId, ballKey, { droppe
         const message = await channel.messages.fetch(spawn.message_id);
         await message.edit({
           content: null,
-          embeds: [buildCaughtEmbed(spawn, species, winnerId, ballKey, spending, { dropped })],
+          embeds: [
+            buildCaughtEmbed(spawn, species, winnerId, ballKey, spending, { dropped, charmed }),
+          ],
           components: [],
         });
       } catch (error) {

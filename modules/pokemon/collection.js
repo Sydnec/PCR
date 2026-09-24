@@ -19,6 +19,7 @@ import {
 } from "./data.js";
 import { consumeItem, getItem, grantItem } from "./items.js";
 import { recordFusion, recordTrade } from "./stats.js";
+import { checkCharms } from "./charms.js";
 
 // Un groupe d'individus : une espèce, une variante, et au besoin un sexe et une
 // fertilité. Les commandes encodent le tout dans la valeur d'une option ; une
@@ -369,6 +370,9 @@ export function creditSpecies(userId, speciesId, isShiny, options, cb) {
     ],
     function (err) {
       if (err) return cb(err, null);
+      // Une espèce de plus peut compléter un Pokédex : le Charme Chroma suit,
+      // sans retarder celui qui vient d'obtenir son Pokémon.
+      checkCharms(userId);
       cb(null, { id: this.lastID, sex: chosenSex });
     }
   );
@@ -472,7 +476,12 @@ export function restoreDuplicates(rows, cb = () => {}) {
   const next = (err) => {
     if (err) return cb(err);
     const row = list.shift();
-    if (!row) return cb(null);
+    if (!row) {
+      // Un Pokémon qui évolue change d'espèce, un Pokémon échangé change de
+      // boîte : l'un comme l'autre peut compléter un Pokédex.
+      for (const userId of new Set(rows.map((entry) => entry.user_id))) checkCharms(userId);
+      return cb(null);
+    }
     // La place dans la boîte PC, le surnom et le verrou reviennent avec lui :
     // un Pokémon qui évolue, ou qu'une compensation remet en place, reste où
     // son dresseur l'avait rangé, sous le nom et la protection qu'il lui avait

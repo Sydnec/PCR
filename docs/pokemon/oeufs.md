@@ -19,8 +19,9 @@ génération 2 (voir [Générations](README.md#générations)).
 - **Éclosion au premier des deux seuils** : **5 jours**, ou **200 messages** de son propriétaire —
   comme des pas dans le jeu. Le bébé naît avec un sexe et s'annonce dans le salon des apparitions.
 - **Shiny** : deux parents normaux donnent les chances d'une apparition sauvage ; **chaque parent
-  shiny les double** (×2 pour un, ×4 pour deux, `shinyParentMultiplier`). C'est retenu à la ponte,
-  et `/pk oeuf voir` le rappelle.
+  shiny les double** (×2 pour un, ×4 pour deux, `shinyParentMultiplier`), et le
+  [Charme Chroma](charme.md) de la génération du bébé les double encore. Les parents shiny sont
+  retenus à la ponte, le charme compte à l'éclosion, et `/pk oeuf voir` rappelle les deux.
 - `/pk oeuf voir` : l'œuf en cours et ce qu'il lui manque.
 
 Réglages : `pokemon.eggs` (`enabled`, `hatchHours`, `hatchMessages`, `shinyParentMultiplier`). Les

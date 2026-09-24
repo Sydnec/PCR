@@ -24,6 +24,7 @@ Toutes ses commandes vivent sous `/pk`. → **[Documentation du jeu](docs/pokemo
 
 - [Capture & Pokédex](docs/pokemon/capture.md) — apparitions, balls, shiny, fiche d'espèce.
 - [Individus](docs/pokemon/individus.md) — sexe, ball de capture, fertilité, `/pk boite`.
+- [Charme Chroma](docs/pokemon/charme.md) — un Pokédex de génération complété, deux fois plus de shiny.
 - [Œufs](docs/pokemon/oeufs.md) — la seule façon d'obtenir les bébés.
 - [Objets](docs/pokemon/objets.md) — ce que tiennent les Pokémon, balls offertes, pierres.
 - [Loterie](docs/pokemon/loterie.md) — un tirage par jour et par dresseur.

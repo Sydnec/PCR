@@ -52,6 +52,11 @@ export function getItem(key) {
   return resolve(key, items[key]);
 }
 
+// Le Charme Chroma d'une génération, tel que le catalogue le déclare
+// (`charm.generation`), ou null.
+export const getCharmItem = (generation) =>
+  getItems().find((item) => Number(item.charm?.generation) === Number(generation)) ?? null;
+
 // Ce qui se revend, et à combien. Un objet sans sellValue ne se revend pas :
 // c'est le catalogue qui décide, pas la commande.
 export const itemSellValue = (item) => {
@@ -246,6 +251,33 @@ export function grantItem(userId, key, quantity = 1, { source } = {}, cb = () =>
       if (err) return cb(err);
       logMovement(userId, key, quantity, source);
       cb(null, true);
+    }
+  );
+}
+
+// Un objet qu'on ne possède qu'une fois, comme le Charme Chroma : l'écriture ne
+// passe que s'il est absent — une ligne à zéro compte comme absente —, et
+// `granted` dit si c'est elle qui l'a donné. Deux crédits simultanés, un seul
+// gagnant, et une seule annonce.
+export function grantItemOnce(userId, key, { source } = {}, cb = () => {}) {
+  const invalid = check(key, 1);
+  if (invalid) return cb(invalid, false);
+
+  const now = Date.now();
+  db.run(
+    `INSERT INTO pokemon_inventory (user_id, item_key, count, first_obtained_at, last_obtained_at)
+     VALUES (?, ?, 1, ?, ?)
+     ON CONFLICT(user_id, item_key) DO UPDATE SET
+       count = 1,
+       first_obtained_at = COALESCE(first_obtained_at, excluded.first_obtained_at),
+       last_obtained_at = excluded.last_obtained_at
+     WHERE count = 0`,
+    [userId, key, now, now],
+    function (err) {
+      if (err) return cb(err, false);
+      const granted = this.changes === 1;
+      if (granted) logMovement(userId, key, 1, source);
+      cb(null, granted);
     }
   );
 }

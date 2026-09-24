@@ -57,6 +57,15 @@ function incubating(ctx, egg) {
             `chances de shiny ×${fmt(egg.shinyFactor)}.`
         )
       : null,
+    egg.charmFactor > 1
+      ? h(
+          "p",
+          { class: "small" },
+          icon("sparkle", { label: "Charme Chroma" }),
+          ` Ton Charme Chroma : chances de shiny ×${fmt(egg.charmFactor)}` +
+            (egg.shinyParents > 0 ? `, ×${fmt(egg.shinyFactor * egg.charmFactor)} en tout.` : ".")
+        )
+      : null,
     h(
       "p",
       { class: "muted small" },

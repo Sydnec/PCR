@@ -305,6 +305,34 @@ export async function render() {
       ),
       rarityTable(spawn.rarities)
     ),
+    rules.charm?.generations.length
+      ? section(
+          "infos-charme",
+          "Charme Chroma",
+          list(
+            rule(
+              `Complète le Pokédex d'une génération, légendaires et fabuleux à part : ` +
+                rules.charm.generations
+                  .map(
+                    (entry) =>
+                      `**${fmt(entry.required)} espèces** pour la ` +
+                      `${entry.generation === 1 ? "1re" : `${entry.generation}e`}`
+                  )
+                  .join(", ") +
+                `. Tu reçois son 🌟 Charme Chroma, pour de bon.`
+            ),
+            rule(
+              `Tes chances de shiny sont alors **×${fmt(rules.charm.multiplier)}** sur les Pokémon ` +
+                `de sa génération : **1 sur ${fmt(Math.round(spawn.shinyOdds / rules.charm.multiplier))}** ` +
+                `en apparition, et ×${fmt(rules.charm.multiplier)} aussi au parc safari et dans les œufs.`
+            ),
+            rule(
+              "Une apparition peut ne briller que pour les porteurs : l'annonce le dit et mentionne " +
+                "leur rôle. Attrapée avec le charme, c'est un shiny ; sans, un Pokémon normal."
+            )
+          )
+        )
+      : null,
     section("infos-capture", "Capture", capture(rules)),
     section("infos-objets", "Objets", items(rules)),
     rules.lottery.enabled

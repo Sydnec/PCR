@@ -56,9 +56,9 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
 | `GET /api/users/:userId/pokedex` 🔒 | `{ dexSize, entries: [{ speciesId, shiny, count, firstCaughtAt }] }` |
 | `GET /api/users/:userId/box` 🔒 | `{ total, page, pages, pageSize, items }` |
 | `GET /api/users/:userId/inventory` 🔒 | `{ items: [{ key, label, emoji, description, count }] }` |
-| `GET /api/me/egg` 🔒 | `{ egg }` ou `{ egg: null }` — `egg.shinyParents` et `egg.shinyFactor` : le bonus de shiny des parents |
+| `GET /api/me/egg` 🔒 | `{ egg }` ou `{ egg: null }` — `egg.shinyParents` et `egg.shinyFactor` : le bonus de shiny des parents ; `egg.charmFactor` : celui du Charme Chroma du dresseur |
 | `GET /api/me/lineage/:speciesId` 🔒 | `{ lineage }` — la lignée et ce que le dresseur possède de chaque maillon |
-| `GET /api/spawn` 🔒 | `{ refreshSeconds, cooldownSeconds, pausedUntil, wallet, safari, spawn, last, drops }` — l'apparition du salon |
+| `GET /api/spawn` 🔒 | `{ refreshSeconds, cooldownSeconds, pausedUntil, wallet, safari, spawn, last, drops }` — l'apparition du salon. `spawn.charm` (ou `null`) : elle ne brille que pour les porteurs du Charme Chroma de sa génération (`label`, `image`, `mine` : le visiteur en est un, et `spawn.shiny` est alors vrai pour lui) |
 | `GET /api/safari` 🔒 | `{ offer, visit }` — ce que le dresseur peut faire du parc, et sa visite en cours (`null` sinon) |
 | `GET /api/me/pc` 🔒 | `{ slotsPerBox, columns, maxBoxes, boxNameLength, nicknameLength, boxes, pokemon }` — la boîte PC |
 | `GET /api/admin/config` 🔑 | `{ status, tree }` — la configuration en arbre |
@@ -122,7 +122,7 @@ ou par un groupe `{ "speciesId": 25, "isShiny": false, "sex": "F" }` — les deu
 | `POST /api/me/sell` | Pokémon, `quantity` pour un groupe | `{ sold, unit, points }` |
 | `POST /api/me/evolve` | Pokémon (celui qui évolue, avec `speciesId` son espèce attendue : refus s'il a déjà évolué), `targetId?`, `helper?` (clé d'un objet, ou `metamorph`), `confirmLocked?` (obligatoire pour un verrouillé, sinon 409) | `{ pokemon, sacrificesSpent, dittosSpent, shiniesSacrificed, pointsSpent, helper }` — `pokemon` est le même individu, sous sa nouvelle forme |
 | `POST /api/me/eggs` | `{ parent1, parent2 }` | `{ egg }` |
-| `POST /api/spawn/throw` | `{ spawnId, ball, requireItem? }` | `{ status, message, final, remaining, pokemon }` |
+| `POST /api/spawn/throw` | `{ spawnId, ball, requireItem? }` | `{ status, message, final, remaining, pokemon }` — `pokemon.shiny` : ce qui a rejoint la boîte, Charme Chroma compris |
 | `POST /api/drops/:id/claim` | `{}` | `{ item }` — `409` si quelqu'un a été plus rapide, `403` pour le capteur du Pokémon qui l'a lâché |
 | `POST /api/safari/enter` | `{ parkId }` | `{ resumed, visit }` — entrée gratuite dans un parc ouvert |
 | `POST /api/safari/buy` | `{}` | `{ resumed, ticket, visit }` — entrée payante, au ticket d'abord |

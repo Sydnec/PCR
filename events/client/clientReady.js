@@ -5,6 +5,7 @@ import { rehydratePokemon } from '../../modules/pokemon/spawn.js';
 import { sweepSafari } from '../../modules/pokemon/safari.js';
 import { startWebServer } from '../../modules/web/server.js';
 import { setPseudoClient } from '../../modules/pseudo.js';
+import { repairCharms } from '../../modules/pokemon/charms.js';
 
 const name = 'clientReady';
 const once = true;
@@ -52,6 +53,10 @@ async function execute(bot) {
     // Même chose côté parc safari : une session ou un parc laissés ouverts par
     // un arrêt brutal bloqueraient leurs index uniques respectifs.
     sweepSafari(bot);
+
+    // Les Charmes Chroma : ceux qu'un Pokédex déjà complet n'a pas encore
+    // donnés, et les rôles de leurs porteurs, remis d'accord avec l'inventaire.
+    repairCharms(bot);
 
     // L'API de l'interface web, si WEB_PORT est défini. Elle démarre une fois
     // le bot prêt : c'est lui qui vérifie qu'un visiteur est membre du serveur.

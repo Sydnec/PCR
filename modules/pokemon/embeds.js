@@ -6,7 +6,7 @@ import {
   EmbedBuilder,
 } from "discord.js";
 import { getBall, getPokemonConfig, getSafariConfig } from "./config.js";
-import { getItem, sortByCatalogue } from "./items.js";
+import { getCharmItem, getItem, sortByCatalogue } from "./items.js";
 import {
   RARITIES,
   allSpecies,
@@ -133,7 +133,14 @@ export function buildSpawnEmbed(spawn, species, throws = [], announcement = null
     )
     .setFooter({ text: `Spawn #${spawn.id} · Pokédex n°${species.id}` });
 
-  if (announcement) embed.setDescription(announcement);
+  // Normal pour tout le salon, shiny pour les porteurs du charme de sa
+  // génération : ce sont eux que le rôle a mentionnés.
+  const charm = spawn.charm_shiny ? getCharmItem(species.generation) : null;
+  const description = [
+    announcement,
+    charm ? `✨ Il brille pour les porteurs du ${charm.emoji} **${charm.label}** !` : null,
+  ].filter(Boolean);
+  if (description.length) embed.setDescription(description.join("\n\n"));
   return embed;
 }
 
@@ -360,15 +367,19 @@ export function buildCaughtEmbed(
   winnerId,
   ballKey,
   spending,
-  { dropped = false } = {}
+  { dropped = false, charmed = false } = {}
 ) {
-  const isShiny = Boolean(spawn.is_shiny);
+  // `charmed` : il brillait pour son vainqueur, porteur du Charme Chroma, et
+  // c'est un shiny qui rejoint sa boîte.
+  const isShiny = Boolean(spawn.is_shiny) || charmed;
   const ball = getPokemonConfig().capture.balls[ballKey];
   const total = spending?.total ?? 0;
+  const charm = charmed ? getCharmItem(species.generation) : null;
 
   return new EmbedBuilder()
     .setDescription(
-      `${ball?.emoji ?? ""} **${displayName(species, isShiny, spawn.sex)}** a été capturé par <@${winnerId}> !`
+      `${ball?.emoji ?? ""} **${displayName(species, isShiny, spawn.sex)}** a été capturé par <@${winnerId}>` +
+        (charm ? `, et il brillait grâce à son ${charm.emoji} **${charm.label}** !` : " !")
     )
     .setColor(embedColor(species, isShiny))
     .setThumbnail(spriteUrl(species, isShiny))
