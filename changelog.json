@@ -1,7 +1,34 @@
 {
-  "version": "1.15.3",
-  "lastUpdated": "2026-09-24T07:28:27.410Z",
+  "version": "1.15.4",
+  "lastUpdated": "2026-09-24T08:08:55.836Z",
   "releases": [
+    {
+      "version": "1.15.4",
+      "date": "2026-09-24",
+      "title": "Release 1.15.4",
+      "features": [
+        {
+          "type": "feature",
+          "name": "/pk doublons",
+          "description": "Nouvelle commande /pk doublons : les Pokémon qu'un dresseur a en plusieurs exemplaires, et combien peuvent s'échanger. Avec une espèce, elle liste les dresseurs qui l'ont en double.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-24T12:00:00.000Z",
+          "branch": "claude/adoring-darwin-4o541o"
+        },
+        {
+          "type": "feature",
+          "name": "Page Infos du site",
+          "description": "Le site a une page Infos : les règles du jeu en bref, les chances de chaque tirage, les objets et les commandes, avec les réglages en cours.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-24T13:00:00.000Z",
+          "branch": "claude/adoring-darwin-4o541o"
+        }
+      ]
+    },
     {
       "version": "1.15.3",
       "date": "2026-09-24",
@@ -1669,26 +1696,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "feature",
-      "name": "/pk doublons",
-      "description": "Nouvelle commande /pk doublons : les Pokémon qu'un dresseur a en plusieurs exemplaires, et combien peuvent s'échanger. Avec une espèce, elle liste les dresseurs qui l'ont en double.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-24T12:00:00.000Z",
-      "branch": "claude/adoring-darwin-4o541o"
-    },
-    {
-      "type": "feature",
-      "name": "Page Infos du site",
-      "description": "Le site a une page Infos : les règles du jeu en bref, les chances de chaque tirage, les objets et les commandes, avec les réglages en cours.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-24T13:00:00.000Z",
-      "branch": "claude/adoring-darwin-4o541o"
-    }
-  ]
+  "pending": []
 }
