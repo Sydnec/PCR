@@ -1,7 +1,24 @@
 {
-  "version": "1.15.6",
-  "lastUpdated": "2026-09-24T09:37:22.255Z",
+  "version": "1.15.7",
+  "lastUpdated": "2026-09-24T10:25:49.904Z",
   "releases": [
+    {
+      "version": "1.15.7",
+      "date": "2026-09-24",
+      "title": "Release 1.15.7",
+      "features": [
+        {
+          "type": "feature",
+          "name": "Courbe des points",
+          "description": "Chaque mouvement de points est désormais journalisé, et la page Admin du site en trace la courbe : la somme des dresseurs cochés, ou une courbe par dresseur.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-24T10:09:44.000Z",
+          "branch": "claude/adoring-darwin-4o541o"
+        }
+      ]
+    },
     {
       "version": "1.15.6",
       "date": "2026-09-24",
@@ -1730,16 +1747,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "feature",
-      "name": "Courbe des points",
-      "description": "Chaque mouvement de points est désormais journalisé, et la page Admin du site en trace la courbe : la somme des dresseurs cochés, ou une courbe par dresseur.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-24T10:09:44.000Z",
-      "branch": "claude/adoring-darwin-4o541o"
-    }
-  ]
+  "pending": []
 }
