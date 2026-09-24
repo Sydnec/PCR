@@ -399,10 +399,14 @@ export async function render(ctx) {
           { class: "drop" },
           itemIcon(drop),
           h("span", { class: "drop-text" }, drop.label),
+          // Ce qu'un Pokémon capturé lâche n'est pas pour son capteur : l'API le
+          // dit, le bouton reste visible mais inerte.
           h(
             "button",
             {
               class: "button small",
+              disabled: !drop.claimable,
+              title: drop.claimable ? null : "Tu l'as capturé : il revient aux autres.",
               onclick: async (event) => {
                 event.currentTarget.disabled = true;
                 try {
@@ -417,7 +421,7 @@ export async function render(ctx) {
                 await refreshAll();
               },
             },
-            "Ramasser"
+            drop.claimable ? "Ramasser" : "Aux autres"
           )
         )
       )

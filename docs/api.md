@@ -85,9 +85,10 @@ sa lignée (`lineage` : chaque maillon avec son stade et ce qu'il en possède, c
 Discord), les balls (`price`, `probability`, `free` = balls offertes, `usable` = en poche ou
 payable avec le solde) et le journal des derniers
 lancers (`throws`, avec le pseudo et l'avatar du serveur). L'objet tenu reste
-secret. `last` est le dernier Pokémon parti (`CAUGHT` ou `FLED`), `drops` les objets au sol, et
-`pausedUntil` la fin d'un parc safari qui suspend les apparitions. `wallet` (`{ balance, balls }`,
-comme dans `/api/me`) fait suivre le solde à l'onglet Capture sans relire `/api/me`.
+secret. `last` est le dernier Pokémon parti (`CAUGHT` ou `FLED`), `drops` les objets au sol
+(`claimable` : faux pour le capteur du Pokémon qui l'a lâché), et `pausedUntil` la fin d'un parc
+safari qui suspend les apparitions. `wallet` (`{ balance, balls }`, comme dans `/api/me`) fait
+suivre le solde à l'onglet Capture sans relire `/api/me`.
 
 `safari` (et `offer` de `/api/safari`) : `{ enabled, session, freePark, price, actions, tickets,
 retryAt, canBuy, blocked }`. `session` est la visite en cours (`{ id, actionsLeft }`), `freePark`
@@ -121,7 +122,7 @@ ou par un groupe `{ "speciesId": 25, "isShiny": false, "sex": "F" }` — les deu
 | `POST /api/me/evolve` | Pokémon (celui qui évolue, avec `speciesId` son espèce attendue : refus s'il a déjà évolué), `targetId?`, `helper?` (clé d'un objet, ou `metamorph`), `confirmLocked?` (obligatoire pour un verrouillé, sinon 409) | `{ pokemon, sacrificesSpent, dittosSpent, shiniesSacrificed, pointsSpent, helper }` — `pokemon` est le même individu, sous sa nouvelle forme |
 | `POST /api/me/eggs` | `{ parent1, parent2 }` | `{ egg }` |
 | `POST /api/spawn/throw` | `{ spawnId, ball, requireItem? }` | `{ status, message, final, remaining, pokemon }` |
-| `POST /api/drops/:id/claim` | `{}` | `{ item }` — `409` si quelqu'un a été plus rapide |
+| `POST /api/drops/:id/claim` | `{}` | `{ item }` — `409` si quelqu'un a été plus rapide, `403` pour le capteur du Pokémon qui l'a lâché |
 | `POST /api/safari/enter` | `{ parkId }` | `{ resumed, visit }` — entrée gratuite dans un parc ouvert |
 | `POST /api/safari/buy` | `{}` | `{ resumed, ticket, visit }` — entrée payante, au ticket d'abord |
 | `POST /api/safari/action` | `{ sessionId, token, action }` | `{ outcome, message, visit }` — `action` : `BALL`, `BAIT` ou `FLEE` |

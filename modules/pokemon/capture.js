@@ -337,7 +337,14 @@ export function resolveThrow(client, userId, spawnId, ballKey, { requireItem = f
             // sol, et c'est une seconde course — ouverte à tous les autres, pas
             // à celui qui vient de gagner la première (claimDrop).
             if (dropped) {
-              dropItem(client, { spawn, itemKey: held.key });
+              // Posé au sol, il n'est plus pour le capteur : si le dépôt échoue,
+              // l'objet lui revient plutôt que de se perdre pour tout le monde.
+              dropItem(client, { spawn, itemKey: held.key }, (err, dropId) => {
+                if (dropId) return;
+                grantItem(userId, held.key, 1, { source: `capture:${spawnId}` }, (err) => {
+                  if (err) handleException("Remise d'un objet qui n'a pas pu tomber :", err);
+                });
+              });
               return caughtOutcome({ item: held, dropped: true });
             }
 
@@ -402,7 +409,7 @@ export function throwMessage(outcome) {
       const butin = !item
         ? ""
         : dropped
-          ? `\n${item.emoji} Il a lâché **${item.label}** en partant !`
+          ? `\n${item.emoji} Il a lâché **${item.label}** en partant : il revient aux autres.`
           : `\n${item.emoji} Il tenait **${item.label}** !`;
       return (
         `🎉 Bravo ! **${displayName(outcome.species, outcome.spawn.is_shiny, outcome.caught?.sex)}** ` +

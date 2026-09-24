@@ -29,10 +29,10 @@ a 20 % de chances de le laisser par terre plutôt que de le céder à son vainqu
 s'affiche alors avec un bouton **« 🤚 Ramasser »**, et c'est une seconde course — ouverte à tous
 les autres, y compris à qui n'a pas lancé une seule ball, mais pas à celui qui vient de gagner la
 première : ce qu'un Pokémon capturé lâche revient aux autres. L'annonce dit alors « Il a lâché »
-plutôt que « Il tenait ». C'est la seule récompense du jeu qui ne demande pas d'avoir gagné quoi que ce soit, et la
-seule chose qu'une apparition perdue peut encore donner. Le verrou est en base, comme toujours :
-deux clics simultanés, un seul ramasseur, et un crédit qui échoue repose l'objet par terre plutôt
-que de le faire disparaître.
+plutôt que « Il tenait ». C'est la seule récompense du jeu qui ne demande pas d'avoir gagné quoi
+que ce soit, et la seule chose qu'une apparition perdue peut encore donner. Le verrou est en base,
+comme toujours : deux clics simultanés, un seul ramasseur, et un crédit qui échoue repose l'objet
+par terre plutôt que de le faire disparaître.
 
 - **Un objet est une clé et un compteur.** Nom, icône et description vivent dans `pokemon.items` —
   réglables à chaud, comme les balls. Une entrée `ball: "poke"` lui fait *emprunter* le libellé et
