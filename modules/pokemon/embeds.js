@@ -180,7 +180,7 @@ export function buildInfoRow(spawnId) {
 
 // ====================== FICHE D'ESPÈCE ======================
 
-const dexNumber = (species) => `#${String(species.id).padStart(3, "0")}`;
+export const dexNumber = (species) => `#${String(species.id).padStart(3, "0")}`;
 
 // Les stades tels que le dataset les numérote : 1 = forme de base.
 const STAGE_LABELS = ["Forme de base", "Stade 1", "Stade 2"];
@@ -558,16 +558,24 @@ function individualLine(row) {
 const boxPageSize = () => Math.max(1, Math.floor(getPokemonConfig().box?.pageSize ?? 15));
 export const boxPageCount = (total) => Math.max(1, Math.ceil(total / boxPageSize()));
 
+// La page affichée d'une liste paginée comme la boîte, et les bornes de sa
+// tranche. Une page hors limites retombe sur la dernière : la liste a pu
+// raccourcir entre deux clics.
+function pageOf(total, page) {
+  const pages = boxPageCount(total);
+  const current = Math.min(Math.max(0, page), pages - 1);
+  const size = boxPageSize();
+  return { pages, current, start: current * size, end: (current + 1) * size };
+}
+
 // La boîte d'un dresseur : ses Pokémon un par un, les plus récents d'abord, ou
 // seulement ceux d'une espèce, page par page. Chaque ligne commence par
 // l'identifiant qu'acceptent les commandes (#123). Une page hors limites
 // retombe sur la dernière : la boîte a pu se vider entre deux clics.
 export function buildBoxEmbed(rows, { user, species = null, page = 0 } = {}) {
   const sorted = [...rows].sort((a, b) => b.obtained_at - a.obtained_at || b.id - a.id);
-  const pages = boxPageCount(sorted.length);
-  const current = Math.min(Math.max(0, page), pages - 1);
-  const size = boxPageSize();
-  const shown = sorted.slice(current * size, (current + 1) * size);
+  const { pages, current, start, end } = pageOf(sorted.length, page);
+  const shown = sorted.slice(start, end);
   const embed = new EmbedBuilder()
     .setTitle(
       `\u{1F4E6} Boîte de ${user.displayName ?? user.username}` +
@@ -618,20 +626,20 @@ function pageRow(base, noopId, current, pages) {
 
 // Les boutons de page de la boîte : le propriétaire et l'espèce filtrée.
 export function buildBoxRow(ownerId, speciesId, page, total) {
-  const pages = boxPageCount(total);
-  const current = Math.min(Math.max(0, page), pages - 1);
+  const { pages, current } = pageOf(total, page);
   return pageRow(`poke_box|${ownerId}|${speciesId ?? 0}`, `poke_box_noop|${ownerId}`, current, pages);
 }
 
+// Revendre, non : légendaires et shiny n'ont pas de prix. S'échanger, oui.
 const DUPLICATES_NOTE =
   "Il reste toujours un exemplaire de chaque espèce, et un verrouillé 🛡️ ne part pas : " +
-  "le reste peut s'échanger ou se revendre.";
+  "le reste peut s'échanger.";
+const fr = (value) => value.toLocaleString("fr-FR");
 
 // Les chiffres d'une ligne de doublons (listDuplicates) : combien, dont combien
 // de shiny, combien peuvent partir — en gras, c'est ce qui compte pour un
 // échange — et combien sont verrouillés.
 function duplicateCounts(entry) {
-  const fr = (value) => value.toLocaleString("fr-FR");
   const locked = entry.total - entry.free;
   return (
     `×${fr(entry.total)}` +
@@ -644,7 +652,6 @@ function duplicateCounts(entry) {
 // Le pied d'une liste de doublons : la page, combien de lignes (`what`, au
 // singulier et au pluriel), combien de Pokémon peuvent partir en tout.
 function duplicatesFooter(list, current, pages, [one, many]) {
-  const fr = (value) => value.toLocaleString("fr-FR");
   const spare = list.reduce((sum, entry) => sum + entry.spare, 0);
   return {
     text:
@@ -654,18 +661,15 @@ function duplicatesFooter(list, current, pages, [one, many]) {
 }
 
 // Les doublons d'un dresseur (listDuplicates), une ligne par espèce, page par
-// page comme la boîte. Une page hors limites retombe sur la dernière.
+// page comme la boîte.
 export function buildDuplicatesEmbed(list, { user, page = 0 } = {}) {
-  const pages = boxPageCount(list.length);
-  const current = Math.min(Math.max(0, page), pages - 1);
-  const size = boxPageSize();
+  const { pages, current, start, end } = pageOf(list.length, page);
   const embed = new EmbedBuilder()
     .setTitle(`\u{1F501} Doublons de ${user.displayName ?? user.username}`)
     .setColor(0x3b88c3);
-  if (!list.length) {
-    return embed.setDescription("*Aucun doublon : un seul exemplaire de chaque espèce.*");
-  }
-  const lines = list.slice(current * size, (current + 1) * size).map((entry) => {
+  // Rien sur la boîte elle-même : elle peut être vide.
+  if (!list.length) return embed.setDescription("*Aucun doublon pour l'instant.*");
+  const lines = list.slice(start, end).map((entry) => {
     const species = getSpecies(entry.speciesId);
     return (
       `\`${species ? dexNumber(species) : `#${entry.speciesId}`}\` **${species?.name ?? "?"}** ` +
@@ -681,9 +685,7 @@ export function buildDuplicatesEmbed(list, { user, page = 0 } = {}) {
 // par dresseur. La mention n'a sa place que dans la description : Discord ne
 // la rend pas dans un titre. `member` restreint la liste à un dresseur.
 export function buildSpeciesDuplicatesEmbed(species, list, { page = 0, member = null } = {}) {
-  const pages = boxPageCount(list.length);
-  const current = Math.min(Math.max(0, page), pages - 1);
-  const size = boxPageSize();
+  const { pages, current, start, end } = pageOf(list.length, page);
   const embed = new EmbedBuilder()
     .setTitle(`\u{1F501} ${species.name} en double`)
     .setColor(embedColor(species, false))
@@ -696,7 +698,7 @@ export function buildSpeciesDuplicatesEmbed(species, list, { page = 0, member = 
     );
   }
   const lines = list
-    .slice(current * size, (current + 1) * size)
+    .slice(start, end)
     .map((entry) => `<@${entry.userId}> ${duplicateCounts(entry)}`);
   return embed
     .setDescription(`${DUPLICATES_NOTE}\n\n${lines.join("\n")}`)
@@ -705,15 +707,13 @@ export function buildSpeciesDuplicatesEmbed(species, list, { page = 0, member = 
 
 // Les boutons de page des doublons : le dresseur dont on lit la boîte.
 export function buildDuplicatesRow(ownerId, page, total) {
-  const pages = boxPageCount(total);
-  const current = Math.min(Math.max(0, page), pages - 1);
+  const { pages, current } = pageOf(total, page);
   return pageRow(`poke_dup|${ownerId}`, `poke_dup_noop|${ownerId}`, current, pages);
 }
 
 // Les boutons de page de « qui a cette espèce en double » : l'espèce suffit.
 export function buildSpeciesDuplicatesRow(speciesId, page, total) {
-  const pages = boxPageCount(total);
-  const current = Math.min(Math.max(0, page), pages - 1);
+  const { pages, current } = pageOf(total, page);
   return pageRow(`poke_dupsp|${speciesId}`, `poke_dupsp_noop|${speciesId}`, current, pages);
 }
 

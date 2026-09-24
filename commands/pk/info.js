@@ -6,7 +6,7 @@ import {
   searchByName,
 } from "../../modules/pokemon/data.js";
 import { getOwnedVariantsFor } from "../../modules/pokemon/collection.js";
-import { buildSpeciesInfoEmbed } from "../../modules/pokemon/embeds.js";
+import { buildSpeciesInfoEmbed, dexNumber } from "../../modules/pokemon/embeds.js";
 
 // La fiche est construite par embeds.js, exactement comme celle du bouton
 // « Infos du Pokémon » des apparitions : une seule mise en forme, donc une
@@ -28,7 +28,7 @@ export default {
     const query = interaction.options.getFocused();
     await interaction.respond(
       searchByName(query, 25).map((species) => ({
-        name: `#${String(species.id).padStart(3, "0")} ${species.name}`,
+        name: `${dexNumber(species)} ${species.name}`,
         value: String(species.id),
       }))
     );

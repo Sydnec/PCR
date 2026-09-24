@@ -22,7 +22,7 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
 - `/pk boite [pokemon] [membre]` : les Pokémon un par un, page par page — `#numéro`, sexe, ball,
   date, fertilité, et 🛡️ les verrouillés (voir [Individus](individus.md)).
 - `/pk doublons [membre] [pokemon]` : les espèces qu'un dresseur a en plusieurs exemplaires, dans
-  l'ordre du Pokédex, et combien peuvent s'échanger ou se revendre — tout sauf un par espèce, hors
+  l'ordre du Pokédex, et combien peuvent s'échanger — tout sauf un par espèce, hors
   verrouillés 🛡️. Avec une espèce, l'inverse : les dresseurs qui l'ont en double, ceux qui peuvent
   en céder le plus d'abord. Réponse privée, page par page.
 - `/pk verrou <espece> <individu>` : verrouille ou déverrouille un Pokémon. **Verrouillé, il ne part

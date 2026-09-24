@@ -35,9 +35,8 @@ function respondWithSpecies(interaction, userId, query, emptyLabel) {
     }
     const needle = query.toLowerCase();
     const choices = [...countBySpecies(rows)]
-      .map(([speciesId, { total, free }]) => {
+      .map(([speciesId, { spare }]) => {
         const species = getSpecies(speciesId);
-        const spare = Math.min(free, total - 1);
         if (!species || spare < 1) return null;
         // Les quatre évolutions par échange se déclarent ici plutôt que dans un
         // message d'aide que personne ne lit : c'est l'instant exact où on

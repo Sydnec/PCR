@@ -11,6 +11,7 @@ import {
   buildDuplicatesRow,
   buildSpeciesDuplicatesEmbed,
   buildSpeciesDuplicatesRow,
+  dexNumber,
   respondHint as hint,
 } from "../../modules/pokemon/embeds.js";
 
@@ -43,7 +44,7 @@ export default {
     await interaction
       .respond(
         matches.map((species) => ({
-          name: `#${String(species.id).padStart(3, "0")} ${species.name}`,
+          name: `${dexNumber(species)} ${species.name}`,
           value: String(species.id),
         }))
       )
@@ -58,26 +59,38 @@ export default {
       // Tapée à la main, l'espèce peut viser une génération encore fermée.
       const species = raw ? getAvailableSpecies(raw) : null;
       if (raw && !species) {
-        return interaction.reply({
-          content: "❌ Choisis une espèce dans la liste d'autocomplétion.",
-          flags: MessageFlags.Ephemeral,
-        });
+        return interaction
+          .reply({
+            content: "❌ Choisis une espèce dans la liste d'autocomplétion.",
+            flags: MessageFlags.Ephemeral,
+          })
+          .catch(() => {});
       }
       // Réponse privée, comme la boîte : elle ne concerne que celui qui la
       // consulte, et personne d'autre ne tourne ses pages.
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
       // Avec une espèce : qui l'a en double, ou seulement `membre` s'il est
-      // précisé. Sa liste tient en une ligne, sans pages.
+      // précisé — sa boîte suffit alors, et sa liste tient en une ligne.
       if (species) {
-        return getSpeciesDuplicates(species.id, (err, all) => {
+        const read = member
+          ? (cb) =>
+              getIndividuals(member.id, (err, rows) =>
+                cb(
+                  err,
+                  listDuplicates(rows.filter((row) => row.species_id === species.id)).map(
+                    (entry) => ({ userId: member.id, ...entry })
+                  )
+                )
+              )
+          : (cb) => getSpeciesDuplicates(species.id, cb);
+        return read((err, list) => {
           if (err) {
             handleException("Lecture des doublons d'une espèce :", err);
             return interaction
               .editReply({ content: "❌ Impossible de lire les doublons." })
               .catch(() => {});
           }
-          const list = member ? all.filter((entry) => entry.userId === member.id) : all;
           interaction
             .editReply({
               embeds: [buildSpeciesDuplicatesEmbed(species, list, { member })],
