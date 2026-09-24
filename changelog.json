@@ -1730,5 +1730,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "feature",
+      "name": "Courbe des points",
+      "description": "Chaque mouvement de points est désormais journalisé, et la page Admin du site en trace la courbe : la somme des dresseurs cochés, ou une courbe par dresseur.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-24T10:09:44.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    }
+  ]
 }
