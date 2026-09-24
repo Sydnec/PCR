@@ -1293,6 +1293,85 @@ input[type="number"] {
   font-variant-numeric: tabular-nums;
 }
 
+/* ---------- Infos ---------- */
+
+.rules-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* La barre du haut colle en tête de page : une section atteinte par le
+   sommaire ne doit pas passer dessous. */
+.rules-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  scroll-margin-top: 76px;
+}
+
+.rules-section h2 {
+  font-size: 1.1rem;
+}
+
+.rules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding-left: 20px;
+}
+
+.rules-list ul {
+  margin: 4px 0 0;
+  padding-left: 20px;
+}
+
+.rules-commands {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rules-commands li {
+  display: flex;
+  flex-direction: column;
+}
+
+.rules-commands code {
+  overflow-wrap: anywhere;
+  font-size: 0.9rem;
+}
+
+.rules-table {
+  width: 100%;
+  max-width: 560px;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.rules-table th,
+.rules-table td {
+  padding: 6px 8px 6px 0;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.rules-table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.rules-section p {
+  margin: 0;
+}
+
 /* ---------- Œuf ---------- */
 
 .egg {
