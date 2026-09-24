@@ -74,6 +74,7 @@ import {
   sortByCatalogue,
 } from "../pokemon/items.js";
 import { pokemonSellValue, sellPokemon } from "../pokemon/sell.js";
+import { describeRules } from "../pokemon/rules.js";
 import {
   getActiveSpawn,
   getLastEndedSpawn,
@@ -455,6 +456,15 @@ export const routes = [
         description: item.description ?? null,
       })),
     }),
+  },
+
+  // La page Infos : les règles en chiffres, calculés par les fonctions mêmes
+  // qui tirent au sort (rules.js), et les commandes /pk telles que Discord les
+  // connaît.
+  {
+    method: "GET",
+    path: "/api/rules",
+    handler: async (ctx) => describeRules(ctx.bot),
   },
 
   {

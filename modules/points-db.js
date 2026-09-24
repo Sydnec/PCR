@@ -261,6 +261,14 @@ const db = new sqlite3.Database(dbPath, (err) => {
             if (err) handleException("Erreur création index pokemon_owned_entry :", err);
           }
         );
+        // « Qui a cette espèce en double ? » (/pk doublons pokemon) lit une
+        // espèce chez tous les dresseurs : sans cet index, toute la table.
+        db.run(
+          "CREATE INDEX IF NOT EXISTS idx_pokemon_owned_species ON pokemon_owned(species_id)",
+          (err) => {
+            if (err) handleException("Erreur création index pokemon_owned_species :", err);
+          }
+        );
       }
     );
 

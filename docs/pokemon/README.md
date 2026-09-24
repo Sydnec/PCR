@@ -21,6 +21,10 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
   que d'un œuf.
 - `/pk boite [pokemon] [membre]` : les Pokémon un par un, page par page — `#numéro`, sexe, ball,
   date, fertilité, et 🛡️ les verrouillés (voir [Individus](individus.md)).
+- `/pk doublons [membre] [pokemon]` : les espèces qu'un dresseur a en plusieurs exemplaires, dans
+  l'ordre du Pokédex, et combien peuvent s'échanger — tout sauf un par espèce, hors
+  verrouillés 🛡️. Avec une espèce, l'inverse : les dresseurs qui l'ont en double, ceux qui peuvent
+  en céder le plus d'abord. Réponse privée, page par page.
 - `/pk verrou <espece> <individu>` : verrouille ou déverrouille un Pokémon. **Verrouillé, il ne part
   jamais** — ni revente, ni échange, ni sacrifice — mais peut encore évoluer, après confirmation,
   et pondre. Les shiny et les légendaires arrivent verrouillés (`pokemon.lockByDefault`), y compris
@@ -52,7 +56,7 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
   exactement ce qu'il aura, fertilité comprise. **Seuls les doublons s'échangent** : contrairement
   aux jeux, avoir capturé un Pokémon ne suffit pas à le garder au Pokédex, il faut le posséder. Il
   en reste toujours au moins un de chaque espèce, shiny ou non, et l'autocomplétion ne propose que
-  ce qu'on a en trop.
+  ce qu'on a en trop — `/pk doublons membre` le montre avant de proposer.
   **Kadabra, Machopeur, Gravalanch et Spectrum évoluent en changeant de dresseur**, comme en
   première génération : c'est celui qui *reçoit* le Pokémon qui reçoit sa forme évoluée. La
   proposition l'annonce avant le clic, et un shiny reste shiny en évoluant.

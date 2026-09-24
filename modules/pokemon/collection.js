@@ -155,7 +155,7 @@ export function resolveIndividual(ownerId, speciesValue, value, cb) {
 // Les individus comptés par espèce : `total`, dont `normal` et `shiny`, et
 // `free` / `freeNormal` ceux qui ne sont pas verrouillés — les seuls qui
 // peuvent partir. Une entrée de Pokédex est une espèce, et ce qu'elle peut
-// céder se lit ici : tout sauf un, et jamais un verrouillé.
+// céder se lit ici, dans `spare` : tout sauf un, et jamais un verrouillé.
 export function countBySpecies(rows) {
   const counts = new Map();
   for (const row of rows) {
@@ -174,7 +174,49 @@ export function countBySpecies(rows) {
     }
     counts.set(row.species_id, entry);
   }
+  for (const entry of counts.values()) entry.spare = Math.min(entry.free, entry.total - 1);
   return counts;
+}
+
+// Les doublons d'un dresseur, espèce par espèce dans l'ordre du Pokédex : tout
+// ce qui dépasse un exemplaire, avec le `spare` de countBySpecies — la marge
+// que l'échange et les sacrifices revérifient au moment de retirer.
+export function listDuplicates(rows) {
+  return [...countBySpecies(rows)]
+    .filter(([, entry]) => entry.total > 1)
+    .map(([speciesId, entry]) => ({ speciesId, ...entry }))
+    .sort((a, b) => a.speciesId - b.speciesId);
+}
+
+// L'inverse : les dresseurs qui ont `speciesId` en double, ceux qui peuvent en
+// céder le plus d'abord. Chaque ligne est celle de listDuplicates pour ce
+// dresseur, avec son `userId` : la même marge, calculée au même endroit.
+export function getSpeciesDuplicates(speciesId, cb) {
+  db.all(
+    "SELECT * FROM pokemon_owned WHERE species_id = ?",
+    [Number(speciesId)],
+    (err, rows) => {
+      if (err) return cb(err, []);
+      const byUser = new Map();
+      for (const row of rows || []) {
+        if (!byUser.has(row.user_id)) byUser.set(row.user_id, []);
+        byUser.get(row.user_id).push(row);
+      }
+      const list = [];
+      for (const [userId, own] of byUser) {
+        const [entry] = listDuplicates(own);
+        if (entry) list.push({ userId, ...entry });
+      }
+      // L'identifiant départage les égalités : la liste est relue à chaque
+      // page, et un ordre qui bougerait entre deux clics montrerait un
+      // dresseur deux fois et en cacherait un autre.
+      list.sort(
+        (a, b) =>
+          b.spare - a.spare || b.total - a.total || String(a.userId).localeCompare(String(b.userId))
+      );
+      cb(null, list);
+    }
+  );
 }
 
 // Regroupe des individus par espèce et variante, et au besoin par sexe et

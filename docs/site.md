@@ -17,6 +17,7 @@ en donne le lien, en réponse privée (ou dit que le site n'est pas en ligne, ou
 | **Pokédex** | Toutes les espèces des générations ouvertes, celles qu'on possède en couleur. La fiche d'une espèce montre sa lignée et ce que tu en possèdes. |
 | **Sac** | Le solde et les objets. |
 | **Œuf** | L'œuf qui couve, ou le formulaire pour en **pondre** un. |
+| **Infos** | Les règles en bref, avec un sommaire : points, apparitions et raretés, chances de capture par ball et par difficulté, objets (qui les tient, loterie, revente), évolution, œufs, échanges et revente, verrou, parc safari, et les commandes `/pk`. Chaque chiffre vient des réglages en cours. |
 
 Le site ne fait rien que Discord ne fasse pas : tout reste faisable avec `/pk`, sauf le rangement
 du PC (places, noms des boîtes, surnoms), réservé au site parce qu'il ne change rien au jeu. Il ne

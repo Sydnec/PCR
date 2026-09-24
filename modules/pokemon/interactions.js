@@ -36,7 +36,9 @@ import {
   getCollection,
   getIndividuals,
   getOwnedVariantsFor,
+  getSpeciesDuplicates,
   getTrade,
+  listDuplicates,
   resolveTradeAs,
 } from "./collection.js";
 import {
@@ -46,6 +48,10 @@ import {
   buildBoxEmbed,
   buildBoxRow,
   buildDropEmbed,
+  buildDuplicatesEmbed,
+  buildDuplicatesRow,
+  buildSpeciesDuplicatesEmbed,
+  buildSpeciesDuplicatesRow,
   buildSafariRecapEmbed,
   buildSafariView,
   buildSpeciesInfoEmbed,
@@ -264,6 +270,49 @@ function showBoxPage(interaction, ownerId, speciesId, page) {
       .update({
         embeds: [buildBoxEmbed(shown, { user: owner, species, page })],
         components: [buildBoxRow(ownerId, species?.id, page, shown.length)],
+      })
+      .catch(() => {});
+  });
+}
+
+// ---------------------- Doublons ----------------------
+
+// La page demandée des doublons, relue en base à chaque clic, comme la boîte.
+function showDuplicatesPage(interaction, ownerId, page) {
+  getIndividuals(ownerId, async (err, rows) => {
+    if (err) {
+      handleException("Lecture des doublons :", err);
+      return ephemeral(interaction, "❌ Impossible de lire les doublons.");
+    }
+    let owner = { username: "Dresseur inconnu", id: ownerId };
+    try {
+      owner = await interaction.client.users.fetch(ownerId);
+    } catch (error) {
+      // Dresseur parti du serveur : on affiche quand même ses doublons.
+    }
+    const list = listDuplicates(rows);
+    await interaction
+      .update({
+        embeds: [buildDuplicatesEmbed(list, { user: owner, page })],
+        components: [buildDuplicatesRow(ownerId, page, list.length)],
+      })
+      .catch(() => {});
+  });
+}
+
+// L'inverse, qui a cette espèce en double : relu à chaque clic lui aussi.
+function showSpeciesDuplicatesPage(interaction, speciesId, page) {
+  const species = getSpecies(speciesId);
+  if (!species) return ephemeral(interaction, "❌ Espèce inconnue.");
+  getSpeciesDuplicates(species.id, (err, list) => {
+    if (err) {
+      handleException("Lecture des doublons d'une espèce :", err);
+      return ephemeral(interaction, "❌ Impossible de lire les doublons.");
+    }
+    interaction
+      .update({
+        embeds: [buildSpeciesDuplicatesEmbed(species, list, { page })],
+        components: [buildSpeciesDuplicatesRow(species.id, page, list.length)],
       })
       .catch(() => {});
   });
@@ -689,6 +738,12 @@ export async function handlePokemonButton(interaction) {
 
     case "poke_box":
       return showBoxPage(interaction, args[0], Number(args[1]) || null, Number(args[2]) || 0);
+
+    case "poke_dup":
+      return showDuplicatesPage(interaction, args[0], Number(args[1]) || 0);
+
+    case "poke_dupsp":
+      return showSpeciesDuplicatesPage(interaction, Number(args[0]), Number(args[1]) || 0);
 
     // Le cinquième segment, facultatif, est l'objet qui aide l'évolution : une
     // pierre impose alors sa cible, un bonbon remplace un sacrifice manquant.

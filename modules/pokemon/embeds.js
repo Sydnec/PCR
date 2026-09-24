@@ -180,7 +180,7 @@ export function buildInfoRow(spawnId) {
 
 // ====================== FICHE D'ESPÈCE ======================
 
-const dexNumber = (species) => `#${String(species.id).padStart(3, "0")}`;
+export const dexNumber = (species) => `#${String(species.id).padStart(3, "0")}`;
 
 // Les stades tels que le dataset les numérote : 1 = forme de base.
 const STAGE_LABELS = ["Forme de base", "Stade 1", "Stade 2"];
@@ -558,16 +558,24 @@ function individualLine(row) {
 const boxPageSize = () => Math.max(1, Math.floor(getPokemonConfig().box?.pageSize ?? 15));
 export const boxPageCount = (total) => Math.max(1, Math.ceil(total / boxPageSize()));
 
+// La page affichée d'une liste paginée comme la boîte, et les bornes de sa
+// tranche. Une page hors limites retombe sur la dernière : la liste a pu
+// raccourcir entre deux clics.
+function pageOf(total, page) {
+  const pages = boxPageCount(total);
+  const current = Math.min(Math.max(0, page), pages - 1);
+  const size = boxPageSize();
+  return { pages, current, start: current * size, end: (current + 1) * size };
+}
+
 // La boîte d'un dresseur : ses Pokémon un par un, les plus récents d'abord, ou
 // seulement ceux d'une espèce, page par page. Chaque ligne commence par
 // l'identifiant qu'acceptent les commandes (#123). Une page hors limites
 // retombe sur la dernière : la boîte a pu se vider entre deux clics.
 export function buildBoxEmbed(rows, { user, species = null, page = 0 } = {}) {
   const sorted = [...rows].sort((a, b) => b.obtained_at - a.obtained_at || b.id - a.id);
-  const pages = boxPageCount(sorted.length);
-  const current = Math.min(Math.max(0, page), pages - 1);
-  const size = boxPageSize();
-  const shown = sorted.slice(current * size, (current + 1) * size);
+  const { pages, current, start, end } = pageOf(sorted.length, page);
+  const shown = sorted.slice(start, end);
   const embed = new EmbedBuilder()
     .setTitle(
       `\u{1F4E6} Boîte de ${user.displayName ?? user.username}` +
@@ -590,32 +598,123 @@ export function buildBoxEmbed(rows, { user, species = null, page = 0 } = {}) {
     });
 }
 
-// Les boutons de page de la boîte. Le propriétaire et l'espèce filtrée voyagent
-// dans le customId : un redémarrage du bot n'y change rien. Sur une ou deux
+// Les trois boutons de page — ◀, le numéro, ▶ — de la boîte, du Pokédex et des
+// doublons. Ce qu'il faut pour relire la page voyage dans le customId (`base`,
+// puis la page visée) : un redémarrage du bot n'y change rien. Sur une ou deux
 // pages, ◀ et ▶ visent la même : le sens, en dernier segment, les distingue —
 // Discord refuse tout message dont deux boutons partagent un customId, et la
 // boîte ne s'affichait pas.
-export function buildBoxRow(ownerId, speciesId, page, total) {
-  const pages = boxPageCount(total);
-  const current = Math.min(Math.max(0, page), pages - 1);
-  const id = (target, sens) => `poke_box|${ownerId}|${speciesId ?? 0}|${target}|${sens}`;
+function pageRow(base, noopId, current, pages) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId(id((current - 1 + pages) % pages, "prev"))
+      .setCustomId(`${base}|${(current - 1 + pages) % pages}|prev`)
       .setLabel("◀")
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(pages <= 1),
     new ButtonBuilder()
-      .setCustomId(`poke_box_noop|${ownerId}`)
+      .setCustomId(noopId)
       .setLabel(`${current + 1}/${pages}`)
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(true),
     new ButtonBuilder()
-      .setCustomId(id((current + 1) % pages, "next"))
+      .setCustomId(`${base}|${(current + 1) % pages}|next`)
       .setLabel("▶")
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(pages <= 1)
   );
+}
+
+// Les boutons de page de la boîte : le propriétaire et l'espèce filtrée.
+export function buildBoxRow(ownerId, speciesId, page, total) {
+  const { pages, current } = pageOf(total, page);
+  return pageRow(`poke_box|${ownerId}|${speciesId ?? 0}`, `poke_box_noop|${ownerId}`, current, pages);
+}
+
+// Revendre, non : légendaires et shiny n'ont pas de prix. S'échanger, oui.
+const DUPLICATES_NOTE =
+  "Il reste toujours un exemplaire de chaque espèce, et un verrouillé 🛡️ ne part pas : " +
+  "le reste peut s'échanger.";
+const fr = (value) => value.toLocaleString("fr-FR");
+
+// Les chiffres d'une ligne de doublons (listDuplicates) : combien, dont combien
+// de shiny, combien peuvent partir — en gras, c'est ce qui compte pour un
+// échange — et combien sont verrouillés.
+function duplicateCounts(entry) {
+  const locked = entry.total - entry.free;
+  return (
+    `×${fr(entry.total)}` +
+    (entry.shiny ? ` (dont ${fr(entry.shiny)} ✨)` : "") +
+    ` · **${fr(entry.spare)}** échangeable${entry.spare > 1 ? "s" : ""}` +
+    (locked ? ` · ${fr(locked)} 🛡️` : "")
+  );
+}
+
+// Le pied d'une liste de doublons : la page, combien de lignes (`what`, au
+// singulier et au pluriel), combien de Pokémon peuvent partir en tout.
+function duplicatesFooter(list, current, pages, [one, many]) {
+  const spare = list.reduce((sum, entry) => sum + entry.spare, 0);
+  return {
+    text:
+      `Page ${current + 1}/${pages} · ${fr(list.length)} ${list.length > 1 ? many : one} · ` +
+      `${fr(spare)} Pokémon échangeable${spare > 1 ? "s" : ""}`,
+  };
+}
+
+// Les doublons d'un dresseur (listDuplicates), une ligne par espèce, page par
+// page comme la boîte.
+export function buildDuplicatesEmbed(list, { user, page = 0 } = {}) {
+  const { pages, current, start, end } = pageOf(list.length, page);
+  const embed = new EmbedBuilder()
+    .setTitle(`\u{1F501} Doublons de ${user.displayName ?? user.username}`)
+    .setColor(0x3b88c3);
+  // Rien sur la boîte elle-même : elle peut être vide.
+  if (!list.length) return embed.setDescription("*Aucun doublon pour l'instant.*");
+  const lines = list.slice(start, end).map((entry) => {
+    const species = getSpecies(entry.speciesId);
+    return (
+      `\`${species ? dexNumber(species) : `#${entry.speciesId}`}\` **${species?.name ?? "?"}** ` +
+      duplicateCounts(entry)
+    );
+  });
+  return embed
+    .setDescription(`${DUPLICATES_NOTE}\n\n${lines.join("\n")}`)
+    .setFooter(duplicatesFooter(list, current, pages, ["espèce en double", "espèces en double"]));
+}
+
+// L'inverse : qui a cette espèce en double (getSpeciesDuplicates), une ligne
+// par dresseur. La mention n'a sa place que dans la description : Discord ne
+// la rend pas dans un titre. `member` restreint la liste à un dresseur.
+export function buildSpeciesDuplicatesEmbed(species, list, { page = 0, member = null } = {}) {
+  const { pages, current, start, end } = pageOf(list.length, page);
+  const embed = new EmbedBuilder()
+    .setTitle(`\u{1F501} ${species.name} en double`)
+    .setColor(embedColor(species, false))
+    .setThumbnail(spriteUrl(species, false));
+  if (!list.length) {
+    return embed.setDescription(
+      member
+        ? `*<@${member.id}> n'a pas de ${species.name} en double.*`
+        : `*Personne n'a de ${species.name} en double pour l'instant.*`
+    );
+  }
+  const lines = list
+    .slice(start, end)
+    .map((entry) => `<@${entry.userId}> ${duplicateCounts(entry)}`);
+  return embed
+    .setDescription(`${DUPLICATES_NOTE}\n\n${lines.join("\n")}`)
+    .setFooter(duplicatesFooter(list, current, pages, ["dresseur", "dresseurs"]));
+}
+
+// Les boutons de page des doublons : le dresseur dont on lit la boîte.
+export function buildDuplicatesRow(ownerId, page, total) {
+  const { pages, current } = pageOf(total, page);
+  return pageRow(`poke_dup|${ownerId}`, `poke_dup_noop|${ownerId}`, current, pages);
+}
+
+// Les boutons de page de « qui a cette espèce en double » : l'espèce suffit.
+export function buildSpeciesDuplicatesRow(speciesId, page, total) {
+  const { pages, current } = pageOf(total, page);
+  return pageRow(`poke_dupsp|${speciesId}`, `poke_dupsp_noop|${speciesId}`, current, pages);
 }
 
 export function buildInventoryEmbed(rows, { user = null } = {}) {
@@ -747,26 +846,7 @@ export function buildDexEmbed(targetUser, rows, page) {
 }
 
 export function buildDexRow(targetUserId, page) {
-  const pages = dexPageCount();
-  return new ActionRowBuilder().addComponents(
-    // Le sens en dernier segment, comme pour la boîte : deux customId égaux
-    // font refuser le message.
-    new ButtonBuilder()
-      .setCustomId(`poke_dex|${targetUserId}|${(page - 1 + pages) % pages}|prev`)
-      .setLabel("◀")
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(pages <= 1),
-    new ButtonBuilder()
-      .setCustomId(`poke_dex_noop|${targetUserId}`)
-      .setLabel(`${page + 1}/${pages}`)
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(true),
-    new ButtonBuilder()
-      .setCustomId(`poke_dex|${targetUserId}|${(page + 1) % pages}|next`)
-      .setLabel("▶")
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(pages <= 1)
-  );
+  return pageRow(`poke_dex|${targetUserId}`, `poke_dex_noop|${targetUserId}`, page, dexPageCount());
 }
 
 // ====================== ÉCHANGES ======================

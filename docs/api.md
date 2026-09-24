@@ -51,6 +51,7 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
 | `GET /api/species` | `{ generation, species: [...] }` — espèces des générations ouvertes |
 | `GET /api/species/:id` | fiche + `chain` (lignée) |
 | `GET /api/catalogue` | `{ balls, items, types }` — clés, noms et emoji (`<:nom:id>` pour ceux du serveur), couleur de chaque type |
+| `GET /api/rules` | Les règles en chiffres pour la page Infos (`modules/pokemon/rules.js`) : `points`, `spawn` (dont `rarities`, part de chaque rareté), `capture` (balls et `table` des chances par difficulté), `items` (`held`, `lottery`, `lot`, `sellValue`), `lottery`, `evolution`, `eggs`, `trade`, `sell`, `lock`, `safari`, et les `commands` /pk. Lus dans la configuration ou calculés par les fonctions des tirages |
 | `GET /api/species/:id/evolution?targetId&helper` | coût d'une évolution : `{ targets, sacrifices, required, points, helper }` — `required` compte celui qui évolue et celui qui reste, shiny ou non |
 | `GET /api/users/:userId/pokedex` 🔒 | `{ dexSize, entries: [{ speciesId, shiny, count, firstCaughtAt }] }` |
 | `GET /api/users/:userId/box` 🔒 | `{ total, page, pages, pageSize, items }` |

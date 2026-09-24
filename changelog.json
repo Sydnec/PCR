@@ -1669,5 +1669,26 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "feature",
+      "name": "/pk doublons",
+      "description": "Nouvelle commande /pk doublons : les Pokémon qu'un dresseur a en plusieurs exemplaires, et combien peuvent s'échanger. Avec une espèce, elle liste les dresseurs qui l'ont en double.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-24T12:00:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "feature",
+      "name": "Page Infos du site",
+      "description": "Le site a une page Infos : les règles du jeu en bref, les chances de chaque tirage, les objets et les commandes, avec les réglages en cours.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-24T13:00:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    }
+  ]
 }
