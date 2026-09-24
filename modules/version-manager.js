@@ -29,7 +29,15 @@ export function readChangelog() {
         fs.writeFileSync(CHANGELOG_FILE, JSON.stringify(defaultChangelog, null, 2), { flag: 'wx' });
         return defaultChangelog;
     } catch (error) {
-        if (error.code === 'EEXIST') return readChangelog();
+        if (error.code !== 'EEXIST') {
+            throw new Error(`Erreur lors de la création du changelog: ${error.message}`);
+        }
+    }
+    // Apparu entre-temps : on le lit, une fois. Un lien vers un fichier absent
+    // répondrait encore ENOENT, et relire indéfiniment ne le ferait pas exister.
+    try {
+        return JSON.parse(fs.readFileSync(CHANGELOG_FILE, 'utf8'));
+    } catch (error) {
         throw new Error(`Erreur lors de la lecture du changelog: ${error.message}`);
     }
 }

@@ -127,9 +127,16 @@ function handleException(...args) {
 	error(...args);
 }
 // Une ligne de journal par entrée : un pseudo ou un message qui contiendrait
-// des retours à la ligne ne doit pas pouvoir y fabriquer de fausses lignes.
-// Seul le texte est touché — une erreur garde sa pile, sur plusieurs lignes.
-const oneLine = (arg) => (typeof arg === 'string' ? arg.replace(/[\n\r]/g, ' ') : arg);
+// des retours à la ligne, ou des séquences qui déplacent le curseur d'un
+// terminal, ne doit pas pouvoir y fabriquer de fausses lignes. Seul le texte
+// est touché — une erreur garde sa pile, sur plusieurs lignes.
+const oneLine = (arg) =>
+	typeof arg === 'string'
+		? arg
+				.replace(/[\n\r]/g, ' ')
+				// eslint-disable-next-line no-control-regex -- ce sont eux qu'on retire
+				.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, ' ')
+		: arg;
 function log(...args) {
 	const messageWithDate = [`${formatDate()} -`, ...args.map(oneLine)];
 	console.log(...messageWithDate);

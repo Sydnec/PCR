@@ -1717,7 +1717,7 @@
     {
       "type": "fix",
       "name": "Liens X et Instagram",
-      "description": "Le bot ne réécrit plus que les liens qui mènent vraiment à X ou à Instagram : une adresse qui ne fait que leur ressembler reste telle quelle.",
+      "description": "Le bot ne réécrit plus que les liens qui mènent vraiment à X ou à Instagram, en une seule copie même s'il y a les deux, et ne supprime ton message qu'une fois sa copie publiée.",
       "announce": false,
       "author": "Sydnec",
       "commit": "pending",

@@ -4,7 +4,7 @@ import pointsDb from "../../modules/points-db.js";
 import { registerMessageForSpawn } from "../../modules/pokemon/spawn.js";
 import { countEggMessage } from "../../modules/pokemon/eggs.js";
 import { emojiRegex } from "../../modules/regex.js";
-import { rewriteInstagram, rewriteTwitter } from "../../modules/links.js";
+import { rewriteSocialLinks } from "../../modules/links.js";
 import { getConfig } from "../../modules/config.js";
 import dotenv from "dotenv";
 
@@ -158,35 +158,18 @@ async function execute(message) {
       }
     }
 
-    // --- Twitter to vxtwitter ---
-    const twitterContent = rewriteTwitter(messageContent);
-    if (twitterContent) {
-      const newMessageContent = twitterContent;
+    // --- Liens X et Instagram vers leurs miroirs, qui ont un aperçu ---
+    const rewritten = rewriteSocialLinks(messageContent);
+    // Un message Discord tient en 2 000 caractères : au-delà, la copie
+    // échouerait, et l'original reste.
+    const repost = rewritten && `<@${message.author.id}> a envoyé :\n${rewritten}`;
+    if (repost && repost.length <= 2000) {
       message.channel
-        .send("Remplacement de lien twitter")
-        .then((newMessage) => {
-          // Modifiez le message en ajoutant une mention
-          newMessage.edit(
-            `<@!${message.author.id}> a envoyé : \n${newMessageContent}`
-          );
-        })
-        .then(message.delete())
-        .catch((err) => handleException(err));
-    }
-
-    // --- Instagram to kkinstagram (uniquement pour les reels) ---
-    const instagramContent = rewriteInstagram(messageContent);
-    if (instagramContent) {
-      const newMessageContent = instagramContent;
-      message.channel
-        .send("Ajout de lien kkinstagram pour reel")
-        .then((newMessage) => {
-          newMessage.edit(
-            `<@!${message.author.id}> a envoyé : \n${newMessageContent}`
-          );
-        })
-        .then(message.delete())
-        .catch((err) => handleException(err));
+        // La mention dit qui l'a envoyé, sans le notifier.
+        .send({ content: repost, allowedMentions: { parse: [] } })
+        // L'original ne part qu'une fois la copie publiée : rien ne se perd.
+        .then(() => message.delete())
+        .catch((err) => handleException("Remplacement de lien :", err));
     }
   } catch (err) {
     handleException(err);
