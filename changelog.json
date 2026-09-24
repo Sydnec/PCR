@@ -1713,5 +1713,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "fix",
+      "name": "Liens X et Instagram",
+      "description": "Le bot ne réécrit plus que les liens qui mènent vraiment à X ou à Instagram : une adresse qui ne fait que leur ressembler reste telle quelle.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-24T15:00:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    }
+  ]
 }

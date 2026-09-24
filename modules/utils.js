@@ -126,12 +126,16 @@ function handleException(...args) {
 	// silencieusement perdue et les logs n'indiquaient pas la cause.
 	error(...args);
 }
+// Une ligne de journal par entrée : un pseudo ou un message qui contiendrait
+// des retours à la ligne ne doit pas pouvoir y fabriquer de fausses lignes.
+// Seul le texte est touché — une erreur garde sa pile, sur plusieurs lignes.
+const oneLine = (arg) => (typeof arg === 'string' ? arg.replace(/[\n\r]/g, ' ') : arg);
 function log(...args) {
-	const messageWithDate = [`${formatDate()} -`, ...args];
+	const messageWithDate = [`${formatDate()} -`, ...args.map(oneLine)];
 	console.log(...messageWithDate);
 }
 function error(...args) {
-	const messageWithDate = [`${formatDate()} -`, ...args];
+	const messageWithDate = [`${formatDate()} -`, ...args.map(oneLine)];
 	console.error(...messageWithDate);
 }
 function formatDate() {

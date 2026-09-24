@@ -4,8 +4,7 @@ import pointsDb from "../../modules/points-db.js";
 import { registerMessageForSpawn } from "../../modules/pokemon/spawn.js";
 import { countEggMessage } from "../../modules/pokemon/eggs.js";
 import { emojiRegex } from "../../modules/regex.js";
-import { twitterRegex } from "../../modules/regex.js";
-import { instagramRegex } from "../../modules/regex.js";
+import { rewriteInstagram, rewriteTwitter } from "../../modules/links.js";
 import { getConfig } from "../../modules/config.js";
 import dotenv from "dotenv";
 
@@ -47,12 +46,11 @@ async function execute(message) {
         // Initialisation si l'utilisateur n'existe pas dans la table (ou champs null pour anciens users)
         let lastMessageAt = row && row.last_message_at ? row.last_message_at : 0;
         let countToday = row && row.messages_today_count ? row.messages_today_count : 0;
-        let lastResetDate = row && row.last_reset_date ? row.last_reset_date : "";
+        const lastResetDate = row && row.last_reset_date ? row.last_reset_date : "";
 
         // Si on a changé de jour, reset du compteur
         if (lastResetDate !== today) {
             countToday = 0;
-            lastResetDate = today;
             // On peut reset lastMessageAt pour permettre le premier message du jour (évite d'attendre 1h après minuit si msg à 23h30)
             lastMessageAt = 0;
         }
@@ -161,12 +159,9 @@ async function execute(message) {
     }
 
     // --- Twitter to vxtwitter ---
-    if (twitterRegex.test(messageContent)) {
-      // Remplacez les occurrences trouvées par "fxtwitter.com"
-      const newMessageContent = messageContent.replace(
-        twitterRegex,
-        "https://vxtwitter.com"
-      );
+    const twitterContent = rewriteTwitter(messageContent);
+    if (twitterContent) {
+      const newMessageContent = twitterContent;
       message.channel
         .send("Remplacement de lien twitter")
         .then((newMessage) => {
@@ -180,12 +175,9 @@ async function execute(message) {
     }
 
     // --- Instagram to kkinstagram (uniquement pour les reels) ---
-    if (instagramRegex.test(messageContent)) {
-      // Remplacer instagram.com par kkinstagram.com
-      const newMessageContent = messageContent.replace(
-        instagramRegex,
-        "https://kkinstagram.com/reel/"
-      );
+    const instagramContent = rewriteInstagram(messageContent);
+    if (instagramContent) {
+      const newMessageContent = instagramContent;
       message.channel
         .send("Ajout de lien kkinstagram pour reel")
         .then((newMessage) => {
