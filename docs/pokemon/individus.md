@@ -24,7 +24,7 @@ d'une espèce.
 Chaque Pokémon a un **numéro** (`#123`), affiché en tête de sa ligne dans `/pk boite`. Il ne
 change jamais, même quand le Pokémon évolue ou change de dresseur. `/pk evolution`, `/pk echange`
 et `/pk revendre pokemon` demandent l'espèce, puis l'individu parmi les siens, désigné par son
-numéro. `/pk oeuf pondre` accepte un groupe ou `#123` ; l'autocomplétion propose les numéros dès
+numéro — facultatif pour l'évolution et la revente, où le bot choisit sinon. `/pk oeuf pondre` accepte un groupe ou `#123` ; l'autocomplétion propose les numéros dès
 qu'on tape `#`.
 
 Sur le [site](../site.md#boîte-pc), chacun range aussi ses Pokémon dans les boîtes de son PC et
@@ -55,9 +55,10 @@ les **stériles**, puis **les plus récents** — et jamais un verrouillé.
 
 - **Revente** : un individu précis, ou `quantite` normaux de l'espèce choisis par le bot. Un shiny
   se choisit, il ne part jamais dans le lot.
-- **Évolution** : on choisit l'individu qui **évolue** ; il reste lui-même — numéro, ball, sexe,
-  fertilité, shiny. Les **sacrifices**, de n'importe quel sexe et de n'importe quelle variante, sont
-  choisis par le bot et disparaissent.
+- **Évolution** : on choisit l'individu qui **évolue**, ou on laisse le bot faire : il prend
+  d'abord les sacrifices, puis fait évoluer le suivant dans le même ordre, jamais un verrouillé.
+  Celui qui évolue reste lui-même — numéro, ball, sexe, fertilité, shiny. Les **sacrifices**, de
+  n'importe quel sexe et de n'importe quelle variante, sont choisis par le bot et disparaissent.
 - **Échange** : un individu précis de chaque côté, fertilité comprise — qui reçoit une femelle
   fertile doit pouvoir compter dessus : si elle pond ou est verrouillée entre-temps, l'échange
   échoue. L'individu change de dresseur sans cesser d'être lui-même : numéro, shiny, ball,

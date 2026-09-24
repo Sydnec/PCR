@@ -122,14 +122,20 @@ export const sexSymbol = (sex) => SEXES[sex]?.symbol ?? "";
 // Métamorph, les légendaires…) n'ont pas de sexe ici non plus.
 export const isGenderless = (species) => Number(species?.genderRate) === -1;
 
-// Le sexe d'un nouvel individu, tiré selon la proportion des jeux :
-// `genderRate` est la part de femelles en huitièmes. NULL pour une espèce
-// asexuée.
-export function rollSex(species) {
+// La part de femelles d'une espèce, selon la proportion des jeux :
+// `genderRate` est en huitièmes, la moitié à défaut. null pour une espèce
+// asexuée. Ce que les fiches affichent est ce que rollSex tire.
+export function femaleShare(species) {
   if (isGenderless(species)) return null;
   const rate = Number(species?.genderRate);
-  const femaleShare = rate >= 0 && rate <= 8 ? rate / 8 : 0.5;
-  return Math.random() < femaleShare ? "F" : "M";
+  return rate >= 0 && rate <= 8 ? rate / 8 : 0.5;
+}
+
+// Le sexe d'un nouvel individu. NULL pour une espèce asexuée.
+export function rollSex(species) {
+  const share = femaleShare(species);
+  if (share === null) return null;
+  return Math.random() < share ? "F" : "M";
 }
 
 // Le sexe d'un individu qui change d'espèce, en évoluant ou en étant échangé :

@@ -14,6 +14,7 @@ import {
   difficultyLabel,
   embedColor,
   evolutionChain,
+  femaleShare,
   getSpecies,
   isEggOnly,
   isEvolutionOnly,
@@ -36,6 +37,17 @@ const formatPercent = (probability) => {
   if (percent >= 1) return `${percent.toFixed(1)} %`;
   return `${percent.toFixed(2)} %`;
 };
+
+// La répartition des sexes d'une espèce, celle que tire rollSex : des
+// huitièmes, donc au plus une décimale (87,5 %). « Asexué » pour Magnéti,
+// Métamorph ou les légendaires.
+function genderLine(species) {
+  const share = femaleShare(species);
+  if (share === null) return "Asexué";
+  const pct = (value) =>
+    `${(value * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %`;
+  return `${sexSymbol("M")} ${pct(1 - share)} · ${sexSymbol("F")} ${pct(share)}`;
+}
 
 // Un instant rendu par Discord dans le fuseau de celui qui lit. Il ne s'affiche
 // que dans une description ou une valeur de champ — jamais dans un titre ni un
@@ -240,7 +252,9 @@ export function buildSpeciesInfoEmbed(
           difficultyLabel(catchRate) +
           (ball ? `\n${ball.emoji} ${formatPercent(ball.probability)}` : ""),
         inline: true,
-      }
+      },
+      // Seul sur sa ligne : les stades qui suivent en occupent une à eux.
+      { name: "Sexe", value: genderLine(species), inline: false }
     );
 
   // Un champ par stade : la rangée se lit de gauche à droite comme la lignée
@@ -577,14 +591,17 @@ export function buildBoxEmbed(rows, { user, species = null, page = 0 } = {}) {
 }
 
 // Les boutons de page de la boîte. Le propriétaire et l'espèce filtrée voyagent
-// dans le customId : un redémarrage du bot n'y change rien.
+// dans le customId : un redémarrage du bot n'y change rien. Sur une ou deux
+// pages, ◀ et ▶ visent la même : le sens, en dernier segment, les distingue —
+// Discord refuse tout message dont deux boutons partagent un customId, et la
+// boîte ne s'affichait pas.
 export function buildBoxRow(ownerId, speciesId, page, total) {
   const pages = boxPageCount(total);
   const current = Math.min(Math.max(0, page), pages - 1);
-  const id = (target) => `poke_box|${ownerId}|${speciesId ?? 0}|${target}`;
+  const id = (target, sens) => `poke_box|${ownerId}|${speciesId ?? 0}|${target}|${sens}`;
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId(id((current - 1 + pages) % pages))
+      .setCustomId(id((current - 1 + pages) % pages, "prev"))
       .setLabel("◀")
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(pages <= 1),
@@ -594,7 +611,7 @@ export function buildBoxRow(ownerId, speciesId, page, total) {
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(true),
     new ButtonBuilder()
-      .setCustomId(id((current + 1) % pages))
+      .setCustomId(id((current + 1) % pages, "next"))
       .setLabel("▶")
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(pages <= 1)
@@ -732,8 +749,10 @@ export function buildDexEmbed(targetUser, rows, page) {
 export function buildDexRow(targetUserId, page) {
   const pages = dexPageCount();
   return new ActionRowBuilder().addComponents(
+    // Le sens en dernier segment, comme pour la boîte : deux customId égaux
+    // font refuser le message.
     new ButtonBuilder()
-      .setCustomId(`poke_dex|${targetUserId}|${(page - 1 + pages) % pages}`)
+      .setCustomId(`poke_dex|${targetUserId}|${(page - 1 + pages) % pages}|prev`)
       .setLabel("◀")
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(pages <= 1),
@@ -743,7 +762,7 @@ export function buildDexRow(targetUserId, page) {
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(true),
     new ButtonBuilder()
-      .setCustomId(`poke_dex|${targetUserId}|${(page + 1) % pages}`)
+      .setCustomId(`poke_dex|${targetUserId}|${(page + 1) % pages}|next`)
       .setLabel("▶")
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(pages <= 1)

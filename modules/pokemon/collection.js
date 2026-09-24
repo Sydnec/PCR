@@ -124,13 +124,20 @@ export function resolveSelector(ownerId, value, cb) {
   });
 }
 
+// L'espèce que désigne la première option d'une commande, revalidée : tapée à
+// la main ou périmée, elle peut ne rien désigner.
+export function resolveSpecies(value) {
+  const species = getSpecies(Number(value));
+  return species ? { species } : { error: "Choisis l'espèce dans la liste d'autocomplétion." };
+}
+
 // L'individu que désigne la seconde option d'une commande, une fois l'espèce
 // choisie dans la première : il doit appartenir à `ownerId` et être de cette
 // espèce. Les deux valeurs se revalident, puisqu'elles peuvent être tapées à
 // la main ou périmées.
 export function resolveIndividual(ownerId, speciesValue, value, cb) {
-  const species = getSpecies(Number(speciesValue));
-  if (!species) return cb(null, { error: "Choisis l'espèce dans la liste d'autocomplétion." });
+  const { species, error } = resolveSpecies(speciesValue);
+  if (error) return cb(null, { error });
   if (!parseIndividual(value)) {
     return cb(null, { error: `Choisis le ${species.name} dans la liste d'autocomplétion.` });
   }
@@ -618,8 +625,10 @@ export function describeEvolution(speciesId, chosenTargetId = null, helperKey = 
 // `group.pokemonId` désigne l'individu qui évolue ; sans `speciesId`, son espèce
 // se lit sur lui. Avec, c'est l'espèce attendue : la réservation ne le prend
 // que s'il l'a encore, ce qui refuse un second clic sur un Pokémon qui vient
-// d'évoluer. Un groupe sans identifiant — les boutons d'avant le choix de
-// l'individu — en fait évoluer un du sexe et de la variante demandés.
+// d'évoluer. Sans identifiant ni variante ni sexe — /pk evolution sans
+// individu —, le bot choisit celui qui évolue (voir plus bas). Un groupe avec
+// variante — les boutons d'avant le choix de l'individu — en fait évoluer un
+// du sexe et de la variante demandés.
 export function evolve(userId, group, chosenTargetId, helperKey, cb) {
   if (group.pokemonId && !group.speciesId) {
     return resolveSelector(userId, encodeIndividual(group.pokemonId), (err, selector) => {
@@ -775,6 +784,79 @@ export function evolve(userId, group, chosenTargetId, helperKey, cb) {
     });
   };
 
+  // Combien d'exemplaires de l'espèce sacrifier, et combien de Métamorph pour
+  // le reste. `owned` compte l'espèce, celui qui évolue compris. Rend null
+  // après avoir répondu quand l'évolution ne peut pas se payer.
+  const dimensionner = (owned, rendreAvant) => {
+    const fill = sacrificeFill(plan, owned);
+    if (fill.missing > 0 && !ditto) {
+      rendreAvant(manque);
+      return null;
+    }
+    const metamorph = fill.dittos > 0 ? dittoSpecies() : null;
+    if (fill.dittos > 0 && !metamorph) {
+      rendreAvant(() =>
+        cb(null, { ok: false, reason: "Métamorph n'est pas disponible dans cette génération." })
+      );
+      return null;
+    }
+    return { fill, metamorph };
+  };
+
+  // Métamorph pour ce qui manque — assez d'exemplaires, il reste dans la boîte,
+  // même demandé —, puis l'aide. `pris` commence par l'individu qui évolue,
+  // suivi des sacrifices de l'espèce.
+  const completer = (pris, { fill, metamorph }) =>
+    prendre(
+      pris,
+      { speciesId: metamorph?.id },
+      fill.dittos,
+      () => manqueMetamorph(metamorph, fill),
+      (reserved) =>
+        prendreAide(
+          reserved,
+          {
+            sacrifices: fill.real,
+            dittos: fill.dittos,
+            // Les normaux partent d'abord ; un shiny sacrifié ne se
+            // rattrape pas, le message le dit.
+            shinies: reserved.slice(1).filter((row) => row.is_shiny).length,
+          },
+          rendre(reserved)
+        )
+    );
+
+  // Sans individu désigné, le bot choisit : les sacrifices d'abord, les moins
+  // précieux de l'espèce (les normaux, puis les stériles, puis les plus
+  // récents), puis celui qui évolue, le suivant dans le même ordre. Dans
+  // l'autre sens, le moins précieux évoluait et un shiny pouvait partir en
+  // sacrifice à sa place. Jamais un verrouillé : il n'évolue que désigné.
+  if (!pokemonId && anyVariant(isShiny) && !sex) {
+    return compter((err, owned) => {
+      if (err) return cb(err);
+      if (!owned.free) {
+        return cb(null, {
+          ok: false,
+          reason:
+            `${evolutionShortage(plan, owned)} Le bot ne fait jamais évoluer un verrouillé de ` +
+            `lui-même : choisis-le dans l'option « individu ».`,
+        });
+      }
+      // Un libre est gardé pour évoluer : les sacrifices se prennent parmi les
+      // autres.
+      const dims = dimensionner({ total: owned.total, free: owned.free - 1 }, (suite) => suite());
+      if (!dims) return;
+      prendre([], { speciesId }, dims.fill.real, aChange, (sacrifices) =>
+        reserveDuplicates(userId, { speciesId }, 1, (err, evolvers) => {
+          if (err || !evolvers.length) {
+            return rendre(sacrifices)(() => (err ? cb(err) : aChange()));
+          }
+          completer([...evolvers, ...sacrifices], dims);
+        })
+      );
+    });
+  }
+
   // Un verrouillé n'est pris qu'avec la confirmation : sans elle, il ne quitte
   // jamais la boîte, et une relecture dit pourquoi rien n'a bougé.
   const evolverGroup = {
@@ -815,37 +897,10 @@ export function evolve(userId, group, chosenTargetId, helperKey, cb) {
       if (err) return rendre(evolvers)(() => cb(err));
       // Le compte ne voit plus l'individu qui évolue, déjà réservé : `free`
       // est exactement ce qui peut être sacrifié.
-      const fill = sacrificeFill(plan, { total: owned.total + 1, free: owned.free });
-      if (fill.missing > 0 && !ditto) return rendre(evolvers)(manque);
-      const metamorph = fill.dittos > 0 ? dittoSpecies() : null;
-      if (fill.dittos > 0 && !metamorph) {
-        return rendre(evolvers)(() =>
-          cb(null, { ok: false, reason: "Métamorph n'est pas disponible dans cette génération." })
-        );
-      }
-      // Les sacrifices de l'espèce, shiny ou non (les normaux d'abord), puis
-      // Métamorph pour ce qui manque. Assez d'exemplaires : Métamorph reste
-      // dans la boîte, même demandé.
-      prendre(evolvers, { speciesId }, fill.real, aChange, (pris) =>
-        prendre(
-          pris,
-          { speciesId: metamorph?.id },
-          fill.dittos,
-          () => manqueMetamorph(metamorph, fill),
-          (reserved) =>
-            prendreAide(
-              reserved,
-              {
-                sacrifices: fill.real,
-                dittos: fill.dittos,
-                // Les normaux partent d'abord ; un shiny sacrifié ne se
-                // rattrape pas, le message le dit.
-                shinies: reserved.slice(1).filter((row) => row.is_shiny).length,
-              },
-              rendre(reserved)
-            )
-        )
-      );
+      const dims = dimensionner({ total: owned.total + 1, free: owned.free }, rendre(evolvers));
+      if (!dims) return;
+      // Les sacrifices de l'espèce, shiny ou non (les normaux d'abord).
+      prendre(evolvers, { speciesId }, dims.fill.real, aChange, (pris) => completer(pris, dims));
     });
   });
 }

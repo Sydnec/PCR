@@ -271,17 +271,19 @@ function showBoxPage(interaction, ownerId, speciesId, page) {
 
 // ---------------------- Évolution ----------------------
 
-// Le deuxième segment des boutons d'évolution porte la variante et le sexe de
-// l'individu qui évolue : « 1F » pour une femelle shiny, « 0 » pour n'importe
-// quel sexe — le format d'avant, que les anciens boutons portent encore.
-// « #123 » désigne un individu précis.
-const parseVariant = (raw) =>
-  String(raw).startsWith("#")
-    ? { pokemonId: Number(String(raw).slice(1)) || null }
-    : {
-        isShiny: String(raw).startsWith("1"),
-        sex: ["M", "F"].includes(String(raw).slice(1)) ? String(raw).slice(1) : null,
-      };
+// Le deuxième segment des boutons d'évolution désigne l'individu qui évolue :
+// « #123 » un individu précis, « * » celui que le bot choisira au clic, shiny ou
+// non. « 1F » pour une femelle shiny, « 0 » pour n'importe quel sexe, c'est le
+// format d'avant, que les anciens boutons portent encore.
+const parseVariant = (raw) => {
+  const value = String(raw);
+  if (value.startsWith("#")) return { pokemonId: Number(value.slice(1)) || null };
+  if (value === "*") return { isShiny: null, sex: null };
+  return {
+    isShiny: value.startsWith("1"),
+    sex: ["M", "F"].includes(value.slice(1)) ? value.slice(1) : null,
+  };
+};
 
 // `confirmed` : le dresseur a confirmé l'évolution d'un Pokémon verrouillé.
 // Sans elle, evolve n'y touche pas et répond `locked` ; le message propose
@@ -367,6 +369,8 @@ function runEvolution(
   });
 }
 
+// `variant` est le segment brut du bouton : il passe tel quel aux boutons des
+// cibles, qui désignent le même individu — ou laissent le même choix au bot.
 function showEvolutionChoices(interaction, speciesId, variant, helperKey = null) {
   const plan = describeEvolution(speciesId);
   if (plan.error) {
@@ -380,11 +384,7 @@ function showEvolutionChoices(interaction, speciesId, variant, helperKey = null)
     row.addComponents(
       new ButtonBuilder()
         .setCustomId(
-          `poke_evo_pick|${speciesId}|` +
-            (variant.pokemonId
-              ? `#${variant.pokemonId}`
-              : `${variant.isShiny ? 1 : 0}${variant.sex ?? ""}`) +
-            `|${target.id}` +
+          `poke_evo_pick|${speciesId}|${variant}|${target.id}` +
             (helperKey ? `|${helperKey}` : "")
         )
         .setLabel(target.name)
@@ -698,7 +698,7 @@ export async function handlePokemonButton(interaction) {
         return showEvolutionChoices(
           interaction,
           Number(speciesId),
-          parseVariant(variant),
+          variant,
           helper === DITTO_HELPER ? helper : null
         );
       }
