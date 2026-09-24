@@ -1635,6 +1635,16 @@
       "commit": "pending",
       "timestamp": "2026-09-24T10:00:00.000Z",
       "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "fix",
+      "name": "/pk boite qui ne répondait pas",
+      "description": "/pk boite ne répondait pas quand la boîte affichée tenait sur une ou deux pages, par exemple avec un membre et une espèce précisés.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-24T10:30:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
     }
   ]
 }
