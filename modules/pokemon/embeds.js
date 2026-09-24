@@ -590,32 +590,84 @@ export function buildBoxEmbed(rows, { user, species = null, page = 0 } = {}) {
     });
 }
 
-// Les boutons de page de la boîte. Le propriétaire et l'espèce filtrée voyagent
-// dans le customId : un redémarrage du bot n'y change rien. Sur une ou deux
+// Les trois boutons de page — ◀, le numéro, ▶ — de la boîte, du Pokédex et des
+// doublons. Ce qu'il faut pour relire la page voyage dans le customId (`base`,
+// puis la page visée) : un redémarrage du bot n'y change rien. Sur une ou deux
 // pages, ◀ et ▶ visent la même : le sens, en dernier segment, les distingue —
 // Discord refuse tout message dont deux boutons partagent un customId, et la
 // boîte ne s'affichait pas.
-export function buildBoxRow(ownerId, speciesId, page, total) {
-  const pages = boxPageCount(total);
-  const current = Math.min(Math.max(0, page), pages - 1);
-  const id = (target, sens) => `poke_box|${ownerId}|${speciesId ?? 0}|${target}|${sens}`;
+function pageRow(base, noopId, current, pages) {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId(id((current - 1 + pages) % pages, "prev"))
+      .setCustomId(`${base}|${(current - 1 + pages) % pages}|prev`)
       .setLabel("◀")
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(pages <= 1),
     new ButtonBuilder()
-      .setCustomId(`poke_box_noop|${ownerId}`)
+      .setCustomId(noopId)
       .setLabel(`${current + 1}/${pages}`)
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(true),
     new ButtonBuilder()
-      .setCustomId(id((current + 1) % pages, "next"))
+      .setCustomId(`${base}|${(current + 1) % pages}|next`)
       .setLabel("▶")
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(pages <= 1)
   );
+}
+
+// Les boutons de page de la boîte : le propriétaire et l'espèce filtrée.
+export function buildBoxRow(ownerId, speciesId, page, total) {
+  const pages = boxPageCount(total);
+  const current = Math.min(Math.max(0, page), pages - 1);
+  return pageRow(`poke_box|${ownerId}|${speciesId ?? 0}`, `poke_box_noop|${ownerId}`, current, pages);
+}
+
+// Les doublons d'un dresseur (listDuplicates), une ligne par espèce, page par
+// page comme la boîte. Ce qui compte pour un échange vient en gras : combien
+// peuvent partir. Une page hors limites retombe sur la dernière.
+export function buildDuplicatesEmbed(list, { user, page = 0 } = {}) {
+  const pages = boxPageCount(list.length);
+  const current = Math.min(Math.max(0, page), pages - 1);
+  const size = boxPageSize();
+  const embed = new EmbedBuilder()
+    .setTitle(`\u{1F501} Doublons de ${user.displayName ?? user.username}`)
+    .setColor(0x3b88c3);
+  if (!list.length) {
+    return embed.setDescription("*Aucun doublon : un seul exemplaire de chaque espèce.*");
+  }
+
+  const fr = (value) => value.toLocaleString("fr-FR");
+  const lines = list.slice(current * size, (current + 1) * size).map((entry) => {
+    const species = getSpecies(entry.speciesId);
+    const locked = entry.total - entry.free;
+    return (
+      `\`${species ? dexNumber(species) : `#${entry.speciesId}`}\` **${species?.name ?? "?"}** ` +
+      `×${fr(entry.total)}` +
+      (entry.shiny ? ` (dont ${fr(entry.shiny)} ✨)` : "") +
+      ` · **${fr(entry.spare)}** échangeable${entry.spare > 1 ? "s" : ""}` +
+      (locked ? ` · ${fr(locked)} 🛡️` : "")
+    );
+  });
+  const spare = list.reduce((sum, entry) => sum + entry.spare, 0);
+  return embed
+    .setDescription(
+      "Il reste toujours un exemplaire de chaque espèce, et un verrouillé 🛡️ ne part pas : " +
+        "le reste peut s'échanger ou se revendre.\n\n" +
+        lines.join("\n")
+    )
+    .setFooter({
+      text:
+        `Page ${current + 1}/${pages} · ${fr(list.length)} espèce${list.length > 1 ? "s" : ""} ` +
+        `en double · ${fr(spare)} Pokémon échangeable${spare > 1 ? "s" : ""}`,
+    });
+}
+
+// Les boutons de page des doublons : le dresseur dont on lit la boîte.
+export function buildDuplicatesRow(ownerId, page, total) {
+  const pages = boxPageCount(total);
+  const current = Math.min(Math.max(0, page), pages - 1);
+  return pageRow(`poke_dup|${ownerId}`, `poke_dup_noop|${ownerId}`, current, pages);
 }
 
 export function buildInventoryEmbed(rows, { user = null } = {}) {
@@ -747,26 +799,7 @@ export function buildDexEmbed(targetUser, rows, page) {
 }
 
 export function buildDexRow(targetUserId, page) {
-  const pages = dexPageCount();
-  return new ActionRowBuilder().addComponents(
-    // Le sens en dernier segment, comme pour la boîte : deux customId égaux
-    // font refuser le message.
-    new ButtonBuilder()
-      .setCustomId(`poke_dex|${targetUserId}|${(page - 1 + pages) % pages}|prev`)
-      .setLabel("◀")
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(pages <= 1),
-    new ButtonBuilder()
-      .setCustomId(`poke_dex_noop|${targetUserId}`)
-      .setLabel(`${page + 1}/${pages}`)
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(true),
-    new ButtonBuilder()
-      .setCustomId(`poke_dex|${targetUserId}|${(page + 1) % pages}|next`)
-      .setLabel("▶")
-      .setStyle(ButtonStyle.Secondary)
-      .setDisabled(pages <= 1)
-  );
+  return pageRow(`poke_dex|${targetUserId}`, `poke_dex_noop|${targetUserId}`, page, dexPageCount());
 }
 
 // ====================== ÉCHANGES ======================

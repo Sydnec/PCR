@@ -3,6 +3,7 @@ import { handleException } from "../modules/utils.js";
 
 import pokedex from "./pk/pokedex.js";
 import boite from "./pk/boite.js";
+import doublons from "./pk/doublons.js";
 import info from "./pk/info.js";
 import classement from "./pk/classement.js";
 import evolution from "./pk/evolution.js";
@@ -25,6 +26,7 @@ import web from "./pk/web.js";
 const SUBCOMMANDS = [
   pokedex,
   boite,
+  doublons,
   info,
   classement,
   evolution,

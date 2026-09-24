@@ -177,6 +177,21 @@ export function countBySpecies(rows) {
   return counts;
 }
 
+// Les doublons d'un dresseur, espèce par espèce dans l'ordre du Pokédex : tout
+// ce qui dépasse un exemplaire. `spare` compte ceux qui peuvent partir — ni le
+// dernier, ni un verrouillé —, la marge que l'échange, la revente et les
+// sacrifices revérifient au moment de retirer.
+export function listDuplicates(rows) {
+  return [...countBySpecies(rows)]
+    .filter(([, entry]) => entry.total > 1)
+    .map(([speciesId, entry]) => ({
+      speciesId,
+      ...entry,
+      spare: Math.min(entry.free, entry.total - 1),
+    }))
+    .sort((a, b) => a.speciesId - b.speciesId);
+}
+
 // Regroupe des individus par espèce et variante, et au besoin par sexe et
 // fertilité. `spare` compte ceux qu'on peut céder : ceux du groupe qui ne sont
 // pas verrouillés, dans la limite de ce que l'espèce peut perdre en gardant un

@@ -1669,5 +1669,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "feature",
+      "name": "/pk doublons",
+      "description": "Nouvelle commande /pk doublons : les Pokémon que tu (ou un autre dresseur) as en plusieurs exemplaires, et combien peuvent s'échanger.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-24T12:00:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    }
+  ]
 }
