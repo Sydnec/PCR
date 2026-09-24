@@ -1615,5 +1615,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "fix",
+      "name": "Objet lâché à la capture",
+      "description": "Quand un Pokémon capturé lâche son objet, celui qui l'a capturé ne peut plus le ramasser, et l'annonce dit « Il a lâché » au lieu de « Il tenait ».",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-24T09:00:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    }
+  ]
 }

@@ -300,9 +300,14 @@ export function resolveThrow(client, userId, spawnId, ballKey, { requireItem = f
           // La ball qui l'a emportée reste attachée à l'individu, pour de bon,
           // et il a le sexe que l'annonce montrait.
           const options = { ball: ball.key, origin: "capture", sex: spawn.sex };
+          // S'il lâche son objet, c'est tiré AVANT d'annoncer la capture : le
+          // message public doit dire « il lâche » et non « il tenait » quand un
+          // bouton « Ramasser » apparaît juste en dessous.
+          const held = getItem(spawn.held_item);
+          const dropped = Boolean(held) && leavesItemBehind();
           creditSpecies(userId, spawn.species_id, spawn.is_shiny, options, (err, caught) => {
             if (err) handleException("Crédit de la collection :", err);
-            finalizeCaughtSpawn(client, spawnId, userId, ball.key);
+            finalizeCaughtSpawn(client, spawnId, userId, ball.key, { dropped });
             pseudo(userId).then((name) =>
               log(
                 `Capture : ${name} attrape ${species.name}${spawn.is_shiny ? " ✨" : ""} ` +
@@ -314,7 +319,6 @@ export function resolveThrow(client, userId, spawnId, ballKey, { requireItem = f
             // Le crédit est au mieux : une capture réussie ne se défait pas
             // parce qu'un objet n'a pas pu être rangé, et l'échec est bruyant
             // dans les logs plutôt que silencieux pour le dresseur.
-            const held = getItem(spawn.held_item);
             const caughtOutcome = (heldOutcome) =>
               cb(null, {
                 status: "catch",
@@ -330,10 +334,17 @@ export function resolveThrow(client, userId, spawnId, ballKey, { requireItem = f
             if (!held) return caughtOutcome(null);
 
             // Il le lâche parfois au lieu de le céder : l'objet tombe alors au
-            // sol, et c'est une seconde course — ouverte à tous, celui qui vient
-            // de gagner la première y compris.
-            if (leavesItemBehind()) {
-              dropItem(client, { spawn, itemKey: held.key });
+            // sol, et c'est une seconde course — ouverte à tous les autres, pas
+            // à celui qui vient de gagner la première (claimDrop).
+            if (dropped) {
+              // Posé au sol, il n'est plus pour le capteur : si le dépôt échoue,
+              // l'objet lui revient plutôt que de se perdre pour tout le monde.
+              dropItem(client, { spawn, itemKey: held.key }, (err, dropId) => {
+                if (dropId) return;
+                grantItem(userId, held.key, 1, { source: `capture:${spawnId}` }, (err) => {
+                  if (err) handleException("Remise d'un objet qui n'a pas pu tomber :", err);
+                });
+              });
               return caughtOutcome({ item: held, dropped: true });
             }
 
@@ -398,7 +409,7 @@ export function throwMessage(outcome) {
       const butin = !item
         ? ""
         : dropped
-          ? `\n${item.emoji} Il tenait **${item.label}**... et l'a lâché en partant !`
+          ? `\n${item.emoji} Il a lâché **${item.label}** en partant : il revient aux autres.`
           : `\n${item.emoji} Il tenait **${item.label}** !`;
       return (
         `🎉 Bravo ! **${displayName(outcome.species, outcome.spawn.is_shiny, outcome.caught?.sex)}** ` +

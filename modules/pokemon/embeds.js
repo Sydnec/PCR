@@ -325,7 +325,7 @@ function heldItemField(spawn, { fled = false, dropped = false } = {}) {
       // Trois états, et le troisième n'est pas cosmétique : annoncer « et il
       // emporte » d'un objet qui gît dans le salon, bouton compris, ferait
       // renoncer à le ramasser.
-      name: dropped ? "Et il lâche" : fled ? "Et il emporte" : "Il tenait",
+      name: dropped ? "Il a lâché" : fled ? "Et il emporte" : "Il tenait",
       value: `${item.emoji} **${item.label}**`,
       inline: true,
     },
@@ -340,7 +340,14 @@ function heldItemField(spawn, { fled = false, dropped = false } = {}) {
 // brut du dresseur. La ligne dit donc à elle seule avec quoi et par qui — ce qui
 // rendait la phrase d'avant, « Untel l'a attrapé avec une Super Ball »,
 // entièrement redondante.
-export function buildCaughtEmbed(spawn, species, winnerId, ballKey, spending) {
+export function buildCaughtEmbed(
+  spawn,
+  species,
+  winnerId,
+  ballKey,
+  spending,
+  { dropped = false } = {}
+) {
   const isShiny = Boolean(spawn.is_shiny);
   const ball = getPokemonConfig().capture.balls[ballKey];
   const total = spending?.total ?? 0;
@@ -353,7 +360,7 @@ export function buildCaughtEmbed(spawn, species, winnerId, ballKey, spending) {
     .setThumbnail(spriteUrl(species, isShiny))
     .addFields(
       { name: "Lancers", value: `${spawn.throw_count}`, inline: true },
-      ...heldItemField(spawn),
+      ...heldItemField(spawn, { dropped }),
       { name: "Participants", value: participantsField(spending), inline: false }
     )
     .setFooter({

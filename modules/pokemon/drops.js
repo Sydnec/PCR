@@ -2,9 +2,10 @@
 //
 // Un Pokémon sur quelques-uns tient un objet. En temps normal il part avec celui
 // qui l'attrape ; une fois sur cinq il le lâche par terre, et là c'est une
-// seconde course — ouverte à tout le monde, y compris à ceux qui n'ont pas lancé
-// une seule ball. C'est aussi la seule chose qu'un Pokémon enfui laisse derrière
-// lui, ce qui donne une raison de suivre une apparition qu'on sait perdue.
+// seconde course — ouverte à tous les autres, y compris à ceux qui n'ont pas
+// lancé une seule ball, mais pas à celui qui vient de gagner la première. C'est
+// aussi la seule chose qu'un Pokémon enfui laisse derrière lui, ce qui donne une
+// raison de suivre une apparition qu'on sait perdue.
 //
 // Même doctrine que le reste : l'objet au sol est une ligne en base, sa
 // revendication un UPDATE gardé dont on inspecte this.changes. Deux clics
@@ -28,11 +29,19 @@ export function getDrop(dropId, cb) {
   db.get("SELECT * FROM pokemon_drops WHERE id = ?", [dropId], cb);
 }
 
+// Vrai quand `?` a capturé le Pokémon qui a lâché l'objet : ce qu'un Pokémon
+// capturé lâche revient aux autres, il a déjà gagné la première course. Écrit
+// une fois, pour la garde de claimDrop comme pour la liste que lit le site.
+const CAPTOR = `EXISTS (
+  SELECT 1 FROM pokemon_spawns s
+   WHERE s.id = pokemon_drops.spawn_id AND s.caught_by = ?)`;
+
 // Les objets qui attendent encore d'être ramassés, les plus récents d'abord.
-export function getOpenDrops(cb) {
+// `captor` dit, pour `userId`, que celui-là n'est pas pour lui.
+export function getOpenDrops(userId, cb) {
   db.all(
-    "SELECT * FROM pokemon_drops WHERE status = 'OPEN' ORDER BY id DESC",
-    [],
+    `SELECT *, ${CAPTOR} AS captor FROM pokemon_drops WHERE status = 'OPEN' ORDER BY id DESC`,
+    [String(userId)],
     (err, rows) => cb(err, rows ?? [])
   );
 }
@@ -40,7 +49,8 @@ export function getOpenDrops(cb) {
 // Pose l'objet par terre et l'annonce. L'annonce est best-effort : un salon
 // injoignable ne doit pas empêcher la ligne d'exister, mais un objet dont
 // personne ne voit le message n'a aucun intérêt — on le referme donc plutôt que
-// de le laisser ouvert pour l'éternité.
+// de le laisser ouvert pour l'éternité. Le rappel reçoit l'identifiant de
+// l'objet, ou null quand il n'est pas au sol : personne ne pourra le ramasser.
 export function dropItem(client, { spawn, itemKey }, cb = () => {}) {
   const item = getItem(itemKey);
   if (!item) return cb(null, null);
@@ -63,14 +73,7 @@ export function dropItem(client, { spawn, itemKey }, cb = () => {}) {
         // Le rappel attend l'écriture : quand il part, la ligne est close. Sans
         // cela l'appelant reprend la main pendant que l'UPDATE est encore en vol
         // et peut relire un statut qui n'est pas encore le bon.
-        return db.run(
-          "UPDATE pokemon_drops SET status = 'LOST' WHERE id = ?",
-          [dropId],
-          (err) => {
-            if (err) handleException("Abandon d'un objet au sol :", err);
-            cb(null, null);
-          }
-        );
+        return abandon(dropId, (lost) => cb(null, lost ? null : dropId));
       }
       try {
         const channel = await client.channels.fetch(spawn.channel_id);
@@ -88,10 +91,24 @@ export function dropItem(client, { spawn, itemKey }, cb = () => {}) {
         log(`Objet au sol #${dropId} : ${item.label} (spawn #${spawn.id ?? "—"})`);
       } catch (error) {
         handleException("Annonce d'un objet au sol :", error);
-        db.run("UPDATE pokemon_drops SET status = 'LOST' WHERE id = ?", [dropId], () => {});
-        return cb(error, null);
+        return abandon(dropId, (lost) => cb(lost ? error : null, lost ? null : dropId));
       }
       cb(null, dropId);
+    }
+  );
+}
+
+// Déclare perdu un objet que rien n'annonce. Gardé par le statut : le site liste
+// les objets OUVERTS dès leur dépôt, et un ramassage passé entre-temps ne doit
+// pas être effacé. `lost` dit si l'objet est vraiment perdu — l'appelant peut
+// alors le rendre ailleurs sans risque de le dupliquer.
+function abandon(dropId, cb) {
+  db.run(
+    "UPDATE pokemon_drops SET status = 'LOST' WHERE id = ? AND status = 'OPEN'",
+    [dropId],
+    function (err) {
+      if (err) handleException("Abandon d'un objet au sol :", err);
+      cb(!err && this.changes === 1);
     }
   );
 }
@@ -111,16 +128,40 @@ function reopen(dropId, cb) {
   );
 }
 
-// Revendication atomique. Rend la définition de l'objet au vainqueur, et null à
-// tous les autres : « quelqu'un a été plus rapide » n'est pas une erreur.
+// Revendication atomique, par un UPDATE gardé : un seul ramasseur, jamais le
+// capteur. Rend { ok, reason } comme les autres actions du jeu — `captor` quand
+// le refus tient à la règle et non à la course —, et au vainqueur l'objet au sol
+// avec sa définition.
 export function claimDrop(userId, dropId, cb) {
   db.run(
     `UPDATE pokemon_drops SET status = 'CLAIMED', claimed_by = ?, claimed_at = ?
-      WHERE id = ? AND status = 'OPEN'`,
-    [userId, Date.now(), dropId],
+      WHERE id = ? AND status = 'OPEN' AND NOT ${CAPTOR}`,
+    [userId, Date.now(), dropId, String(userId)],
     function (err) {
       if (err) return cb(err, null);
-      if (this.changes !== 1) return cb(null, null);
+      if (this.changes !== 1) {
+        // Relu seulement pour dire pourquoi. Une relecture ratée ne change rien
+        // au refus : elle dit « trop tard » plutôt qu'une erreur.
+        return db.get(
+          `SELECT status, ${CAPTOR} AS captor FROM pokemon_drops WHERE id = ?`,
+          [String(userId), dropId],
+          (err, row) => {
+            if (err) handleException("Relecture d'un objet au sol :", err);
+            if (row?.status === "OPEN" && row.captor) {
+              return cb(null, {
+                ok: false,
+                captor: true,
+                reason: "🙅 Tu viens de le capturer : ce qu'il a lâché revient aux autres.",
+              });
+            }
+            // Encore au sol : un ramassage raté vient de l'y reposer.
+            if (row?.status === "OPEN") {
+              return cb(null, { ok: false, reason: "Il vient de retomber par terre : réessaie !" });
+            }
+            cb(null, { ok: false, reason: "💨 Trop tard, quelqu'un a été plus rapide !" });
+          }
+        );
+      }
 
       getDrop(dropId, (err, drop) => {
         if (err || !drop) return cb(err ?? new Error(`Objet au sol introuvable : ${dropId}`), null);
@@ -144,7 +185,7 @@ export function claimDrop(userId, dropId, cb) {
           pseudo(userId).then((name) =>
             log(`Objet au sol #${dropId} ramassé par ${name} (${item.label})`)
           );
-          cb(null, { drop, item });
+          cb(null, { ok: true, drop, item });
         });
       });
     }

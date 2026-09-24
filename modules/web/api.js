@@ -592,7 +592,7 @@ export const routes = [
         promise((cb) => getActiveSpawn((err, row) => cb(err, row ?? null))),
         promise((cb) => getLastEndedSpawn(cb)),
         promise((cb) => getSpawnPause(cb)),
-        promise((cb) => getOpenDrops(cb)),
+        promise((cb) => getOpenDrops(ctx.user.id, cb)),
         walletJson(ctx.user.id),
       ]);
       return {
@@ -623,6 +623,8 @@ export const routes = [
             emoji: item?.emoji ?? null,
             image: itemImageUrl(item?.sprite),
             droppedAt: drop.dropped_at,
+            // Ce qu'un Pokémon capturé lâche n'est pas pour son capteur.
+            claimable: !drop.captor,
           };
         }),
       };
@@ -836,7 +838,9 @@ export const routes = [
       const dropId = Number(ctx.params.dropId);
       if (!Number.isInteger(dropId) || dropId <= 0) throw new HttpError(400, "Objet invalide.");
       const claimed = await promise((cb) => claimDrop(ctx.user.id, dropId, cb));
-      if (!claimed) throw new HttpError(409, "💨 Trop tard, quelqu'un a été plus rapide !");
+      // Le capteur est refusé pour de bon (403) ; la course perdue, elle, est un
+      // conflit (409).
+      if (!claimed.ok) throw new HttpError(claimed.captor ? 403 : 409, claimed.reason);
       announceDropClaim(ctx.bot, claimed.drop, claimed.item, ctx.user.id);
       const { key, label, emoji, sprite } = claimed.item;
       return { item: { key, label, emoji, image: itemImageUrl(sprite) } };
