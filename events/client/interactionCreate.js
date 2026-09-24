@@ -101,7 +101,7 @@ async function execute(interaction, bot) {
         // Système Pokémon : toute la logique vit dans modules/pokemon/.
         if (customId.startsWith('poke_')) {
             try {
-                await handlePokemonButton(interaction, bot);
+                await handlePokemonButton(interaction);
             } catch (err) {
                 handleException(err);
             }

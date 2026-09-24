@@ -8,20 +8,35 @@ const PACKAGE_FILE = './package.json';
  * Lit le fichier changelog.json
  */
 export function readChangelog() {
+    // On lit directement plutôt que de tester l'existence d'abord : entre le
+    // test et l'écriture, le fichier pouvait apparaître et se faire écraser par
+    // un changelog vide.
     try {
-        if (!fs.existsSync(CHANGELOG_FILE)) {
-            const defaultChangelog = {
-                version: "1.0.0",
-                lastUpdated: new Date().toISOString(),
-                releases: [],
-                pending: []
-            };
-            fs.writeFileSync(CHANGELOG_FILE, JSON.stringify(defaultChangelog, null, 2));
-            return defaultChangelog;
+        return JSON.parse(fs.readFileSync(CHANGELOG_FILE, 'utf8'));
+    } catch (error) {
+        if (error.code !== 'ENOENT') {
+            throw new Error(`Erreur lors de la lecture du changelog: ${error.message}`);
         }
-        
-        const data = fs.readFileSync(CHANGELOG_FILE, 'utf8');
-        return JSON.parse(data);
+    }
+    // Absent : on le crée, sans jamais écraser (wx) un fichier apparu entre-temps.
+    const defaultChangelog = {
+        version: "1.0.0",
+        lastUpdated: new Date().toISOString(),
+        releases: [],
+        pending: []
+    };
+    try {
+        fs.writeFileSync(CHANGELOG_FILE, JSON.stringify(defaultChangelog, null, 2), { flag: 'wx' });
+        return defaultChangelog;
+    } catch (error) {
+        if (error.code !== 'EEXIST') {
+            throw new Error(`Erreur lors de la création du changelog: ${error.message}`);
+        }
+    }
+    // Apparu entre-temps : on le lit, une fois. Un lien vers un fichier absent
+    // répondrait encore ENOENT, et relire indéfiniment ne le ferait pas exister.
+    try {
+        return JSON.parse(fs.readFileSync(CHANGELOG_FILE, 'utf8'));
     } catch (error) {
         throw new Error(`Erreur lors de la lecture du changelog: ${error.message}`);
     }
