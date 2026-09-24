@@ -91,8 +91,8 @@ function evolutionPaths(speciesId, stock, helpers) {
 // individus, shiny compris, et les Métamorph — toutes variantes — qui peuvent
 // combler les sacrifices qui manquent. `sacrificeable` compte ceux qui peuvent
 // être sacrifiés : ni verrouillés, ni `evolver`, celui qui évolue. Sans
-// individu choisi (la liste des espèces), on suppose le cas le plus favorable :
-// un verrouillé qui évolue laisse tous les autres libres.
+// `evolver` (la liste des espèces), on suppose le cas le plus favorable : un
+// verrouillé qui évolue laisse tous les autres libres.
 function stockOf(counts, speciesId, evolver = null) {
   const entry = counts.get(speciesId) ?? NO_ENTRY;
   const metamorph = dittoSpecies();
@@ -107,6 +107,15 @@ function stockOf(counts, speciesId, evolver = null) {
     dittoFree: dittos.free,
     dittoFreeNormal: dittos.freeNormal,
   };
+}
+
+// Celui que le bot fera évoluer quand l'option « individu » est vide, tel que
+// stockOf le lit : jamais un verrouillé, et un normal tant qu'il en reste un —
+// l'ordre de reserveDuplicates, qui le choisira au clic. null quand aucun n'est
+// libre : le bot ne fait pas évoluer un verrouillé, il faut le choisir.
+function autoEvolver(counts, speciesId) {
+  const entry = counts.get(speciesId) ?? NO_ENTRY;
+  return entry.free ? { locked: 0, is_shiny: entry.freeNormal ? 0 : 1 } : null;
 }
 
 // Combien de shiny partiraient parmi `count` sacrifices, quand `normals`
@@ -177,8 +186,8 @@ export default {
       .addStringOption((option) =>
         option
           .setName("individu")
-          .setDescription("Le Pokémon précis qui évolue : il garde son sexe, sa ball, sa fertilité")
-          .setRequired(true)
+          .setDescription("Un Pokémon précis — sans lui, le bot choisit, jamais un verrouillé")
+          .setRequired(false)
           .setAutocomplete(true)
       ),
 
@@ -242,19 +251,24 @@ export default {
   async execute(interaction) {
     try {
       // Les deux valeurs se revalident : tapées à la main ou périmées, elles
-      // peuvent désigner un Pokémon parti, ou d'une autre espèce.
-      const selector = await new Promise((resolve, reject) =>
-        resolveIndividual(
-          interaction.user.id,
-          interaction.options.getString("espece"),
-          interaction.options.getString("individu"),
-          (err, s) => (err ? reject(err) : resolve(s))
-        )
-      );
+      // peuvent désigner un Pokémon parti, ou d'une autre espèce. Sans
+      // individu, le plus souvent, seule l'espèce compte : le bot choisira
+      // celui qui évolue au clic.
+      const espece = interaction.options.getString("espece");
+      const chosen = interaction.options.getString("individu");
+      const selector = chosen
+        ? await new Promise((resolve, reject) =>
+            resolveIndividual(interaction.user.id, espece, chosen, (err, s) =>
+              err ? reject(err) : resolve(s)
+            )
+          )
+        : getSpecies(Number(espece))
+          ? { speciesId: Number(espece), pokemonId: null }
+          : { error: "Choisis l'espèce dans la liste d'autocomplétion." };
       if (selector.error) {
         return interaction.reply({ content: `❌ ${selector.error}`, flags: MessageFlags.Ephemeral });
       }
-      const { speciesId, isShiny, sex, pokemonId, row: evolver } = selector;
+      const { speciesId, pokemonId } = selector;
       const plan = describeEvolution(speciesId);
       if (plan.error) {
         return interaction.reply({
@@ -274,15 +288,38 @@ export default {
         // évolution qu'il ne peut pas payer n'a pas à lui être proposée.
         getIndividuals(interaction.user.id, (err, individuals) => {
           if (err) handleException("Lecture de la collection pour /pk evolution :", err);
-          const stock = stockOf(countBySpecies(err ? [] : individuals), speciesId, evolver);
+          const counts = countBySpecies(err ? [] : individuals);
+          const species = plan.species;
+          const entry = counts.get(speciesId) ?? NO_ENTRY;
+
+          // Tous verrouillés : le bot n'en prendra aucun, il faut le désigner.
+          if (!pokemonId && entry.total && !entry.free) {
+            return interaction
+              .editReply({
+                content:
+                  `❌ Tes **${entry.total}** ${species.name} sont verrouillés 🛡️ : le bot n'en ` +
+                  `fait jamais évoluer un de lui-même. Choisis-le dans l'option « individu », ` +
+                  `une confirmation te sera demandée.`,
+              })
+              .catch(() => {});
+          }
+
+          const evolver = pokemonId ? selector.row : autoEvolver(counts, speciesId);
+          const stock = stockOf(counts, speciesId, evolver);
           // Les normaux qui peuvent être sacrifiés avant un shiny.
           const normals = stock.sacrificeableNormal;
+          const isShiny = Boolean(evolver?.is_shiny);
+          const sex = pokemonId ? selector.sex : null;
 
-          const species = plan.species;
-          // Le deuxième segment du customId désigne l'individu qui évolue.
-          const suffix = `#${pokemonId}`;
+          // Le deuxième segment du customId désigne l'individu qui évolue, ou
+          // « * » : le bot le choisit au clic, parmi ceux qui restent alors.
+          const suffix = pokemonId ? `#${pokemonId}` : "*";
           const embed = new EmbedBuilder()
-            .setTitle(`Évolution de #${pokemonId} ${displayName(species, isShiny, sex)}`)
+            .setTitle(
+              pokemonId
+                ? `Évolution de #${pokemonId} ${displayName(species, isShiny, sex)}`
+                : `Évolution de ${species.name}`
+            )
             .setColor(embedColor(species, isShiny))
             .setThumbnail(spriteUrl(species, isShiny))
             .setDescription(
@@ -292,12 +329,16 @@ export default {
                     .join(", ")}.\n\n` +
                   `Tu peux laisser le hasard décider, ou payer plus cher pour choisir.`
                 : `**${species.name}** peut évoluer en **${plan.targets[0].name}**.`) +
-                `\nIl garde son sexe, sa ball et sa fertilité${isShiny ? ", et reste shiny" : ""}.`
+                (pokemonId
+                  ? `\nIl garde son sexe, sa ball et sa fertilité${isShiny ? ", et reste shiny" : ""}.`
+                  : `\nLe bot choisit celui qui évolue, le moins précieux d'abord : un normal ` +
+                    `avant un shiny, puis un stérile, puis le plus récent — jamais un verrouillé. ` +
+                    `Pour en choisir un, remplis l'option « individu ».`)
             );
 
           // Verrouillé : il évolue quand même — il ne quitte pas la boîte —,
           // mais on le dit avant, et le clic demandera confirmation.
-          if (evolver.locked) {
+          if (evolver?.locked) {
             embed.addFields({
               name: "Verrouillé",
               value:
@@ -435,6 +476,13 @@ export default {
           // exemplaires de l'espèce, celui qui évolue et celui qui reste. Ses
           // chiffres sont ceux de sacrificeFill, comme pour le bouton.
           if (!rows.length) {
+            // Sans individu, le bot ne prend qu'un libre : si un verrouillé
+            // pouvait évoluer à sa place, on le dit plutôt que de laisser
+            // croire que l'évolution est hors de portée.
+            const lockedCould =
+              !pokemonId &&
+              entry.free < entry.total &&
+              evolutionPaths(speciesId, stockOf(counts, speciesId, { locked: 1 }), helpers).length;
             const metamorph = dittoSpecies();
             const joker =
               metamorph && stock.total >= 2
@@ -454,6 +502,10 @@ export default {
                         ? `, dont **${dittosLocked}** verrouillé${dittosLocked > 1 ? "s" : ""} 🛡️`
                         : "") +
                       "."
+                    : null,
+                  lockedCould
+                    ? `Un de tes ${species.name} verrouillés 🛡️ peut évoluer à sa place : ` +
+                      `choisis-le dans l'option « individu ».`
                     : null,
                 ]
                   .filter(Boolean)

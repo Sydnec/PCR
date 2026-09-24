@@ -1625,6 +1625,16 @@
       "commit": "pending",
       "timestamp": "2026-09-24T09:00:00.000Z",
       "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "enhancement",
+      "name": "Évolution sans choisir l'individu",
+      "description": "Dans /pk evolution, l'individu devient facultatif : sans lui, le bot fait évoluer le moins précieux de l'espèce, jamais un verrouillé.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-24T10:00:00.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
     }
   ]
 }

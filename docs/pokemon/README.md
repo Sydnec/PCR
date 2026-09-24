@@ -30,9 +30,11 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
 - `/pk classement` : classement des dresseurs par espèces distinctes.
 - `/pk info <pokemon>` : la même fiche que le bouton des apparitions — type, rareté,
   difficulté, et la lignée évolutive stade par stade avec ce que le dresseur en a déjà.
-- `/pk evolution <espece> <individu>` : fait évoluer **un Pokémon précis**, choisi après son espèce.
-  Il reste lui-même : même numéro, même ball, même sexe, même fertilité, shiny s'il l'était, et
-  verrouillé s'il l'était — un verrouillé évolue après une confirmation. Les autres Pokémon de
+- `/pk evolution <espece> [individu]` : fait évoluer un Pokémon de l'espèce. L'individu est
+  facultatif : sans lui, le bot choisit le moins précieux — un normal avant un shiny, puis un
+  stérile, puis le plus récent — et jamais un verrouillé. Celui qui évolue reste lui-même : même
+  numéro, même ball, même sexe, même fertilité, shiny s'il l'était, et verrouillé s'il l'était — un
+  verrouillé évolue après une confirmation, s'il est choisi. Les autres Pokémon de
   l'évolution sont des **sacrifices** : des exemplaires de l'espèce, shiny ou non (les normaux
   partent d'abord), jamais un verrouillé, et il en reste toujours un. Avec un Salamèche et un Salamèche
   shiny, on peut faire évoluer le shiny avec des bonbons ou des Métamorph : le normal garde
@@ -63,7 +65,7 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
   **toujours** conservé.
 
 `/pk evolution`, `/pk echange` et `/pk revendre pokemon` demandent l'espèce, puis l'individu parmi
-les siens. `/pk oeuf pondre` accepte un groupe de la liste ou **`#numéro`** — le numéro qu'affiche
+les siens — facultatif pour l'évolution et la revente. `/pk oeuf pondre` accepte un groupe de la liste ou **`#numéro`** — le numéro qu'affiche
 `/pk boite` — pour désigner un Pokémon précis.
 - `/admin pokespawn` *(Admin)* : déclenche une apparition pour organiser un événement. Donne accès aux
   espèces hors pool naturel (légendaires et évolutions par échange), avec forçage du shiny, texte
