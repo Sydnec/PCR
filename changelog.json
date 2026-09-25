@@ -1,7 +1,44 @@
 {
-  "version": "1.15.7",
-  "lastUpdated": "2026-09-24T10:25:49.904Z",
+  "version": "1.15.8",
+  "lastUpdated": "2026-09-25T12:02:08.882Z",
   "releases": [
+    {
+      "version": "1.15.8",
+      "date": "2026-09-25",
+      "title": "Release 1.15.8",
+      "features": [
+        {
+          "type": "fix",
+          "name": "Balls offertes sur le panneau de lancer",
+          "description": "Le panneau de lancer affiche « offerte » sur les balls que tu as en poche, avec le nombre qu'il te reste, au lieu de leur prix.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-25T10:57:14.000Z",
+          "branch": "claude/adoring-darwin-4o541o"
+        },
+        {
+          "type": "fix",
+          "name": "/pk doublons sans les verrouillés",
+          "description": "/pk doublons ne montre plus les espèces dont tous les exemplaires en trop sont verrouillés : seulement ce qui peut vraiment s'échanger.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-25T10:57:14.000Z",
+          "branch": "claude/adoring-darwin-4o541o"
+        },
+        {
+          "type": "feature",
+          "name": "/pk doublons : garder de quoi évoluer",
+          "description": "Nouvelle option evolutions sur /pk doublons : elle met de côté ce qu'il faut pour les évolutions qui manquent au Pokédex du dresseur, évolutions d'évolutions comprises, et ne montre que le vrai surplus.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-25T11:46:51.000Z",
+          "branch": "claude/adoring-darwin-4o541o"
+        }
+      ]
+    },
     {
       "version": "1.15.7",
       "date": "2026-09-24",
@@ -1747,36 +1784,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "fix",
-      "name": "Balls offertes sur le panneau de lancer",
-      "description": "Le panneau de lancer affiche « offerte » sur les balls que tu as en poche, avec le nombre qu'il te reste, au lieu de leur prix.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-25T10:57:14.000Z",
-      "branch": "claude/adoring-darwin-4o541o"
-    },
-    {
-      "type": "fix",
-      "name": "/pk doublons sans les verrouillés",
-      "description": "/pk doublons ne montre plus les espèces dont tous les exemplaires en trop sont verrouillés : seulement ce qui peut vraiment s'échanger.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-25T10:57:14.000Z",
-      "branch": "claude/adoring-darwin-4o541o"
-    },
-    {
-      "type": "feature",
-      "name": "/pk doublons : garder de quoi évoluer",
-      "description": "Nouvelle option evolutions sur /pk doublons : elle met de côté ce qu'il faut pour les évolutions qui manquent au Pokédex du dresseur, évolutions d'évolutions comprises, et ne montre que le vrai surplus.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-25T11:46:51.000Z",
-      "branch": "claude/adoring-darwin-4o541o"
-    }
-  ]
+  "pending": []
 }
