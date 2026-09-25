@@ -30,7 +30,7 @@ import {
   resumeSession,
   startPaidSession,
 } from "./safari.js";
-import { activeGeneration, evolutionChain, getSpecies } from "./data.js";
+import { activeGeneration, getSpecies } from "./data.js";
 import {
   DITTO_HELPER,
   acceptTrade,
@@ -38,8 +38,8 @@ import {
   evolve,
   getCollection,
   getIndividuals,
-  getOwnedVariantsFor,
   getSpeciesDuplicates,
+  getSpeciesOwnership,
   getTrade,
   listDuplicates,
   resolveTradeAs,
@@ -168,41 +168,35 @@ function answerSpeciesInfo(interaction, spawnId) {
     const species = getSpecies(spawn.species_id);
     if (!species) return ephemeral(interaction, "❌ Espèce inconnue.");
 
-    const chain = evolutionChain(species);
-    getOwnedVariantsFor(
-      interaction.user.id,
-      chain.map((link) => link.id),
-      (err, owned) => {
-        // Compteurs à zéro en cas d'erreur : mieux vaut la fiche sans les
-        // pastilles de possession qu'un refus sec devant une apparition.
-        if (err) handleException("Lecture de la collection pour la fiche :", err);
+    // Compteurs à zéro en cas d'erreur : mieux vaut la fiche sans les
+    // pastilles de possession qu'un refus sec devant une apparition.
+    getSpeciesOwnership(interaction.user.id, species, (err, { owned, forms }) => {
+      const fiche = buildSpeciesInfoEmbed(species, {
+        owned,
+        forms,
+        isShiny: Boolean(spawn.is_shiny),
+        catchRate: spawn.catch_rate,
+      });
 
-        const fiche = buildSpeciesInfoEmbed(species, {
-          owned,
-          isShiny: Boolean(spawn.is_shiny),
-          catchRate: spawn.catch_rate,
+      getBalance(interaction.user.id, (err, balance) => {
+        // getBalance rend 0 sur erreur, ce qui ici serait un mensonge : mieux
+        // vaut ne pas montrer un solde illisible que d'en montrer un faux. La
+        // fiche, elle, part quand même.
+        if (err) handleException("Lecture du solde pour la fiche :", err);
+        const soldeKo = Boolean(err);
+        getBallStock(interaction.user.id, (err, balls) => {
+          if (err) handleException("Lecture des balls pour la fiche :", err);
+          interaction
+            .reply({
+              embeds: soldeKo
+                ? [fiche]
+                : [fiche, buildBalanceEmbed(balance, { balls: err ? null : balls })],
+              flags: MessageFlags.Ephemeral,
+            })
+            .catch(() => {});
         });
-
-        getBalance(interaction.user.id, (err, balance) => {
-          // getBalance rend 0 sur erreur, ce qui ici serait un mensonge : mieux
-          // vaut ne pas montrer un solde illisible que d'en montrer un faux. La
-          // fiche, elle, part quand même.
-          if (err) handleException("Lecture du solde pour la fiche :", err);
-          const soldeKo = Boolean(err);
-          getBallStock(interaction.user.id, (err, balls) => {
-            if (err) handleException("Lecture des balls pour la fiche :", err);
-            interaction
-              .reply({
-                embeds: soldeKo
-                  ? [fiche]
-                  : [fiche, buildBalanceEmbed(balance, { balls: err ? null : balls })],
-                flags: MessageFlags.Ephemeral,
-              })
-              .catch(() => {});
-          });
-        });
-      }
-    );
+      });
+    });
   });
 }
 
@@ -415,7 +409,7 @@ function runEvolution(
         content:
           `✨ Félicitations ! Ton #${result.evolved.id} ` +
           `**${displayName(source, result.isShiny, result.evolved.sex)}** a évolué en ` +
-          `**${displayName(result.target, result.isShiny, result.evolved.sex)}** ! ` +
+          `**${displayName(result.target, result.isShiny, result.evolved.sex, result.evolved.form)}** ! ` +
           (paye.length ? `(${paye.join(", ")})` : ""),
         embeds: [],
         components: [],

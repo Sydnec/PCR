@@ -1,6 +1,6 @@
 {
   "maxGeneration": 2,
-  "generatedAt": "2026-09-23",
+  "generatedAt": "2026-09-25",
   "source": "PokéAPI CSV dataset (github.com/PokeAPI/pokeapi, data/v2/csv)",
   "species": [
     {
@@ -4316,7 +4316,139 @@
       "evolvesFrom": null,
       "evolvesInto": [],
       "sprite": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/201.png",
-      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/201.png"
+      "spriteShiny": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/shiny/201.png",
+      "forms": [
+        {
+          "key": "a",
+          "name": "A",
+          "generation": 2
+        },
+        {
+          "key": "b",
+          "name": "B",
+          "generation": 2
+        },
+        {
+          "key": "c",
+          "name": "C",
+          "generation": 2
+        },
+        {
+          "key": "d",
+          "name": "D",
+          "generation": 2
+        },
+        {
+          "key": "e",
+          "name": "E",
+          "generation": 2
+        },
+        {
+          "key": "f",
+          "name": "F",
+          "generation": 2
+        },
+        {
+          "key": "g",
+          "name": "G",
+          "generation": 2
+        },
+        {
+          "key": "h",
+          "name": "H",
+          "generation": 2
+        },
+        {
+          "key": "i",
+          "name": "I",
+          "generation": 2
+        },
+        {
+          "key": "j",
+          "name": "J",
+          "generation": 2
+        },
+        {
+          "key": "k",
+          "name": "K",
+          "generation": 2
+        },
+        {
+          "key": "l",
+          "name": "L",
+          "generation": 2
+        },
+        {
+          "key": "m",
+          "name": "M",
+          "generation": 2
+        },
+        {
+          "key": "n",
+          "name": "N",
+          "generation": 2
+        },
+        {
+          "key": "o",
+          "name": "O",
+          "generation": 2
+        },
+        {
+          "key": "p",
+          "name": "P",
+          "generation": 2
+        },
+        {
+          "key": "q",
+          "name": "Q",
+          "generation": 2
+        },
+        {
+          "key": "r",
+          "name": "R",
+          "generation": 2
+        },
+        {
+          "key": "s",
+          "name": "S",
+          "generation": 2
+        },
+        {
+          "key": "t",
+          "name": "T",
+          "generation": 2
+        },
+        {
+          "key": "u",
+          "name": "U",
+          "generation": 2
+        },
+        {
+          "key": "v",
+          "name": "V",
+          "generation": 2
+        },
+        {
+          "key": "w",
+          "name": "W",
+          "generation": 2
+        },
+        {
+          "key": "x",
+          "name": "X",
+          "generation": 2
+        },
+        {
+          "key": "y",
+          "name": "Y",
+          "generation": 2
+        },
+        {
+          "key": "z",
+          "name": "Z",
+          "generation": 2
+        }
+      ]
     },
     {
       "id": 202,

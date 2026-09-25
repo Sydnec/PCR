@@ -1841,6 +1841,46 @@
       "commit": "pending",
       "timestamp": "2026-09-25T16:19:28.000Z",
       "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "feature",
+      "name": "Zarbi et ses lettres",
+      "description": "Dès la 2ᵉ génération, chaque Zarbi porte l'une des 26 lettres, avec son image. La fiche de l'espèce compte celles que tu possèdes.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-25T17:27:15.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "enhancement",
+      "name": "Les objets de la 2ᵉ génération s'ajoutent",
+      "description": "À l'ouverture de la 2ᵉ génération, ses trois objets viennent en plus sans rendre les autres plus rares : à la loterie, ils prennent la place de « Rien ».",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-25T17:27:16.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "fix",
+      "name": "/admin poids s'affiche de nouveau",
+      "description": "La commande ne plante plus quand ses tableaux dépassent la limite de Discord : ils se poursuivent dans un champ suivant.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-25T17:27:17.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "chore",
+      "name": "Réglages du jeu versionnés",
+      "description": "Les réglages ajustés depuis Discord (prix des balls et des évolutions, objets tenus, parc safari…) font désormais partie de la configuration du bot.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-25T17:27:18.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
     }
   ]
 }

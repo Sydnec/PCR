@@ -1,11 +1,7 @@
 import { MessageFlags } from "discord.js";
 import { handleException } from "../../modules/utils.js";
-import {
-  evolutionChain,
-  getAvailableSpecies,
-  searchByName,
-} from "../../modules/pokemon/data.js";
-import { getOwnedVariantsFor } from "../../modules/pokemon/collection.js";
+import { getAvailableSpecies, searchByName } from "../../modules/pokemon/data.js";
+import { getSpeciesOwnership } from "../../modules/pokemon/collection.js";
 import { buildSpeciesInfoEmbed, dexNumber } from "../../modules/pokemon/embeds.js";
 
 // La fiche est construite par embeds.js, exactement comme celle du bouton
@@ -45,23 +41,17 @@ export default {
         });
       }
 
-      const chain = evolutionChain(species);
-      getOwnedVariantsFor(
-        interaction.user.id,
-        chain.map((link) => link.id),
-        (err, owned) => {
-          // Une collection illisible ne doit pas priver le dresseur de la
-          // fiche : getOwnedVariantsFor rend des compteurs à zéro, et la lignée
-          // s'affiche simplement sans ses pastilles de possession.
-          if (err) handleException("Lecture de la collection pour /pk info :", err);
-          interaction
-            .reply({
-              embeds: [buildSpeciesInfoEmbed(species, { owned })],
-              flags: MessageFlags.Ephemeral,
-            })
-            .catch(() => {});
-        }
-      );
+      // Une collection illisible ne doit pas priver le dresseur de la fiche :
+      // les compteurs retombent à zéro, et la lignée s'affiche simplement sans
+      // ses pastilles de possession.
+      getSpeciesOwnership(interaction.user.id, species, (err, { owned, forms }) => {
+        interaction
+          .reply({
+            embeds: [buildSpeciesInfoEmbed(species, { owned, forms })],
+            flags: MessageFlags.Ephemeral,
+          })
+          .catch(() => {});
+      });
     } catch (error) {
       handleException(error);
     }

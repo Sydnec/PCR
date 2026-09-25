@@ -148,7 +148,7 @@ export async function render(ctx) {
       ),
       h("img", {
         class: "spawn-art",
-        src: spawn.shiny ? species.spriteShiny : species.sprite,
+        src: spawn.form?.sprite ?? (spawn.shiny ? species.spriteShiny : species.sprite),
         alt: species.name,
       }),
       // Le sexe du Pokémon apparu, comme sur l'annonce Discord.
@@ -157,7 +157,7 @@ export async function render(ctx) {
         { class: "spawn-title" },
         spawn.shiny ? [icon("sparkle", { label: "Shiny" }), " "] : null,
         "Un ",
-        pokemonName(species, false, spawn.sex),
+        pokemonName(species, false, spawn.sex, null, spawn.form),
         spawn.shiny ? " shiny apparaît !" : " sauvage apparaît !"
       ),
       h(
@@ -332,7 +332,7 @@ export async function render(ctx) {
             { class: "last-spawn" },
             h("img", {
               class: "sprite",
-              src: last.shiny ? species.iconShiny : species.icon,
+              src: last.form?.icon ?? (last.shiny ? species.iconShiny : species.icon),
               alt: "",
               width: 96,
               height: 96,
@@ -342,13 +342,13 @@ export async function render(ctx) {
               {},
               last.status === "CAUGHT"
                 ? [
-                    pokemonName(species, last.shiny, last.sex),
+                    pokemonName(species, last.shiny, last.sex, null, last.form),
                     " a été capturé par ",
                     h("strong", {}, last.caughtBy?.name ?? "un dresseur parti"),
                     ball ? [" avec ", itemIcon(ball), " ", ball.label] : null,
                     ".",
                   ]
-                : [pokemonName(species, last.shiny, last.sex), " s'est enfui…"]
+                : [pokemonName(species, last.shiny, last.sex, null, last.form), " s'est enfui…"]
             )
           )
         : null,

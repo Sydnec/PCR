@@ -192,6 +192,12 @@ export function sexAfterEvolution(target, sex) {
   return sex ?? rollSex(target);
 }
 
+// La forme d'un individu qui change d'espèce, comme son sexe : il garde la
+// sienne si la nouvelle espèce la connaît, en prend une au hasard si elle en a,
+// et n'en a plus sinon.
+export const formAfterEvolution = (target, form) =>
+  formOf(target, form) ? form : rollForm(target);
+
 export function rarityOf(species) {
   if (isLegendary(species)) return "LEGENDAIRE";
   if (species.stage >= 3) return "RARE";
@@ -199,15 +205,46 @@ export function rarityOf(species) {
   return "COMMUN";
 }
 
-export const spriteUrl = (species, isShiny) =>
-  isShiny ? species.spriteShiny : species.sprite;
+// ====================== FORMES ======================
+
+// Les formes d'apparence d'une espèce — les lettres de Zarbi — que la
+// génération jouable connaît : [] pour une espèce qui n'en a pas. Une seule
+// entrée de Pokédex pour toutes : la forme est un trait de l'individu, comme
+// son sexe ou sa ball, et ne change rien au jeu.
+export const speciesForms = (species, generation = activeGeneration()) =>
+  (species?.forms ?? []).filter((form) => form.generation <= generation);
+
+// La forme `key` de l'espèce, ou null : une clé inconnue — lue en base ou dans
+// un bouton — ne s'affiche pas, et ne compose jamais une adresse d'image.
+export const formOf = (species, key) =>
+  (key && species?.forms?.find((form) => form.key === key)) || null;
+
+// Tirée à parts égales, là où naît l'individu (apparition, parc, œuf) ; null
+// pour une espèce sans formes.
+export function rollForm(species) {
+  const forms = speciesForms(species);
+  return forms.length ? forms[Math.floor(Math.random() * forms.length)].key : null;
+}
+
+// Le nom de fichier d'une image dans le dépôt PokéAPI : « 201 » pour la forme
+// par défaut — la première, Zarbi A —, « 201-b » pour les autres.
+const imageName = (species, key) => {
+  const form = formOf(species, key);
+  return form && form !== species.forms[0] ? `${species.id}-${form.key}` : String(species.id);
+};
+
+export const spriteUrl = (species, isShiny, form = null) =>
+  (isShiny ? species.spriteShiny : species.sprite).replace(
+    /\/\d+\.png$/,
+    `/${imageName(species, form)}.png`
+  );
 
 // La petite image (96 px) du même dépôt, pour les grilles du site : une
 // illustration officielle pèse cent fois plus, et un Pokédex en affiche 251 d'un
 // coup. Le dépôt range les deux par numéro national, d'où une adresse calculée.
 const ICON_BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon";
-export const iconUrl = (species, isShiny) =>
-  `${ICON_BASE}/${isShiny ? "shiny/" : ""}${species.id}.png`;
+export const iconUrl = (species, isShiny, form = null) =>
+  `${ICON_BASE}/${isShiny ? "shiny/" : ""}${imageName(species, form)}.png`;
 
 // L'image d'un objet ou d'une ball dans le même dépôt, d'après le nom que lui
 // donne la configuration (`sprite`) ; null sans nom, et le site retombe alors
@@ -394,6 +431,7 @@ export function rollSafariEncounter(safariConfig, charms = [], generations = nul
       charmFactor(species, charms),
     catchRate: species.catchRate,
     sex: rollSex(species),
+    form: rollForm(species),
   };
 }
 

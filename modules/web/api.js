@@ -12,6 +12,7 @@ import { getPointsHistory } from "../points-history.js";
 import {
   getCollection,
   getIndividuals,
+  getOwnedForms,
   getOwnedVariantsFor,
   resolveSelector,
   evolve,
@@ -33,6 +34,7 @@ import {
   evolutionChain,
   evolutionTargets,
   femaleShare,
+  formOf,
   getAvailableSpecies,
   getSpecies,
   iconUrl,
@@ -49,6 +51,7 @@ import {
   safariCatchProbability,
   safariGenerationChoices,
   safariFleeChance,
+  speciesForms,
   spriteUrl,
   typeColors,
 } from "../pokemon/data.js";
@@ -146,12 +149,27 @@ function speciesJson(species, families = babyFamilies()) {
   };
 }
 
+// La forme d'un individu, d'une apparition ou d'une rencontre — la lettre d'un
+// Zarbi —, avec ses images : null sans forme. Le site les affiche telles
+// quelles, à la place de celles de l'espèce.
+function formJson(species, key, shiny) {
+  const form = formOf(species, key);
+  if (!form) return null;
+  return {
+    key: form.key,
+    name: form.name,
+    icon: iconUrl(species, shiny, form.key),
+    sprite: spriteUrl(species, shiny, form.key),
+  };
+}
+
 function individualJson(row) {
   return {
     id: row.id,
     speciesId: row.species_id,
     shiny: Boolean(row.is_shiny),
     sex: row.sex,
+    form: formJson(getSpecies(row.species_id), row.form, Boolean(row.is_shiny)),
     ball: row.ball,
     origin: row.origin,
     fertile: !row.sterile,
@@ -278,6 +296,27 @@ async function lineageJson(userId, species) {
   }));
 }
 
+// Les formes d'une espèce qui en a, et celles que le dresseur possède : la
+// ligne « Formes » de la fiche Discord. null sans formes, ou sur une lecture
+// ratée — la fiche l'omet plutôt que d'annoncer zéro.
+async function formsJson(userId, species) {
+  const forms = speciesForms(species);
+  if (!forms.length) return null;
+  let owned;
+  try {
+    owned = await promise((cb) => getOwnedForms(userId, species.id, cb));
+  } catch (error) {
+    handleException("API web, lecture des formes :", error);
+    return null;
+  }
+  return forms.map((form) => ({
+    key: form.key,
+    name: form.name,
+    icon: iconUrl(species, false, form.key),
+    owned: owned.has(form.key),
+  }));
+}
+
 // Une ball ou un objet tel que le site l'affiche : son emoji Discord, et son
 // image quand la configuration lui en donne une.
 const withImage = (entry) => ({ ...entry, image: itemImageUrl(entry.sprite) });
@@ -325,6 +364,7 @@ async function spawnJson(ctx, spawn, balance) {
       ? { label: charm.label, emoji: charm.emoji, image: itemImageUrl(charm.sprite), mine }
       : null,
     sex: spawn.sex ?? null,
+    form: formJson(species, spawn.form, Boolean(spawn.is_shiny) || mine),
     rarity: spawn.rarity,
     rarityLabel: RARITIES[spawn.rarity]?.label ?? null,
     // Figée à l'apparition, comme le taux de capture qui la fonde.
@@ -380,13 +420,18 @@ async function visitJson(session, owned) {
     actionsTotal: config.actionsPerSession,
     expiresAt: session.expires_at,
     finished,
-    catches: catches.map((row) => ({ speciesId: row.species_id, shiny: Boolean(row.is_shiny) })),
+    catches: catches.map((row) => ({
+      speciesId: row.species_id,
+      shiny: Boolean(row.is_shiny),
+      form: formJson(getSpecies(row.species_id), row.form, Boolean(row.is_shiny)),
+    })),
     ball: withImage(config.ball),
     encounter: species
       ? {
           speciesId: species.id,
           shiny: Boolean(session.encounter_is_shiny),
           sex: session.encounter_sex ?? null,
+          form: formJson(species, session.encounter_form, Boolean(session.encounter_is_shiny)),
           rarity: rarityOf(species),
           rarityLabel: RARITIES[rarityOf(species)].label,
           probability: safariCatchProbability(session.encounter_catch_rate, bait, config),
@@ -535,7 +580,10 @@ export const routes = [
     handler: async (ctx) => {
       const species = getAvailableSpecies(ctx.params.speciesId);
       if (!species) throw new HttpError(404, "Espèce inconnue.");
-      return { lineage: await lineageJson(ctx.user.id, species) };
+      return {
+        lineage: await lineageJson(ctx.user.id, species),
+        forms: await formsJson(ctx.user.id, species),
+      };
     },
   },
 
@@ -698,6 +746,7 @@ export const routes = [
               speciesId: last.species_id,
               shiny: Boolean(last.is_shiny),
               sex: last.sex ?? null,
+              form: formJson(getSpecies(last.species_id), last.form, Boolean(last.is_shiny)),
               status: last.status,
               caughtBy: last.caught_by ? await trainerOf(ctx.bot, last.caught_by) : null,
               ball: last.caught_ball,
@@ -910,7 +959,12 @@ export const routes = [
         final: isFinalThrow(outcome),
         remaining: outcome.remaining ?? null,
         pokemon: outcome.caught
-          ? { id: outcome.caught.id, sex: outcome.caught.sex, shiny: Boolean(outcome.shiny) }
+          ? {
+              id: outcome.caught.id,
+              sex: outcome.caught.sex,
+              shiny: Boolean(outcome.shiny),
+              form: formJson(outcome.species, outcome.caught.form, Boolean(outcome.shiny)),
+            }
           : null,
       };
     },
@@ -972,7 +1026,13 @@ export const routes = [
       const result = await promise((cb) => evolve(ctx.user.id, group, targetId, helper, cb));
       if (!result.ok && result.locked) throw new HttpError(409, result.reason, { locked: true });
       return outcome(result, ({ target, plan, spent, evolved, isShiny }) => ({
-        pokemon: { id: evolved.id, speciesId: target.id, sex: evolved.sex, shiny: isShiny },
+        pokemon: {
+          id: evolved.id,
+          speciesId: target.id,
+          sex: evolved.sex,
+          shiny: isShiny,
+          form: formJson(target, evolved.form, isShiny),
+        },
         // Les Métamorph qui ont comblé les sacrifices sont comptés à part : ce
         // ne sont pas des exemplaires de l'espèce.
         sacrificesSpent: spent.sacrifices,

@@ -98,7 +98,7 @@ export function findFreeParkFor(userId, cb) {
 
 export function getSessionCatches(sessionId, cb) {
   db.all(
-    `SELECT species_id, is_shiny FROM pokemon_safari_catches
+    `SELECT species_id, is_shiny, form FROM pokemon_safari_catches
       WHERE session_id = ? ORDER BY id`,
     [sessionId],
     (err, rows) => cb(err, rows || [])
@@ -178,9 +178,17 @@ function storeNextEncounter(sessionId, encounter, cb) {
             encounter_is_shiny = ?,
             encounter_catch_rate = ?,
             encounter_sex = ?,
+            encounter_form = ?,
             encounter_bait = 0
       WHERE id = ?`,
-    [encounter.species.id, encounter.isShiny ? 1 : 0, encounter.catchRate, encounter.sex, sessionId],
+    [
+      encounter.species.id,
+      encounter.isShiny ? 1 : 0,
+      encounter.catchRate,
+      encounter.sex,
+      encounter.form,
+      sessionId,
+    ],
     (err) => cb(err)
   );
 }
@@ -302,8 +310,8 @@ function startSession(userId, { park = null, entryCost = 0, generations = null }
       `INSERT INTO pokemon_safari_sessions
          (park_id, user_id, actions_left, entry_cost, started_at, expires_at,
           encounter_no, encounter_species_id, encounter_is_shiny, encounter_catch_rate,
-          encounter_sex, generations)
-       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)`,
+          encounter_sex, encounter_form, generations)
+       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)`,
       [
         parkId,
         userId,
@@ -315,6 +323,7 @@ function startSession(userId, { park = null, entryCost = 0, generations = null }
         encounter.isShiny ? 1 : 0,
         encounter.catchRate,
         encounter.sex,
+        encounter.form,
         targeted ? targeted.join(",") : null,
       ],
       function (err) {
@@ -607,7 +616,8 @@ function resolveAction({ session, species, action, config }, cb) {
     config
   );
   const sex = session.encounter_sex;
-  const base = { species, isShiny, sex, probability, baitStacks: session.encounter_bait };
+  const form = session.encounter_form ?? null;
+  const base = { species, isShiny, sex, form, probability, baitStacks: session.encounter_bait };
   const done = (outcome, extra = {}) =>
     finishOrContinue(session.id, { ...base, outcome, ...extra }, cb);
 
@@ -653,7 +663,7 @@ function resolveAction({ session, species, action, config }, cb) {
     return done("MISS");
   }
 
-  const options = { ball: "safari", origin: "safari", sex };
+  const options = { ball: "safari", origin: "safari", sex, form };
   creditSpecies(session.user_id, species.id, isShiny, options, (err) => {
     if (err) return cb(err);
     recordSafariCatch({ userId: session.user_id, species, isShiny });
@@ -665,9 +675,9 @@ function resolveAction({ session, species, action, config }, cb) {
     );
 
     db.run(
-      `INSERT INTO pokemon_safari_catches (session_id, species_id, is_shiny, caught_at)
-       VALUES (?, ?, ?, ?)`,
-      [session.id, species.id, isShiny ? 1 : 0, Date.now()],
+      `INSERT INTO pokemon_safari_catches (session_id, species_id, is_shiny, caught_at, form)
+       VALUES (?, ?, ?, ?, ?)`,
+      [session.id, species.id, isShiny ? 1 : 0, Date.now(), form],
       (err) => {
         if (err) handleException("Enregistrement d'une capture du parc safari :", err);
         db.run(

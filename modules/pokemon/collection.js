@@ -10,12 +10,17 @@ import { handleException } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
 import {
   dittoSpecies,
+  evolutionChain,
   evolutionTargets,
+  formAfterEvolution,
+  formOf,
   getSpecies,
   itemOnlyTargets,
   lockedByDefault,
+  rollForm,
   rollSex,
   sexAfterEvolution,
+  speciesForms,
   tradeEvolutionTarget,
 } from "./data.js";
 import { consumeItem, getInventory, getItem, getItems, grantItem, itemOpen } from "./items.js";
@@ -119,6 +124,7 @@ export function resolveSelector(ownerId, value, cb) {
       speciesId: row.species_id,
       isShiny: Boolean(row.is_shiny),
       sex: row.sex,
+      form: row.form ?? null,
       fertile: null,
       pokemonId: row.id,
       row,
@@ -426,6 +432,38 @@ export function getOwnedVariantsFor(userId, speciesIds, cb) {
   );
 }
 
+// Les formes qu'un dresseur possède d'une espèce — les lettres de ses Zarbi —,
+// shiny ou non.
+export function getOwnedForms(userId, speciesId, cb) {
+  db.all(
+    `SELECT DISTINCT form FROM pokemon_owned
+      WHERE user_id = ? AND species_id = ? AND form IS NOT NULL`,
+    [userId, Number(speciesId)],
+    (err, rows) => cb(err, new Set((rows || []).map((row) => row.form)))
+  );
+}
+
+// Ce que la fiche d'une espèce montre de la collection d'un dresseur : ses
+// exemplaires de chaque maillon de la lignée (compteurs à zéro sur une lecture
+// ratée, comme getOwnedVariantsFor), et les formes qu'il en a quand l'espèce en
+// a. `forms` vaut null sans formes ou sur une lecture ratée : la fiche l'omet
+// plutôt que d'annoncer zéro.
+export function getSpeciesOwnership(userId, species, cb) {
+  const chain = evolutionChain(species);
+  getOwnedVariantsFor(
+    userId,
+    chain.map((link) => link.id),
+    (err, owned) => {
+      if (err) handleException("Lecture de la collection pour une fiche :", err);
+      if (!speciesForms(species).length) return cb(null, { owned, forms: null });
+      getOwnedForms(userId, species.id, (err, forms) => {
+        if (err) handleException("Lecture des formes pour une fiche :", err);
+        cb(null, { owned, forms: err ? null : forms });
+      });
+    }
+  );
+}
+
 export function getLeaderboard(limit, cb) {
   db.all(
     `SELECT user_id,
@@ -444,16 +482,19 @@ export function getLeaderboard(limit, cb) {
 // ====================== ÉCRITURES ======================
 
 // Chemin unique de crédit de la collection : capture sauvage, parc safari et
-// éclosion passent tous par ici. Le sexe se tire selon l'espèce sauf s'il est
-// imposé ; la ball est celle de la capture, NULL quand il n'y en a pas eu.
-// Rend l'individu créé { id, sex }.
+// éclosion passent tous par ici. Le sexe et la forme se tirent selon l'espèce
+// sauf s'ils sont imposés — ceux de l'apparition ou de la rencontre, que
+// l'annonce a montrés ; la ball est celle de la capture, NULL quand il n'y en a
+// pas eu. Rend l'individu créé { id, sex, form }.
 export function creditSpecies(userId, speciesId, isShiny, options, cb) {
-  const { ball = null, origin, sex = null, obtainedAt = Date.now() } = options;
-  const chosenSex = sex ?? rollSex(getSpecies(speciesId));
+  const { ball = null, origin, sex = null, form = null, obtainedAt = Date.now() } = options;
+  const species = getSpecies(speciesId);
+  const chosenSex = sex ?? rollSex(species);
+  const chosenForm = formOf(species, form) ? form : rollForm(species);
   db.run(
     `INSERT INTO pokemon_owned
-       (user_id, species_id, is_shiny, sex, ball, origin, sterile, obtained_at, locked)
-     VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+       (user_id, species_id, is_shiny, sex, ball, origin, sterile, obtained_at, locked, form)
+     VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
     [
       userId,
       speciesId,
@@ -463,13 +504,14 @@ export function creditSpecies(userId, speciesId, isShiny, options, cb) {
       origin,
       obtainedAt,
       lockedByDefault(speciesId, isShiny) ? 1 : 0,
+      chosenForm,
     ],
     function (err) {
       if (err) return cb(err, null);
       // Une espèce de plus peut compléter un Pokédex : le Charme Chroma suit,
       // sans retarder celui qui vient d'obtenir son Pokémon.
       checkCharms(userId);
-      cb(null, { id: this.lastID, sex: chosenSex });
+      cb(null, { id: this.lastID, sex: chosenSex, form: chosenForm });
     }
   );
 }
@@ -564,7 +606,7 @@ export function reserveDuplicates(userId, group, quantity, cb) {
 }
 
 // Rend des individus réservés, à l'identique — même identifiant, même sexe,
-// même ball —, quand la suite de l'opération a échoué. Accepte aussi des lignes
+// même ball, même forme —, quand la suite de l'opération a échoué. Accepte aussi des lignes
 // modifiées : c'est ainsi qu'un individu change d'espèce en évoluant, ou de
 // dresseur en étant échangé, sans cesser d'être lui-même.
 export function restoreDuplicates(rows, cb = () => {}) {
@@ -585,8 +627,8 @@ export function restoreDuplicates(rows, cb = () => {}) {
     db.run(
       `INSERT INTO pokemon_owned
          (id, user_id, species_id, is_shiny, sex, ball, origin, sterile, obtained_at, pc_pos,
-          nickname, locked)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          nickname, locked, form)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         row.id,
         row.user_id,
@@ -600,6 +642,7 @@ export function restoreDuplicates(rows, cb = () => {}) {
         row.pc_pos ?? null,
         row.nickname ?? null,
         row.locked ? 1 : 0,
+        row.form ?? null,
       ],
       next
     );
@@ -888,6 +931,7 @@ export function evolve(userId, group, chosenTargetId, helperKey, cb) {
         ...evolver,
         species_id: target.id,
         sex: sexAfterEvolution(target, evolver.sex),
+        form: formAfterEvolution(target, evolver.form),
       };
       restoreDuplicates([evolved], (err) => {
         if (err) return rendreTout(() => cb(err));
@@ -904,7 +948,7 @@ export function evolve(userId, group, chosenTargetId, helperKey, cb) {
               target,
               plan,
               spent,
-              evolved: { id: evolved.id, sex: evolved.sex },
+              evolved: { id: evolved.id, sex: evolved.sex, form: evolved.form ?? null },
               isShiny: Boolean(evolver.is_shiny),
             });
           }
@@ -1155,8 +1199,9 @@ export function createTrade(trade, cb) {
     `INSERT INTO pokemon_trades
        (from_user_id, to_user_id, offer_species_id, offer_is_shiny, offer_sex, offer_fertile,
         request_species_id, request_is_shiny, request_sex, request_fertile,
-        offer_pokemon_id, request_pokemon_id, created_at, expires_at, channel_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        offer_pokemon_id, request_pokemon_id, created_at, expires_at, channel_id,
+        offer_form, request_form)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       trade.fromUserId,
       trade.toUserId,
@@ -1173,6 +1218,8 @@ export function createTrade(trade, cb) {
       now,
       expiresAt,
       trade.channelId,
+      trade.offerForm ?? null,
+      trade.requestForm ?? null,
     ],
     function (err) {
       cb(err, this ? this.lastID : null);
@@ -1287,6 +1334,7 @@ export function acceptTrade(tradeId, cb) {
                 user_id: userId,
                 species_id: species.id,
                 sex: sexAfterEvolution(species, row.sex),
+                form: formAfterEvolution(species, row.form),
                 origin: "echange",
                 obtained_at: now,
                 // Il arrive comme une capture : verrouillé d'office s'il est

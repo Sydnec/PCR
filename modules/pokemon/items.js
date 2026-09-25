@@ -165,11 +165,37 @@ export function itemLot(item) {
   return { min, max: Math.max(min, borne(item?.lot?.max, min)) };
 }
 
+// La part des tirages qui donnent un objet, pour une table (`weightOf`). Le
+// réglage vaut pour les objets de la première génération ; ceux d'une
+// génération ouverte ensuite s'ajoutent par-dessus sans rien retirer aux
+// autres : chaque objet garde exactement sa chance d'avant, et les nouveaux
+// prennent leur place sur « rien ». Plafonnée à 1 ; sans objet de première
+// génération dans la table, le réglage s'applique tel quel.
+function openedChance(chance, weightOf) {
+  const setting = Math.max(0, Math.min(1, Number(chance) || 0));
+  const items = getItems();
+  const base = items
+    .filter((item) => Number(item.generation ?? 1) <= 1)
+    .reduce((sum, item) => sum + weightOf(item), 0);
+  if (!base) return setting;
+  const total = items.reduce((sum, item) => sum + weightOf(item), 0);
+  return Math.min(1, (setting * total) / base);
+}
+
+// Combien de Pokémon tiennent un objet (`spawn.heldItemChance` en première
+// génération), et combien de tirages de loterie donnent un lot
+// (`lottery.winChance`) : ce que tirent l'apparition et /pk loterie, et ce
+// qu'affichent la page Infos et /admin poids.
+export const heldItemChance = () =>
+  openedChance(getPokemonConfig().spawn?.heldItemChance, itemDropWeight);
+export const lotteryWinChance = () =>
+  openedChance(getPokemonConfig().lottery?.winChance, itemLotteryWeight);
+
 // Ce que tient un Pokémon qui vient d'apparaître, ou null. Tiré à l'apparition
 // et figé dans la ligne : ce qu'il porte lui appartient, ça ne se décide pas au
 // moment où quelqu'un l'attrape.
 export function rollHeldItem() {
-  const chance = Number(getPokemonConfig().spawn?.heldItemChance) || 0;
+  const chance = heldItemChance();
   if (chance <= 0 || Math.random() >= chance) return null;
   return pickWeightedItem(itemDropWeight)?.key ?? null;
 }

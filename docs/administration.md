@@ -26,9 +26,11 @@
     schéma est refusée, les réglages dangereux sont bornés, et l'écriture est atomique (fichier
     temporaire relu puis renommé) pour que le bot n'en voie jamais une version tronquée.
   - `/admin poids [table]` : convertit les poids de tirage en probabilités réelles — apparitions
-    sauvages, rencontres du parc, butin des Pokémon. Un poids n'est pas un pourcentage mais une part
-    d'un total qui bouge à chaque ligne ajoutée, et la table se construit avec les **mêmes**
-    fonctions que les tirages : elle ne peut pas diverger de ce qu'elle décrit.
+    sauvages, rencontres du parc, butin des Pokémon, loterie. Un poids n'est pas un pourcentage mais
+    une part d'un total qui bouge à chaque ligne ajoutée, et la table se construit avec les
+    **mêmes** fonctions que les tirages : elle ne peut pas diverger de ce qu'elle décrit. Les objets
+    hors tirage (charmes, objets d'une génération fermée) sont nommés sous le titre plutôt que listés,
+    et un tableau trop long pour Discord se poursuit dans un champ « suite », voire un second message.
   - `/admin config-voir [cle]` : valeur courante face à la valeur par défaut. Sans clé, le fichier
     entier. Le [site](site.md#administration) offre les deux en arbre, pour `SYDNEC_USER_ID`.
   - `/admin potcommun [simulation]` : déclenche un pot commun hors calendrier, ou simule le

@@ -37,6 +37,9 @@ const CSV_FILES = [
   "pokemon_types.csv",
   "type_names.csv",
   "pokemon_evolution.csv",
+  "pokemon_forms.csv",
+  "pokemon_form_names.csv",
+  "version_groups.csv",
 ];
 
 const argOf = (flag) => {
@@ -119,6 +122,9 @@ async function main() {
     pokemonTypeRows,
     typeNameRows,
     evolutionRows,
+    formRows,
+    formNameRows,
+    versionGroupRows,
   ] = await Promise.all(CSV_FILES.map(loadCsv));
 
   const species = new Map(speciesRows.map((r) => [Number(r.id), r]));
@@ -197,6 +203,41 @@ async function main() {
     }
   }
 
+  // Les formes d'apparence d'une espèce, comme les lettres de Zarbi : des
+  // formes du même Pokémon (pokemon_id identique), ni de combat ni Méga. Chacune
+  // garde la génération qui l'a introduite — les lettres arrivent avec Or et
+  // Argent, « ! » et « ? » avec Rubis et Saphir — et seules celles des
+  // générations incluses sont écrites.
+  const generationOfVersionGroup = new Map(
+    versionGroupRows.map((row) => [row.id, Number(row.generation_id)])
+  );
+  const frenchFormNames = new Map();
+  for (const row of formNameRows) {
+    if (row.local_language_id === FRENCH) {
+      frenchFormNames.set(row.pokemon_form_id, row.form_name);
+    }
+  }
+  const formsBySpecies = new Map();
+  for (const row of formRows) {
+    const id = Number(row.pokemon_id);
+    if (!species.has(id) || row.is_battle_only === "1" || row.is_mega === "1") continue;
+    const generation = generationOfVersionGroup.get(row.introduced_in_version_group_id);
+    if (!row.form_identifier || !(generation <= GENERATION)) continue;
+    const list = formsBySpecies.get(id) || [];
+    list.push({
+      key: row.form_identifier,
+      name: frenchFormNames.get(row.id) || row.form_identifier,
+      generation: Math.max(generation, Number(species.get(id).generation_id)),
+      order: Number(row.form_order),
+    });
+    formsBySpecies.set(id, list);
+  }
+  const formsOf = (id) => {
+    const list = (formsBySpecies.get(id) || []).sort((a, b) => a.order - b.order);
+    if (list.length < 2) return null;
+    return list.map(({ key, name, generation }) => ({ key, name, generation }));
+  };
+
   const dataset = {
     maxGeneration: GENERATION,
     generatedAt: new Date().toISOString().slice(0, 10),
@@ -224,6 +265,7 @@ async function main() {
         evolvesInto: evolutionsOf.get(id),
         sprite: `${SPRITE_BASE}/${id}.png`,
         spriteShiny: `${SPRITE_BASE}/shiny/${id}.png`,
+        ...(formsOf(id) ? { forms: formsOf(id) } : {}),
       };
     }),
   };
@@ -244,6 +286,12 @@ async function main() {
   console.log(`   Évolutions par échange : ${trades.map((s) => s.name).join(", ")}`);
   console.log(
     `   Bébés : ${dataset.species.filter((s) => s.isBaby).map((s) => s.name).join(", ")}`
+  );
+  console.log(
+    `   Formes : ${dataset.species
+      .filter((s) => s.forms)
+      .map((s) => `${s.name} (${s.forms.length})`)
+      .join(", ")}`
   );
 }
 

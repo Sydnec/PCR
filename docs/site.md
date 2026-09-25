@@ -73,13 +73,17 @@ parce que le Pokémon est le dernier de son espèce, ou verrouillé : la note so
   deux échangent leur place. Glisser sur une flèche change de boîte.
 - **Nommer une boîte** : un clic sur son nom (`boxNameLength` caractères, 20) ; vide, elle reprend
   son nom par défaut.
-- **Surnommer un Pokémon** depuis sa fiche (`nicknameLength` caractères, 12) ; vide, il reprend le
+- **Surnommer un Pokémon** depuis sa fiche (`nicknameLength` caractères, 20) ; vide, il reprend le
   nom de son espèce.
 - Surnom comme nom de boîte s'enregistrent **en sortant du champ**, ou sur Entrée, sans bouton ;
   Échap abandonne.
 - **Verrouiller un Pokémon** depuis sa fiche, comme `/pk verrou` : il ne part plus (ni revente, ni
   échange, ni sacrifice) et porte un bouclier dans sa case. Il peut encore évoluer : la bande
   d'évolution le rappelle, et la valider vaut confirmation.
+
+La fiche d'une espèce à formes, comme Zarbi, montre toutes ses lettres sous la lignée : celles qu'on
+possède en couleur, les autres en silhouette. Chaque Zarbi a son image, dans sa case comme sur sa
+fiche.
 
 Un Pokémon garde sa place et son surnom quand il évolue. Reçu en échange, il garde son surnom et
 prend la première case libre ; une capture ou une éclosion aussi. Le Pokédex ouvre la boîte sur

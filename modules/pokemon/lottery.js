@@ -19,7 +19,13 @@ import db from "../points-db.js";
 import { handleException, log } from "../utils.js";
 import { pseudo } from "../pseudo.js";
 import { getPokemonConfig } from "./config.js";
-import { grantItem, itemLot, itemLotteryWeight, pickWeightedItem } from "./items.js";
+import {
+  grantItem,
+  itemLot,
+  itemLotteryWeight,
+  lotteryWinChance,
+  pickWeightedItem,
+} from "./items.js";
 
 const SOURCE = "loterie";
 
@@ -112,7 +118,7 @@ export function rollLot(item) {
 // l'aléatoire de la décision rend le reste testable, comme pour les objets au
 // sol. Renvoie null quand le dresseur repart les mains vides.
 export function rollLottery() {
-  const chance = Number(getLotteryConfig().winChance);
+  const chance = lotteryWinChance();
   if (!(chance > 0) || Math.random() >= chance) return null;
   const item = pickWeightedItem(itemLotteryWeight);
   if (!item) return null;

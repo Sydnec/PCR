@@ -146,7 +146,9 @@ function openSpecies(ctx, species, counts) {
   // le même rendu que sur l'onglet Capture.
   const lineage = h("div", { class: "lineage-slot" });
   loadLineage(species.id)
-    .then((links) => lineage.replaceWith(lineageView(ctx, links, { currentId: species.id })))
+    .then(({ lineage: links, forms }) =>
+      lineage.replaceWith(lineageView(ctx, links, { currentId: species.id, forms }))
+    )
     .catch(() => lineage.remove());
 
   const dialog = openDialog(

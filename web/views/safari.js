@@ -136,7 +136,7 @@ export async function render(ctx) {
       ),
       h("img", {
         class: "spawn-art",
-        src: encounter.shiny ? species.spriteShiny : species.sprite,
+        src: encounter.form?.sprite ?? (encounter.shiny ? species.spriteShiny : species.sprite),
         alt: species.name,
       }),
       h(
@@ -144,7 +144,7 @@ export async function render(ctx) {
         { class: "spawn-title" },
         encounter.shiny ? [icon("sparkle", { label: "Shiny" }), " "] : null,
         "Un ",
-        pokemonName(species, false, encounter.sex),
+        pokemonName(species, false, encounter.sex, null, encounter.form),
         encounter.shiny ? " shiny vous observe !" : " sauvage vous observe…"
       ),
       h(
@@ -280,9 +280,9 @@ export async function render(ctx) {
               return species
                 ? h("img", {
                     class: "sprite",
-                    src: row.shiny ? species.iconShiny : species.icon,
+                    src: row.form?.icon ?? (row.shiny ? species.iconShiny : species.icon),
                     alt: species.name,
-                    title: `${species.name}${row.shiny ? " shiny" : ""}`,
+                    title: `${species.name}${row.form ? ` ${row.form.name}` : ""}${row.shiny ? " shiny" : ""}`,
                     width: 56,
                     height: 56,
                   })

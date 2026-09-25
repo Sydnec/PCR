@@ -314,7 +314,7 @@ export function hatchEgg(eggId, cb) {
             pseudo(egg.user_id).then((name) =>
               log(`Éclosion : ${name} obtient ${species.name}${isShiny ? " ✨" : ""} (œuf #${eggId})`)
             );
-            cb(null, { egg, species, isShiny, sex: born.sex });
+            cb(null, { egg, species, isShiny, sex: born.sex, form: born.form });
           });
         });
       });
@@ -322,13 +322,13 @@ export function hatchEgg(eggId, cb) {
   );
 }
 
-export function buildHatchEmbed({ egg, species, isShiny, sex }) {
+export function buildHatchEmbed({ egg, species, isShiny, sex, form = null }) {
   return new EmbedBuilder()
     .setTitle("🐣 Un œuf a éclos !")
     .setColor(embedColor(species, isShiny))
-    .setThumbnail(spriteUrl(species, isShiny))
+    .setThumbnail(spriteUrl(species, isShiny, form))
     .setDescription(
-      `<@${egg.user_id}> accueille **${displayName(species, isShiny, sex)}** !` +
+      `<@${egg.user_id}> accueille **${displayName(species, isShiny, sex, form)}** !` +
         (isShiny ? "\nEt il brille… ✨" : "")
     );
 }

@@ -26,11 +26,13 @@ import {
 import {
   getCharmItem,
   getItems,
+  heldItemChance,
   itemDropWeight,
   itemLot,
   itemLotteryWeight,
   itemOpen,
   itemSellValue,
+  lotteryWinChance,
 } from "./items.js";
 import { getLotteryConfig } from "./lottery.js";
 import { describeEvolution } from "./collection.js";
@@ -98,12 +100,12 @@ function catchTable(spawnConfig) {
 // quelle part des tirages de loterie il sort, par quels lots, et ce qu'il
 // rapporte revendu. Un objet d'une génération pas encore ouverte n'y figure
 // pas : il n'existe pas encore pour les joueurs.
-function itemTable(config) {
+function itemTable() {
   const items = getItems().filter(itemOpen);
   const dropTotal = items.reduce((sum, item) => sum + itemDropWeight(item), 0);
   const lotteryTotal = items.reduce((sum, item) => sum + itemLotteryWeight(item), 0);
-  const heldChance = Number(config.spawn.heldItemChance) || 0;
-  const winChance = Number(getLotteryConfig().winChance) || 0;
+  const heldChance = heldItemChance();
+  const winChance = lotteryWinChance();
   return items.map((item) => ({
     key: item.key,
     label: item.label,
@@ -223,7 +225,7 @@ export function describeRules(bot) {
       afterEndMinutes: config.spawn.minDelayAfterEndMinutes,
       fleeMinutes: config.spawn.fleeAfterMinutes,
       shinyOdds: config.spawn.shinyOdds,
-      heldItemChance: config.spawn.heldItemChance,
+      heldItemChance: heldItemChance(),
       itemDropChance: config.spawn.itemDropChance,
       rarities: rarityShares(config.spawn),
     },
@@ -251,10 +253,10 @@ export function describeRules(bot) {
       })),
       table: catchTable(config.spawn),
     },
-    items: itemTable(config),
+    items: itemTable(),
     lottery: {
       enabled: lottery.enabled !== false,
-      winChance: lottery.winChance,
+      winChance: lotteryWinChance(),
       lotDecay: lottery.lotDecay,
     },
     evolution: {

@@ -57,7 +57,7 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
 | `GET /api/users/:userId/box` 🔒 | `{ total, page, pages, pageSize, items }` |
 | `GET /api/users/:userId/inventory` 🔒 | `{ items: [{ key, label, emoji, description, count }] }` |
 | `GET /api/me/egg` 🔒 | `{ egg }` ou `{ egg: null }` — `egg.shinyParents` et `egg.shinyFactor` : le bonus de shiny des parents ; `egg.charmFactor` : celui du Charme Chroma du dresseur |
-| `GET /api/me/lineage/:speciesId` 🔒 | `{ lineage }` — la lignée et ce que le dresseur possède de chaque maillon |
+| `GET /api/me/lineage/:speciesId` 🔒 | `{ lineage, forms }` — la lignée et ce que le dresseur possède de chaque maillon ; `forms`, pour une espèce à formes (Zarbi), chacune avec `key`, `name`, `icon` et `owned`, `null` sinon |
 | `GET /api/spawn` 🔒 | `{ refreshSeconds, cooldownSeconds, pausedUntil, wallet, safari, spawn, last, drops }` — l'apparition du salon. `spawn.charm` (ou `null`) : elle ne brille que pour les porteurs du Charme Chroma de sa génération (`label`, `image`, `mine` : le visiteur en est un, et `spawn.shiny` est alors vrai pour lui) |
 | `GET /api/safari` 🔒 | `{ offer, visit }` — ce que le dresseur peut faire du parc, et sa visite en cours (`null` sinon) |
 | `GET /api/me/pc` 🔒 | `{ slotsPerBox, columns, maxBoxes, boxNameLength, nicknameLength, boxes, pokemon }` — la boîte PC |
@@ -68,13 +68,15 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
 (`M`, `F` ou `none`), `fertile` et `shiny` (`true`/`false`). Un individu :
 
 ```json
-{ "id": 123, "speciesId": 25, "shiny": false, "sex": "F", "ball": "hyper",
+{ "id": 123, "speciesId": 25, "shiny": false, "sex": "F", "form": null, "ball": "hyper",
   "origin": "capture", "fertile": true, "last": false, "obtainedAt": 1758600000000,
   "nickname": null }
 ```
 
 `last` : dernier de son espèce (shiny compris), il ne peut pas partir. `locked` : verrouillé, il ne
-part pas non plus. Une espèce porte `obtention` (`wild`,
+part pas non plus. `form` : sa forme pour une espèce qui en a — la lettre d'un Zarbi —,
+`{ key, name, icon, sprite }` avec ses images (qui remplacent celles de l'espèce), `null` sinon ;
+l'apparition, la rencontre du parc et ses captures la portent de même. Une espèce porte `obtention` (`wild`,
 `evolution` ou `egg`), `femaleShare` (`null` si asexuée), `breeder` (parent possible d'un œuf),
 `sellValue` / `sellValueShiny` (prix de revente, 0 si invendable), ses évolutions, ses
 illustrations (`sprite`, `spriteShiny`) et ses petites images (`icon`, `iconShiny`).

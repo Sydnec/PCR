@@ -2,31 +2,35 @@
 
 # 🎒 Objets
 
-**Un Pokémon sur quinze tient quelque chose** (7 %), tiré à l'apparition et figé dans sa ligne, comme
+**15 % des Pokémon tiennent quelque chose**, tiré à l'apparition et figé dans sa ligne, comme
 le shiny et le taux de capture : ce qu'il porte lui appartient et ne se rejoue pas à chaque lancer.
 L'annonce n'en dit rien — sinon un objet rare ferait monter les enchères sur un Roucool — et tout le
 monde le découvre à la fin. Le parc safari, lui, ne fait rien tomber : 25 rencontres par visite
 noieraient la table.
 
-| Objet | Part des trouvailles | Ce qu'il fait | Revente |
+| Objet | Pokémon qui le tiennent | Ce qu'il fait | Revente |
 |---|---|---|---|
-| Poké Ball | 43 % | un lancer offert | — |
-| Super Ball | 22 % | un lancer offert | — |
-| 🍬 Super Bonbon | 13 % | **trois** tiennent lieu d'un sacrifice dans une évolution | 300 |
-| Hyper Ball | 8,7 % | un lancer offert | — |
-| 🔮 Évolyte | 9,8 % | un Évoli qui évolue avec lui prend la forme de son choix, sans supplément ; il tient lieu d'un sacrifice | 500 |
-| ☀️ Pierre Soleil | 3 %, dès la 2ᵉ gén. | Ortide devient Joliflor plutôt que Rafflesia ; tient lieu d'un sacrifice | 500 |
-| 👑 Roche Royale | 3 %, dès la 2ᵉ gén. | Têtarte devient Tarpaud, Ramoloss devient Roigada ; tient lieu d'un sacrifice | 500 |
-| ⚙️ Catalyseur | 3 %, dès la 2ᵉ gén. | le seul moyen de faire évoluer Onix, Insécateur, Hypocéan et Porygon ; tient lieu d'un sacrifice | 500 |
-| 💎 Pépite | 2,2 % | rien, sinon se revendre | 2 000 |
-| 🎟️ Ticket Safari | 0,9 % | une entrée du parc, sans passer par la caisse | — |
-| Master Ball | **0,33 %** | la capture garantie, offerte | — |
+| Poké Ball | 6,4 % (1 sur 16) | un lancer offert | — |
+| Super Ball | 3,2 % (1 sur 31) | un lancer offert | — |
+| 🍬 Super Bonbon | 1,9 % (1 sur 52) | **trois** tiennent lieu d'un sacrifice dans une évolution | 300 |
+| Hyper Ball | 1,3 % (1 sur 78) | un lancer offert | — |
+| 🔮 Évolyte | 0,97 % (1 sur 104) | un Évoli qui évolue avec lui prend la forme de son choix, sans supplément ; il tient lieu d'un sacrifice | 500 |
+| ☀️ Pierre Soleil | 0,48 % (1 sur 207), dès la 2ᵉ gén. | Ortide devient Joliflor plutôt que Rafflesia ; tient lieu d'un sacrifice | 500 |
+| 👑 Roche Royale | 0,48 % (1 sur 207), dès la 2ᵉ gén. | Têtarte devient Tarpaud, Ramoloss devient Roigada ; tient lieu d'un sacrifice | 500 |
+| ⚙️ Catalyseur | 0,48 % (1 sur 207), dès la 2ᵉ gén. | le seul moyen de faire évoluer Onix, Insécateur, Hypocéan et Porygon ; tient lieu d'un sacrifice | 500 |
+| 💎 Pépite | 0,80 % (1 sur 124) | rien, sinon se revendre | 4 000 |
+| 🎟️ Ticket Safari | 0,32 % (1 sur 311) | une entrée du parc, sans passer par la caisse | — |
+| Master Ball | **0,03 % (1 sur 3 107)** | la capture garantie, offerte | — |
 
 `dropWeight` est un **poids**, pas un pourcentage : la part d'un objet vaut son poids divisé par la
-somme de tous (921 pour le butin, 1 011 dès la 2ᵉ génération : les autres parts y reculent d'un
-onzième). `/admin poids` fait la conversion pour les quatre tables de tirage du jeu, cadence
-comprise — la Master Ball tombe une fois sur 4 386 apparitions. La loterie tire dans sa propre table
-(`lotteryWeight`, voir [Loterie](loterie.md)) ; celle-ci ne décrit que le butin.
+somme de tous (932 pour le butin). `/admin poids` fait la conversion pour les quatre tables de
+tirage du jeu, cadence comprise. La loterie tire dans sa propre table (`lotteryWeight`, voir
+[Loterie](loterie.md)) ; celle-ci ne décrit que le butin.
+
+**Les objets d'une génération suivante s'ajoutent sans rien retirer aux autres.** Les 15 %
+(`spawn.heldItemChance`) valent pour les objets de la 1ʳᵉ génération ; à l'ouverture de la 2ᵉ, ses
+trois objets viennent par-dessus, si bien que chaque objet du tableau garde exactement sa chance, et
+que 16,4 % des Pokémon tiennent alors quelque chose.
 
 **Une fois sur cinq, il le lâche en partant.** Capturé ou enfui, un Pokémon qui tenait quelque chose
 a 20 % de chances de le laisser par terre plutôt que de le céder à son vainqueur. Un message public
@@ -54,7 +58,7 @@ par terre plutôt que de le faire disparaître.
   partie entre-temps (lancée depuis le site), le lancer est refusé sans rien débiter. L'annonce
   publique, la même pour tous, garde le prix. La Master Ball garde sa
   confirmation — elle ne coûte rien mais ne se retrouve pas. Le Ticket Safari suit la même règle
-  dans `/pk safari`, et il ignore le délai de 24 h : ce délai borne ce qu'on peut s'**acheter**.
+  dans `/pk safari`, et il ignore le délai de 12 h : ce délai borne ce qu'on peut s'**acheter**.
 - **Une ball offerte se rend en ball.** Battu à la milliseconde sur un Pokémon, on récupère l'objet,
   jamais sa valeur en points : la convertir en monnaie ferait d'un Pokémon disputé une petite
   imprimerie. Le lancer est alors journalisé à coût nul, ce qui garde honnête le total des points

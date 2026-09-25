@@ -135,6 +135,8 @@ prennent en compte immédiatement. Ce qu'elle change :
   l'état sauvage (🔒).
 - **Le parc safari demande quelles générations on vise** (voir [Parc Safari](safari.md)).
 - **Six légendaires** de plus : Raikou, Entei, Suicune, Lugia, Ho-Oh et Celebi.
+- **Zarbi et ses 26 lettres** : une seule entrée de Pokédex, mais chaque Zarbi porte la sienne,
+  avec son image (voir [Individus](individus.md)).
 - **Un Charme Chroma de 2ᵉ génération** (voir [Charme Chroma](charme.md)).
 - **Les raretés de la 1ʳᵉ génération ne bougent pas.** Un bébé est de stade 1, sa forme adulte
   aussi : Pikachu reste commun et Raichu peu commun, là où compter Pichu en ferait un rare.

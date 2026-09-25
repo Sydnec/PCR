@@ -254,7 +254,7 @@ export async function render(ctx) {
           "span",
           {},
           "Choisis la case de ",
-          pokemonName(species, moving.shiny, moving.sex, moving.nickname),
+          pokemonName(species, moving.shiny, moving.sex, moving.nickname, moving.form),
           ` #${moving.id}. Une case occupée : les deux échangent leur place.`
         ),
         h(
@@ -355,7 +355,9 @@ export async function render(ctx) {
     const species = ctx.species.get(mon.speciesId);
     // Le nom au survol et pour les lecteurs d'écran : la case n'en montre rien.
     const name =
-      [mon.nickname, species?.name ?? "?"].filter(Boolean).join(" · ") +
+      [mon.nickname, `${species?.name ?? "?"}${mon.form ? ` ${mon.form.name}` : ""}`]
+        .filter(Boolean)
+        .join(" · ") +
       `${mon.shiny ? " shiny" : ""} #${mon.id}${mon.locked ? " · verrouillé" : ""}`;
     return h(
       "button",
@@ -383,7 +385,7 @@ export async function render(ctx) {
         ondragend: endDrag,
       },
       h("img", {
-        src: mon.shiny ? species?.iconShiny : species?.icon,
+        src: mon.form?.icon ?? (mon.shiny ? species?.iconShiny : species?.icon),
         alt: "",
         loading: "lazy",
         draggable: "false",
@@ -440,9 +442,13 @@ function openPokemon(ctx, item, pc, { reload, startMove }) {
     await Promise.all([ctx.refreshMe().catch(() => {}), reload()]);
   };
 
-  const title = h("h2", {}, pokemonName(species, item.shiny, item.sex, item.nickname));
+  const title = h("h2", {}, pokemonName(species, item.shiny, item.sex, item.nickname, item.form));
   const subtitle = () =>
-    [`#${item.id}`, dexNumber(species), item.nickname ? species.name : null]
+    [
+      `#${item.id}`,
+      dexNumber(species),
+      item.nickname ? `${species.name}${item.form ? ` ${item.form.name}` : ""}` : null,
+    ]
       .filter(Boolean)
       .join(" · ");
   const subtitleLine = h("p", { class: "muted" }, subtitle());
@@ -475,8 +481,10 @@ function openPokemon(ctx, item, pc, { reload, startMove }) {
   // fiche est lisible sans elle.
   const lineage = h("div", { class: "lineage-slot" });
   loadLineage(species.id)
-    .then((links) =>
-      lineage.replaceWith(lineageView(ctx, links, { currentId: species.id, shiny: item.shiny }))
+    .then(({ lineage: links, forms }) =>
+      lineage.replaceWith(
+        lineageView(ctx, links, { currentId: species.id, shiny: item.shiny, forms })
+      )
     )
     .catch(() => lineage.remove());
 
@@ -487,7 +495,7 @@ function openPokemon(ctx, item, pc, { reload, startMove }) {
   const targets = species.evolvesInto.map((id) => ctx.species.get(id)).filter(Boolean);
   const actions = pokemonActions(ctx, item, species, targets, {
     renamed: () => {
-      title.replaceChildren(pokemonName(species, item.shiny, item.sex, item.nickname));
+      title.replaceChildren(pokemonName(species, item.shiny, item.sex, item.nickname, item.form));
       subtitleLine.textContent = subtitle();
       reload();
     },
@@ -507,7 +515,7 @@ function openPokemon(ctx, item, pc, { reload, startMove }) {
       { class: "dialog-head" },
       h("img", {
         class: "artwork",
-        src: item.shiny ? species.spriteShiny : species.sprite,
+        src: item.form?.sprite ?? (item.shiny ? species.spriteShiny : species.sprite),
         alt: "",
       }),
       title,

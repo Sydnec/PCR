@@ -72,6 +72,10 @@ const POKEMON = {
     // et l'objet reste par terre pour le plus rapide. C'est la seule récompense
     // du jeu qui ne demande pas d'avoir gagné la course, et la seule chose qu'un
     // Pokémon qui s'échappe laisse derrière lui.
+    //
+    // La part vaut pour les objets de la 1re génération : ceux d'une génération
+    // ouverte ensuite s'y ajoutent sans rien retirer aux autres
+    // (heldItemChance dans pokemon/items.js).
     heldItemChance: 0.07,
     itemDropChance: 0.2,
     embedRefreshMs: 2000,
@@ -301,7 +305,7 @@ const POKEMON = {
       label: "Ticket Safari",
       emoji: "🎟️",
       sprite: "pass",
-      description: "Une entrée pour le parc safari. Elle s'utilise, elle ne se monnaie pas.",
+      description: "Une entrée pour le parc safari.",
       dropWeight: 8,
     },
     ball_master: {
@@ -357,6 +361,10 @@ const POKEMON = {
   // son défaut d'origine — cinq Poké Balls tombaient aussi souvent qu'une seule.
   // À 0,5, un lot sur deux est le plus petit possible, et le gros lot redevient
   // un événement.
+  //
+  // `winChance` vaut pour les objets de la 1re génération : ceux d'une
+  // génération ouverte ensuite prennent leur place sur « rien », et aucun autre
+  // lot ne devient plus rare (lotteryWinChance dans pokemon/items.js).
   //
   // Repère aux réglages actuels : ~267 points de valeur par jour et par dresseur,
   // un dixième d'une journée de messages. Un gain sur deux est une ou deux Poké

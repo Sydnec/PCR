@@ -6,15 +6,15 @@ import { icon } from "./icons.js";
 import { OBTENTION_LEGENDS, api, fmt, h, obtentionMark, richText } from "./lib.js";
 
 // La lignée et la possession, lues par l'API avec les fonctions de la fiche
-// Discord.
-export const loadLineage = (speciesId) =>
-  api(`/api/me/lineage/${speciesId}`).then((data) => data.lineage);
+// Discord : `{ lineage, forms }`, `forms` étant null pour une espèce sans
+// formes.
+export const loadLineage = (speciesId) => api(`/api/me/lineage/${speciesId}`);
 
 // `shiny` : la variante regardée. Une entrée de Pokédex est une espèce, shiny
 // ou non : « je l'ai » veut dire qu'on en a un — sauf sur un shiny, où il veut
 // dire « je l'ai en shiny », puisqu'un premier shiny se signale. Les deux
 // compteurs restent affichés. `currentId` : le maillon consulté, mis en avant.
-export function lineageView(ctx, lineage, { currentId = null, shiny = false } = {}) {
+export function lineageView(ctx, lineage, { currentId = null, shiny = false, forms = null } = {}) {
   const stages = new Map();
   for (const link of lineage) {
     const species = ctx.species.get(link.speciesId);
@@ -46,7 +46,33 @@ export function lineageView(ctx, lineage, { currentId = null, shiny = false } = 
       .filter((kind) => kinds.has(kind))
       .map((kind) =>
         h("p", { class: "lineage-legend muted small" }, richText(OBTENTION_LEGENDS[kind]))
+      ),
+    forms ? formsView(forms) : null
+  );
+}
+
+// Les formes d'une espèce qui en a — les lettres de Zarbi —, comme la ligne
+// « Formes » de la fiche Discord : celles qu'on possède, en couleur, les
+// autres en silhouette.
+function formsView(forms) {
+  const owned = forms.filter((form) => form.owned).length;
+  return h(
+    "div",
+    { class: "forms" },
+    h("p", { class: "muted small" }, `Formes : ${fmt(owned)}/${fmt(forms.length)}`),
+    h(
+      "div",
+      { class: "forms-grid" },
+      forms.map((form) =>
+        h("img", {
+          class: `forms-icon${form.owned ? "" : " artwork-missing"}`,
+          src: form.icon,
+          alt: form.name,
+          title: `${form.name}${form.owned ? "" : " (pas encore)"}`,
+          loading: "lazy",
+        })
       )
+    )
   );
 }
 

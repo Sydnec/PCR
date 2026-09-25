@@ -12,6 +12,7 @@ import {
   getSpecies,
   pickWeightedSpecies,
   rarityOf,
+  rollForm,
   rollSex,
   rollShiny,
 } from "./data.js";
@@ -265,14 +266,16 @@ function createSpawn(client, channel, species, { isShiny, charm }, announcement,
   // appartient. Celui qui s'enfuit part avec — on ne fouille pas les fuyards.
   const heldItem = rollHeldItem();
   // Son sexe aussi, pour que l'annonce le montre : c'est celui de l'individu
-  // qui rejoindra la boîte de son vainqueur.
+  // qui rejoindra la boîte de son vainqueur. Sa forme de même (la lettre d'un
+  // Zarbi).
   const sex = rollSex(species);
+  const form = rollForm(species);
 
   db.run(
     `INSERT INTO pokemon_spawns
        (species_id, is_shiny, catch_rate, rarity, channel_id, spawned_at, flees_at, held_item, sex,
-        charm_shiny)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        charm_shiny, form)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       species.id,
       isShiny ? 1 : 0,
@@ -284,6 +287,7 @@ function createSpawn(client, channel, species, { isShiny, charm }, announcement,
       heldItem,
       sex,
       charm ? 1 : 0,
+      form,
     ],
     async function (err) {
       if (err) {
@@ -301,6 +305,7 @@ function createSpawn(client, channel, species, { isShiny, charm }, announcement,
         held_item: heldItem,
         sex,
         charm_shiny: charm ? 1 : 0,
+        form,
       };
 
       const shouldPing =

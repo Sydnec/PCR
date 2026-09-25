@@ -872,6 +872,32 @@ input[type="number"] {
   font-variant-numeric: tabular-nums;
 }
 
+.forms {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.forms p {
+  margin: 0;
+}
+
+.forms-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+  gap: 2px;
+  width: 100%;
+  max-width: 360px;
+}
+
+.forms-icon {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+
 .lineage-legend {
   display: flex;
   align-items: center;

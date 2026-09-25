@@ -288,6 +288,8 @@ export default {
           requestFertile: fertility(request),
           offerPokemonId: offer.pokemonId,
           requestPokemonId: request.pokemonId,
+          offerForm: offer.form,
+          requestForm: request.form,
           channelId: interaction.channelId,
         },
         async (err, tradeId) => {
@@ -311,6 +313,8 @@ export default {
             request_fertile: fertility(request) ? 1 : 0,
             offer_pokemon_id: offer.pokemonId,
             request_pokemon_id: request.pokemonId,
+            offer_form: offer.form,
+            request_form: request.form,
           };
 
           const message = await interaction.editReply({

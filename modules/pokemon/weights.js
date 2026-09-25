@@ -11,7 +11,14 @@
 // serait pire que pas de table du tout : elle ferait régler le jeu à côté.
 import { getPokemonConfig, getSafariConfig } from "./config.js";
 import { allSpecies, isLegendary, itemOnlySpecies, spawnWeight } from "./data.js";
-import { getItems, itemDropWeight, itemLot, itemLotteryWeight } from "./items.js";
+import {
+  getItems,
+  heldItemChance,
+  itemDropWeight,
+  itemLot,
+  itemLotteryWeight,
+  lotteryWinChance,
+} from "./items.js";
 
 // Une ligne de table : un groupe de tirages qui partagent le même poids.
 // `count` vaut 1 pour un objet, et le nombre d'espèces pour un groupe de
@@ -114,7 +121,7 @@ export function describeSafariPool() {
 }
 
 export function describeDropPool() {
-  const chance = Number(getPokemonConfig().spawn?.heldItemChance) || 0;
+  const chance = heldItemChance();
   return table({
     key: "butin",
     name: "Butin des Pokémon",
@@ -132,7 +139,7 @@ export function describeDropPool() {
 // côte : c'est là, et nulle part ailleurs, qu'on voit qu'ils ont divergé.
 export function describeLotteryPool() {
   const lottery = getPokemonConfig().lottery ?? {};
-  const chance = Number(lottery.winChance) || 0;
+  const chance = lotteryWinChance();
   const raw = Number(lottery.lotDecay);
   // Annoncé en « N fois moins probable » : 0,5 se lit mal, « deux fois moins » se
   // lit tout seul.
