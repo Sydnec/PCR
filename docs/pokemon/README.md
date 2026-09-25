@@ -22,10 +22,18 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
   que d'un œuf.
 - `/pk boite [pokemon] [membre]` : les Pokémon un par un, page par page — `#numéro`, sexe, ball,
   date, fertilité, et 🛡️ les verrouillés (voir [Individus](individus.md)).
-- `/pk doublons [membre] [pokemon]` : les espèces qu'un dresseur a en plusieurs exemplaires, dans
-  l'ordre du Pokédex, et combien peuvent s'échanger — tout sauf un par espèce, hors
-  verrouillés 🛡️. Avec une espèce, l'inverse : les dresseurs qui l'ont en double, ceux qui peuvent
-  en céder le plus d'abord. Réponse privée, page par page.
+- `/pk doublons [membre] [pokemon] [evolutions]` : les espèces qu'un dresseur a en plusieurs
+  exemplaires, dans l'ordre du Pokédex, et combien peuvent s'échanger — tout sauf un par espèce,
+  hors verrouillés 🛡️. Avec une espèce, l'inverse : les dresseurs qui l'ont en double, ceux qui
+  peuvent en céder le plus d'abord. Dans les deux sens, un doublon dont tous les exemplaires en trop
+  sont verrouillés n'apparaît pas. Réponse privée, page par page.
+  - `evolutions` met de côté 🧬 ce qu'il faut pour les évolutions qui manquent au Pokédex du
+    dresseur affiché, lignée entière : s'il manque Florizarre, assez d'Herbizarre pour le faire
+    évoluer, et assez de Bulbizarre pour faire ces Herbizarre. Le compte suit le tarif des
+    évolutions sans objet ni Métamorph, une évolution par forme manquante (Évoli), et laisse de côté
+    les évolutions par échange, qu'on obtient en recevant le premier stade. Les verrouillés servent
+    d'abord à évoluer et à rester au Pokédex, seuls les libres se sacrifient. Ce qui est mis de côté
+    reste échangeable : l'option ne change que ce que la liste montre.
 - `/pk verrou <espece> <individu>` : verrouille ou déverrouille un Pokémon. **Verrouillé, il ne part
   jamais** — ni revente, ni échange, ni sacrifice — mais peut encore évoluer, après confirmation,
   et pondre. Les shiny et les légendaires arrivent verrouillés (`pokemon.lockByDefault`), y compris

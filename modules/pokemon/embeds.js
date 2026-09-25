@@ -148,18 +148,34 @@ export function buildSpawnEmbed(spawn, species, throws = [], announcement = null
 // lancers. Seul le préfixe change : `poke_throw` ouvre un éphémère, `poke_rethrow`
 // réécrit celui d'où vient le clic. Le nom de la route dit donc ce qu'elle fait,
 // plutôt qu'un drapeau à déchiffrer côté routeur.
-export function buildBallRow(spawnId, { disabled = false, panel = false } = {}) {
+//
+// `stock` (clé de ball → nombre en poche) ne vaut que pour le panneau, que seul
+// son dresseur lit : une ball en poche y est dite offerte, et son bouton la
+// lance sans jamais prendre de points (`|item`, comme la confirmation de la
+// Master Ball) — partie entre-temps, depuis le site par exemple, le lancer est
+// refusé au lieu d'être payé en silence. L'annonce, la même pour tous, garde
+// les prix ; `prices: false` les tait quand le sac n'a pas pu être lu.
+export function buildBallRow(
+  spawnId,
+  { disabled = false, panel = false, stock = null, prices = true } = {}
+) {
   const row = new ActionRowBuilder();
   for (const [key, ball] of Object.entries(getPokemonConfig().capture.balls)) {
     // La Master Ball passe par une confirmation : à 22 500 points, un mésclic
     // n'est pas rattrapable.
+    const held = stock?.get(key) ?? 0;
     const customId = ball.guaranteed
       ? `${panel ? "poke_remaster" : "poke_master"}|${spawnId}`
-      : `${panel ? "poke_rethrow" : "poke_throw"}|${spawnId}|${key}`;
+      : `${panel ? "poke_rethrow" : "poke_throw"}|${spawnId}|${key}${held ? "|item" : ""}`;
+    const label = held
+      ? `${ball.label} (offerte ×${held.toLocaleString("fr-FR")})`
+      : prices
+        ? `${ball.label} (${ball.price.toLocaleString("fr-FR")})`
+        : ball.label;
     row.addComponents(
       new ButtonBuilder()
         .setCustomId(customId)
-        .setLabel(`${ball.label} (${ball.price})`)
+        .setLabel(label)
         .setEmoji(ball.emoji)
         .setStyle(ball.guaranteed ? ButtonStyle.Danger : ButtonStyle.Primary)
         .setDisabled(disabled)
@@ -645,6 +661,12 @@ export function buildBoxRow(ownerId, speciesId, page, total) {
 const DUPLICATES_NOTE =
   "Il reste toujours un exemplaire de chaque espèce, et un verrouillé 🛡️ ne part pas : " +
   "le reste peut s'échanger.";
+// Avec l'option `evolutions` : ce qui est mis de côté, et pour quoi.
+const RESERVE_NOTE =
+  "🧬 Mis de côté : de quoi faire les évolutions qui manquent au Pokédex du dresseur, " +
+  "évolutions d'évolutions comprises. Ils restent échangeables.";
+const duplicatesNote = (reserve) =>
+  reserve ? `${DUPLICATES_NOTE}\n${RESERVE_NOTE}` : DUPLICATES_NOTE;
 const fr = (value) => value.toLocaleString("fr-FR");
 
 // Les chiffres d'une ligne de doublons (listDuplicates) : combien, dont combien
@@ -656,6 +678,7 @@ function duplicateCounts(entry) {
     `×${fr(entry.total)}` +
     (entry.shiny ? ` (dont ${fr(entry.shiny)} ✨)` : "") +
     ` · **${fr(entry.spare)}** échangeable${entry.spare > 1 ? "s" : ""}` +
+    (entry.reserved ? ` · ${fr(entry.reserved)} 🧬` : "") +
     (locked ? ` · ${fr(locked)} 🛡️` : "")
   );
 }
@@ -672,14 +695,20 @@ function duplicatesFooter(list, current, pages, [one, many]) {
 }
 
 // Les doublons d'un dresseur (listDuplicates), une ligne par espèce, page par
-// page comme la boîte.
-export function buildDuplicatesEmbed(list, { user, page = 0 } = {}) {
+// page comme la boîte. `reserve` : la liste met de côté de quoi évoluer.
+export function buildDuplicatesEmbed(list, { user, page = 0, reserve = false } = {}) {
   const { pages, current, start, end } = pageOf(list.length, page);
   const embed = new EmbedBuilder()
     .setTitle(`\u{1F501} Doublons de ${user.displayName ?? user.username}`)
     .setColor(0x3b88c3);
   // Rien sur la boîte elle-même : elle peut être vide.
-  if (!list.length) return embed.setDescription("*Aucun doublon pour l'instant.*");
+  if (!list.length) {
+    return embed.setDescription(
+      reserve
+        ? `${RESERVE_NOTE}\n\n*Aucun doublon en dehors de ce qui est mis de côté.*`
+        : "*Aucun doublon échangeable pour l'instant.*"
+    );
+  }
   const lines = list.slice(start, end).map((entry) => {
     const species = getSpecies(entry.speciesId);
     return (
@@ -688,44 +717,51 @@ export function buildDuplicatesEmbed(list, { user, page = 0 } = {}) {
     );
   });
   return embed
-    .setDescription(`${DUPLICATES_NOTE}\n\n${lines.join("\n")}`)
+    .setDescription(`${duplicatesNote(reserve)}\n\n${lines.join("\n")}`)
     .setFooter(duplicatesFooter(list, current, pages, ["espèce en double", "espèces en double"]));
 }
 
 // L'inverse : qui a cette espèce en double (getSpeciesDuplicates), une ligne
 // par dresseur. La mention n'a sa place que dans la description : Discord ne
 // la rend pas dans un titre. `member` restreint la liste à un dresseur.
-export function buildSpeciesDuplicatesEmbed(species, list, { page = 0, member = null } = {}) {
+export function buildSpeciesDuplicatesEmbed(
+  species,
+  list,
+  { page = 0, member = null, reserve = false } = {}
+) {
   const { pages, current, start, end } = pageOf(list.length, page);
   const embed = new EmbedBuilder()
     .setTitle(`\u{1F501} ${species.name} en double`)
     .setColor(embedColor(species, false))
     .setThumbnail(spriteUrl(species, false));
   if (!list.length) {
-    return embed.setDescription(
-      member
-        ? `*<@${member.id}> n'a pas de ${species.name} en double.*`
-        : `*Personne n'a de ${species.name} en double pour l'instant.*`
-    );
+    const none = member
+      ? `*<@${member.id}> n'a pas de ${species.name} en double à échanger.*`
+      : `*Personne n'a de ${species.name} en double à échanger pour l'instant.*`;
+    return embed.setDescription(reserve ? `${RESERVE_NOTE}\n\n${none}` : none);
   }
   const lines = list
     .slice(start, end)
     .map((entry) => `<@${entry.userId}> ${duplicateCounts(entry)}`);
   return embed
-    .setDescription(`${DUPLICATES_NOTE}\n\n${lines.join("\n")}`)
+    .setDescription(`${duplicatesNote(reserve)}\n\n${lines.join("\n")}`)
     .setFooter(duplicatesFooter(list, current, pages, ["dresseur", "dresseurs"]));
 }
 
-// Les boutons de page des doublons : le dresseur dont on lit la boîte.
-export function buildDuplicatesRow(ownerId, page, total) {
+// Les boutons de page des doublons : le dresseur dont on lit la boîte. Avec la
+// réserve d'évolution, une route à part (`poke_dupr`) : les boutons des listes
+// déjà affichées gardent la leur.
+export function buildDuplicatesRow(ownerId, page, total, { reserve = false } = {}) {
   const { pages, current } = pageOf(total, page);
-  return pageRow(`poke_dup|${ownerId}`, `poke_dup_noop|${ownerId}`, current, pages);
+  const action = reserve ? "poke_dupr" : "poke_dup";
+  return pageRow(`${action}|${ownerId}`, `${action}_noop|${ownerId}`, current, pages);
 }
 
 // Les boutons de page de « qui a cette espèce en double » : l'espèce suffit.
-export function buildSpeciesDuplicatesRow(speciesId, page, total) {
+export function buildSpeciesDuplicatesRow(speciesId, page, total, { reserve = false } = {}) {
   const { pages, current } = pageOf(total, page);
-  return pageRow(`poke_dupsp|${speciesId}`, `poke_dupsp_noop|${speciesId}`, current, pages);
+  const action = reserve ? "poke_dupspr" : "poke_dupsp";
+  return pageRow(`${action}|${speciesId}`, `${action}_noop|${speciesId}`, current, pages);
 }
 
 export function buildInventoryEmbed(rows, { user = null } = {}) {

@@ -179,23 +179,104 @@ export function countBySpecies(rows) {
   return counts;
 }
 
-// Les doublons d'un dresseur, espèce par espèce dans l'ordre du Pokédex : tout
-// ce qui dépasse un exemplaire, avec le `spare` de countBySpecies — la marge
-// que l'échange et les sacrifices revérifient au moment de retirer.
-export function listDuplicates(rows) {
-  return [...countBySpecies(rows)]
-    .filter(([, entry]) => entry.total > 1)
-    .map(([speciesId, entry]) => ({ speciesId, ...entry }))
+// Ce qu'un dresseur doit encore garder de chaque espèce pour les évolutions qui
+// manquent à son Pokédex, sur toute la lignée : `owned` donne ses individus par
+// espèce ({ total, free }, comme countBySpecies). Il manque Florizarre ? Il faut
+// assez d'Herbizarre pour le faire évoluer, et assez de Bulbizarre pour faire
+// ces Herbizarre-là — une évolution d'évolution se paie en évolutions.
+//
+// Rend, par espèce, `evolutions` (les individus qui évolueront) et
+// `sacrifices` (ceux qu'elles consumeront, au tarif sans objet ni Métamorph de
+// describeEvolution). Les deux ne se valent pas : un verrouillé peut évoluer et
+// garder l'entrée du Pokédex, seul un libre se sacrifie. Une cible par échange
+// ne compte pas : en recevoir le premier stade suffit, sans rien consumer.
+// `edges` garde les tarifs d'une lignée d'un dresseur à l'autre.
+export function evolutionReserve(owned, edges = new Map()) {
+  const routes = (species) => {
+    if (!edges.has(species.id)) {
+      edges.set(
+        species.id,
+        evolutionTargets(species)
+          .filter((target) => !target.tradeEvolution)
+          .map((target) => ({ target, plan: describeEvolution(species.id, target.id) }))
+          .filter(({ plan }) => !plan.error)
+      );
+    }
+    return edges.get(species.id);
+  };
+  const memo = new Map();
+  const consume = (species) => {
+    if (memo.has(species.id)) return memo.get(species.id);
+    // Garde-fou : un dataset régénéré avec un cycle ne doit pas boucler.
+    memo.set(species.id, { evolutions: 0, sacrifices: 0 });
+    const need = { evolutions: 0, sacrifices: 0 };
+    for (const { target, plan } of routes(species)) {
+      // Ce que la cible devra avoir : des libres pour ses propres sacrifices, et
+      // n'importe lesquels pour ses évolutions et celui qui reste. Il manque
+      // ce que ses libres et ses verrouillés ne couvrent pas.
+      const below = consume(target);
+      const { total = 0, free = 0 } = owned.get(target.id) ?? {};
+      const missing = Math.max(
+        0,
+        below.sacrifices + Math.max(0, 1 + below.evolutions - (total - free)) - free
+      );
+      need.evolutions += missing;
+      need.sacrifices += missing * plan.sacrifices;
+    }
+    memo.set(species.id, need);
+    return need;
+  };
+  const reserve = new Map();
+  for (const speciesId of owned.keys()) {
+    const species = getSpecies(speciesId);
+    if (species) reserve.set(speciesId, consume(species));
+  }
+  return reserve;
+}
+
+// Les doublons d'un dresseur, espèce par espèce dans l'ordre du Pokédex : ceux
+// qui peuvent partir, avec le `spare` de countBySpecies — la marge que
+// l'échange et les sacrifices revérifient au moment de retirer. Une espèce
+// dont tout l'en-trop est verrouillé n'en est pas : on ne la proposera pas.
+//
+// `reserve` met de côté ce qu'il faut pour les évolutions qui manquent
+// (evolutionReserve) : `reserved` dit combien de `spare` y passent, en prenant
+// d'abord les verrouillés pour évoluer et rester. Une indication pour qui
+// cherche quoi échanger, pas une règle : rien n'empêche de céder ce qui est mis
+// de côté.
+export function listDuplicates(rows, { reserve = false, edges = new Map() } = {}) {
+  const counts = countBySpecies(rows);
+  const kept = reserve ? evolutionReserve(counts, edges) : null;
+  return [...counts]
+    .map(([speciesId, entry]) => {
+      const { evolutions = 0, sacrifices = 0 } = kept?.get(speciesId) ?? {};
+      const locked = entry.total - entry.free;
+      const left = entry.free - sacrifices - Math.max(0, 1 + evolutions - locked);
+      const spare = Math.max(0, Math.min(entry.spare, left));
+      return { speciesId, ...entry, spare, reserved: entry.spare - spare };
+    })
+    .filter((entry) => entry.spare > 0)
     .sort((a, b) => a.speciesId - b.speciesId);
 }
 
 // L'inverse : les dresseurs qui ont `speciesId` en double, ceux qui peuvent en
 // céder le plus d'abord. Chaque ligne est celle de listDuplicates pour ce
-// dresseur, avec son `userId` : la même marge, calculée au même endroit.
-export function getSpeciesDuplicates(speciesId, cb) {
+// dresseur, avec son `userId` : la même marge, calculée au même endroit. Avec
+// `reserve`, ses descendants sont lus aussi : ce qu'il faut garder dépend des
+// évolutions que chacun possède déjà.
+export function getSpeciesDuplicates(speciesId, { reserve = false } = {}, cb) {
+  const species = getSpecies(speciesId);
+  const ids = [Number(speciesId)];
+  for (let index = 0; reserve && species && index < ids.length; index++) {
+    for (const target of evolutionTargets(getSpecies(ids[index]))) {
+      if (!ids.includes(target.id)) ids.push(target.id);
+    }
+  }
+  // Les tarifs de la lignée, lus une fois pour tous les dresseurs.
+  const edges = new Map();
   db.all(
-    "SELECT * FROM pokemon_owned WHERE species_id = ?",
-    [Number(speciesId)],
+    `SELECT * FROM pokemon_owned WHERE species_id IN (${ids.map(() => "?").join(", ")})`,
+    ids,
     (err, rows) => {
       if (err) return cb(err, []);
       const byUser = new Map();
@@ -205,7 +286,9 @@ export function getSpeciesDuplicates(speciesId, cb) {
       }
       const list = [];
       for (const [userId, own] of byUser) {
-        const [entry] = listDuplicates(own);
+        const entry = listDuplicates(own, { reserve, edges }).find(
+          (line) => line.speciesId === Number(speciesId)
+        );
         if (entry) list.push({ userId, ...entry });
       }
       // L'identifiant départage les égalités : la liste est relue à chaque

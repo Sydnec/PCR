@@ -16,7 +16,8 @@
 - **Course à un vainqueur** : tout le monde peut lancer autant de balls qu'il veut, le premier jet
   réussi remporte le Pokémon. Les balls ratées sont définitivement perdues.
 - **Panneau de relance** : la réponse privée à un lancer porte elle-même les quatre balls et se
-  **réécrit** à chaque jet, au lieu d'empiler un message par lancer. Plus besoin de remonter à
+  **réécrit** à chaque jet, au lieu d'empiler un message par lancer. Une ball que tu as en poche
+  y est marquée « offerte » (avec le nombre qu'il te reste) : elle part avant tes points. Plus besoin de remonter à
   l'annonce pour relancer — et si on y remonte quand même, le nouveau panneau remplace l'ancien :
   un dresseur n'en a jamais qu'un seul ouvert. Dès que le Pokémon n'est plus là, le panneau te le dit et retire ses
   boutons — au clic suivant : Discord ne permet pas de modifier un message privé sans que son

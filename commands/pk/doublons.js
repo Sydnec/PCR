@@ -36,6 +36,12 @@ export default {
           .setDescription("Une espèce : qui l'a en double")
           .setRequired(false)
           .setAutocomplete(true)
+      )
+      .addBooleanOption((option) =>
+        option
+          .setName("evolutions")
+          .setDescription("Mettre de côté de quoi faire les évolutions qui manquent au Pokédex du dresseur")
+          .setRequired(false)
       ),
 
   async autocomplete(interaction) {
@@ -54,6 +60,9 @@ export default {
   async execute(interaction) {
     try {
       const member = interaction.options.getUser("membre");
+      // Facultatif, et désactivé par défaut : la liste brute convient à qui
+      // n'attend pas d'évoluer.
+      const reserve = interaction.options.getBoolean("evolutions") ?? false;
       const user = member ?? interaction.user;
       const raw = interaction.options.getString("pokemon");
       // Tapée à la main, l'espèce peut viser une génération encore fermée.
@@ -73,17 +82,19 @@ export default {
       // Avec une espèce : qui l'a en double, ou seulement `membre` s'il est
       // précisé — sa boîte suffit alors, et sa liste tient en une ligne.
       if (species) {
+        // Toute la boîte, et pas la seule espèce : la réserve dépend des
+        // évolutions déjà possédées.
         const read = member
           ? (cb) =>
               getIndividuals(member.id, (err, rows) =>
                 cb(
                   err,
-                  listDuplicates(rows.filter((row) => row.species_id === species.id)).map(
-                    (entry) => ({ userId: member.id, ...entry })
-                  )
+                  listDuplicates(rows, { reserve })
+                    .filter((entry) => entry.speciesId === species.id)
+                    .map((entry) => ({ userId: member.id, ...entry }))
                 )
               )
-          : (cb) => getSpeciesDuplicates(species.id, cb);
+          : (cb) => getSpeciesDuplicates(species.id, { reserve }, cb);
         return read((err, list) => {
           if (err) {
             handleException("Lecture des doublons d'une espèce :", err);
@@ -93,8 +104,8 @@ export default {
           }
           interaction
             .editReply({
-              embeds: [buildSpeciesDuplicatesEmbed(species, list, { member })],
-              components: [buildSpeciesDuplicatesRow(species.id, 0, list.length)],
+              embeds: [buildSpeciesDuplicatesEmbed(species, list, { member, reserve })],
+              components: [buildSpeciesDuplicatesRow(species.id, 0, list.length, { reserve })],
             })
             .catch(() => {});
         });
@@ -107,11 +118,11 @@ export default {
             .editReply({ content: "❌ Impossible de lire les doublons." })
             .catch(() => {});
         }
-        const list = listDuplicates(rows);
+        const list = listDuplicates(rows, { reserve });
         interaction
           .editReply({
-            embeds: [buildDuplicatesEmbed(list, { user, page: 0 })],
-            components: [buildDuplicatesRow(user.id, 0, list.length)],
+            embeds: [buildDuplicatesEmbed(list, { user, page: 0, reserve })],
+            components: [buildDuplicatesRow(user.id, 0, list.length, { reserve })],
           })
           .catch(() => {});
       });

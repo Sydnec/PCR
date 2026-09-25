@@ -14,7 +14,7 @@ import { buildBalanceEmbed, getBalance } from "../economy.js";
 import { handleException, log } from "../utils.js";
 import { pseudoOf, pseudos } from "../pseudo.js";
 import { getPokemonConfig } from "./config.js";
-import { answerThrow, throwBall, trackPanel } from "./capture.js";
+import { answerThrow, ballPanelRow, throwBall, trackPanel } from "./capture.js";
 import { getSpawn } from "./spawn.js";
 import { getBallItem, getBallStock, getItemCount } from "./items.js";
 import { claimDrop } from "./drops.js";
@@ -42,7 +42,6 @@ import {
   resolveTradeAs,
 } from "./collection.js";
 import {
-  buildBallRow,
   buildDexEmbed,
   buildDexRow,
   buildBoxEmbed,
@@ -278,7 +277,7 @@ function showBoxPage(interaction, ownerId, speciesId, page) {
 // ---------------------- Doublons ----------------------
 
 // La page demandée des doublons, relue en base à chaque clic, comme la boîte.
-function showDuplicatesPage(interaction, ownerId, page) {
+function showDuplicatesPage(interaction, ownerId, page, { reserve = false } = {}) {
   getIndividuals(ownerId, async (err, rows) => {
     if (err) {
       handleException("Lecture des doublons :", err);
@@ -290,29 +289,29 @@ function showDuplicatesPage(interaction, ownerId, page) {
     } catch (error) {
       // Dresseur parti du serveur : on affiche quand même ses doublons.
     }
-    const list = listDuplicates(rows);
+    const list = listDuplicates(rows, { reserve });
     await interaction
       .update({
-        embeds: [buildDuplicatesEmbed(list, { user: owner, page })],
-        components: [buildDuplicatesRow(ownerId, page, list.length)],
+        embeds: [buildDuplicatesEmbed(list, { user: owner, page, reserve })],
+        components: [buildDuplicatesRow(ownerId, page, list.length, { reserve })],
       })
       .catch(() => {});
   });
 }
 
 // L'inverse, qui a cette espèce en double : relu à chaque clic lui aussi.
-function showSpeciesDuplicatesPage(interaction, speciesId, page) {
+function showSpeciesDuplicatesPage(interaction, speciesId, page, { reserve = false } = {}) {
   const species = getSpecies(speciesId);
   if (!species) return ephemeral(interaction, "❌ Espèce inconnue.");
-  getSpeciesDuplicates(species.id, (err, list) => {
+  getSpeciesDuplicates(species.id, { reserve }, (err, list) => {
     if (err) {
       handleException("Lecture des doublons d'une espèce :", err);
       return ephemeral(interaction, "❌ Impossible de lire les doublons.");
     }
     interaction
       .update({
-        embeds: [buildSpeciesDuplicatesEmbed(species, list, { page })],
-        components: [buildSpeciesDuplicatesRow(species.id, page, list.length)],
+        embeds: [buildSpeciesDuplicatesEmbed(species, list, { page, reserve })],
+        components: [buildSpeciesDuplicatesRow(species.id, page, list.length, { reserve })],
       })
       .catch(() => {});
   });
@@ -703,8 +702,12 @@ export async function handlePokemonButton(interaction) {
       return askMasterBallConfirmation(interaction, args[0]);
 
     // Depuis le panneau : on le réécrit, au lieu d'empiler un message par jet.
+    // `item` : annoncée offerte, la ball ne se paie jamais en points.
     case "poke_rethrow":
-      return throwBall(interaction, args[0], args[1], { panel: true });
+      return throwBall(interaction, args[0], args[1], {
+        panel: true,
+        requireItem: args[2] === "item",
+      });
 
     case "poke_remaster":
       return askMasterBallConfirmation(interaction, args[0], { panel: true });
@@ -718,11 +721,13 @@ export async function handlePokemonButton(interaction) {
       });
 
     case "poke_master_cancel":
-      return interaction
-        .update({
-          content: "Annulé, tes points sont intacts.",
-          components: args[0] ? [buildBallRow(args[0], { panel: true })] : [],
-        })
+      return (args[0] ? ballPanelRow(interaction.user.id, args[0]) : Promise.resolve(null))
+        .then((row) =>
+          interaction.update({
+            content: "Annulé, tes points sont intacts.",
+            components: row ? [row] : [],
+          })
+        )
         .catch(() => {});
 
     // Le customId date du bouton « Je l'ai déjà ? », que la fiche a remplacé :
@@ -740,10 +745,16 @@ export async function handlePokemonButton(interaction) {
       return showBoxPage(interaction, args[0], Number(args[1]) || null, Number(args[2]) || 0);
 
     case "poke_dup":
-      return showDuplicatesPage(interaction, args[0], Number(args[1]) || 0);
+    case "poke_dupr":
+      return showDuplicatesPage(interaction, args[0], Number(args[1]) || 0, {
+        reserve: action === "poke_dupr",
+      });
 
     case "poke_dupsp":
-      return showSpeciesDuplicatesPage(interaction, Number(args[0]), Number(args[1]) || 0);
+    case "poke_dupspr":
+      return showSpeciesDuplicatesPage(interaction, Number(args[0]), Number(args[1]) || 0, {
+        reserve: action === "poke_dupspr",
+      });
 
     // Le cinquième segment, facultatif, est l'objet qui aide l'évolution : une
     // pierre impose alors sa cible, un bonbon remplace un sacrifice manquant.
