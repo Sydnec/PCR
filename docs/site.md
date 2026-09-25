@@ -57,6 +57,12 @@ partage du bilan dans un salon reste sur Discord.
 Des boîtes de `pokemon.pc.slotsPerBox` cases (30), sur `columns` colonnes (6). Il y en a au moins
 `minBoxes` (8), et toujours une vide après la dernière occupée, jusqu'à `maxBoxes` (60).
 
+La fiche d'un Pokémon réunit ses actions en haut, sous son nom : le champ du surnom, l'interrupteur
+du verrou, puis des boutons à icône (déplacer, revendre, faire évoluer, nommés dans leur bulle).
+Revendre et faire évoluer ouvrent une bande qui dit ce qu'il en coûte, à valider ou annuler ; sur
+une lignée à embranchement, la forme s'y choisit en cliquant sur son sprite. Un bouton grisé l'est
+parce que le Pokémon est le dernier de son espèce, ou verrouillé : la note sous la barre le dit.
+
 - **Ranger** : glisser un Pokémon sur une case, ou choisir « Déplacer » dans sa fiche puis
   toucher la case voulue (au doigt, le glisser-déposer n'existe pas). Sur une case occupée, les
   deux échangent leur place. Glisser sur une flèche change de boîte.
@@ -64,9 +70,11 @@ Des boîtes de `pokemon.pc.slotsPerBox` cases (30), sur `columns` colonnes (6). 
   son nom par défaut.
 - **Surnommer un Pokémon** depuis sa fiche (`nicknameLength` caractères, 12) ; vide, il reprend le
   nom de son espèce.
+- Surnom comme nom de boîte s'enregistrent **en sortant du champ**, ou sur Entrée, sans bouton ;
+  Échap abandonne.
 - **Verrouiller un Pokémon** depuis sa fiche, comme `/pk verrou` : il ne part plus (ni revente, ni
-  échange, ni sacrifice) et porte un bouclier dans sa case. Le faire évoluer demande un second
-  clic de confirmation.
+  échange, ni sacrifice) et porte un bouclier dans sa case. Il peut encore évoluer : la bande
+  d'évolution le rappelle, et la valider vaut confirmation.
 
 Un Pokémon garde sa place et son surnom quand il évolue. Reçu en échange, il garde son surnom et
 prend la première case libre ; une capture ou une éclosion aussi. Le Pokédex ouvre la boîte sur
