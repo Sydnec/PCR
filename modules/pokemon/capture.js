@@ -16,7 +16,15 @@ import { handleException, log } from "../utils.js";
 import { pseudo } from "../pseudo.js";
 import { getBall, getPokemonConfig } from "./config.js";
 import { creditSpecies } from "./collection.js";
-import { consumeItem, getBallItem, getCharmItem, getItem, grantItem } from "./items.js";
+import {
+  consumeItem,
+  freeBallCount,
+  getBallItem,
+  getCharmItem,
+  getInventory,
+  getItem,
+  grantItem,
+} from "./items.js";
 import { dropItem, leavesItemBehind } from "./drops.js";
 import { catchProbability, charmFactor, getSpecies } from "./data.js";
 import { buildBallRow, displayName } from "./embeds.js";
@@ -64,6 +72,31 @@ export function trackPanel(interaction, spawnId, { replacing = false } = {}) {
   previous.webhook?.deleteMessage("@original").catch(() => {});
 }
 
+// La rangée de balls d'un panneau, avec ce que son dresseur a en poche : relue
+// à chaque réécriture, puisqu'un lancer vient peut-être d'en prendre une. Sur
+// une lecture ratée, ni « offerte » ni prix : l'un comme l'autre pourrait mentir.
+export function ballPanelRow(userId, spawnId) {
+  return new Promise((resolve, reject) =>
+    getInventory(userId, (err, inventory) => {
+      if (err) handleException("Lecture des balls du panneau :", err);
+      // Dans un callback SQLite, une exception ne remonterait nulle part.
+      try {
+        const stock = err
+          ? null
+          : new Map(
+              Object.keys(getPokemonConfig().capture.balls).map((key) => [
+                key,
+                freeBallCount(inventory, key),
+              ])
+            );
+        resolve(buildBallRow(spawnId, { panel: true, stock, prices: !err }));
+      } catch (error) {
+        reject(error);
+      }
+    })
+  );
+}
+
 // Réponse à un clic de lancer qui n'ira pas jusqu'au tirage : cooldown, ball
 // inconnue, refus de la Master Ball. Les deux origines demandent l'inverse l'une
 // de l'autre, et ceci en est la SEULE définition — la confirmation Master Ball,
@@ -81,11 +114,9 @@ export function trackPanel(interaction, spawnId, { replacing = false } = {}) {
 export function answerThrow(interaction, spawnId, content, { panel = false } = {}) {
   return (panel
     ? interaction.update({ content })
-    : interaction.reply({
-        content,
-        components: [buildBallRow(spawnId, { panel: true })],
-        flags: MessageFlags.Ephemeral,
-      })
+    : ballPanelRow(interaction.user.id, spawnId).then((row) =>
+        interaction.reply({ content, components: [row], flags: MessageFlags.Ephemeral })
+      )
   )
     // Uniquement en cas de succès : si la réponse échoue, supprimer le panneau
     // précédent laisserait le dresseur sans rien du tout.
@@ -498,7 +529,7 @@ export async function throwBall(
     interaction
       .editReply({
         content: throwMessage(outcome),
-        components: isFinalThrow(outcome) ? [] : [buildBallRow(spawnId, { panel: true })],
+        components: isFinalThrow(outcome) ? [] : [await ballPanelRow(userId, spawnId)],
       })
       .catch(() => {});
   });

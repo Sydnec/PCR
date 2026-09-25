@@ -42,9 +42,12 @@ par terre plutôt que de le faire disparaître.
   valent combien de sacrifices, s'ils dispensent des points, et à quelle lignée ils sont
   réservés. C'est ce dernier point qui fait des pierres des objets à Évoli : une Pierre Feu jetée
   sur un Chenipan est refusée, elle ne part pas.
-- **Les balls offertes partent d'elles-mêmes.** Cliquer sur *Poké Ball (120)* en ayant une Poké Ball
-  dans son inventaire ne coûte rien : l'objet passe avant le solde, parce qu'un objet posé dans un
-  sac ne doit pas dormir pendant qu'on prend la monnaie de son propriétaire. La Master Ball garde sa
+- **Les balls offertes partent d'elles-mêmes.** Lancer une Poké Ball en en ayant une dans son
+  inventaire ne coûte rien : l'objet passe avant le solde, parce qu'un objet posé dans un sac ne
+  doit pas dormir pendant qu'on prend la monnaie de son propriétaire. Le panneau de lancer, privé,
+  l'annonce *Poké Ball (offerte ×2)*, et ce bouton-là ne prend jamais de points : si la ball est
+  partie entre-temps (lancée depuis le site), le lancer est refusé sans rien débiter. L'annonce
+  publique, la même pour tous, garde le prix. La Master Ball garde sa
   confirmation — elle ne coûte rien mais ne se retrouve pas. Le Ticket Safari suit la même règle
   dans `/pk safari`, et il ignore le délai de 24 h : ce délai borne ce qu'on peut s'**acheter**.
 - **Une ball offerte se rend en ball.** Battu à la milliseconde sur un Pokémon, on récupère l'objet,

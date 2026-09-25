@@ -69,7 +69,7 @@ import {
   layEgg,
 } from "../pokemon/eggs.js";
 import {
-  getBallItem,
+  freeBallCount,
   getBallStock,
   getCharmItem,
   getInventory,
@@ -296,7 +296,6 @@ async function spawnJson(ctx, spawn, balance) {
       })
     ),
   ]);
-  const stock = new Map(inventory.map((row) => [row.item_key, row.count]));
   // Normal pour le salon, shiny pour les porteurs du Charme Chroma de sa
   // génération : le visiteur qui en est un le voit briller, comme il
   // l'attraperait.
@@ -324,7 +323,7 @@ async function spawnJson(ctx, spawn, balance) {
     balls: probabilitiesByBall(spawn.catch_rate).map((ball) => {
       // Les balls offertes partent avant les points, comme sur Discord : une
       // ball en poche se lance quel que soit le solde.
-      const free = stock.get(getBallItem(ball.key)?.key) ?? 0;
+      const free = freeBallCount(inventory, ball.key);
       return {
         key: ball.key,
         label: ball.label,

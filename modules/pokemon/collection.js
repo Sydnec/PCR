@@ -179,12 +179,13 @@ export function countBySpecies(rows) {
   return counts;
 }
 
-// Les doublons d'un dresseur, espèce par espèce dans l'ordre du Pokédex : tout
-// ce qui dépasse un exemplaire, avec le `spare` de countBySpecies — la marge
-// que l'échange et les sacrifices revérifient au moment de retirer.
+// Les doublons d'un dresseur, espèce par espèce dans l'ordre du Pokédex : ceux
+// qui peuvent partir, avec le `spare` de countBySpecies — la marge que
+// l'échange et les sacrifices revérifient au moment de retirer. Une espèce
+// dont tout l'en-trop est verrouillé n'en est pas : on ne la proposera pas.
 export function listDuplicates(rows) {
   return [...countBySpecies(rows)]
-    .filter(([, entry]) => entry.total > 1)
+    .filter(([, entry]) => entry.spare > 0)
     .map(([speciesId, entry]) => ({ speciesId, ...entry }))
     .sort((a, b) => a.speciesId - b.speciesId);
 }

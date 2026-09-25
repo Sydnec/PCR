@@ -81,6 +81,14 @@ export function getBallItem(ballKey) {
   return getItems().find((item) => item.ball === ballKey) ?? null;
 }
 
+// Combien de lancers de `ballKey` un dresseur a en poche, lu dans ses lignes
+// d'inventaire (getInventory) : ceux de l'objet que le lancer consommera
+// (getBallItem), pour que ce qui s'annonce offert soit ce qui se lance.
+export function freeBallCount(inventory, ballKey) {
+  const item = getBallItem(ballKey);
+  return item ? (inventory.find((row) => row.item_key === item.key)?.count ?? 0) : 0;
+}
+
 // ====================== BUTIN ======================
 
 // Un objet ne tombe que si le catalogue lui donne un poids. Celui dont l'effet

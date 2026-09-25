@@ -148,18 +148,34 @@ export function buildSpawnEmbed(spawn, species, throws = [], announcement = null
 // lancers. Seul le préfixe change : `poke_throw` ouvre un éphémère, `poke_rethrow`
 // réécrit celui d'où vient le clic. Le nom de la route dit donc ce qu'elle fait,
 // plutôt qu'un drapeau à déchiffrer côté routeur.
-export function buildBallRow(spawnId, { disabled = false, panel = false } = {}) {
+//
+// `stock` (clé de ball → nombre en poche) ne vaut que pour le panneau, que seul
+// son dresseur lit : une ball en poche y est dite offerte, et son bouton la
+// lance sans jamais prendre de points (`|item`, comme la confirmation de la
+// Master Ball) — partie entre-temps, depuis le site par exemple, le lancer est
+// refusé au lieu d'être payé en silence. L'annonce, la même pour tous, garde
+// les prix ; `prices: false` les tait quand le sac n'a pas pu être lu.
+export function buildBallRow(
+  spawnId,
+  { disabled = false, panel = false, stock = null, prices = true } = {}
+) {
   const row = new ActionRowBuilder();
   for (const [key, ball] of Object.entries(getPokemonConfig().capture.balls)) {
     // La Master Ball passe par une confirmation : à 22 500 points, un mésclic
     // n'est pas rattrapable.
+    const held = stock?.get(key) ?? 0;
     const customId = ball.guaranteed
       ? `${panel ? "poke_remaster" : "poke_master"}|${spawnId}`
-      : `${panel ? "poke_rethrow" : "poke_throw"}|${spawnId}|${key}`;
+      : `${panel ? "poke_rethrow" : "poke_throw"}|${spawnId}|${key}${held ? "|item" : ""}`;
+    const label = held
+      ? `${ball.label} (offerte ×${held.toLocaleString("fr-FR")})`
+      : prices
+        ? `${ball.label} (${ball.price.toLocaleString("fr-FR")})`
+        : ball.label;
     row.addComponents(
       new ButtonBuilder()
         .setCustomId(customId)
-        .setLabel(`${ball.label} (${ball.price})`)
+        .setLabel(label)
         .setEmoji(ball.emoji)
         .setStyle(ball.guaranteed ? ButtonStyle.Danger : ButtonStyle.Primary)
         .setDisabled(disabled)
@@ -679,7 +695,7 @@ export function buildDuplicatesEmbed(list, { user, page = 0 } = {}) {
     .setTitle(`\u{1F501} Doublons de ${user.displayName ?? user.username}`)
     .setColor(0x3b88c3);
   // Rien sur la boîte elle-même : elle peut être vide.
-  if (!list.length) return embed.setDescription("*Aucun doublon pour l'instant.*");
+  if (!list.length) return embed.setDescription("*Aucun doublon échangeable pour l'instant.*");
   const lines = list.slice(start, end).map((entry) => {
     const species = getSpecies(entry.speciesId);
     return (
@@ -704,8 +720,8 @@ export function buildSpeciesDuplicatesEmbed(species, list, { page = 0, member = 
   if (!list.length) {
     return embed.setDescription(
       member
-        ? `*<@${member.id}> n'a pas de ${species.name} en double.*`
-        : `*Personne n'a de ${species.name} en double pour l'instant.*`
+        ? `*<@${member.id}> n'a pas de ${species.name} en double à échanger.*`
+        : `*Personne n'a de ${species.name} en double à échanger pour l'instant.*`
     );
   }
   const lines = list

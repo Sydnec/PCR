@@ -14,7 +14,7 @@ import { buildBalanceEmbed, getBalance } from "../economy.js";
 import { handleException, log } from "../utils.js";
 import { pseudoOf, pseudos } from "../pseudo.js";
 import { getPokemonConfig } from "./config.js";
-import { answerThrow, throwBall, trackPanel } from "./capture.js";
+import { answerThrow, ballPanelRow, throwBall, trackPanel } from "./capture.js";
 import { getSpawn } from "./spawn.js";
 import { getBallItem, getBallStock, getItemCount } from "./items.js";
 import { claimDrop } from "./drops.js";
@@ -42,7 +42,6 @@ import {
   resolveTradeAs,
 } from "./collection.js";
 import {
-  buildBallRow,
   buildDexEmbed,
   buildDexRow,
   buildBoxEmbed,
@@ -703,8 +702,12 @@ export async function handlePokemonButton(interaction) {
       return askMasterBallConfirmation(interaction, args[0]);
 
     // Depuis le panneau : on le réécrit, au lieu d'empiler un message par jet.
+    // `item` : annoncée offerte, la ball ne se paie jamais en points.
     case "poke_rethrow":
-      return throwBall(interaction, args[0], args[1], { panel: true });
+      return throwBall(interaction, args[0], args[1], {
+        panel: true,
+        requireItem: args[2] === "item",
+      });
 
     case "poke_remaster":
       return askMasterBallConfirmation(interaction, args[0], { panel: true });
@@ -718,11 +721,13 @@ export async function handlePokemonButton(interaction) {
       });
 
     case "poke_master_cancel":
-      return interaction
-        .update({
-          content: "Annulé, tes points sont intacts.",
-          components: args[0] ? [buildBallRow(args[0], { panel: true })] : [],
-        })
+      return (args[0] ? ballPanelRow(interaction.user.id, args[0]) : Promise.resolve(null))
+        .then((row) =>
+          interaction.update({
+            content: "Annulé, tes points sont intacts.",
+            components: row ? [row] : [],
+          })
+        )
         .catch(() => {});
 
     // Le customId date du bouton « Je l'ai déjà ? », que la fiche a remplacé :
