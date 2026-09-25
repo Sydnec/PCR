@@ -54,6 +54,13 @@ const PATHS = {
   chevronRight: [["path", { d: "M9 18l6-6-6-6" }]],
   move: [["path", { d: "M12 3v18M3 12h18M8 7l4-4 4 4M8 17l4 4 4-4M7 8l-4 4 4 4M17 8l4 4-4 4" }]],
   pencil: [["path", { d: "M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4" }]],
+  // Une étiquette de prix : la revente.
+  tag: [
+    ["path", { d: "M3 12V4a1 1 0 0 1 1-1h8l9 9-9 9z" }],
+    ["circle", { cx: 7.5, cy: 7.5, r: 1.5 }],
+  ],
+  // Deux chevrons qui montent : l'évolution.
+  evolve: [["path", { d: "M6 13l6-6 6 6M6 19l6-6 6 6" }]],
 };
 
 const SVG = "http://www.w3.org/2000/svg";

@@ -11,7 +11,6 @@ import { icon } from "../icons.js";
 import { lineageView, loadLineage } from "../lineage.js";
 import {
   api,
-  confirmButton,
   dateFr,
   dexNumber,
   fmt,
@@ -94,10 +93,17 @@ export async function render(ctx) {
     draw();
   }
 
+  // Deux relectures peuvent se croiser (un surnom puis un verrou, fiche
+  // ouverte) : seule la dernière demandée redessine.
+  let reloads = 0;
   async function reload() {
+    const ticket = ++reloads;
     try {
-      pc = await api("/api/me/pc");
+      const fresh = await api("/api/me/pc");
+      if (ticket !== reloads) return;
+      pc = fresh;
     } catch (error) {
+      if (ticket !== reloads) return;
       toast(error.message, "error");
     }
     box = Math.min(box, pc.boxes.length - 1);
@@ -189,44 +195,50 @@ export async function render(ctx) {
     );
   }
 
-  // Entrée enregistre, Échap abandonne ; un nom vide rend le nom par défaut.
+  // Un champ sans bouton : il s'enregistre en sortant du champ, ou sur Entrée ;
+  // Échap abandonne. Un nom vide rend le nom par défaut.
   function nameForm(current) {
+    const initial = current.custom ? current.name : "";
+    let settled = false;
+    const finish = async (save) => {
+      // Retirer le champ le fait sortir une seconde fois.
+      if (settled) return;
+      settled = true;
+      renaming = false;
+      // Rien de changé : le nom reprend sa place, sans redessiner la boîte —
+      // le clic qui a fait sortir du champ vise peut-être une case ou une flèche.
+      if (!save || input.value.trim() === initial) {
+        wrapper.replaceWith(nameButton(current));
+        return;
+      }
+      try {
+        const result = await api(`/api/me/pc/boxes/${current.box}/name`, {
+          method: "POST",
+          body: { name: input.value },
+        });
+        current.name = result.name;
+        current.custom = result.custom;
+      } catch (error) {
+        toast(error.message, "error");
+      }
+      draw();
+    };
     const input = h("input", {
       class: "pc-name-input",
       type: "text",
-      value: current.custom ? current.name : "",
+      value: initial,
       placeholder: current.defaultName,
       maxlength: pc.boxNameLength,
       "aria-label": "Nom de la boîte",
       onkeydown: (event) => {
-        if (event.key !== "Escape") return;
-        renaming = false;
-        draw();
+        if (event.key === "Enter" && !event.isComposing) finish(true);
+        if (event.key === "Escape") finish(false);
       },
+      // Changer de fenêtre n'est pas sortir du champ.
+      onblur: () => document.hasFocus() && finish(true),
     });
-    return h(
-      "form",
-      {
-        class: "pc-name-form",
-        onsubmit: async (event) => {
-          event.preventDefault();
-          try {
-            const result = await api(`/api/me/pc/boxes/${current.box}/name`, {
-              method: "POST",
-              body: { name: input.value },
-            });
-            current.name = result.name;
-            current.custom = result.custom;
-          } catch (error) {
-            toast(error.message, "error");
-          }
-          renaming = false;
-          draw();
-        },
-      },
-      input,
-      h("button", { class: "button small primary", type: "submit" }, "OK")
-    );
+    const wrapper = h("div", { class: "pc-name-form" }, input);
+    return wrapper;
   }
 
   // ---------------------- Bandeaux ----------------------
@@ -468,59 +480,26 @@ function openPokemon(ctx, item, pc, { reload, startMove }) {
     )
     .catch(() => lineage.remove());
 
-  // Le surnom : vide, le Pokémon reprend le nom de son espèce.
-  const nickname = h("input", {
-    type: "text",
-    value: item.nickname ?? "",
-    placeholder: species.name,
-    maxlength: pc.nicknameLength,
-    "aria-label": "Surnom",
+  // Tout ce qu'on fait d'un Pokémon tient dans le haut de sa fiche : son surnom,
+  // un champ sans bouton, puis le verrou et des boutons à icône. La revente et
+  // l'évolution, qui ne se rattrapent pas, se confirment dans une bande qui
+  // s'ouvre dessous et dit ce qu'elles coûtent.
+  const targets = species.evolvesInto.map((id) => ctx.species.get(id)).filter(Boolean);
+  const actions = pokemonActions(ctx, item, species, targets, {
+    renamed: () => {
+      title.replaceChildren(pokemonName(species, item.shiny, item.sex, item.nickname));
+      subtitleLine.textContent = subtitle();
+      reload();
+    },
+    relocked: reload,
+    move: () => {
+      dialog.close();
+      startMove(item);
+    },
+    done,
+    pc,
+    value,
   });
-  const tidy = h(
-    "div",
-    { class: "action" },
-    h("h3", {}, "Ranger"),
-    h(
-      "form",
-      {
-        class: "inline-form",
-        onsubmit: async (event) => {
-          event.preventDefault();
-          try {
-            const result = await api(`/api/me/pokemon/${item.id}/nickname`, {
-              method: "POST",
-              body: { nickname: nickname.value },
-            });
-            item.nickname = result.nickname;
-            nickname.value = result.nickname ?? "";
-            title.replaceChildren(pokemonName(species, item.shiny, item.sex, item.nickname));
-            subtitleLine.textContent = subtitle();
-            toast(
-              result.nickname ? `Il s'appelle désormais **${result.nickname}**.` : "Surnom retiré.",
-              "success"
-            );
-            reload();
-          } catch (error) {
-            toast(error.message, "error");
-          }
-        },
-      },
-      nickname,
-      h("button", { class: "button", type: "submit" }, "Renommer")
-    ),
-    h(
-      "button",
-      {
-        class: "button",
-        onclick: () => {
-          dialog.close();
-          startMove(item);
-        },
-      },
-      icon("move"),
-      "Déplacer"
-    )
-  );
 
   const dialog = openDialog(
     h(
@@ -533,14 +512,143 @@ function openPokemon(ctx, item, pc, { reload, startMove }) {
       }),
       title,
       subtitleLine,
-      speciesChips(ctx, species)
+      speciesChips(ctx, species),
+      actions
     ),
     facts,
-    lineage,
-    h(
-      "div",
-      { class: "actions" },
-      tidy,
+    lineage
+  );
+}
+
+// Un bouton réduit à son icône : son nom passe par `title` et `aria-label`.
+function iconButton(name, label, onclick, { kind = "" } = {}) {
+  return h(
+    "button",
+    {
+      type: "button",
+      class: `button icon-button${kind ? ` ${kind}` : ""}`,
+      title: label,
+      "aria-label": label,
+      onclick,
+    },
+    icon(name)
+  );
+}
+
+// Nomme un bouton à icône après coup : son état a changé.
+function relabel(button, label) {
+  button.title = label;
+  button.setAttribute("aria-label", label);
+}
+
+// La barre d'actions d'une fiche, et ce qu'elle ouvre. Verrou, revente et
+// évolution passent par les mêmes routes que /pk verrou, /pk revendre et
+// /pk evolution avec un `#id` ; le surnom, lui, n'existe que sur le site, comme
+// tout le rangement du PC.
+function pokemonActions(ctx, item, species, targets, { renamed, relocked, move, done, pc, value }) {
+  // Le surnom s'enregistre en sortant du champ, ou sur Entrée ; Échap rend la
+  // valeur d'avant, et une seconde fois ferme la fiche. Vide, le Pokémon
+  // reprend le nom de son espèce. Changer de fenêtre n'est pas sortir du champ.
+  const nickname = h("input", {
+    class: "pokemon-nickname",
+    type: "text",
+    value: item.nickname ?? "",
+    placeholder: `Surnom (${species.name})`,
+    maxlength: pc.nicknameLength,
+    "aria-label": "Surnom",
+    onkeydown: (event) => {
+      if (event.key === "Enter" && !event.isComposing) nickname.blur();
+      if (event.key === "Escape" && nickname.value !== (item.nickname ?? "")) {
+        event.preventDefault();
+        nickname.value = item.nickname ?? "";
+      }
+    },
+    onblur: async () => {
+      if (!document.hasFocus()) return;
+      const sent = nickname.value;
+      if (sent.trim() === (item.nickname ?? "")) return;
+      try {
+        const result = await api(`/api/me/pokemon/${item.id}/nickname`, {
+          method: "POST",
+          body: { nickname: sent },
+        });
+        item.nickname = result.nickname;
+        // Le serveur a pu rogner le surnom ; une saisie reprise entre-temps
+        // reste à son auteur.
+        if (nickname.value === sent) nickname.value = result.nickname ?? "";
+        toast(
+          result.nickname ? `Il s'appelle désormais **${result.nickname}**.` : "Surnom retiré.",
+          "success"
+        );
+        renamed();
+      } catch (error) {
+        // La saisie reste dans le champ : on la corrige plutôt que la retaper.
+        toast(error.message, "error");
+      }
+    },
+  });
+
+  // Le verrou, un interrupteur, comme /pk verrou : verrouillé, il ne part
+  // jamais, mais peut encore évoluer, après confirmation, et pondre.
+  const lock = h("input", {
+    type: "checkbox",
+    class: "switch",
+    role: "switch",
+    checked: item.locked,
+    "aria-label": "Verrouillé",
+    onchange: async () => {
+      lock.disabled = true;
+      try {
+        const result = await api(`/api/me/pokemon/${item.id}/lock`, {
+          method: "POST",
+          body: { locked: lock.checked },
+        });
+        item.locked = result.locked;
+        toast(
+          result.locked ? `#${item.id} est verrouillé.` : `#${item.id} est déverrouillé.`,
+          "success"
+        );
+        relocked();
+      } catch (error) {
+        toast(error.message, "error");
+      }
+      lock.checked = item.locked;
+      lock.disabled = false;
+      update();
+    },
+  });
+  const lockToggle = h("label", { class: "lock-toggle" }, icon("shield"), lock);
+
+  const sell = value ? iconButton("tag", "", () => toggle("sell")) : null;
+  const evolve = targets.length ? iconButton("evolve", "", () => toggle("evolve")) : null;
+  const notes = h("div", { class: "pokemon-notes" });
+  const bar = h("div", { class: "confirm pokemon-confirm", hidden: true });
+  let open = null;
+
+  // Ce que l'état du Pokémon permet : le dernier de son espèce ne part ni
+  // n'évolue, un verrouillé ne se revend pas. La bulle d'un bouton grisé dit
+  // pourquoi, et la note sous la barre aussi, pour qui n'a pas de souris.
+  function update() {
+    lockToggle.title = item.locked
+      ? "Verrouillé : il ne part jamais, ni revente, ni échange, ni sacrifice"
+      : "Verrouiller : le protéger de la revente, des échanges et des sacrifices";
+    const last = `c'est ton dernier ${species.name}`;
+    if (sell) {
+      sell.disabled = item.last || item.locked;
+      relabel(
+        sell,
+        item.last
+          ? `Revendre : impossible, ${last}`
+          : item.locked
+            ? "Revendre : impossible, il est verrouillé"
+            : `Revendre · ${fmt(value)} pts`
+      );
+    }
+    if (evolve) {
+      evolve.disabled = item.last;
+      relabel(evolve, item.last ? `Faire évoluer : impossible, ${last}` : "Faire évoluer");
+    }
+    notes.replaceChildren(
       item.last
         ? h(
             "p",
@@ -548,79 +656,61 @@ function openPokemon(ctx, item, pc, { reload, startMove }) {
             icon("pin"),
             ` C'est ton dernier ${species.name}, shiny ou non : il garde ton entrée du Pokédex, donc il ne peut ni partir ni évoluer.`
           )
-        : [
-            // Verrouillé, il ne se revend pas : on le dit au lieu du bouton.
-            item.locked
-              ? h(
-                  "p",
-                  { class: "notice" },
-                  icon("shield"),
-                  " Verrouillé : il ne sera ni revendu, ni échangé, ni sacrifié."
-                )
-              : sellAction(item, species, done),
-            evolveAction(ctx, item, species, done),
-          ],
-      lockAction(item, done)
-    )
-  );
-}
-
-// Le verrou, comme /pk verrou : un Pokémon verrouillé ne part jamais, mais
-// peut encore évoluer, après confirmation, et pondre.
-function lockAction(item, done) {
-  const button = h(
-    "button",
-    { class: "button" },
-    icon("shield"),
-    item.locked ? " Déverrouiller" : " Verrouiller"
-  );
-  button.addEventListener("click", async () => {
-    button.disabled = true;
-    try {
-      const result = await api(`/api/me/pokemon/${item.id}/lock`, {
-        method: "POST",
-        body: { locked: !item.locked },
-      });
-      toast(
-        result.locked ? `#${item.id} est verrouillé.` : `#${item.id} est déverrouillé.`,
-        "success"
-      );
-      await done();
-    } catch (error) {
-      toast(error.message, "error");
-      button.disabled = false;
-    }
-  });
-  return h(
-    "div",
-    { class: "action" },
-    h("h3", {}, "Verrou"),
-    h(
-      "p",
-      { class: "muted small" },
-      item.locked
-        ? "Verrouillé, il ne part jamais : ni revente, ni échange, ni sacrifice."
-        : "Verrouiller le protège de la revente, des échanges et des sacrifices."
-    ),
-    button
-  );
-}
-
-function sellAction(item, species, done) {
-  const value = item.shiny ? species.sellValueShiny : species.sellValue;
-  if (!value)
-    return h(
-      "p",
-      { class: "muted small" },
-      `${species.name}${item.shiny ? " shiny" : ""} ne se revend pas.`
+        : item.locked
+          ? h(
+              "p",
+              { class: "notice" },
+              icon("shield"),
+              " Verrouillé : il ne sera ni revendu, ni échangé, ni sacrifié."
+            )
+          : ""
     );
-  return h(
-    "div",
-    { class: "action" },
-    h("h3", {}, "Revendre"),
-    confirmButton(
-      `Revendre · ${fmt(value)} pts`,
-      `Confirmer la revente · ${fmt(value)} pts`,
+    if ((open === "sell" && sell.disabled) || (open === "evolve" && evolve.disabled)) close();
+    else if (open === "evolve") showCost();
+  }
+
+  function close() {
+    open = null;
+    bar.hidden = true;
+    bar.replaceChildren();
+    for (const button of [sell, evolve]) button?.setAttribute("aria-expanded", "false");
+  }
+
+  function toggle(kind) {
+    if (open === kind) return close();
+    open = kind;
+    sell?.setAttribute("aria-expanded", String(kind === "sell"));
+    evolve?.setAttribute("aria-expanded", String(kind === "evolve"));
+    if (kind === "sell") sellBar();
+    else evolveBar();
+    bar.hidden = false;
+  }
+
+  // Valider et annuler, en icônes eux aussi. La validation est grisée le temps
+  // de l'appel, et le redevient quoi qu'il arrive.
+  function confirmRow(label, run, { kind = "primary" } = {}) {
+    const ok = iconButton(
+      "check",
+      label,
+      async () => {
+        ok.disabled = true;
+        try {
+          await run();
+        } finally {
+          ok.disabled = false;
+        }
+      },
+      { kind }
+    );
+    return {
+      ok,
+      row: h("div", { class: "confirm-actions" }, ok, iconButton("cross", "Annuler", close)),
+    };
+  }
+
+  function sellBar() {
+    const { row } = confirmRow(
+      `Revendre pour ${fmt(value)} pts`,
       async () => {
         try {
           const result = await api("/api/me/sell", {
@@ -632,42 +722,102 @@ function sellAction(item, species, done) {
         } catch (error) {
           toast(error.message, "error");
         }
-      }
-    )
-  );
-}
+      },
+      { kind: "danger" }
+    );
+    bar.replaceChildren(
+      h(
+        "p",
+        {},
+        "Revendre ",
+        h("strong", {}, `#${item.id}`),
+        " pour ",
+        h("strong", {}, `${fmt(value)} pts`),
+        " ? Il ne reviendra pas."
+      ),
+      row
+    );
+  }
 
-function evolveAction(ctx, item, species, done) {
-  const targets = species.evolvesInto.map((id) => ctx.species.get(id)).filter(Boolean);
-  if (!targets.length) return null;
+  // L'évolution : la forme (sur une lignée à embranchement, en cliquant sur son
+  // sprite ; le hasard coûte le tarif normal), puis son coût, que l'API calcule
+  // comme la commande. Un verrouillé évolue aussi : la bande le rappelle, et la
+  // validation vaut confirmation. Les coûts déjà lus sont gardés, par forme.
   let targetId = null;
-  // Verrouillé, il évolue quand même, mais après un second clic : on ne le
-  // bloque pas, on prévient. L'API refuse sans `confirmLocked`, et dit `locked`
-  // si le verrou a été posé depuis Discord après l'ouverture de la fiche : le
-  // bouton passe alors en confirmation.
-  let locked = item.locked;
-  const cost = h("p", { class: "muted small" }, "Calcul du coût…");
-  let button = makeButton();
-  button.disabled = true;
+  const plans = new Map();
+  let cost = null;
+  let evolveOk = null;
+  let choices = [];
 
-  // Le coût vient de l'API, qui le calcule comme la commande : une forme
-  // choisie sur une lignée à embranchement coûte plus cher que le hasard.
-  async function refresh() {
-    button.disabled = true;
-    try {
-      const plan = await api(
-        `/api/species/${species.id}/evolution${targetId ? `?targetId=${targetId}` : ""}`
-      );
-      const into = plan.target ? ctx.species.get(plan.target)?.name : "une forme tirée au hasard";
-      const others = plan.sacrifices;
-      cost.textContent =
-        `Devient ${into}. Il faut ${plan.required} ${species.name}, shiny ou non : ` +
-        `celui-ci évolue, ${others > 0 ? `${others} autre${others > 1 ? "s sont sacrifiés" : " est sacrifié"} (les normaux d'abord), ` : ""}` +
-        `et un reste. Coût : ${fmt(plan.points)} pts.`;
-      button.disabled = false;
-    } catch (error) {
-      cost.replaceChildren(...richText(error.message));
+  function evolveBar() {
+    cost = h("p");
+    const confirm = confirmRow("Faire évoluer", evolveNow);
+    evolveOk = confirm.ok;
+    choices =
+      targets.length > 1
+        ? [null, ...targets].map((target) =>
+            h(
+              "button",
+              {
+                type: "button",
+                class: "button",
+                title: target ? `Choisir ${target.name}` : "Forme au hasard",
+                "aria-label": target ? `Choisir ${target.name}` : "Forme au hasard",
+                "data-target": target?.id ?? "",
+                onclick: () => {
+                  targetId = target?.id ?? null;
+                  showCost();
+                },
+              },
+              target
+                ? h("img", {
+                    class: "evolve-sprite",
+                    src: item.shiny ? target.iconShiny : target.icon,
+                    alt: "",
+                  })
+                : icon("question", { className: "evolve-sprite" })
+            )
+          )
+        : [];
+    bar.replaceChildren(
+      ...[
+        choices.length ? h("div", { class: "evolve-choice" }, choices) : null,
+        cost,
+        confirm.row,
+      ].filter(Boolean)
+    );
+    showCost();
+  }
+
+  // Met la bande à jour sans la reconstruire : le bouton choisi garde le focus.
+  function showCost() {
+    for (const button of choices) {
+      button.setAttribute("aria-pressed", String(button.dataset.target === String(targetId ?? "")));
     }
+    const key = targetId ?? 0;
+    const plan = plans.get(key);
+    if (!plan) {
+      cost.textContent = "Calcul du coût…";
+      evolveOk.disabled = true;
+      api(`/api/species/${species.id}/evolution${targetId ? `?targetId=${targetId}` : ""}`)
+        .then((fresh) => {
+          plans.set(key, fresh);
+          if (cost.isConnected && (targetId ?? 0) === key) showCost();
+        })
+        .catch((error) => {
+          if (cost.isConnected && (targetId ?? 0) === key)
+            cost.replaceChildren(...richText(error.message));
+        });
+      return;
+    }
+    const into = plan.target ? ctx.species.get(plan.target)?.name : "une forme tirée au hasard";
+    const others = plan.sacrifices;
+    cost.textContent =
+      (item.locked ? "Il est verrouillé : il évoluera quand même. " : "") +
+      `Devient ${into}. Il faut ${plan.required} ${species.name}, shiny ou non : ` +
+      `celui-ci évolue, ${others > 0 ? `${others} autre${others > 1 ? "s sont sacrifiés" : " est sacrifié"} (les normaux d'abord), ` : ""}` +
+      `et un reste. Coût : ${fmt(plan.points)} pts.`;
+    evolveOk.disabled = false;
   }
 
   async function evolveNow() {
@@ -678,7 +828,7 @@ function evolveAction(ctx, item, species, done) {
         pokemonId: item.id,
         speciesId: species.id,
         ...(targetId ? { targetId } : {}),
-        ...(locked ? { confirmLocked: true } : {}),
+        ...(item.locked ? { confirmLocked: true } : {}),
       };
       const result = await api("/api/me/evolve", { method: "POST", body });
       toast(
@@ -687,55 +837,35 @@ function evolveAction(ctx, item, species, done) {
       );
       await done();
     } catch (error) {
-      if (error.details?.locked && !locked) {
-        locked = true;
-        rebuild();
-        toast(`#${item.id} est verrouillé : confirme pour le faire évoluer quand même.`);
+      // Verrouillé depuis Discord après l'ouverture de la fiche : la bande le
+      // dit, la boîte montre le bouclier, et une nouvelle validation fait
+      // évoluer quand même.
+      if (error.details?.locked && !item.locked) {
+        item.locked = true;
+        lock.checked = true;
+        update();
+        relocked();
+        toast(`#${item.id} est verrouillé : valide encore pour le faire évoluer quand même.`);
         return;
       }
       toast(error.message, "error");
     }
   }
 
-  // Le même confirmButton que la revente pour un verrouillé ; un bouton simple
-  // sinon.
-  function makeButton() {
-    if (locked) {
-      return confirmButton("Évoluer", "Il est verrouillé : évoluer quand même ?", evolveNow);
-    }
-    const plain = h("button", { class: "button primary" }, "Évoluer");
-    plain.addEventListener("click", async () => {
-      plain.disabled = true;
-      await evolveNow();
-      plain.disabled = false;
-    });
-    return plain;
-  }
-
-  // Un bouton neuf : changer de forme désarme une confirmation en cours. Il
-  // naît actif ; refresh() le grise le temps de relire le coût.
-  function rebuild() {
-    const next = makeButton();
-    button.replaceWith(next);
-    button = next;
-  }
-
-  const choice =
-    targets.length > 1
-      ? h(
-          "select",
-          {
-            onchange: (event) => {
-              targetId = event.target.value ? Number(event.target.value) : null;
-              rebuild();
-              refresh();
-            },
-          },
-          h("option", { value: "" }, "Forme au hasard"),
-          targets.map((target) => h("option", { value: target.id }, `Choisir ${target.name}`))
-        )
-      : null;
-
-  refresh();
-  return h("div", { class: "action" }, h("h3", {}, "Faire évoluer"), choice, cost, button);
+  update();
+  return h(
+    "div",
+    { class: "pokemon-actions" },
+    h(
+      "div",
+      { class: "pokemon-toolbar" },
+      nickname,
+      lockToggle,
+      iconButton("move", "Déplacer", move),
+      sell,
+      evolve
+    ),
+    notes,
+    bar
+  );
 }

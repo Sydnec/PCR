@@ -263,39 +263,6 @@ export function openDialog(...content) {
   return dialog;
 }
 
-// Un bouton qui demande confirmation : le premier clic arme, le second agit.
-// Plus doux qu'une boîte `confirm()`, et une revente ne part jamais d'un clic
-// malheureux.
-export function confirmButton(label, confirmLabel, action, { kind = "danger" } = {}) {
-  let armed = false;
-  let timer = null;
-  const button = h("button", { class: "button" }, label);
-  button.addEventListener("click", async () => {
-    if (!armed) {
-      armed = true;
-      button.textContent = confirmLabel;
-      button.classList.add(kind);
-      timer = setTimeout(() => {
-        armed = false;
-        button.textContent = label;
-        button.classList.remove(kind);
-      }, 4000);
-      return;
-    }
-    clearTimeout(timer);
-    button.disabled = true;
-    try {
-      await action();
-    } finally {
-      button.disabled = false;
-      armed = false;
-      button.textContent = label;
-      button.classList.remove(kind);
-    }
-  });
-  return button;
-}
-
 // Une barre de progression. La largeur passe par le CSSOM et pas par un
 // attribut `style` : la politique de sécurité du site refuse les styles en
 // ligne.

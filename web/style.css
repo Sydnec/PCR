@@ -657,36 +657,147 @@ input[type="number"] {
   margin: 0;
 }
 
-/* minmax(0, …) : sans lui, la largeur naturelle d'un champ élargit la colonne
-   au-delà de la fenêtre sur un téléphone. */
-.actions {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
-}
+/* ---------- Actions d'une fiche (boîte) ---------- */
 
-.action {
+.pokemon-actions {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
   gap: 8px;
+  width: 100%;
+  margin-top: 6px;
+  text-align: left;
 }
 
-.action p {
+/* Sur un écran étroit, le surnom prend sa ligne et les boutons passent dessous. */
+.pokemon-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.pokemon-nickname {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Un bouton réduit à son icône : carré, à la hauteur des champs. */
+.icon-button {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+}
+
+/* L'icône prend la couleur du bouton : blanche sur une validation pleine. */
+.icon-button .icon {
+  width: 18px;
+  height: 18px;
+  color: inherit;
+  vertical-align: 0;
+}
+
+.icon-button[aria-expanded="true"] {
+  background: var(--surface-2);
+}
+
+/* Le verrou : un interrupteur, précédé du bouclier. */
+.lock-toggle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+/* Le bouclier ne prend sa couleur qu'une fois verrouillé. */
+.lock-toggle .icon {
+  color: inherit;
+}
+
+.lock-toggle:has(.switch:checked) .icon {
+  color: var(--accent);
+}
+
+.switch {
+  position: relative;
+  flex: none;
+  width: 34px;
+  height: 20px;
+  margin: 0;
+  border-radius: 999px;
+  /* Éteint, il doit rester visible sur le fond de la fenêtre. */
+  background: var(--muted);
+  appearance: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.switch::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--surface);
+  transition: transform 0.15s;
+}
+
+.switch:checked {
+  background: var(--accent);
+}
+
+.switch:checked::before {
+  transform: translateX(14px);
+}
+
+.switch:disabled {
+  opacity: 0.5;
+}
+
+.pokemon-notes:empty {
+  display: none;
+}
+
+.pokemon-confirm {
+  max-width: none;
+}
+
+.pokemon-confirm p {
   margin: 0;
 }
 
-.inline-form {
+.evolve-choice {
   display: flex;
-  gap: 8px;
-  width: 100%;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
-.inline-form input {
-  flex: 1;
-  min-width: 0;
+.evolve-choice .button {
+  padding: 4px;
+}
+
+.evolve-choice .button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+.evolve-sprite {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+.evolve-choice .icon.evolve-sprite {
+  padding: 8px;
+  color: var(--muted);
 }
 
 /* ---------- Lignée (Capture, boîte, Pokédex) ---------- */
@@ -1838,6 +1949,10 @@ input[type="number"] {
 /* ---------- Petits écrans ---------- */
 
 @media (max-width: 640px) {
+  .pokemon-nickname {
+    flex-basis: 100%;
+  }
+
   .config-leaf {
     grid-template-columns: minmax(0, 1fr);
   }

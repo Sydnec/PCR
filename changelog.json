@@ -1784,5 +1784,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Fiche de la boîte plus compacte",
+      "description": "Sur le site, les actions d'un Pokémon sont en haut de sa fiche : surnom enregistré en sortant du champ, verrou en interrupteur, et des boutons à icône pour déplacer, revendre et faire évoluer.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-25T12:18:24.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    }
+  ]
 }
