@@ -21,8 +21,8 @@ en donne le lien, en réponse privée (ou dit que le site n'est pas en ligne, ou
 
 Le site ne fait rien que Discord ne fasse pas : tout reste faisable avec `/pk`, sauf le rangement
 du PC (places, noms des boîtes, surnoms), réservé au site parce qu'il ne change rien au jeu. Il ne
-gère pas encore les échanges, la loterie ni les aides aux évolutions (bonbons, pierres, Métamorph),
-qui se font sur Discord.
+gère pas encore les échanges, la loterie ni Métamorph comme joker d'évolution, qui se font sur
+Discord.
 
 ## Capture
 
@@ -47,6 +47,10 @@ Le bouton en haut de la Capture fait ce que fait `/pk safari` :
   a un dans le sac, sinon avec des points. Il est grisé quand le solde ne suffit pas, ou pendant
   le délai entre deux entrées achetées.
 
+Dès que plusieurs générations sont ouvertes, l'entrée (gratuite ou à sa confirmation) montre une
+bascule par génération, toutes allumées : les rencontres ne viendront que des générations
+laissées allumées, et la dernière ne s'éteint pas.
+
 La visite est **la même** que sur Discord : une visite commencée sur le site se reprend avec
 `/pk safari`, et inversement. Chaque action passe par le même chemin que les boutons, avec le même
 jeton : un double clic ne joue qu'une fois, et une action déjà jouée ailleurs est refusée. Le
@@ -60,7 +64,8 @@ Des boîtes de `pokemon.pc.slotsPerBox` cases (30), sur `columns` colonnes (6). 
 La fiche d'un Pokémon réunit ses actions en haut, sous son nom : le champ du surnom, l'interrupteur
 du verrou, puis des boutons à icône (déplacer, revendre, faire évoluer, nommés dans leur bulle).
 Revendre et faire évoluer ouvrent une bande qui dit ce qu'il en coûte, à valider ou annuler ; sur
-une lignée à embranchement, la forme s'y choisit en cliquant sur son sprite. Un bouton grisé l'est
+une lignée à embranchement, la forme s'y choisit en cliquant sur son sprite, et un objet d'évolution
+qu'on a en poche (Super Bonbon, Évolyte, Catalyseur…) en cliquant sur son image. Un bouton grisé l'est
 parce que le Pokémon est le dernier de son espèce, ou verrouillé : la note sous la barre le dit.
 
 - **Ranger** : glisser un Pokémon sur une case, ou choisir « Déplacer » dans sa fiche puis

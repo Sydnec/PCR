@@ -4,6 +4,8 @@ import {
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
 } from "discord.js";
 import { getBall, getPokemonConfig, getSafariConfig } from "./config.js";
 import { getCharmItem, getItem, sortByCatalogue } from "./items.js";
@@ -25,6 +27,7 @@ import {
   safariBaitFactor,
   safariCatchProbability,
   safariFleeChance,
+  safariGenerationChoices,
   sexSymbol,
   unobtainableMark,
   spriteUrl,
@@ -1267,6 +1270,109 @@ export function buildSafariView(
     embeds: [buildEncounterEmbed(session, species, config, { intro, owned })],
     components: [buildSafariRow(session, config)],
   };
+}
+
+// Le choix des générations visées au parc, avant d'y entrer : un menu à choix
+// multiple, toutes cochées par défaut, et le bouton qui entre. Le bouton porte
+// le choix dans son customId (« 1,2 ») : le menu réécrit le message à chaque
+// changement, rien n'est gardé en mémoire. `mode` : « park » pour l'entrée
+// gratuite d'un parc ouvert (`parkId`), « paid » pour /pk safari.
+export function buildSafariGenerationPicker(mode, parkId, selected = null) {
+  const choices = safariGenerationChoices();
+  const all = choices.map((choice) => choice.generation);
+  const valid = (selected ?? []).filter((generation) => all.includes(generation));
+  const chosen = valid.length ? valid : all;
+  const select = new StringSelectMenuBuilder()
+    .setCustomId(`poke_safari_gens|${mode}|${parkId}`)
+    .setPlaceholder("Les générations que tu vises")
+    .setMinValues(1)
+    .setMaxValues(choices.length)
+    .addOptions(
+      choices.map(({ generation, ordinal, species }) =>
+        new StringSelectMenuOptionBuilder()
+          .setLabel(`${ordinal} génération`)
+          .setDescription(`${species.toLocaleString("fr-FR")} espèces à croiser`)
+          .setValue(String(generation))
+          .setDefault(chosen.includes(generation))
+      )
+    );
+  const enter = new ButtonBuilder()
+    .setCustomId(`poke_safari_go|${mode}|${parkId}|${chosen.join(",")}`)
+    .setLabel("Entrer dans le parc")
+    .setEmoji("\u{1F33F}")
+    .setStyle(ButtonStyle.Success);
+  return [
+    new ActionRowBuilder().addComponents(select),
+    new ActionRowBuilder().addComponents(enter),
+  ];
+}
+
+// Une visite offerte attend : on ne débite pas le prix d'une entrée pour la
+// même chose sans le dire. /pk safari le dit avant le choix des générations,
+// son bouton d'entrée au clic.
+export function freeParkNotice() {
+  return (
+    "🏕️ Un parc safari est ouvert en ce moment et **ton entrée est offerte** !\n" +
+    "Utilise le bouton *« Entrer dans le parc »* sur son message plutôt que de payer " +
+    `**${getSafariConfig().entryPrice.toLocaleString("fr-FR")}** points.`
+  );
+}
+
+// Le message du choix des générations : ce qui attend derrière le bouton.
+export function safariPickerContent(mode) {
+  const config = getSafariConfig();
+  return (
+    "\u{1F33F} **Quelles générations vises-tu ?** Les rencontres de ta visite ne viendront que " +
+    "d'elles." +
+    (mode === "paid"
+      ? `\nL'entrée se règle au clic : un Ticket Safari s'il t'en reste, sinon ` +
+        `**${config.entryPrice.toLocaleString("fr-FR")}** points.`
+      : "\nTon entrée est offerte.")
+  );
+}
+
+// Ce que répond une entrée payante (startPaidSession) : la visite, ou le refus
+// et ce qui a été rendu. /pk safari et le bouton du choix des générations
+// répondent la même chose.
+// Ce que l'entrée a rendu, s'il a fallu défaire quelque chose. La phrase suit
+// les DEUX sorties : un refus après un ticket consommé laissait croire que
+// l'objet le plus rare du jeu avait été mangé pour rien. Discord et le site la
+// disent de la même façon.
+export const paidEntryRefund = (result) =>
+  result.refunded
+    ? ` Tes **${result.refunded.toLocaleString("fr-FR")}** points t'ont été rendus.`
+    : result.ticketRendu
+      ? " Ton **Ticket Safari** t'a été rendu."
+      : "";
+
+export function buildPaidEntryReply(result) {
+  const config = getSafariConfig();
+  const rendu = paidEntryRefund(result);
+
+  if (!result.ok) {
+    const content =
+      result.code === "COOLDOWN"
+        ? `⏳ Tu as déjà visité le parc récemment. Prochaine entrée possible <t:${Math.floor(result.retryAt / 1000)}:R>.`
+        : `❌ ${result.reason}`;
+    return { content: content + rendu, embeds: [], components: [] };
+  }
+
+  // Le contenu s'écrit APRÈS l'étalement de la vue : celle-ci porte le sien (la
+  // phrase de reprise, ou null pour effacer ce qui traîne), et l'ordre inverse
+  // le ferait écraser.
+  //
+  // Une visite ouverte entre la vérification et le débit est rendue telle
+  // quelle : c'est une reprise, pas l'entrée qu'on vient de payer.
+  const view = buildSafariView(result.session, { owned: result.owned, resumed: result.resumed });
+  const content = result.resumed
+    ? view.content + rendu
+    : result.ticket
+      ? `🎟️ Tu présentes ton **${result.ticket.label}** à l'entrée et franchis les grilles ` +
+        `du parc safari. **${config.actionsPerSession} actions**, et pas un point dépensé.`
+      : `🏕️ Tu paies **${config.entryPrice.toLocaleString("fr-FR")}** points et franchis ` +
+        `les grilles du parc safari. **${config.actionsPerSession} actions**, et plus rien ` +
+        `à débourser.`;
+  return { ...view, content };
 }
 
 // `author` bascule le bilan en version publique : même embed, signé. Une

@@ -9,7 +9,7 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
 - [Individus](individus.md) — sexe, ball de capture, fertilité, `#numéro`, toujours un exemplaire.
 - [Charme Chroma](charme.md) — un Pokédex de génération complété, deux fois plus de shiny.
 - [Œufs](oeufs.md) — la seule façon d'obtenir les bébés.
-- [Objets](objets.md) — ce que tiennent les Pokémon, balls offertes, pierres.
+- [Objets](objets.md) — ce que tiennent les Pokémon, balls offertes, objets d'évolution.
 - [Loterie](loterie.md) — un tirage par jour et par dresseur.
 - [Revente](revente.md) — doublons et objets contre des points.
 - [Parc Safari](safari.md) — l'événement où les actions ne coûtent rien.
@@ -18,8 +18,8 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
 
 - `/pk pokedex [membre]` : collection, doublons, shinies et progression. Réponse privée. Une entrée
   est une **espèce**, shiny ou non. Un 🔒 marque les espèces qu'aucune apparition ne donnera
-  jamais — elles ne s'obtiennent que par évolution ou par échange —, un 🥚 celles qui ne sortent
-  que d'un œuf.
+  jamais — elles ne s'obtiennent que par évolution, avec un objet ou par échange —, un 🥚 celles
+  qui ne sortent que d'un œuf.
 - `/pk boite [pokemon] [membre]` : les Pokémon un par un, page par page — `#numéro`, sexe, ball,
   date, fertilité, et 🛡️ les verrouillés (voir [Individus](individus.md)).
 - `/pk doublons [membre] [pokemon] [evolutions]` : les espèces qu'un dresseur a en plusieurs
@@ -30,8 +30,9 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
   - `evolutions` met de côté 🧬 ce qu'il faut pour les évolutions qui manquent au Pokédex du
     dresseur affiché, lignée entière : s'il manque Florizarre, assez d'Herbizarre pour le faire
     évoluer, et assez de Bulbizarre pour faire ces Herbizarre. Le compte suit le tarif des
-    évolutions sans objet ni Métamorph, une évolution par forme manquante (Évoli), et laisse de côté
-    les évolutions par échange, qu'on obtient en recevant le premier stade. Les verrouillés servent
+    évolutions sans objet ni Métamorph — avec le sien pour une forme qui n'existe qu'avec un objet
+    (Steelix) —, une évolution par forme manquante (Évoli), et laisse de côté les évolutions par
+    échange, qu'on obtient en recevant le premier stade. Les verrouillés servent
     d'abord à évoluer et à rester au Pokédex, seuls les libres se sacrifient. Ce qui est mis de côté
     reste échangeable : l'option ne change que ce que la liste montre.
 - `/pk verrou <espece> <individu>` : verrouille ou déverrouille un Pokémon. **Verrouillé, il ne part
@@ -53,8 +54,10 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
   exemplaires de l'espèce, shiny ou non (les normaux partent d'abord), jamais un verrouillé, et il
   en reste toujours un. Avec un Salamèche et un Salamèche shiny, on peut faire évoluer le shiny
   avec des bonbons ou des Métamorph : le normal garde l'entrée. Les lignées à embranchement (Évoli)
-  peuvent évoluer au hasard, ou vers une cible choisie pour plus cher. La commande ne propose que
-  les chemins réellement praticables, objets d'évolution compris.
+  peuvent évoluer au hasard, ou vers une cible choisie pour plus cher — au tarif du hasard avec une
+  Évolyte. Certaines formes ne s'obtiennent qu'avec leur objet : Joliflor, Tarpaud, Roigada,
+  Steelix… (voir [Objets](objets.md#objets-dévolution)). La commande ne propose que les chemins
+  réellement praticables, objets d'évolution compris.
   **Métamorph sert de joker** : quand il manque des sacrifices, un bouton propose de les remplacer
   par des Métamorph, shiny ou non (les normaux d'abord), un par sacrifice
   (`pokemon.evolution.dittosPerCopy`). Les exemplaires de l'espèce partent d'abord, et il reste
@@ -82,7 +85,7 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
 les siens — facultatif pour l'évolution et la revente. `/pk oeuf pondre` accepte un groupe de la liste ou **`#numéro`** — le numéro qu'affiche
 `/pk boite` — pour désigner un Pokémon précis.
 - `/admin pokespawn` *(Admin)* : déclenche une apparition pour organiser un événement. Donne accès aux
-  espèces hors pool naturel (légendaires et évolutions par échange), avec forçage du shiny, texte
+  espèces hors pool naturel (légendaires, évolutions par échange ou par objet), avec forçage du shiny, texte
   d'annonce et mention de rôle.
 - `/admin safarispawn` *(Admin)* : ouvre un parc safari à la demande, pour un événement ou pour offrir
   une visite à un dresseur en particulier.
@@ -99,31 +102,47 @@ exemplaire de moins.
 
 ## Générations
 
-Le jeu tourne sur la **1ʳᵉ génération**, et la **2ᵉ est prête** : ses 100 espèces sont déjà dans
-les données, cachées. Pour l'ouvrir, une seule commande, sans release ni redémarrage :
+Le jeu tourne sur la **1ʳᵉ génération**, et la **2ᵉ s'ouvre d'elle-même le vendredi 30 octobre
+2026 à 18 h** (heure de Paris) : ses 100 espèces sont déjà dans les données, cachées. La date vit
+dans `pokemon.generationOpenings` (`{ "2": "2026-10-30T18:00:00+01:00" }`), relue à chaque
+instant : ni release ni redémarrage. La génération jouable est la plus haute de `pokemon.generation`
+et des dates passées.
+
+Pour avancer ou repousser l'ouverture, puis pour ouvrir tout de suite :
 
 ```
+/admin config pokemon.generationOpenings.2 2026-10-30T18:00:00+01:00
 /admin config pokemon.generation 2
 ```
+
+À l'ouverture, le salon des apparitions reçoit **une annonce**, rôle Pokémon mentionné : les
+nouvelles espèces, les légendaires, les bébés, les objets et le Charme Chroma. Elle ne part qu'une
+fois (la base en garde la trace), même si le bot redémarre, et un bot éteint à l'heure dite
+l'envoie à son retour.
 
 Apparitions, parc safari, Pokédex (251 espèces), recherche, fiches, évolutions et échanges la
 prennent en compte immédiatement. Ce qu'elle change :
 
 - **Des lignées s'allongent** : Nosferalto → Nostenfer, Leveinard → Leuphorie, Évoli → Mentali et
-  Noctali, Ortide → Joliflor, et les bébés en amont (Pichu → Pikachu, Mélo, Toudoudou, Élekid,
-  Magby, Lippouti, Debugant → Kicklee, Tygnon ou Kapoera). Les bébés n'apparaissent pas : ils
-  sortent des [œufs](oeufs.md), qui n'ont donc rien à pondre tant que la génération 2 est fermée.
-- **Six nouvelles évolutions par échange**, dont la source est souvent de 1ʳᵉ génération : Onix →
-  Steelix, Insécateur → Cizayox, Hypocéan → Hyporoi, Ramoloss → Roigada, Têtarte → Tarpaud, Porygon
-  → Porygon2. Comme les quatre premières, elles n'apparaissent jamais à l'état sauvage (🔒).
+  Noctali, et les bébés en amont (Pichu → Pikachu, Mélo, Toudoudou, Élekid, Magby, Lippouti,
+  Debugant → Kicklee, Tygnon ou Kapoera). Les bébés n'apparaissent pas : ils sortent des
+  [œufs](oeufs.md), qui n'ont donc rien à pondre tant que la génération 2 est fermée.
+- **Des formes qui demandent un objet** : Ortide → Joliflor (☀️ Pierre Soleil, sinon Rafflesia),
+  Têtarte → Tarpaud et Ramoloss → Roigada (👑 Roche Royale, sinon Tartard et Flagadoss), Onix →
+  Steelix, Insécateur → Cizayox, Hypocéan → Hyporoi et Porygon → Porygon2 (⚙️ Catalyseur, sans
+  lequel ils n'évoluent pas). Ces trois objets entrent dans les mains des Pokémon et dans la loterie
+  à l'ouverture (voir [Objets](objets.md#objets-dévolution)). Ces formes n'apparaissent jamais à
+  l'état sauvage (🔒).
+- **Le parc safari demande quelles générations on vise** (voir [Parc Safari](safari.md)).
 - **Six légendaires** de plus : Raikou, Entei, Suicune, Lugia, Ho-Oh et Celebi.
+- **Un Charme Chroma de 2ᵉ génération** (voir [Charme Chroma](charme.md)).
 - **Les raretés de la 1ʳᵉ génération ne bougent pas.** Un bébé est de stade 1, sa forme adulte
   aussi : Pikachu reste commun et Raichu peu commun, là où compter Pichu en ferait un rare.
   L'évolution d'un bébé vers sa forme adulte coûte comme une première évolution d'adulte :
   le tarif du stade 2 (`pokemon.evolution.2`).
 
-Refermer une génération (`pokemon.generation 1`) cache ses espèces sans les retirer des
-collections ; elles réapparaissent à la réouverture.
+Refermer une génération (`pokemon.generation 1`, avec une date d'ouverture repoussée) cache ses
+espèces sans les retirer des collections ; elles réapparaissent à la réouverture.
 
 ## Données
 

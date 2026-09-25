@@ -18,13 +18,13 @@ d'exceptionnel. À `lotDecay: 1` on retrouve exactement l'ancien comportement.
 | 1× Super Ball | 10,22 % | 10 |
 | 2× Poké Ball | 8,96 % | 11 |
 | 2× Super Ball | 5,11 % | 20 |
+| 🔮 Évolyte | 4,88 % | 20 |
 | 3× Poké Ball | 4,48 % | 22 |
 | 🍬 1× Super Bonbon | 4,34 % | 23 |
 | 1× Hyper Ball | 2,89 % | 35 |
 | 3× Super Ball | 2,56 % | 39 |
 | 4× Poké Ball | 2,24 % | 45 |
 | 🍬 2× Super Bonbon | 2,17 % | 46 |
-| 🔥⚡💧 Pierre | 1,63 % chacune | 61 |
 | 2× Hyper Ball | 1,45 % | 69 |
 | 5× Poké Ball | 1,12 % | 89 |
 | 💎 Pépite | 1,08 % | 92 |
@@ -32,6 +32,9 @@ d'exceptionnel. À `lotDecay: 1` on retrouve exactement l'ancien comportement.
 | **Master Ball** | **0,16 %** | **615** |
 
 Vérifié sur 400 000 tirages réels : écart maximal de **0,10 point** avec ce tableau.
+
+**Dès la 2ᵉ génération**, la ☀️ Pierre Soleil, la 👑 Roche Royale et le ⚙️ Catalyseur s'ajoutent
+(1,52 % chacun, un jour sur 66), et chaque autre lot recule d'un quinzième.
 
 **La loterie a ses propres poids** (`lotteryWeight`, qui retombe sur `dropWeight` quand le
 catalogue n'en dit rien). Les deux tables ont été la même jusqu'à ce que la loterie doive donner

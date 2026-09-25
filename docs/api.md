@@ -52,7 +52,7 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
 | `GET /api/species/:id` | fiche + `chain` (lignée) |
 | `GET /api/catalogue` | `{ balls, items, types }` — clés, noms et emoji (`<:nom:id>` pour ceux du serveur), couleur de chaque type |
 | `GET /api/rules` | Les règles en chiffres pour la page Infos (`modules/pokemon/rules.js`) : `points`, `spawn` (dont `rarities`, part de chaque rareté), `capture` (balls et `table` des chances par difficulté), `items` (`held`, `lottery`, `lot`, `sellValue`), `lottery`, `evolution`, `eggs`, `trade`, `sell`, `lock`, `safari`, et les `commands` /pk. Lus dans la configuration ou calculés par les fonctions des tirages |
-| `GET /api/species/:id/evolution?targetId&helper` | coût d'une évolution : `{ targets, sacrifices, required, points, helper }` — `required` compte celui qui évolue et celui qui reste, shiny ou non |
+| `GET /api/species/:id/evolution?targetId&helper` | coût d'une évolution : `{ targets, target, branching, sacrifices, required, points, helper, helpers }` — `required` compte celui qui évolue et celui qui reste, shiny ou non ; `targets` les formes ouvertes sans objet ; `helpers` les objets utilisables sur l'espèce (`key`, `label`, `image`, `quantity`, `target` : la forme qu'il donne, `choose` : il laisse choisir la forme sans supplément). Une espèce qui n'évolue qu'avec un objet (Onix) répond 409 avec `needs` (les noms des objets) et `helpers` |
 | `GET /api/users/:userId/pokedex` 🔒 | `{ dexSize, entries: [{ speciesId, shiny, count, firstCaughtAt }] }` |
 | `GET /api/users/:userId/box` 🔒 | `{ total, page, pages, pageSize, items }` |
 | `GET /api/users/:userId/inventory` 🔒 | `{ items: [{ key, label, emoji, description, count }] }` |
@@ -93,10 +93,12 @@ safari qui suspend les apparitions. `wallet` (`{ balance, balls }`, comme dans `
 suivre le solde à l'onglet Capture sans relire `/api/me`.
 
 `safari` (et `offer` de `/api/safari`) : `{ enabled, session, freePark, price, actions, tickets,
-retryAt, canBuy, blocked }`. `session` est la visite en cours (`{ id, actionsLeft }`), `freePark`
+retryAt, canBuy, blocked, generations }`. `session` est la visite en cours (`{ id, actionsLeft }`), `freePark`
 un parc où entrer gratuitement (`{ id, expiresAt, reserved }`). `canBuy` dit si l'achat d'une
 entrée passerait ; sinon `blocked` vaut `balance` (solde insuffisant) ou `cooldown` (délai entre
-deux achats, jusqu'à `retryAt`). Un Ticket Safari lève les deux.
+deux achats, jusqu'à `retryAt`). Un Ticket Safari lève les deux. `generations` liste les
+générations qu'on peut viser (`{ generation, ordinal, species }` : « 1re », et le nombre d'espèces qu'y croise le parc)
+dès qu'il y en a plus d'une ouverte, et reste vide sinon.
 
 Une visite : `{ id, token, actionsLeft, actionsTotal, expiresAt, finished, catches, ball,
 encounter }`. `encounter` (`null` une fois la visite finie) porte l'espèce, `shiny`, `sex`, la
@@ -125,8 +127,8 @@ ou par un groupe `{ "speciesId": 25, "isShiny": false, "sex": "F" }` — les deu
 | `POST /api/me/eggs` | `{ parent1, parent2 }` | `{ egg }` |
 | `POST /api/spawn/throw` | `{ spawnId, ball, requireItem? }` | `{ status, message, final, remaining, pokemon }` — `pokemon.shiny` : ce qui a rejoint la boîte, Charme Chroma compris |
 | `POST /api/drops/:id/claim` | `{}` | `{ item }` — `409` si quelqu'un a été plus rapide, `403` pour le capteur du Pokémon qui l'a lâché |
-| `POST /api/safari/enter` | `{ parkId }` | `{ resumed, visit }` — entrée gratuite dans un parc ouvert |
-| `POST /api/safari/buy` | `{}` | `{ resumed, ticket, visit }` — entrée payante, au ticket d'abord |
+| `POST /api/safari/enter` | `{ parkId, generations? }` | `{ resumed, visit }` — entrée gratuite dans un parc ouvert. `generations` : les générations visées (entiers) ; les fermées sont ignorées, et sans elle, ou sans aucune valable, toutes |
+| `POST /api/safari/buy` | `{ generations? }` | `{ resumed, ticket, visit }` — entrée payante, au ticket d'abord |
 | `POST /api/safari/action` | `{ sessionId, token, action }` | `{ outcome, message, visit }` — `action` : `BALL`, `BAIT` ou `FLEE` |
 | `POST /api/me/pc/move` | `{ pokemonId, pos }` | la boîte PC relue — l'occupant de la case prend l'ancienne place |
 | `POST /api/me/pc/boxes/:box/name` | `{ name }` | `{ name, custom }` — vide : nom par défaut |

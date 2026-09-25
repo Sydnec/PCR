@@ -19,6 +19,7 @@ import {
   rarityOf,
   safariBaitFactor,
   safariFleeChance,
+  itemOnlySpecies,
   spawnWeight,
   tradeEvolutionTarget,
 } from "./data.js";
@@ -28,6 +29,7 @@ import {
   itemDropWeight,
   itemLot,
   itemLotteryWeight,
+  itemOpen,
   itemSellValue,
 } from "./items.js";
 import { getLotteryConfig } from "./lottery.js";
@@ -41,8 +43,9 @@ import { charmSpecies } from "./charms.js";
 function rarityShares(spawnConfig) {
   const byRarity = new Map();
   let total = 0;
+  const itemOnly = itemOnlySpecies();
   for (const species of allSpecies()) {
-    const weight = spawnWeight(species, spawnConfig);
+    const weight = spawnWeight(species, spawnConfig, itemOnly);
     if (weight <= 0) continue;
     total += weight;
     const entry = byRarity.get(rarityOf(species)) ?? { weight: 0, species: 0 };
@@ -65,8 +68,9 @@ function rarityShares(spawnConfig) {
 // plutôt qu'une formule.
 function catchTable(spawnConfig) {
   const bands = new Map();
+  const itemOnly = itemOnlySpecies();
   for (const species of allSpecies()) {
-    if (spawnWeight(species, spawnConfig) <= 0) continue;
+    if (spawnWeight(species, spawnConfig, itemOnly) <= 0) continue;
     const { level, label } = difficultyOf(species.catchRate);
     const band = bands.get(level) ?? { level, label, min: Infinity, max: -Infinity };
     band.min = Math.min(band.min, species.catchRate);
@@ -92,9 +96,10 @@ function catchTable(spawnConfig) {
 
 // Chaque objet du catalogue : sur quelle part des apparitions on le trouve, à
 // quelle part des tirages de loterie il sort, par quels lots, et ce qu'il
-// rapporte revendu.
+// rapporte revendu. Un objet d'une génération pas encore ouverte n'y figure
+// pas : il n'existe pas encore pour les joueurs.
 function itemTable(config) {
-  const items = getItems();
+  const items = getItems().filter(itemOpen);
   const dropTotal = items.reduce((sum, item) => sum + itemDropWeight(item), 0);
   const lotteryTotal = items.reduce((sum, item) => sum + itemLotteryWeight(item), 0);
   const heldChance = Number(config.spawn.heldItemChance) || 0;

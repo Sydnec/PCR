@@ -16,7 +16,10 @@ import {
   resolveSelector,
   evolve,
   describeEvolution,
+  describeHelper,
+  evolutionHelpers,
   setLock,
+  usableHelpers,
   DITTO_HELPER,
 } from "../pokemon/collection.js";
 import { isFinalThrow, resolveThrow, startThrow, throwMessage } from "../pokemon/capture.js";
@@ -44,13 +47,14 @@ import {
   safariBaitCapped,
   safariBaitFactor,
   safariCatchProbability,
+  safariGenerationChoices,
   safariFleeChance,
   spriteUrl,
   typeColors,
 } from "../pokemon/data.js";
 import { getBalls, getPokemonConfig, getSafariConfig } from "../pokemon/config.js";
 import { announceDropClaim, claimDrop, getOpenDrops } from "../pokemon/drops.js";
-import { safariOutcomeLine } from "../pokemon/embeds.js";
+import { paidEntryRefund, safariOutcomeLine } from "../pokemon/embeds.js";
 import { getPc, movePokemon, renameBox, renamePokemon } from "../pokemon/pc.js";
 import {
   enterPark,
@@ -225,6 +229,18 @@ async function resolveOwn(userId, body, label) {
   const selector = await promise((cb) => resolveSelector(userId, selectorValue(body, label), cb));
   if (selector.error) throw new HttpError(404, selector.error);
   return selector;
+}
+
+// Les générations visées au parc safari : une liste d'entiers dans le corps,
+// ou rien pour toutes. Le jeu les revalide (safariGenerations) ; ici, on ne
+// laisse passer qu'une liste courte de nombres.
+function generationsOf(body) {
+  const list = body?.generations;
+  if (list === undefined || list === null) return null;
+  if (!Array.isArray(list) || list.length > 20 || !list.every(Number.isInteger)) {
+    throw new HttpError(400, "generations : une liste de générations.");
+  }
+  return list;
 }
 
 // Le résultat d'une action du jeu : { ok, reason } devient un 409 quand le jeu
@@ -407,6 +423,8 @@ async function safariState(ctx) {
     retryAt: offer.retryAt,
     canBuy: !offer.blocked,
     blocked: offer.blocked,
+    // Les générations qu'on peut viser, dès qu'il y en a plus d'une.
+    generations: activeGeneration() > 1 ? safariGenerationChoices() : [],
   };
   return { json, ongoing: offer.ongoing };
 }
@@ -598,23 +616,56 @@ export const routes = [
   },
 
   // Ce qu'une évolution coûterait, sans rien faire : l'écran d'évolution.
+  // `helpers` : les objets qui peuvent y servir (evolutionHelpers), avec la
+  // forme qu'ils donnent ou le choix qu'ils laissent — joints aussi au refus
+  // d'une espèce qui n'évolue qu'avec l'un d'eux, pour que l'écran le propose.
   {
     method: "GET",
     path: "/api/species/:speciesId/evolution",
     handler: async (ctx) => {
+      const speciesId = Number(ctx.params.speciesId);
+      // Connecté, ce que le dresseur a en poche : `usable` suit le même tri que
+      // /pk evolution. Une lecture ratée omet l'information plutôt que de dire
+      // « tu n'en as aucun ».
+      let owned = null;
+      if (ctx.user) {
+        try {
+          const usable = await promise((cb) => usableHelpers(ctx.user.id, cb));
+          owned = new Map(usable.map((item) => [item.key, item.held]));
+        } catch (error) {
+          handleException("API web, objets d'évolution :", error);
+        }
+      }
+      const helpers = evolutionHelpers(speciesId).map((item) => {
+        const { helper } = describeHelper(item.key, speciesId);
+        return {
+          key: item.key,
+          label: item.label,
+          image: itemImageUrl(item.sprite),
+          quantity: helper.quantity,
+          target: helper.target,
+          choose: helper.choose,
+          held: owned ? (owned.get(item.key) ?? null) : null,
+          usable: owned ? owned.has(item.key) : null,
+        };
+      });
       const plan = describeEvolution(
-        Number(ctx.params.speciesId),
+        speciesId,
         ctx.query.targetId ? Number(ctx.query.targetId) : null,
         ctx.query.helper || null
       );
-      if (plan.error) throw new HttpError(409, plan.error);
+      if (plan.error) {
+        throw new HttpError(409, plan.error, plan.needs ? { needs: plan.needs, helpers } : null);
+      }
       return {
         targets: plan.targets.map((target) => target.id),
         target: plan.target?.id ?? null,
+        branching: plan.branching,
         sacrifices: plan.sacrifices,
         required: plan.required,
         points: plan.points,
         helper: plan.helper ? { key: plan.helper.item.key, quantity: plan.helper.quantity } : null,
+        helpers,
       };
     },
   },
@@ -704,7 +755,9 @@ export const routes = [
     handler: async (ctx) => {
       const parkId = Number(ctx.body.parkId);
       if (!Number.isInteger(parkId) || parkId <= 0) throw new HttpError(400, "parkId invalide.");
-      const result = await promise((cb) => enterPark(ctx.user.id, parkId, cb));
+      const result = await promise((cb) =>
+        enterPark(ctx.user.id, parkId, { generations: generationsOf(ctx.body) }, cb)
+      );
       if (!result.ok) throw new HttpError(409, result.reason);
       // Une reprise n'est pas une entrée : le compteur du parc n'a pas bougé.
       if (!result.resumed) refreshParkMessage(ctx.bot, parkId);
@@ -722,15 +775,10 @@ export const routes = [
     auth: true,
     write: true,
     handler: async (ctx) => {
-      const result = await promise((cb) => startPaidSession(ctx.user.id, cb));
-      if (!result.ok) {
-        const rendu = result.refunded
-          ? ` Tes **${result.refunded}** points t'ont été rendus.`
-          : result.ticketRendu
-            ? " Ton **Ticket Safari** t'a été rendu."
-            : "";
-        throw new HttpError(409, `${result.reason}${rendu}`);
-      }
+      const result = await promise((cb) =>
+        startPaidSession(ctx.user.id, { generations: generationsOf(ctx.body) }, cb)
+      );
+      if (!result.ok) throw new HttpError(409, `${result.reason}${paidEntryRefund(result)}`);
       return {
         resumed: Boolean(result.resumed),
         ticket: result.ticket?.label ?? null,

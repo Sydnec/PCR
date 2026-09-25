@@ -18,7 +18,7 @@ PCR est un bot Discord modulaire conçu pour animer et gérer la communauté. Il
 
 ### 🔴 Pokémon
 
-Un jeu de capture de Pokémon — 1ʳᵉ génération, la 2ᵉ prête à s'ouvrir d'une commande — qui sert de
+Un jeu de capture de Pokémon — 1ʳᵉ génération, la 2ᵉ ouvre le vendredi 30 octobre 2026 à 18 h — qui sert de
 **puits à points** : chaque lancer de ball débite des points, que la capture réussisse ou non.
 Toutes ses commandes vivent sous `/pk`. → **[Documentation du jeu](docs/pokemon/README.md)**
 
@@ -26,7 +26,7 @@ Toutes ses commandes vivent sous `/pk`. → **[Documentation du jeu](docs/pokemo
 - [Individus](docs/pokemon/individus.md) — sexe, ball de capture, fertilité, `/pk boite`.
 - [Charme Chroma](docs/pokemon/charme.md) — un Pokédex de génération complété, deux fois plus de shiny.
 - [Œufs](docs/pokemon/oeufs.md) — la seule façon d'obtenir les bébés.
-- [Objets](docs/pokemon/objets.md) — ce que tiennent les Pokémon, balls offertes, pierres.
+- [Objets](docs/pokemon/objets.md) — ce que tiennent les Pokémon, balls offertes, objets d'évolution.
 - [Loterie](docs/pokemon/loterie.md) — un tirage par jour et par dresseur.
 - [Revente](docs/pokemon/revente.md) — doublons et objets contre des points.
 - [Parc Safari](docs/pokemon/safari.md) — l'événement où les actions ne coûtent rien.

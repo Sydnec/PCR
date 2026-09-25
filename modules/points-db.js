@@ -564,10 +564,19 @@ const db = new sqlite3.Database(dbPath, (err) => {
         encounter_catch_rate INTEGER,
         encounter_bait INTEGER NOT NULL DEFAULT 0,
         encounter_sex TEXT,
-        shared_at INTEGER
+        shared_at INTEGER,
+        generations TEXT
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_safari_sessions :", err);
+        // Les générations visées (« 1,2 »), NULL pour toutes. Temporaire : la
+        // colonne manque aux bases d'avant la Gen 2 ; à retirer une fois
+        // déployé.
+        db.run("ALTER TABLE pokemon_safari_sessions ADD COLUMN generations TEXT", (err) => {
+          if (err && !/duplicate column/i.test(err.message)) {
+            handleException("Erreur ajout de la colonne generations :", err);
+          }
+        });
         // Une seule session à la fois par dresseur, garanti en base. Les index
         // se créent l'un après l'autre : sqlite3 n'ordonne pas deux db.run
         // successifs.
@@ -595,6 +604,19 @@ const db = new sqlite3.Database(dbPath, (err) => {
             );
           }
         );
+      }
+    );
+
+    // Les générations déjà annoncées. La ligne est la revendication : un INSERT
+    // OR IGNORE dont this.changes dit qui annonce, si bien que deux passages du
+    // minuteur — ou un redémarrage à l'heure dite — n'annoncent qu'une fois.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_generations (
+        generation INTEGER PRIMARY KEY,
+        announced_at INTEGER NOT NULL
+      )`,
+      (err) => {
+        if (err) handleException("Erreur création table pokemon_generations :", err);
       }
     );
 

@@ -14,15 +14,19 @@ noieraient la table.
 | Super Ball | 22 % | un lancer offert | — |
 | 🍬 Super Bonbon | 13 % | **trois** tiennent lieu d'un sacrifice dans une évolution | 300 |
 | Hyper Ball | 8,7 % | un lancer offert | — |
-| 🔥⚡💧 Pierres | 3,3 % chacune | font évoluer un Évoli vers *leur* forme, sans exemplaire ni point en plus | 500 |
+| 🔮 Évolyte | 9,8 % | un Évoli qui évolue avec lui prend la forme de son choix, sans supplément ; il tient lieu d'un sacrifice | 500 |
+| ☀️ Pierre Soleil | 3 %, dès la 2ᵉ gén. | Ortide devient Joliflor plutôt que Rafflesia ; tient lieu d'un sacrifice | 500 |
+| 👑 Roche Royale | 3 %, dès la 2ᵉ gén. | Têtarte devient Tarpaud, Ramoloss devient Roigada ; tient lieu d'un sacrifice | 500 |
+| ⚙️ Catalyseur | 3 %, dès la 2ᵉ gén. | le seul moyen de faire évoluer Onix, Insécateur, Hypocéan et Porygon ; tient lieu d'un sacrifice | 500 |
 | 💎 Pépite | 2,2 % | rien, sinon se revendre | 2 000 |
 | 🎟️ Ticket Safari | 0,9 % | une entrée du parc, sans passer par la caisse | — |
 | Master Ball | **0,33 %** | la capture garantie, offerte | — |
 
 `dropWeight` est un **poids**, pas un pourcentage : la part d'un objet vaut son poids divisé par la
-somme de tous (921 pour le butin). `/admin poids` fait la conversion pour les quatre tables de
-tirage du jeu, cadence comprise — la Master Ball tombe une fois sur 4 386 apparitions. La loterie
-tire dans sa propre table (`lotteryWeight`, voir [Loterie](loterie.md)) ; celle-ci ne décrit que le butin.
+somme de tous (921 pour le butin, 1 011 dès la 2ᵉ génération : les autres parts y reculent d'un
+onzième). `/admin poids` fait la conversion pour les quatre tables de tirage du jeu, cadence
+comprise — la Master Ball tombe une fois sur 4 386 apparitions. La loterie tire dans sa propre table
+(`lotteryWeight`, voir [Loterie](loterie.md)) ; celle-ci ne décrit que le butin.
 
 **Une fois sur cinq, il le lâche en partant.** Capturé ou enfui, un Pokémon qui tenait quelque chose
 a 20 % de chances de le laisser par terre plutôt que de le céder à son vainqueur. Un message public
@@ -40,8 +44,9 @@ par terre plutôt que de le faire disparaître.
 - **Trois attributs décident du reste** : `sellValue` le rend revendable, `dropWeight` le fait
   tomber, `evolution` le rend utilisable dans une évolution — combien d'exemplaires de l'objet
   valent combien de sacrifices, s'ils dispensent des points, et à quelle lignée ils sont
-  réservés. C'est ce dernier point qui fait des pierres des objets à Évoli : une Pierre Feu jetée
-  sur un Chenipan est refusée, elle ne part pas.
+  réservés : une Évolyte jetée sur un Chenipan est refusée, elle ne part pas. Un quatrième,
+  `generation`, garde un objet hors du jeu tant que sa génération est fermée : il ne tombe pas, ne
+  sort pas à la loterie et ne sert à rien avant.
 - **Les balls offertes partent d'elles-mêmes.** Lancer une Poké Ball en en ayant une dans son
   inventaire ne coûte rien : l'objet passe avant le solde, parce qu'un objet posé dans un sac ne
   doit pas dormir pendant qu'on prend la monnaie de son propriétaire. Le panneau de lancer, privé,
@@ -61,3 +66,24 @@ par terre plutôt que de le faire disparaître.
   `capture:42`, `sol:8`, `fusion`, `safari`, `vente`, `admin:…`).
 - **La ligne survit à zéro**, comme dans le Pokédex : `first_obtained_at` ne se retrouve pas après
   coup. Toute lecture filtre donc sur `count > 0`.
+
+## Objets d'évolution
+
+**Un objet d'évolution tient lieu d'un sacrifice**, et le prix en points reste celui du stade :
+l'objet ne dispense de rien d'autre. `/pk evolution` propose un bouton par objet utilisable qu'on a
+en poche, et le site une image à cliquer dans la bande d'évolution.
+
+- **L'Évolyte laisse choisir.** Sur Évoli, choisir sa forme coûte d'ordinaire le tarif du choix
+  (`pokemon.evolution.branchChoicePoints`) ; avec une Évolyte, on la choisit au tarif du stade,
+  hasard ou pas. Elle remplace les Pierres Feu, Foudre et Eau, qui ne servaient qu'à Évoli : celles
+  qu'on avait ont été converties une pour une au démarrage du bot, y compris celles qui attendaient
+  par terre ou que tenait le Pokémon du salon.
+- **Certaines formes ne s'obtiennent qu'avec leur objet** (`evolution.targets` :
+  `{ espèce: forme }`). Sans Pierre Soleil, Ortide devient Rafflesia ; sans Roche Royale, Têtarte
+  devient Tartard et Ramoloss Flagadoss — l'objet change la forme, il ne débloque pas l'évolution.
+  Sans Catalyseur, Onix, Insécateur, Hypocéan et Porygon n'évoluent pas du tout. Dans les jeux, ces
+  quatre-là évoluent en changeant de dresseur avec un objet tenu : ici, l'objet suffit, et
+  l'échange ne les fait plus évoluer. Kadabra, Machopeur, Gravalanch et Spectrum évoluent toujours
+  par échange, sans objet.
+- **Les trois objets de la 2ᵉ génération** (`generation: 2`) n'entrent dans les mains des Pokémon
+  et dans la loterie qu'à son ouverture (voir [Générations](README.md#générations)).

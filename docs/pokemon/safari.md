@@ -26,7 +26,14 @@ visite. C'est le seul contenu Pokémon où les actions ne coûtent rien.
   apparitions publiques ont besoin d'un bouton pour répondre à chacun séparément.
 - **Raretés compensées** : stade 2 ×1,5, stade 3 (les *rares*) ×2,4, légendaires ×3, shiny 1/250 au
   lieu de 1/500. En 1ʳᵉ génération, les rares passent de 2,7 % à 5,4 % du pool et les légendaires de
-  0,4 % à 0,9 %. Les évolutions par échange et les bébés restent hors pool, comme à l'état sauvage.
+  0,4 % à 0,9 %. Les évolutions par échange ou par objet et les bébés restent hors pool, comme à
+  l'état sauvage.
+- **Dès la 2ᵉ génération, on choisit ce qu'on vise.** Entrer (parc offert comme entrée payante)
+  demande d'abord quelles générations on cible : un menu sur Discord, des bascules sur le site, qui
+  disent combien d'espèces chacune fait croiser. Toutes sont cochées au départ, il en faut au moins
+  une, et les rencontres de la visite ne viennent que d'elles, raretés compensées comprises. Le
+  choix est gardé sur la visite : une reprise, de Discord comme du site, le conserve. Tant qu'une
+  seule génération est ouverte, l'entrée reste directe.
 - **Une visite dure autant que le parc** : elle expire à la fermeture des grilles, avec un
   plancher d'une heure pour qui entre juste avant — 25 actions ne se jouent pas en dix minutes.
 - **La visite se reprend** : l'éphémère se ferme d'un geste et personne ne peut le rouvrir à la

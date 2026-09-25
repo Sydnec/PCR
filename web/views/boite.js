@@ -739,84 +739,165 @@ function pokemonActions(ctx, item, species, targets, { renamed, relocked, move, 
     );
   }
 
-  // L'évolution : la forme (sur une lignée à embranchement, en cliquant sur son
-  // sprite ; le hasard coûte le tarif normal), puis son coût, que l'API calcule
-  // comme la commande. Un verrouillé évolue aussi : la bande le rappelle, et la
-  // validation vaut confirmation. Les coûts déjà lus sont gardés, par forme.
+  // L'évolution : un objet s'il en faut ou s'il en aide un (Roche Royale,
+  // Évolyte…, en cliquant sur son image), la forme (sur une lignée à
+  // embranchement, en cliquant sur son sprite ; le hasard coûte le tarif
+  // normal), puis son coût, que l'API calcule comme la commande. Un verrouillé
+  // évolue aussi : la bande le rappelle, et la validation vaut confirmation.
+  // Les coûts déjà lus sont gardés, par objet et par forme.
   let targetId = null;
+  let helperKey = null;
+  let helpers = [];
   const plans = new Map();
   let cost = null;
   let evolveOk = null;
-  let choices = [];
+  let itemRow = null;
+  let choiceRow = null;
+  let shownHelpers = "";
+  let shownChoices = "";
 
   function evolveBar() {
     cost = h("p");
+    itemRow = h("div", { class: "evolve-choice", hidden: true });
+    choiceRow = h("div", { class: "evolve-choice", hidden: true });
+    shownHelpers = "";
+    shownChoices = "";
     const confirm = confirmRow("Faire évoluer", evolveNow);
     evolveOk = confirm.ok;
-    choices =
-      targets.length > 1
-        ? [null, ...targets].map((target) =>
-            h(
-              "button",
-              {
-                type: "button",
-                class: "button",
-                title: target ? `Choisir ${target.name}` : "Forme au hasard",
-                "aria-label": target ? `Choisir ${target.name}` : "Forme au hasard",
-                "data-target": target?.id ?? "",
-                onclick: () => {
-                  targetId = target?.id ?? null;
-                  showCost();
-                },
-              },
-              target
-                ? h("img", {
-                    class: "evolve-sprite",
-                    src: item.shiny ? target.iconShiny : target.icon,
-                    alt: "",
-                  })
-                : icon("question", { className: "evolve-sprite" })
-            )
-          )
-        : [];
-    bar.replaceChildren(
-      ...[
-        choices.length ? h("div", { class: "evolve-choice" }, choices) : null,
-        cost,
-        confirm.row,
-      ].filter(Boolean)
-    );
+    bar.replaceChildren(itemRow, choiceRow, cost, confirm.row);
     showCost();
   }
 
-  // Met la bande à jour sans la reconstruire : le bouton choisi garde le focus.
+  const planKey = () => `${helperKey ?? ""}|${targetId ?? ""}`;
+  const helperOf = (key) => helpers.find((entry) => entry.key === key) ?? null;
+
+  // Un bouton à image, pressé ou non : les objets comme les formes.
+  function pictureButton(label, content, pressed, onclick) {
+    return h(
+      "button",
+      {
+        type: "button",
+        class: "button",
+        title: label,
+        "aria-label": label,
+        "aria-pressed": String(pressed),
+        onclick,
+      },
+      content
+    );
+  }
+
+  // Met la bande à jour. Les rangées ne se reconstruisent que si leur contenu
+  // change : le bouton choisi garde le focus.
   function showCost() {
-    for (const button of choices) {
-      button.setAttribute("aria-pressed", String(button.dataset.target === String(targetId ?? "")));
-    }
-    const key = targetId ?? 0;
+    const key = planKey();
     const plan = plans.get(key);
-    if (!plan) {
+    if (!plan || plan.pending) {
       cost.textContent = "Calcul du coût…";
       evolveOk.disabled = true;
-      api(`/api/species/${species.id}/evolution${targetId ? `?targetId=${targetId}` : ""}`)
-        .then((fresh) => {
-          plans.set(key, fresh);
-          if (cost.isConnected && (targetId ?? 0) === key) showCost();
-        })
-        .catch((error) => {
-          if (cost.isConnected && (targetId ?? 0) === key)
-            cost.replaceChildren(...richText(error.message));
-        });
+      // Déjà demandé : la réponse redessinera la bande.
+      if (plan) return;
+      plans.set(key, { pending: true });
+      const query = new URLSearchParams();
+      if (targetId) query.set("targetId", targetId);
+      if (helperKey) query.set("helper", helperKey);
+      const search = query.toString();
+      api(`/api/species/${species.id}/evolution${search ? `?${search}` : ""}`)
+        .then((data) => plans.set(key, { data }))
+        .catch((error) =>
+          plans.set(key, { error: error.message, helpers: error.details?.helpers ?? null })
+        )
+        .then(() => cost.isConnected && planKey() === key && showCost());
       return;
     }
-    const into = plan.target ? ctx.species.get(plan.target)?.name : "une forme tirée au hasard";
-    const others = plan.sacrifices;
+    helpers = plan.data?.helpers ?? plan.helpers ?? helpers;
+
+    // Les objets que le dresseur a de quoi utiliser, tels que l'API les trie.
+    const usable = helpers.filter((entry) => entry.usable);
+    const helperIds = usable.map((entry) => entry.key).join(",");
+    if (helperIds !== shownHelpers) {
+      shownHelpers = helperIds;
+      itemRow.replaceChildren(
+        ...usable.map((entry) => {
+          const into = entry.target ? ctx.species.get(entry.target)?.name : null;
+          const label =
+            `${entry.quantity > 1 ? `${entry.quantity}× ` : ""}${entry.label}` +
+            (into ? ` : devient ${into}` : entry.choose ? " : choisis sa forme" : "") +
+            ` (tu en as ${fmt(entry.held)})`;
+          const button = pictureButton(
+            label,
+            entry.image
+              ? h("img", { class: "evolve-sprite", src: entry.image, alt: "" })
+              : entry.label,
+            entry.key === helperKey,
+            () => {
+              helperKey = helperKey === entry.key ? null : entry.key;
+              // Un objet à forme la donne ; l'Évolyte demande une forme.
+              if (helperOf(helperKey)?.target) targetId = null;
+              showCost();
+            }
+          );
+          button.dataset.helper = entry.key;
+          return button;
+        })
+      );
+    }
+    itemRow.hidden = !usable.length;
+    for (const button of itemRow.children) {
+      button.setAttribute("aria-pressed", String(button.dataset.helper === (helperKey ?? "")));
+    }
+
+    // Les formes, quand il y a à choisir : le hasard en premier.
+    const options = plan.data?.branching ? [null, ...plan.data.targets] : [];
+    const choiceIds = options.map((id) => id ?? "hasard").join(",");
+    if (choiceIds !== shownChoices) {
+      shownChoices = choiceIds;
+      choiceRow.replaceChildren(
+        ...options.map((id) => {
+          const target = id ? ctx.species.get(id) : null;
+          const button = pictureButton(
+            target ? `Choisir ${target.name}` : "Forme au hasard",
+            target
+              ? h("img", {
+                  class: "evolve-sprite",
+                  src: item.shiny ? target.iconShiny : target.icon,
+                  alt: "",
+                })
+              : icon("question", { className: "evolve-sprite" }),
+            (id ?? null) === targetId,
+            () => {
+              targetId = id ?? null;
+              showCost();
+            }
+          );
+          button.dataset.target = id ?? "";
+          return button;
+        })
+      );
+    }
+    choiceRow.hidden = !options.length;
+    for (const button of choiceRow.children) {
+      button.setAttribute("aria-pressed", String(button.dataset.target === String(targetId ?? "")));
+    }
+
+    if (plan.error) {
+      cost.replaceChildren(...richText(plan.error));
+      evolveOk.disabled = true;
+      return;
+    }
+    const data = plan.data;
+    const into = data.target ? ctx.species.get(data.target)?.name : "une forme tirée au hasard";
+    const others = data.sacrifices;
+    const aide = helperOf(helperKey);
     cost.textContent =
       (item.locked ? "Il est verrouillé : il évoluera quand même. " : "") +
-      `Devient ${into}. Il faut ${plan.required} ${species.name}, shiny ou non : ` +
+      `Devient ${into}. Il faut ${data.required} ${species.name}, shiny ou non : ` +
       `celui-ci évolue, ${others > 0 ? `${others} autre${others > 1 ? "s sont sacrifiés" : " est sacrifié"} (les normaux d'abord), ` : ""}` +
-      `et un reste. Coût : ${fmt(plan.points)} pts.`;
+      `et un reste` +
+      (aide
+        ? `, et ${aide.quantity}× ${aide.label} ${aide.quantity > 1 ? "partent" : "part"}`
+        : "") +
+      `. Coût : ${fmt(data.points)} pts.`;
     evolveOk.disabled = false;
   }
 
@@ -828,6 +909,7 @@ function pokemonActions(ctx, item, species, targets, { renamed, relocked, move, 
         pokemonId: item.id,
         speciesId: species.id,
         ...(targetId ? { targetId } : {}),
+        ...(helperKey ? { helper: helperKey } : {}),
         ...(item.locked ? { confirmLocked: true } : {}),
       };
       const result = await api("/api/me/evolve", { method: "POST", body });

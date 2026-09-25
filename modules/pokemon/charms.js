@@ -23,6 +23,7 @@ import {
   allSpeciesData,
   charmMultiplier,
   charmRoleId,
+  generationOrdinal,
   isLegendary,
 } from "./data.js";
 import { getCharmItem, getItems, grantItemOnce } from "./items.js";
@@ -41,10 +42,6 @@ export const charmSpecies = (generation) =>
   allSpeciesData().filter(
     (species) => species.generation === Number(generation) && !isLegendary(species)
   );
-
-// « 1re », « 2e » : l'ordinal d'une génération, pour les messages.
-export const generationOrdinal = (generation) =>
-  Number(generation) === 1 ? "1re" : `${generation}e`;
 
 // Les générations dont `userId` porte le charme.
 export function getCharms(userId, cb) {

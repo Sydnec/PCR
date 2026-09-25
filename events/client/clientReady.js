@@ -6,6 +6,7 @@ import { sweepSafari } from '../../modules/pokemon/safari.js';
 import { startWebServer } from '../../modules/web/server.js';
 import { setPseudoClient } from '../../modules/pseudo.js';
 import { repairCharms } from '../../modules/pokemon/charms.js';
+import { migrateRetiredStones } from '../../modules/pokemon/items.js';
 
 const name = 'clientReady';
 const once = true;
@@ -57,6 +58,13 @@ async function execute(bot) {
     // Les Charmes Chroma : ceux qu'un Pokédex déjà complet n'a pas encore
     // donnés, et les rôles de leurs porteurs, remis d'accord avec l'inventaire.
     repairCharms(bot);
+
+    // Les Pierres Feu, Foudre et Eau deviennent des Évolytes. Temporaire : à
+    // retirer une fois déployé. Un échec (une transaction déjà ouverte) se
+    // retente une fois, une minute plus tard.
+    migrateRetiredStones((err) => {
+        if (err) setTimeout(() => migrateRetiredStones(), 60_000);
+    });
 
     // L'API de l'interface web, si WEB_PORT est défini. Elle démarre une fois
     // le bot prêt : c'est lui qui vérifie qu'un visiteur est membre du serveur.

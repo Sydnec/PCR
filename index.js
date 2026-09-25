@@ -124,6 +124,11 @@ try {
     bot.handleEggHatchOnTimer();
   });
 
+  // L'annonce d'une génération qui vient de s'ouvrir, à la date programmée.
+  schedule("* * * * *", "ouverture des générations", () => {
+    bot.handleGenerationOpeningOnTimer();
+  });
+
   // Tirage horaire d'ouverture du parc safari, et fermeture de ce qui a expiré.
   schedule("0 * * * *", "parc safari", () => {
     bot.handleSafariParkOnTimer();

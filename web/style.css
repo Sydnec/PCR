@@ -1175,6 +1175,17 @@ input[type="number"] {
   flex: 1 1 220px;
 }
 
+.safari-gens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.safari-gens .button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
 .safari-intro {
   display: flex;
   flex-direction: column;

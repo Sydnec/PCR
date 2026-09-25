@@ -12,12 +12,13 @@ import {
   dittoSpecies,
   evolutionTargets,
   getSpecies,
+  itemOnlyTargets,
   lockedByDefault,
   rollSex,
   sexAfterEvolution,
   tradeEvolutionTarget,
 } from "./data.js";
-import { consumeItem, getItem, grantItem } from "./items.js";
+import { consumeItem, getInventory, getItem, getItems, grantItem, itemOpen } from "./items.js";
 import { recordFusion, recordTrade } from "./stats.js";
 import { checkCharms } from "./charms.js";
 
@@ -187,18 +188,30 @@ export function countBySpecies(rows) {
 //
 // Rend, par espèce, `evolutions` (les individus qui évolueront) et
 // `sacrifices` (ceux qu'elles consumeront, au tarif sans objet ni Métamorph de
-// describeEvolution). Les deux ne se valent pas : un verrouillé peut évoluer et
-// garder l'entrée du Pokédex, seul un libre se sacrifie. Une cible par échange
-// ne compte pas : en recevoir le premier stade suffit, sans rien consumer.
-// `edges` garde les tarifs d'une lignée d'un dresseur à l'autre.
+// describeEvolution — sauf pour une forme qu'un objet est seul à donner, comme
+// Steelix : son objet est compté, puisqu'il n'y a pas d'autre chemin). Les deux
+// ne se valent pas : un verrouillé peut évoluer et garder l'entrée du Pokédex,
+// seul un libre se sacrifie. Une cible par échange ne compte pas : en recevoir
+// le premier stade suffit, sans rien consumer. `edges` garde les tarifs d'une
+// lignée d'un dresseur à l'autre.
 export function evolutionReserve(owned, edges = new Map()) {
   const routes = (species) => {
     if (!edges.has(species.id)) {
+      const traded = tradeEvolutionTarget(species)?.id;
+      const itemFor = (target) => {
+        const item = getItems().find(
+          (entry) => Number(entry.evolution?.targets?.[species.id]) === target.id
+        );
+        return item?.key ?? null;
+      };
       edges.set(
         species.id,
         evolutionTargets(species)
-          .filter((target) => !target.tradeEvolution)
-          .map((target) => ({ target, plan: describeEvolution(species.id, target.id) }))
+          .filter((target) => target.id !== traded)
+          .map((target) => ({
+            target,
+            plan: describeEvolution(species.id, target.id, itemFor(target)),
+          }))
           .filter(({ plan }) => !plan.error)
       );
     }
@@ -598,28 +611,76 @@ export function restoreDuplicates(rows, cb = () => {}) {
 
 // L'aide qu'un objet apporte à une évolution, ou null. C'est le catalogue qui
 // la décrit — combien d'exemplaires de l'objet, combien de sacrifices ils
-// remplacent, et s'ils dispensent du coût en points — et cette fonction ne fait
-// que la relire et la refuser quand elle ne s'applique pas.
+// remplacent — et cette fonction ne fait que la relire et la refuser quand elle
+// ne s'applique pas.
 //
-// `from` enferme l'objet dans une lignée : une Pierre Feu ne sert que sur un
-// Évoli, et rien n'empêcherait autrement de la jeter sur un Chenipan.
+// Deux sortes d'objets ont une lignée : `targets` ({ espèce: forme }) donne une
+// forme que l'objet est seul à donner (Roche Royale, Catalyseur), `choose` les
+// espèces dont il laisse choisir la forme sans supplément (Évolyte). Rien
+// n'empêcherait sinon de jeter une Roche Royale sur un Chenipan.
 export function describeHelper(helperKey, speciesId) {
   if (!helperKey) return { helper: null };
   const item = getItem(helperKey);
   if (!item?.evolution) return { error: "Cet objet ne sert pas aux évolutions." };
 
-  const { copies = 1, quantity = 1, freePoints = false, from = null, target = null } =
+  const { copies = 1, quantity = 1, freePoints = false, targets = null, choose = null } =
     item.evolution;
-  if (from && Number(from) !== Number(speciesId)) {
-    const source = getSpecies(from);
+  const sources = targets
+    ? Object.keys(targets).map(Number)
+    : Array.isArray(choose)
+      ? choose.map(Number)
+      : null;
+  if (sources && !sources.includes(Number(speciesId))) {
+    const names = sources.map((id) => getSpecies(id)?.name).filter(Boolean);
     return {
-      error: `**${item.label}** ne s'utilise que sur ${source ? source.name : "une autre espèce"}.`,
+      error: `**${item.label}** ne s'utilise que sur ${names.join(", ") || "d'autres espèces"}.`,
     };
   }
   if (!Number.isInteger(quantity) || quantity <= 0 || !Number.isInteger(copies) || copies <= 0) {
     return { error: `**${item.label}** est mal configuré.` };
   }
-  return { helper: { item, copies, quantity, freePoints, target: target ? Number(target) : null } };
+  return {
+    helper: {
+      item,
+      copies,
+      quantity,
+      freePoints: Boolean(freePoints),
+      target: targets ? Number(targets[speciesId]) || null : null,
+      choose: Boolean(choose),
+    },
+  };
+}
+
+// Les objets qui peuvent servir à faire évoluer cette espèce, dans l'ordre du
+// catalogue : ceux de sa lignée, et ceux qui servent à toutes. Une génération
+// fermée garde les siens pour elle, et un objet dont la forme n'est pas encore
+// jouable n'est pas proposé.
+export function evolutionHelpers(speciesId) {
+  const species = getSpecies(speciesId);
+  if (!species) return [];
+  const open = new Set(evolutionTargets(species).map((target) => target.id));
+  return getItems().filter((item) => {
+    if (!item.evolution || !itemOpen(item)) return false;
+    const { helper, error } = describeHelper(item.key, speciesId);
+    return !error && (!helper.target || open.has(helper.target));
+  });
+}
+
+// Les objets d'évolution que ce dresseur a en assez grand nombre pour s'en
+// servir. Trois bonbons ou rien : deux ne remplacent pas deux tiers d'un
+// sacrifice. Le même tri pour /pk evolution et pour le site.
+export function usableHelpers(userId, cb) {
+  getInventory(userId, (err, rows) => {
+    if (err) return cb(err, []);
+    const helpers = [];
+    for (const row of rows || []) {
+      const item = getItem(row.item_key);
+      if (item?.evolution && row.count >= (item.evolution.quantity ?? 1)) {
+        helpers.push({ ...item, held: row.count });
+      }
+    }
+    cb(null, helpers);
+  });
 }
 
 // Métamorph, joker des évolutions. Ce n'est pas un objet mais un Pokémon, d'où
@@ -676,7 +737,13 @@ export function evolutionShortage(plan, owned = null) {
 // tarif « choix », plus cher que le tirage au sort.
 //
 // `helperKey` désigne un objet qui prend une partie de la facture à sa charge :
-// il remplace des sacrifices, parfois les points, et peut imposer la cible.
+// il tient lieu de sacrifices, et peut donner sa forme ou en laisser le choix.
+//
+// Les formes qu'un objet est seul à donner (itemOnlyTargets) sont hors de
+// portée sans lui : Ortide sans Pierre Soleil devient Rafflesia, Onix sans
+// Catalyseur n'évolue pas. `targets` ne garde donc que les formes ouvertes sans
+// objet — celles entre lesquelles le hasard et le choix tranchent — et
+// `needs` nomme les objets qui manquent quand il n'en reste aucune.
 export function describeEvolution(speciesId, chosenTargetId = null, helperKey = null) {
   const config = getPokemonConfig().evolution;
   const species = getSpecies(speciesId);
@@ -687,26 +754,48 @@ export function describeEvolution(speciesId, chosenTargetId = null, helperKey = 
     return { error: `${species.name} ne peut pas évoluer davantage.` };
   }
 
-  const targets = evolutionTargets(species);
-  if (!targets.length) return { error: `${species.name} n'a pas d'évolution.` };
+  const all = evolutionTargets(species);
+  if (!all.length) return { error: `${species.name} n'a pas d'évolution.` };
 
   const { helper, error } = describeHelper(helperKey, speciesId);
   if (error) return { error };
 
-  const branching = targets.length > 1;
-  // Une pierre désigne sa cible : c'est tout ce qui la distingue d'un bonbon, et
-  // ce qui en fait le seul moyen de choisir son Évoli sans payer le supplément.
-  const wanted = helper?.target ?? chosenTargetId;
-  const target = wanted
-    ? targets.find((t) => t.id === Number(wanted))
-    : branching
-    ? null
-    : targets[0];
-
-  if (wanted && !target) {
-    return { error: `${species.name} ne peut pas évoluer en cette forme.` };
+  const gated = itemOnlyTargets(species);
+  const targets = helper?.target ? all : all.filter((target) => !gated.has(target.id));
+  if (!targets.length) {
+    const needs = [...new Set([...gated.values()].flat())];
+    return {
+      error: `${species.name} n'évolue qu'avec ${needs.map((label) => `**${label}**`).join(" ou ")}.`,
+      needs,
+    };
   }
 
+  // Un objet à forme la donne : c'est lui qui trie, pas le dresseur. Encore
+  // faut-il que la forme soit jouable (une Pierre Soleil donnée avant la Gen 2).
+  if (helper?.target && !all.some((t) => t.id === helper.target)) {
+    return { error: `${species.name} ne peut pas encore évoluer avec **${helper.item.label}**.` };
+  }
+  if (helper?.target && chosenTargetId && Number(chosenTargetId) !== helper.target) {
+    return {
+      error: `**${helper.item.label}** fait évoluer ${species.name} en une seule forme.`,
+    };
+  }
+  const branching = !helper?.target && targets.length > 1;
+  const wanted = helper?.target ?? chosenTargetId;
+  const target = wanted
+    ? all.find((t) => t.id === Number(wanted) && (helper?.target || !gated.has(t.id)))
+    : branching
+      ? null
+      : targets[0];
+
+  if (wanted && !target) {
+    const needs = gated.get(Number(wanted));
+    return {
+      error: needs
+        ? `Pour cette forme, il faut ${needs.map((label) => `**${label}**`).join(" ou ")}.`
+        : `${species.name} ne peut pas évoluer en cette forme.`,
+    };
+  }
   // Sur une lignée à embranchement, le coût en points dépend de la cible :
   // un tirage aléatoire coûte le tarif normal du stade, choisir coûte plus cher.
   // Un bébé et sa forme adulte sont tous deux de stade 1 : son évolution coûte
@@ -715,12 +804,10 @@ export function describeEvolution(speciesId, chosenTargetId = null, helperKey = 
   const stageCost = config[referenceStage];
   if (!stageCost) return { error: "Aucun coût configuré pour ce stade." };
 
-  // Le supplément « choix » ne se paie que sur un choix DU JOUEUR : une pierre
-  // impose sa cible, ce n'est pas le dresseur qui trie.
+  // Le supplément « choix » ne se paie que sur un choix DU JOUEUR, sans objet
+  // qui le lui offre : l'Évolyte laisse choisir au tarif du stade.
   const basePoints =
-    branching && chosenTargetId && !helper?.target
-      ? config.branchChoicePoints
-      : stageCost.points;
+    branching && chosenTargetId && !helper?.choose ? config.branchChoicePoints : stageCost.points;
 
   // Le tarif du stade compte l'individu qui évolue parmi ses `duplicates` : il
   // ne se sacrifie pas, il change d'espèce en restant lui-même. L'aide retire

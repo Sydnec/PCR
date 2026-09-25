@@ -1801,5 +1801,46 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "feature",
+      "name": "La 2ᵉ génération ouvre le 30 octobre",
+      "description": "Vendredi 30 octobre à 18 h, 100 nouvelles espèces rejoignent le Pokédex, avec les œufs, trois nouveaux objets et un Charme Chroma de 2ᵉ génération.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-25T16:19:25.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "feature",
+      "name": "Objets d'évolution",
+      "description": "L'Évolyte remplace les Pierres Feu, Foudre et Eau (converties une pour une) et laisse choisir la forme d'Évoli sans supplément. Dès la 2ᵉ génération, la Pierre Soleil, la Roche Royale et le Catalyseur donnent certaines formes, et chaque objet tient lieu d'un sacrifice.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-25T16:19:26.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "feature",
+      "name": "Parc safari : choix des générations",
+      "description": "Dès la 2ᵉ génération, tu choisis à l'entrée du parc safari les générations que tu vises.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-25T16:19:27.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "enhancement",
+      "name": "Objets d'évolution sur le site",
+      "description": "Dans la boîte du site, un objet d'évolution se choisit d'un clic sur son image.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-25T16:19:28.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    }
+  ]
 }

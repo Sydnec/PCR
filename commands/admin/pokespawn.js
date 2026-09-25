@@ -5,6 +5,7 @@ import {
   activeGeneration,
   getAvailableSpecies,
   getSpecies,
+  itemOnlySpecies,
   searchByName,
 } from "../../modules/pokemon/data.js";
 
@@ -42,13 +43,15 @@ export default {
   async autocomplete(interaction) {
     const query = interaction.options.getFocused();
     // Un spawn forcé donne volontairement accès aux espèces hors pool naturel
-    // (légendaires, évolutions par échange) : c'est tout l'intérêt d'un événement.
+    // (légendaires, évolutions par échange ou par objet) : c'est tout l'intérêt
+    // d'un événement.
+    const itemOnly = itemOnlySpecies();
     await interaction
       .respond(
         searchByName(query, 25).map((species) => ({
           name:
             `#${String(species.id).padStart(3, "0")} ${species.name}` +
-            (species.tradeEvolution ? " (hors pool)" : "") +
+            (species.tradeEvolution || itemOnly.has(species.id) ? " (hors pool)" : "") +
             (species.isLegendary || species.isMythical ? " ⭐" : ""),
           value: String(species.id),
         }))
