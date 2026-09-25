@@ -457,7 +457,8 @@ function showEvolutionChoices(interaction, speciesId, variant, helperKey = null)
   interaction
     .update({
       content:
-        `🎯 Choisis l'évolution (**${priced.points.toLocaleString("fr-FR")}** points, ` +
+        `🎯 Choisis l'évolution (` +
+        (priced.points > 0 ? `**${priced.points.toLocaleString("fr-FR")}** points, ` : "gratuit, ") +
         `${priced.sacrifices} sacrifice${priced.sacrifices > 1 ? "s" : ""}${renfort}) :`,
       embeds: [],
       components: [row],

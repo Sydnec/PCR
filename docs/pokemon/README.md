@@ -54,7 +54,7 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
   exemplaires de l'espèce, shiny ou non (les normaux partent d'abord), jamais un verrouillé, et il
   en reste toujours un. Avec un Salamèche et un Salamèche shiny, on peut faire évoluer le shiny
   avec des bonbons ou des Métamorph : le normal garde l'entrée. Les lignées à embranchement (Évoli)
-  peuvent évoluer au hasard, ou vers une cible choisie pour plus cher — au tarif du hasard avec une
+  peuvent évoluer au hasard, ou vers une cible choisie pour plus cher — gratuitement avec une
   Évolyte. Certaines formes ne s'obtiennent qu'avec leur objet : Joliflor, Tarpaud, Roigada,
   Steelix… (voir [Objets](objets.md#objets-dévolution)). La commande ne propose que les chemins
   réellement praticables, objets d'évolution compris.

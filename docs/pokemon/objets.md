@@ -10,27 +10,27 @@ noieraient la table.
 
 | Objet | Pokémon qui le tiennent | Ce qu'il fait | Revente |
 |---|---|---|---|
-| Poké Ball | 6,4 % (1 sur 16) | un lancer offert | — |
-| Super Ball | 3,2 % (1 sur 31) | un lancer offert | — |
-| 🍬 Super Bonbon | 1,9 % (1 sur 52) | **trois** tiennent lieu d'un sacrifice dans une évolution | 300 |
-| Hyper Ball | 1,3 % (1 sur 78) | un lancer offert | — |
-| 🔮 Évolyte | 0,97 % (1 sur 104) | un Évoli qui évolue avec lui prend la forme de son choix, sans supplément ; il tient lieu d'un sacrifice | 500 |
-| ☀️ Pierre Soleil | 0,48 % (1 sur 207), dès la 2ᵉ gén. | Ortide devient Joliflor plutôt que Rafflesia ; tient lieu d'un sacrifice | 500 |
-| 👑 Roche Royale | 0,48 % (1 sur 207), dès la 2ᵉ gén. | Têtarte devient Tarpaud, Ramoloss devient Roigada ; tient lieu d'un sacrifice | 500 |
-| ⚙️ Catalyseur | 0,48 % (1 sur 207), dès la 2ᵉ gén. | le seul moyen de faire évoluer Onix, Insécateur, Hypocéan et Porygon ; tient lieu d'un sacrifice | 500 |
-| 💎 Pépite | 0,80 % (1 sur 124) | rien, sinon se revendre | 4 000 |
-| 🎟️ Ticket Safari | 0,32 % (1 sur 311) | une entrée du parc, sans passer par la caisse | — |
-| Master Ball | **0,03 % (1 sur 3 107)** | la capture garantie, offerte | — |
+| Poké Ball | 6,7 % (1 sur 15) | un lancer offert | — |
+| Super Ball | 3,4 % (1 sur 30) | un lancer offert | — |
+| 🍬 Super Bonbon | 2 % (1 sur 50) | **trois** tiennent lieu d'un sacrifice dans une évolution | 300 |
+| Hyper Ball | 1,3 % (1 sur 74) | un lancer offert | — |
+| 🔮 Évolyte | 0,34 % (1 sur 297) | un Évoli qui évolue avec lui prend la forme de son choix, sans payer de points ; il tient lieu d'un sacrifice | 500 |
+| ☀️ Pierre Soleil | 0,34 % (1 sur 297), dès la 2ᵉ gén. | Ortide devient Joliflor plutôt que Rafflesia ; tient lieu d'un sacrifice | 500 |
+| 👑 Roche Royale | 0,34 % (1 sur 297), dès la 2ᵉ gén. | Têtarte devient Tarpaud, Ramoloss devient Roigada ; tient lieu d'un sacrifice | 500 |
+| ⚙️ Catalyseur | 0,34 % (1 sur 297), dès la 2ᵉ gén. | le seul moyen de faire évoluer Onix, Insécateur, Hypocéan et Porygon ; tient lieu d'un sacrifice | 500 |
+| 💎 Pépite | 0,84 % (1 sur 119) | rien, sinon se revendre | 4 000 |
+| 🎟️ Ticket Safari | 0,34 % (1 sur 297) | une entrée du parc, sans passer par la caisse | — |
+| Master Ball | **0,03 % (1 sur 2 973)** | la capture garantie, offerte | — |
 
 `dropWeight` est un **poids**, pas un pourcentage : la part d'un objet vaut son poids divisé par la
-somme de tous (932 pour le butin). `/admin poids` fait la conversion pour les quatre tables de
+somme de tous (892 pour le butin). `/admin poids` fait la conversion pour les quatre tables de
 tirage du jeu, cadence comprise. La loterie tire dans sa propre table (`lotteryWeight`, voir
 [Loterie](loterie.md)) ; celle-ci ne décrit que le butin.
 
 **Les objets d'une génération suivante s'ajoutent sans rien retirer aux autres.** Les 15 %
 (`spawn.heldItemChance`) valent pour les objets de la 1ʳᵉ génération ; à l'ouverture de la 2ᵉ, ses
 trois objets viennent par-dessus, si bien que chaque objet du tableau garde exactement sa chance, et
-que 16,4 % des Pokémon tiennent alors quelque chose.
+que 16 % des Pokémon tiennent alors quelque chose.
 
 **Une fois sur cinq, il le lâche en partant.** Capturé ou enfui, un Pokémon qui tenait quelque chose
 a 20 % de chances de le laisser par terre plutôt que de le céder à son vainqueur. Un message public
@@ -73,13 +73,13 @@ par terre plutôt que de le faire disparaître.
 
 ## Objets d'évolution
 
-**Un objet d'évolution tient lieu d'un sacrifice**, et le prix en points reste celui du stade :
-l'objet ne dispense de rien d'autre. `/pk evolution` propose un bouton par objet utilisable qu'on a
+**Un objet d'évolution tient lieu d'un sacrifice**, et le prix en points reste celui du stade —
+sauf l'Évolyte, gratuite comme les pierres qu'elle remplace. `/pk evolution` propose un bouton par objet utilisable qu'on a
 en poche, et le site une image à cliquer dans la bande d'évolution.
 
-- **L'Évolyte laisse choisir.** Sur Évoli, choisir sa forme coûte d'ordinaire le tarif du choix
-  (`pokemon.evolution.branchChoicePoints`) ; avec une Évolyte, on la choisit au tarif du stade,
-  hasard ou pas. Elle remplace les Pierres Feu, Foudre et Eau, qui ne servaient qu'à Évoli : celles
+- **L'Évolyte laisse choisir, et ne coûte aucun point** (`freePoints`). Sur Évoli, choisir sa forme
+  coûte d'ordinaire le tarif du choix (`pokemon.evolution.branchChoicePoints`) ; avec une Évolyte,
+  on la choisit sans rien payer, hasard ou pas. Elle se revend 500 points. Elle remplace les Pierres Feu, Foudre et Eau, qui ne servaient qu'à Évoli : celles
   qu'on avait ont été converties une pour une au démarrage du bot, y compris celles qui attendaient
   par terre ou que tenait le Pokémon du salon.
 - **Certaines formes ne s'obtiennent qu'avec leur objet** (`evolution.targets` :

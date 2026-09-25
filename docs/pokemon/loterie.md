@@ -14,26 +14,26 @@ d'exceptionnel. À `lotDecay: 1` on retrouve exactement l'ancien comportement.
 | Résultat | Proba | Un jour sur |
 |---|---|---|
 | **Rien** | 25,00 % | 4 |
-| 1× Poké Ball | 19,03 % | 5 |
-| 1× Super Ball | 10,86 % | 9 |
-| 2× Poké Ball | 9,51 % | 11 |
-| 2× Super Ball | 5,43 % | 18 |
-| 3× Poké Ball | 4,76 % | 21 |
-| 🍬 1× Super Bonbon | 3,95 % | 25 |
-| 🔮 Évolyte | 3,46 % | 29 |
-| 1× Hyper Ball | 3,07 % | 33 |
-| 💎 Pépite | 2,88 % | 35 |
-| 3× Super Ball | 2,72 % | 37 |
-| 4× Poké Ball | 2,38 % | 42 |
-| 🍬 2× Super Bonbon | 1,97 % | 51 |
-| 2× Hyper Ball | 1,54 % | 65 |
-| 5× Poké Ball | 1,19 % | 84 |
-| 🎟️ Ticket Safari | 1,15 % | 87 |
-| 🍬 3× Super Bonbon | 0,99 % | 101 |
-| **Master Ball** | **0,12 %** | **868** |
+| 1× Poké Ball | 19,63 % | 5 |
+| 1× Super Ball | 11,21 % | 9 |
+| 2× Poké Ball | 9,82 % | 10 |
+| 2× Super Ball | 5,60 % | 18 |
+| 3× Poké Ball | 4,91 % | 20 |
+| 🍬 1× Super Bonbon | 4,08 % | 25 |
+| 1× Hyper Ball | 3,17 % | 32 |
+| 💎 Pépite | 2,97 % | 34 |
+| 3× Super Ball | 2,80 % | 36 |
+| 4× Poké Ball | 2,45 % | 41 |
+| 🍬 2× Super Bonbon | 2,04 % | 49 |
+| 2× Hyper Ball | 1,58 % | 63 |
+| 5× Poké Ball | 1,23 % | 82 |
+| 🔮 Évolyte | 1,19 % | 84 |
+| 🎟️ Ticket Safari | 1,19 % | 84 |
+| 🍬 3× Super Bonbon | 1,02 % | 98 |
+| **Master Ball** | **0,12 %** | **841** |
 
 **Dès la 2ᵉ génération**, la ☀️ Pierre Soleil, la 👑 Roche Royale et le ⚙️ Catalyseur s'ajoutent
-(1,73 % chacun, un jour sur 58) **en prenant leur place sur « Rien »**, qui tombe à 19,82 % : aucun
+(1,19 % chacun, un jour sur 84) **en prenant leur place sur « Rien »**, qui tombe à 21,43 % : aucun
 autre lot ne devient plus rare. `winChance` vaut en effet pour les objets de la 1ʳᵉ génération, et
 ceux d'une génération suivante s'y ajoutent.
 
@@ -48,7 +48,7 @@ qu'on voit qu'elles ont divergé.
 La fourchette d'un lot vit dans le catalogue (`lot: { min, max }`) : un objet sans `lot` se gagne à
 l'unité, ce qui évite d'écrire `1` à `1` sur les deux tiers des lignes.
 
-À ces réglages, un tirage rapporte **~340 points de valeur par jour et par dresseur** (~366 dès la
+À ces réglages, un tirage rapporte **~339 points de valeur par jour et par dresseur** (~357 dès la
 2ᵉ génération), en comptant les balls à leur prix et les objets à leur revente. C'est un rituel,
 pas un revenu.
 

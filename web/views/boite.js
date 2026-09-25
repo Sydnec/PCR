@@ -905,7 +905,7 @@ function pokemonActions(ctx, item, species, targets, { renamed, relocked, move, 
       (aide
         ? `, et ${aide.quantity}× ${aide.label} ${aide.quantity > 1 ? "partent" : "part"}`
         : "") +
-      `. Coût : ${fmt(data.points)} pts.`;
+      (data.points > 0 ? `. Coût : ${fmt(data.points)} pts.` : ". Gratuit.");
     evolveOk.disabled = false;
   }
 

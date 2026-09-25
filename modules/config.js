@@ -255,10 +255,12 @@ const POKEMON = {
       emoji: "🔮",
       sprite: "eviolite",
       description:
-        "Un Évoli qui évolue avec lui prend la forme de ton choix, sans supplément. Il tient lieu d'un sacrifice.",
+        "Un Évoli qui évolue avec lui prend la forme de ton choix, sans payer de points. Il tient lieu d'un sacrifice.",
       sellValue: 500,
-      dropWeight: 90,
-      evolution: { copies: 1, quantity: 1, choose: [133] },
+      dropWeight: 30,
+      // Gratuite, comme les pierres qu'elle remplace : elle ne dispense de
+      // points que l'évolution d'Évoli, la seule qu'elle permet.
+      evolution: { copies: 1, quantity: 1, choose: [133], freePoints: true },
     },
     pierre_soleil: {
       label: "Pierre Soleil",
