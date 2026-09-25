@@ -1,74 +1,100 @@
 {
-	"messagePointsDistribution":
-		{"1":750,"2":600,"3":500,"4":400,"5":350,"6":300,"default":300},
-	"pokemon":{
-		"enabled":true,"spawn":{
-			"messagesPerSpawn":20,
-			"minDelayMinutes":1,
-			"minDelayAfterEndMinutes":0,
-			"fleeAfterMinutes":{"min":180,"max":360},
-			"shinyOdds":500,
-			"weightsByStage":{"1":100,"2":60,"3":25},
-			"legendaryWeight":8,
-			"pingRarities":["RARE","LEGENDAIRE"],
-			"throwLogSize":8,
-			"heldItemChance":0.07,
-			"itemDropChance":0.2,
-			"embedRefreshMs":2000
+	"messagePointsDistribution": {
+		"1": 750,
+		"2": 600,
+		"3": 500,
+		"4": 400,
+		"5": 350,
+		"6": 300,
+		"default": 300
+	},
+	"pokemon": {
+		"enabled": true,
+		"generationOpenings": {
+			"2": "2026-10-30T18:00:00+01:00"
 		},
-		"capture":{
-			"globalMultiplier":1,
-			"throwCooldownSeconds":5,
-			"balls":{
-				"poke":{"label":"Poké Ball","emoji":"<:pokeball:1551325915160514690>","price":120,"multiplier":1},
-				"super":{"label":"Super Ball","emoji":"<:superball:1551325951361679411>","price":210,"multiplier":2},
-				"hyper":{"label":"Hyper Ball","emoji":"<:hyperball:1551326031431077898>","price":400,"multiplier":4},
-				"master":{"label":"Master Ball","emoji":"<:masterball:1551326387455926432>","price":22500,"multiplier":255,"guaranteed":true}
+		"spawn": {
+			"messagesPerSpawn": 20,
+			"minDelayMinutes": 1,
+			"minDelayAfterEndMinutes": 0,
+			"fleeAfterMinutes": { "min": 45, "max": 90 },
+			"shinyOdds": 500,
+			"weightsByStage": { "1": 70, "2": 60, "3": 25 },
+			"legendaryWeight": 8,
+			"heldItemChance": 0.15,
+			"itemDropChance": 0.2,
+			"pingRarities": ["RARE", "LEGENDAIRE"],
+			"throwLogSize": 8,
+			"embedRefreshMs": 2000
+		},
+		"capture": {
+			"globalMultiplier": 1,
+			"throwCooldownSeconds": 3,
+			"balls": {
+				"poke": { "emoji": "<:pokeball:1551325915160514690>", "price": 100, "multiplier": 1 },
+				"super": { "emoji": "<:superball:1551325951361679411>", "price": 200, "multiplier": 2 },
+				"hyper": { "emoji": "<:hyperball:1551326031431077898>", "price": 400, "multiplier": 4 },
+				"master": { "emoji": "<:masterball:1551326387455926432>", "price": 20000, "multiplier": 255 }
 			}
 		},
-		"evolution":{
-			"2":{"duplicates":2,"points":2000},
-			"3":{"duplicates":2,"points":5000},
-			"branchChoicePoints":5000
+		"items": {
+			"ball_poke": { "dropWeight": 400, "lotteryWeight": 640, "lot": { "min": 1, "max": 5 } },
+			"ball_super": { "dropWeight": 200, "lotteryWeight": 330, "lot": { "min": 1, "max": 3 } },
+			"ball_hyper": { "dropWeight": 80, "lot": { "min": 1, "max": 2 } },
+			"ball_master": { "dropWeight": 2 },
+			"super_bonbon": { "dropWeight": 120, "sellValue": 300, "lot": { "min": 1, "max": 3 } },
+			"evolyte": { "dropWeight": 20, "sellValue": 500 },
+			"pierre_soleil": { "dropWeight": 20, "sellValue": 500 },
+			"roche_royale": { "dropWeight": 20, "sellValue": 500 },
+			"catalyseur": { "dropWeight": 20, "sellValue": 500 },
+			"pepite": { "dropWeight": 50, "sellValue": 4000 },
+			"ticket_safari": { "dropWeight": 20 }
 		},
-		"trade":{"expiryHours":24},
-		"pokedex":{"pageSize":30},
-		"items":{
-			"ball_poke":{"ball":"poke","description":"Un lancer offert : tu la tiens déjà, elle ne te coûtera rien.","dropWeight":400,"lot":{"min":1,"max":5},"lotteryWeight":640},
-			"ball_super":{"ball":"super","description":"Un lancer offert : tu la tiens déjà, elle ne te coûtera rien.","dropWeight":200,"lot":{"min":1,"max":3},"lotteryWeight":330},
-			"super_bonbon":{"label":"Super Bonbon","emoji":"🍬","description":"Trois d'entre eux tiennent lieu d'un sacrifice dans une évolution.","sellValue":300,"dropWeight":120,"evolution":{"copies":1,"quantity":3},"lot":{"min":1,"max":2}},
-			"ball_hyper":{"ball":"hyper","description":"Un lancer offert : tu la tiens déjà, elle ne te coûtera rien.","dropWeight":80,"lot":{"min":1,"max":2}},
-			"pierre_feu":{"label":"Pierre Feu","emoji":"🔥","description":"Fait évoluer un Évoli en Pyroli : un exemplaire suffit, et c'est gratuit.","sellValue":500,"dropWeight":30,"evolution":{"copies":1,"quantity":1,"freePoints":true,"from":133,"target":136}},
-			"pierre_foudre":{"label":"Pierre Foudre","emoji":"⚡","description":"Fait évoluer un Évoli en Voltali : un exemplaire suffit, et c'est gratuit.","sellValue":500,"dropWeight":30,"evolution":{"copies":1,"quantity":1,"freePoints":true,"from":133,"target":135}},
-			"pierre_eau":{"label":"Pierre Eau","emoji":"💧","description":"Fait évoluer un Évoli en Aquali : un exemplaire suffit, et c'est gratuit.","sellValue":500,"dropWeight":30,"evolution":{"copies":1,"quantity":1,"freePoints":true,"from":133,"target":134}},
-			"pepite":{"label":"Pépite","emoji":"💎","description":"Ça brille, et ça ne sert qu'à ça : se revendre.","sellValue":2000,"dropWeight":20},
-			"ticket_safari":{"label":"Ticket Safari","emoji":"🎟️","description":"Une entrée pour le parc safari. Elle s'utilise, elle ne se monnaie pas.","dropWeight":8},
-			"ball_master":{"ball":"master","description":"La capture garantie, offerte. Autant dire qu'elle ne se trouve pas.","dropWeight":3}
+		"lottery": {
+			"enabled": true,
+			"winChance": 0.75,
+			"lotDecay": 0.5
 		},
-		"sell":{
-			"byRarity":{"COMMUN":250,"PEU_COMMUN":600,"RARE":1500},
-			"shinyMultiplier":0
+		"evolution": {
+			"2": { "duplicates": 2, "points": 1500 },
+			"3": { "duplicates": 2, "points": 3000 },
+			"branchChoicePoints": 3000
 		},
-		"lottery":{"enabled":true,"winChance":0.7,"lotDecay":0.5},
-		"safari":{
-			"enabled":true,
-			"randomChancePerHour":0.01,
-			"minHoursBetweenParks":48,
-			"parkDurationHours":24,
-			"spawnPauseHours":6,
-			"sessionMinDurationMinutes":60,
-			"actionsPerSession":25,
-			"entryPrice":5000,
-			"entryCooldownHours":24,
-			"ball":{"label":"Safari Ball","emoji":"🟢","multiplier":1.5},
-			"baitMultiplier":2,
-			"baitMaxMultiplier":4,
-			"fleeFailChance":0.1,
-			"wildFleeChance":0.05,
-			"wildFleeChancePerBait":0.03,
-			"shinyOdds":250,
-			"weightsByStage":{"1":100,"2":90,"3":60},
-			"legendaryWeight":24
+		"sell": {
+			"byRarity": { "COMMUN": 250, "PEU_COMMUN": 600, "RARE": 1500 },
+			"shinyMultiplier": 0
+		},
+		"trade": {
+			"expiryHours": 24
+		},
+		"pokedex": {
+			"pageSize": 30
+		},
+		"pc": {
+			"nicknameLength": 20
+		},
+		"safari": {
+			"enabled": true,
+			"randomChancePerHour": 0.04,
+			"minHoursBetweenParks": 24,
+			"parkDurationHours": 24,
+			"spawnPauseHours": 4,
+			"sessionMinDurationMinutes": 60,
+			"actionsPerSession": 25,
+			"entryPrice": 5000,
+			"entryCooldownHours": 12,
+			"ball": { "emoji": "<:safariball:1552972083909234811>", "multiplier": 1.5 },
+			"baitMultiplier": 2,
+			"baitMaxMultiplier": 4,
+			"fleeFailChance": 0.1,
+			"wildFleeChance": 0.05,
+			"wildFleeChancePerBait": 0.03,
+			"shinyOdds": 250,
+			"weightsByStage": { "1": 50, "2": 60, "3": 40 },
+			"legendaryWeight": 24
 		}
+	},
+	"web": {
+		"spawnRefreshSeconds": 3
 	}
 }

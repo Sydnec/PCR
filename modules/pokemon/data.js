@@ -48,13 +48,54 @@ const TYPE_COLORS = {
   "Ténèbres": 0x705848, "Fée": 0xee99ac,
 };
 
-// La dernière génération jouable. Un réglage au-delà de ce que contient le
-// fichier retombe sur la dernière génération préparée, en deçà sur la première :
-// une faute de frappe ne peut ni vider le Pokédex ni promettre des espèces
-// absentes du jeu de données.
-export function activeGeneration() {
-  const wanted = Math.floor(Number(getPokemonConfig().generation) || 1);
+// « 1re », « 2e » : l'ordinal d'une génération, pour les messages et le menu
+// du parc safari.
+export const generationOrdinal = (generation) =>
+  Number(generation) === 1 ? "1re" : `${generation}e`;
+
+// La dernière génération jouable : le réglage `generation`, ou une génération
+// dont la date d'ouverture est passée (`generationOpenings`), la plus haute des
+// deux. Un réglage au-delà de ce que contient le fichier retombe sur la
+// dernière génération préparée, en deçà sur la première : une faute de frappe
+// ne peut ni vider le Pokédex ni promettre des espèces absentes du jeu de
+// données.
+export function activeGeneration(now = Date.now()) {
+  const config = getPokemonConfig();
+  let wanted = Math.floor(Number(config.generation) || 1);
+  for (const [generation, date] of Object.entries(config.generationOpenings ?? {})) {
+    if (Date.parse(date) <= now) wanted = Math.max(wanted, Math.floor(Number(generation) || 1));
+  }
   return Math.min(dataset.maxGeneration, Math.max(1, wanted));
+}
+
+// Les générations qu'on peut viser au parc safari, et combien d'espèces chacune
+// y fait croiser : le choix que proposent l'entrée sur Discord et sur le site.
+export function safariGenerationChoices() {
+  const config = getSafariConfig();
+  const counts = new Map();
+  const itemOnly = itemOnlySpecies();
+  for (const species of allSpecies()) {
+    if (spawnWeight(species, config, itemOnly) > 0) {
+      counts.set(species.generation, (counts.get(species.generation) ?? 0) + 1);
+    }
+  }
+  return Array.from({ length: activeGeneration() }, (_, index) => ({
+    generation: index + 1,
+    ordinal: generationOrdinal(index + 1),
+    species: counts.get(index + 1) ?? 0,
+  }));
+}
+
+// Les générations qu'un visiteur du parc vise : une liste, ou le texte stocké
+// sur sa visite (« 1,2 »). Ne garde que les générations ouvertes, sans doublon,
+// dans l'ordre ; rien de valable, ou toutes : null.
+export function safariGenerations(value) {
+  const active = activeGeneration();
+  const list = (Array.isArray(value) ? value : String(value ?? "").split(","))
+    .map((entry) => Math.floor(Number(entry)))
+    .filter((generation) => generation >= 1 && generation <= active);
+  const unique = [...new Set(list)].sort((a, b) => a - b);
+  return unique.length && unique.length < active ? unique : null;
 }
 
 // `generation` se passe quand on filtre une liste : la configuration est relue
@@ -151,6 +192,12 @@ export function sexAfterEvolution(target, sex) {
   return sex ?? rollSex(target);
 }
 
+// La forme d'un individu qui change d'espèce, comme son sexe : il garde la
+// sienne si la nouvelle espèce la connaît, en prend une au hasard si elle en a,
+// et n'en a plus sinon.
+export const formAfterEvolution = (target, form) =>
+  formOf(target, form) ? form : rollForm(target);
+
 export function rarityOf(species) {
   if (isLegendary(species)) return "LEGENDAIRE";
   if (species.stage >= 3) return "RARE";
@@ -158,15 +205,46 @@ export function rarityOf(species) {
   return "COMMUN";
 }
 
-export const spriteUrl = (species, isShiny) =>
-  isShiny ? species.spriteShiny : species.sprite;
+// ====================== FORMES ======================
+
+// Les formes d'apparence d'une espèce — les lettres de Zarbi — que la
+// génération jouable connaît : [] pour une espèce qui n'en a pas. Une seule
+// entrée de Pokédex pour toutes : la forme est un trait de l'individu, comme
+// son sexe ou sa ball, et ne change rien au jeu.
+export const speciesForms = (species, generation = activeGeneration()) =>
+  (species?.forms ?? []).filter((form) => form.generation <= generation);
+
+// La forme `key` de l'espèce, ou null : une clé inconnue — lue en base ou dans
+// un bouton — ne s'affiche pas, et ne compose jamais une adresse d'image.
+export const formOf = (species, key) =>
+  (key && species?.forms?.find((form) => form.key === key)) || null;
+
+// Tirée à parts égales, là où naît l'individu (apparition, parc, œuf) ; null
+// pour une espèce sans formes.
+export function rollForm(species) {
+  const forms = speciesForms(species);
+  return forms.length ? forms[Math.floor(Math.random() * forms.length)].key : null;
+}
+
+// Le nom de fichier d'une image dans le dépôt PokéAPI : « 201 » pour la forme
+// par défaut — la première, Zarbi A —, « 201-b » pour les autres.
+const imageName = (species, key) => {
+  const form = formOf(species, key);
+  return form && form !== species.forms[0] ? `${species.id}-${form.key}` : String(species.id);
+};
+
+export const spriteUrl = (species, isShiny, form = null) =>
+  (isShiny ? species.spriteShiny : species.sprite).replace(
+    /\/\d+\.png$/,
+    `/${imageName(species, form)}.png`
+  );
 
 // La petite image (96 px) du même dépôt, pour les grilles du site : une
 // illustration officielle pèse cent fois plus, et un Pokédex en affiche 251 d'un
 // coup. Le dépôt range les deux par numéro national, d'où une adresse calculée.
 const ICON_BASE = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon";
-export const iconUrl = (species, isShiny) =>
-  `${ICON_BASE}/${isShiny ? "shiny/" : ""}${species.id}.png`;
+export const iconUrl = (species, isShiny, form = null) =>
+  `${ICON_BASE}/${isShiny ? "shiny/" : ""}${imageName(species, form)}.png`;
 
 // L'image d'un objet ou d'une ball dans le même dépôt, d'après le nom que lui
 // donne la configuration (`sprite`) ; null sans nom, et le site retombe alors
@@ -186,15 +264,29 @@ export function embedColor(species, isShiny) {
   return TYPE_COLORS[species.types[0]] ?? 0x5865f2;
 }
 
+// Les formes qu'un objet est seul à donner (Joliflor, Steelix…), toutes
+// lignées confondues. Une boucle sur tout le Pokédex le lit une fois et le
+// passe à spawnWeight, plutôt que de relire le catalogue à chaque espèce.
+export function itemOnlySpecies() {
+  const ids = new Set();
+  for (const item of Object.values(getPokemonConfig().items ?? {})) {
+    if (!item?.label) continue;
+    for (const target of Object.values(item.evolution?.targets ?? {})) ids.add(Number(target));
+  }
+  return ids;
+}
+
 // Poids d'apparition d'une espèce.
 // Les évolutions par échange ne se trouvent jamais à l'état sauvage : elles
 // s'obtiennent en fusionnant des doublons, ou en faisant changer de dresseur
 // leur pré-évolution. Les deux routes donnent de la valeur à cette
-// pré-évolution, qui reste le seul maillon qu'on croise dans la nature.
+// pré-évolution, qui reste le seul maillon qu'on croise dans la nature. Les
+// formes qu'un objet est seul à donner pas davantage : l'objet serait sinon un
+// détour.
 //
 // Les bébés non plus : comme dans les jeux, ils ne sortent que d'un œuf.
-export function spawnWeight(species, spawnConfig) {
-  if (species.tradeEvolution || species.isBaby) return 0;
+export function spawnWeight(species, spawnConfig, itemOnly = itemOnlySpecies()) {
+  if (species.tradeEvolution || species.isBaby || itemOnly.has(species.id)) return 0;
   if (isLegendary(species)) return spawnConfig.legendaryWeight;
   return spawnConfig.weightsByStage[species.stage] ?? 0;
 }
@@ -220,17 +312,22 @@ export const unobtainableMark = (species) =>
 // trouvable si le parc, lui, le tire. C'est donc calculé, jamais recopié.
 export function isEvolutionOnly(species) {
   if (isEggOnly(species)) return false;
+  const itemOnly = itemOnlySpecies();
   return (
-    spawnWeight(species, getPokemonConfig().spawn) <= 0 &&
-    spawnWeight(species, getSafariConfig()) <= 0
+    spawnWeight(species, getPokemonConfig().spawn, itemOnly) <= 0 &&
+    spawnWeight(species, getSafariConfig(), itemOnly) <= 0
   );
 }
 
-export function pickWeightedSpecies(spawnConfig) {
+// `generations` restreint le tirage (le parc safari, où l'on vise les siennes) ;
+// sans lui, toutes les générations ouvertes.
+export function pickWeightedSpecies(spawnConfig, { generations = null } = {}) {
   const pool = [];
   let total = 0;
+  const itemOnly = itemOnlySpecies();
   for (const species of allSpecies()) {
-    const weight = spawnWeight(species, spawnConfig);
+    if (generations && !generations.includes(species.generation)) continue;
+    const weight = spawnWeight(species, spawnConfig, itemOnly);
     if (weight > 0) {
       total += weight;
       pool.push({ species, cumulative: total });
@@ -323,8 +420,9 @@ export function isSafariFinished(session) {
 
 // Une rencontre du parc est privée : le charme joue directement sur ses
 // chances. `charms` : les générations dont le visiteur porte le charme.
-export function rollSafariEncounter(safariConfig, charms = []) {
-  const species = pickWeightedSpecies(safariConfig);
+// `generations` : celles que le visiteur vise, toutes sans elles.
+export function rollSafariEncounter(safariConfig, charms = [], generations = null) {
+  const species = pickWeightedSpecies(safariConfig, { generations });
   if (!species) return null;
   return {
     species,
@@ -333,6 +431,7 @@ export function rollSafariEncounter(safariConfig, charms = []) {
       charmFactor(species, charms),
     catchRate: species.catchRate,
     sex: rollSex(species),
+    form: rollForm(species),
   };
 }
 
@@ -393,16 +492,38 @@ export function evolutionTargets(species) {
   return species.evolvesInto.map(getSpecies).filter((target) => isAvailable(target, generation));
 }
 
+// Les formes qu'un objet est seul à donner, pour une espèce : Map(forme →
+// [noms des objets]). C'est le catalogue qui le dit (`evolution.targets` d'un
+// objet), lu brut dans la configuration : la Roche Royale fait de Têtarte un
+// Tarpaud, le Catalyseur d'Onix un Steelix. Sans l'objet, ces formes sont hors
+// de portée — de l'évolution ordinaire comme de l'échange.
+export function itemOnlyTargets(species) {
+  const gated = new Map();
+  if (!species) return gated;
+  for (const item of Object.values(getPokemonConfig().items ?? {})) {
+    const target = Number(item?.evolution?.targets?.[species.id]);
+    if (!target || !item.label) continue;
+    gated.set(target, [...(gated.get(target) ?? []), item.label]);
+  }
+  return gated;
+}
+
 // La cible d'une évolution par échange, s'il y en a une. Quatre Pokémon de la
 // première génération évoluent en changeant de dresseur : Kadabra, Machopeur,
-// Gravalanch et Spectrum — six de plus une fois la deuxième ouverte, parmi
-// lesquels Onix et Insécateur. Le dataset pose le marqueur sur la CIBLE, parce que
-// c'est elle qu'on exclut des apparitions — la source se déduit donc en
-// regardant ses évolutions, et jamais par une liste d'identifiants écrite à la
-// main qui divergerait à la première régénération du JSON.
+// Gravalanch et Spectrum. Le dataset marque aussi six formes de la deuxième
+// (Steelix, Cizayox, Tarpaud…), mais dans le jeu il leur faut un objet en plus :
+// ici, c'est l'objet qui les donne (itemOnlyTargets), et l'échange ne les fait
+// pas évoluer. Le dataset pose le marqueur sur la CIBLE, parce que c'est elle
+// qu'on exclut des apparitions — la source se déduit donc en regardant ses
+// évolutions, et jamais par une liste d'identifiants écrite à la main qui
+// divergerait à la première régénération du JSON.
 export function tradeEvolutionTarget(species) {
   if (!species) return null;
-  return evolutionTargets(species).find((target) => target.tradeEvolution) ?? null;
+  const gated = itemOnlyTargets(species);
+  return (
+    evolutionTargets(species).find((target) => target.tradeEvolution && !gated.has(target.id)) ??
+    null
+  );
 }
 
 // La lignée complète d'une espèce, de la forme de base aux évolutions les plus

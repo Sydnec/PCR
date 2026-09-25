@@ -13,21 +13,24 @@ import {
 import { buildBalanceEmbed, getBalance } from "../economy.js";
 import { handleException, log } from "../utils.js";
 import { pseudoOf, pseudos } from "../pseudo.js";
-import { getPokemonConfig } from "./config.js";
+import { getPokemonConfig, getSafariConfig } from "./config.js";
 import { answerThrow, ballPanelRow, throwBall, trackPanel } from "./capture.js";
 import { getSpawn } from "./spawn.js";
-import { getBallItem, getBallStock, getItemCount } from "./items.js";
+import { getBallItem, getBallStock, getItem, getItemCount } from "./items.js";
 import { claimDrop } from "./drops.js";
 
 import {
   claimShare,
   enterPark,
+  findFreeParkFor,
   playAction,
   prepareShare,
   refreshParkMessage,
   releaseShare,
+  resumeSession,
+  startPaidSession,
 } from "./safari.js";
-import { evolutionChain, getSpecies } from "./data.js";
+import { activeGeneration, getSpecies } from "./data.js";
 import {
   DITTO_HELPER,
   acceptTrade,
@@ -35,8 +38,8 @@ import {
   evolve,
   getCollection,
   getIndividuals,
-  getOwnedVariantsFor,
   getSpeciesDuplicates,
+  getSpeciesOwnership,
   getTrade,
   listDuplicates,
   resolveTradeAs,
@@ -51,12 +54,16 @@ import {
   buildDuplicatesRow,
   buildSpeciesDuplicatesEmbed,
   buildSpeciesDuplicatesRow,
+  buildPaidEntryReply,
+  buildSafariGenerationPicker,
   buildSafariRecapEmbed,
   buildSafariView,
   buildSpeciesInfoEmbed,
   buildTradeEmbed,
   buildTradeRow,
   displayName,
+  freeParkNotice,
+  safariPickerContent,
 } from "./embeds.js";
 
 const ephemeral = (interaction, content) =>
@@ -161,41 +168,35 @@ function answerSpeciesInfo(interaction, spawnId) {
     const species = getSpecies(spawn.species_id);
     if (!species) return ephemeral(interaction, "❌ Espèce inconnue.");
 
-    const chain = evolutionChain(species);
-    getOwnedVariantsFor(
-      interaction.user.id,
-      chain.map((link) => link.id),
-      (err, owned) => {
-        // Compteurs à zéro en cas d'erreur : mieux vaut la fiche sans les
-        // pastilles de possession qu'un refus sec devant une apparition.
-        if (err) handleException("Lecture de la collection pour la fiche :", err);
+    // Compteurs à zéro en cas d'erreur : mieux vaut la fiche sans les
+    // pastilles de possession qu'un refus sec devant une apparition.
+    getSpeciesOwnership(interaction.user.id, species, (err, { owned, forms }) => {
+      const fiche = buildSpeciesInfoEmbed(species, {
+        owned,
+        forms,
+        isShiny: Boolean(spawn.is_shiny),
+        catchRate: spawn.catch_rate,
+      });
 
-        const fiche = buildSpeciesInfoEmbed(species, {
-          owned,
-          isShiny: Boolean(spawn.is_shiny),
-          catchRate: spawn.catch_rate,
+      getBalance(interaction.user.id, (err, balance) => {
+        // getBalance rend 0 sur erreur, ce qui ici serait un mensonge : mieux
+        // vaut ne pas montrer un solde illisible que d'en montrer un faux. La
+        // fiche, elle, part quand même.
+        if (err) handleException("Lecture du solde pour la fiche :", err);
+        const soldeKo = Boolean(err);
+        getBallStock(interaction.user.id, (err, balls) => {
+          if (err) handleException("Lecture des balls pour la fiche :", err);
+          interaction
+            .reply({
+              embeds: soldeKo
+                ? [fiche]
+                : [fiche, buildBalanceEmbed(balance, { balls: err ? null : balls })],
+              flags: MessageFlags.Ephemeral,
+            })
+            .catch(() => {});
         });
-
-        getBalance(interaction.user.id, (err, balance) => {
-          // getBalance rend 0 sur erreur, ce qui ici serait un mensonge : mieux
-          // vaut ne pas montrer un solde illisible que d'en montrer un faux. La
-          // fiche, elle, part quand même.
-          if (err) handleException("Lecture du solde pour la fiche :", err);
-          const soldeKo = Boolean(err);
-          getBallStock(interaction.user.id, (err, balls) => {
-            if (err) handleException("Lecture des balls pour la fiche :", err);
-            interaction
-              .reply({
-                embeds: soldeKo
-                  ? [fiche]
-                  : [fiche, buildBalanceEmbed(balance, { balls: err ? null : balls })],
-                flags: MessageFlags.Ephemeral,
-              })
-              .catch(() => {});
-          });
-        });
-      }
-    );
+      });
+    });
   });
 }
 
@@ -408,13 +409,21 @@ function runEvolution(
         content:
           `✨ Félicitations ! Ton #${result.evolved.id} ` +
           `**${displayName(source, result.isShiny, result.evolved.sex)}** a évolué en ` +
-          `**${displayName(result.target, result.isShiny, result.evolved.sex)}** ! ` +
+          `**${displayName(result.target, result.isShiny, result.evolved.sex, result.evolved.form)}** ! ` +
           (paye.length ? `(${paye.join(", ")})` : ""),
         embeds: [],
         components: [],
       })
       .catch(() => {});
   });
+}
+
+// L'aide qui accompagne un choix de forme : Métamorph, qui ne fait que combler
+// des sacrifices, ou un objet qui laisse choisir (l'Évolyte). Tout autre
+// segment est ignoré : il a pu être tapé, ou venir d'un vieux bouton.
+function choiceHelper(helper) {
+  if (helper === DITTO_HELPER) return helper;
+  return helper && getItem(helper)?.evolution?.choose ? helper : null;
 }
 
 // `variant` est le segment brut du bouton : il passe tel quel aux boutons des
@@ -440,13 +449,17 @@ function showEvolutionChoices(interaction, speciesId, variant, helperKey = null)
     );
   }
 
-  const cost = describeEvolution(speciesId, plan.targets[0].id).points;
+  // Avec l'Évolyte, le choix se paie au tarif du stade et l'objet tient lieu
+  // d'un sacrifice : le prix affiché est le sien.
+  const item = helperKey && helperKey !== DITTO_HELPER ? getItem(helperKey) : null;
+  const priced = describeEvolution(speciesId, plan.targets[0].id, item ? helperKey : null);
+  const renfort = item ? `, ${item.emoji} ${item.label}` : helperKey ? ", Métamorph en renfort" : "";
   interaction
     .update({
       content:
-        `🎯 Choisis l'évolution (**${cost}** points, ` +
-        `${plan.sacrifices} sacrifice${plan.sacrifices > 1 ? "s" : ""}` +
-        `${helperKey ? ", Métamorph en renfort" : ""}) :`,
+        `🎯 Choisis l'évolution (` +
+        (priced.points > 0 ? `**${priced.points.toLocaleString("fr-FR")}** points, ` : "gratuit, ") +
+        `${priced.sacrifices} sacrifice${priced.sacrifices > 1 ? "s" : ""}${renfort}) :`,
       embeds: [],
       components: [row],
     })
@@ -525,8 +538,30 @@ function handleTradeButton(interaction, action, tradeId) {
 // personne ne peut le lui rouvrir : c'est le bouton du parc qui le refait, avec
 // la visite là où elle en était.
 
+// Le bouton du message de parc. Plusieurs générations ouvertes : une visite en
+// cours se rouvre, sinon on choisit d'abord les générations visées
+// (poke_safari_go entre ensuite).
 function handleSafariEnter(interaction, parkId) {
-  enterPark(interaction.user.id, Number(parkId), (err, result) => {
+  if (activeGeneration() > 1) {
+    return resumeSession(interaction.user.id, (err, ongoing) => {
+      if (err) {
+        handleException(err);
+        return ephemeral(interaction, "❌ Erreur base de données.");
+      }
+      interaction
+        .reply({
+          ...(ongoing
+            ? buildSafariView(ongoing.session, { owned: ongoing.owned, resumed: true })
+            : {
+                content: safariPickerContent("park"),
+                components: buildSafariGenerationPicker("park", Number(parkId)),
+              }),
+          flags: MessageFlags.Ephemeral,
+        })
+        .catch(() => {});
+    });
+  }
+  enterPark(interaction.user.id, Number(parkId), {}, (err, result) => {
     if (err) {
       handleException(err);
       return ephemeral(interaction, "❌ Erreur base de données.");
@@ -545,6 +580,51 @@ function handleSafariEnter(interaction, parkId) {
       })
       .catch(() => {});
   });
+}
+
+// Le bouton qui entre, une fois les générations choisies : l'entrée offerte
+// d'un parc, ou l'entrée payante de /pk safari. Il réécrit le message du choix.
+// Le choix se revalide (safariGenerations) : le customId a pu vieillir.
+function handleSafariGo(interaction, mode, parkId, generations) {
+  const chosen = String(generations ?? "").split(",");
+  const answer = (payload) =>
+    interaction.update({ embeds: [], components: [], ...payload }).catch(() => {});
+  const fail = (err) => {
+    handleException(err);
+    answer({ content: "❌ Erreur base de données." });
+  };
+  // L'entrée payante se revérifie au clic, comme /pk safari avant de débiter :
+  // le menu a pu rester ouvert pendant qu'un parc offert s'ouvrait ou que le
+  // safari fermait.
+  if (mode === "paid") {
+    if (!getPokemonConfig().enabled || !getSafariConfig().enabled) {
+      return answer({ content: "❌ Le parc safari est fermé pour le moment." });
+    }
+    return findFreeParkFor(interaction.user.id, (err, freePark) => {
+      if (err) return fail(err);
+      if (freePark) return answer({ content: freeParkNotice() });
+      startPaidSession(interaction.user.id, { generations: chosen }, (err, result) =>
+        err ? fail(err) : answer(buildPaidEntryReply(result))
+      );
+    });
+  }
+  enterPark(interaction.user.id, Number(parkId), { generations: chosen }, (err, result) => {
+    if (err) return fail(err);
+    if (!result.ok) return answer({ content: `❌ ${result.reason}` });
+    if (!result.resumed) refreshParkMessage(interaction.client, Number(parkId));
+    answer(buildSafariView(result.session, { owned: result.owned, resumed: result.resumed }));
+  });
+}
+
+// Les menus du jeu. Un seul pour l'instant : le choix des générations du parc,
+// qui réécrit son message avec le choix porté par le bouton d'entrée.
+export async function handlePokemonSelect(interaction) {
+  const [action, mode, parkId] = interaction.customId.split("|");
+  if (action !== "poke_safari_gens") return;
+  const chosen = interaction.values.map(Number).filter((value) => value >= 1);
+  await interaction
+    .update({ components: buildSafariGenerationPicker(mode, Number(parkId) || 0, chosen) })
+    .catch(() => {});
 }
 
 // Codes d'erreur Discord qui PROUVENT que rien n'a été publié. Une coupure
@@ -761,12 +841,7 @@ export async function handlePokemonButton(interaction) {
     case "poke_evo": {
       const [speciesId, variant, mode, helper, confirm] = args;
       if (mode === "choose") {
-        return showEvolutionChoices(
-          interaction,
-          Number(speciesId),
-          variant,
-          helper === DITTO_HELPER ? helper : null
-        );
+        return showEvolutionChoices(interaction, Number(speciesId), variant, choiceHelper(helper));
       }
       return runEvolution(
         interaction,
@@ -786,11 +861,8 @@ export async function handlePokemonButton(interaction) {
         .update({ content: "Évolution annulée : il reste tel quel.", embeds: [], components: [] })
         .catch(() => {});
 
-    // Pas d'objet ici, et ce n'est pas un oubli : choisir sa cible et utiliser
-    // un objet sont deux chemins distincts. Une pierre impose déjà sa forme —
-    // c'est précisément ce qui en fait le moyen de choisir son Évoli sans payer
-    // le supplément — et un bonbon laisse le hasard trancher. Métamorph, lui, ne
-    // fait que remplacer des sacrifices : il se combine avec le choix.
+    // Seuls Métamorph et l'Évolyte vont avec un choix de forme : un objet à
+    // forme impose la sienne, et un bonbon laisse le hasard trancher.
     case "poke_evo_pick": {
       const [speciesId, variant, targetId, helper, confirm] = args;
       return runEvolution(
@@ -798,7 +870,7 @@ export async function handlePokemonButton(interaction) {
         Number(speciesId),
         parseVariant(variant),
         Number(targetId),
-        helper === DITTO_HELPER ? helper : null,
+        choiceHelper(helper),
         {
           confirmed: confirm === "ok",
           confirmId: ["poke_evo_pick", speciesId, variant, targetId, helper ?? "", "ok"].join("|"),
@@ -808,6 +880,9 @@ export async function handlePokemonButton(interaction) {
 
     case "poke_safari_enter":
       return handleSafariEnter(interaction, args[0]);
+
+    case "poke_safari_go":
+      return handleSafariGo(interaction, args[0], args[1], args[2]);
 
     case "poke_safari_ball":
       return handleSafariAction(interaction, "BALL", args[0], args[1]);

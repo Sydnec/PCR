@@ -10,14 +10,20 @@ import { handleException } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
 import {
   dittoSpecies,
+  evolutionChain,
   evolutionTargets,
+  formAfterEvolution,
+  formOf,
   getSpecies,
+  itemOnlyTargets,
   lockedByDefault,
+  rollForm,
   rollSex,
   sexAfterEvolution,
+  speciesForms,
   tradeEvolutionTarget,
 } from "./data.js";
-import { consumeItem, getItem, grantItem } from "./items.js";
+import { consumeItem, getInventory, getItem, getItems, grantItem, itemOpen } from "./items.js";
 import { recordFusion, recordTrade } from "./stats.js";
 import { checkCharms } from "./charms.js";
 
@@ -118,6 +124,7 @@ export function resolveSelector(ownerId, value, cb) {
       speciesId: row.species_id,
       isShiny: Boolean(row.is_shiny),
       sex: row.sex,
+      form: row.form ?? null,
       fertile: null,
       pokemonId: row.id,
       row,
@@ -187,18 +194,30 @@ export function countBySpecies(rows) {
 //
 // Rend, par espèce, `evolutions` (les individus qui évolueront) et
 // `sacrifices` (ceux qu'elles consumeront, au tarif sans objet ni Métamorph de
-// describeEvolution). Les deux ne se valent pas : un verrouillé peut évoluer et
-// garder l'entrée du Pokédex, seul un libre se sacrifie. Une cible par échange
-// ne compte pas : en recevoir le premier stade suffit, sans rien consumer.
-// `edges` garde les tarifs d'une lignée d'un dresseur à l'autre.
+// describeEvolution — sauf pour une forme qu'un objet est seul à donner, comme
+// Steelix : son objet est compté, puisqu'il n'y a pas d'autre chemin). Les deux
+// ne se valent pas : un verrouillé peut évoluer et garder l'entrée du Pokédex,
+// seul un libre se sacrifie. Une cible par échange ne compte pas : en recevoir
+// le premier stade suffit, sans rien consumer. `edges` garde les tarifs d'une
+// lignée d'un dresseur à l'autre.
 export function evolutionReserve(owned, edges = new Map()) {
   const routes = (species) => {
     if (!edges.has(species.id)) {
+      const traded = tradeEvolutionTarget(species)?.id;
+      const itemFor = (target) => {
+        const item = getItems().find(
+          (entry) => Number(entry.evolution?.targets?.[species.id]) === target.id
+        );
+        return item?.key ?? null;
+      };
       edges.set(
         species.id,
         evolutionTargets(species)
-          .filter((target) => !target.tradeEvolution)
-          .map((target) => ({ target, plan: describeEvolution(species.id, target.id) }))
+          .filter((target) => target.id !== traded)
+          .map((target) => ({
+            target,
+            plan: describeEvolution(species.id, target.id, itemFor(target)),
+          }))
           .filter(({ plan }) => !plan.error)
       );
     }
@@ -413,6 +432,38 @@ export function getOwnedVariantsFor(userId, speciesIds, cb) {
   );
 }
 
+// Les formes qu'un dresseur possède d'une espèce — les lettres de ses Zarbi —,
+// shiny ou non.
+export function getOwnedForms(userId, speciesId, cb) {
+  db.all(
+    `SELECT DISTINCT form FROM pokemon_owned
+      WHERE user_id = ? AND species_id = ? AND form IS NOT NULL`,
+    [userId, Number(speciesId)],
+    (err, rows) => cb(err, new Set((rows || []).map((row) => row.form)))
+  );
+}
+
+// Ce que la fiche d'une espèce montre de la collection d'un dresseur : ses
+// exemplaires de chaque maillon de la lignée (compteurs à zéro sur une lecture
+// ratée, comme getOwnedVariantsFor), et les formes qu'il en a quand l'espèce en
+// a. `forms` vaut null sans formes ou sur une lecture ratée : la fiche l'omet
+// plutôt que d'annoncer zéro.
+export function getSpeciesOwnership(userId, species, cb) {
+  const chain = evolutionChain(species);
+  getOwnedVariantsFor(
+    userId,
+    chain.map((link) => link.id),
+    (err, owned) => {
+      if (err) handleException("Lecture de la collection pour une fiche :", err);
+      if (!speciesForms(species).length) return cb(null, { owned, forms: null });
+      getOwnedForms(userId, species.id, (err, forms) => {
+        if (err) handleException("Lecture des formes pour une fiche :", err);
+        cb(null, { owned, forms: err ? null : forms });
+      });
+    }
+  );
+}
+
 export function getLeaderboard(limit, cb) {
   db.all(
     `SELECT user_id,
@@ -431,16 +482,19 @@ export function getLeaderboard(limit, cb) {
 // ====================== ÉCRITURES ======================
 
 // Chemin unique de crédit de la collection : capture sauvage, parc safari et
-// éclosion passent tous par ici. Le sexe se tire selon l'espèce sauf s'il est
-// imposé ; la ball est celle de la capture, NULL quand il n'y en a pas eu.
-// Rend l'individu créé { id, sex }.
+// éclosion passent tous par ici. Le sexe et la forme se tirent selon l'espèce
+// sauf s'ils sont imposés — ceux de l'apparition ou de la rencontre, que
+// l'annonce a montrés ; la ball est celle de la capture, NULL quand il n'y en a
+// pas eu. Rend l'individu créé { id, sex, form }.
 export function creditSpecies(userId, speciesId, isShiny, options, cb) {
-  const { ball = null, origin, sex = null, obtainedAt = Date.now() } = options;
-  const chosenSex = sex ?? rollSex(getSpecies(speciesId));
+  const { ball = null, origin, sex = null, form = null, obtainedAt = Date.now() } = options;
+  const species = getSpecies(speciesId);
+  const chosenSex = sex ?? rollSex(species);
+  const chosenForm = formOf(species, form) ? form : rollForm(species);
   db.run(
     `INSERT INTO pokemon_owned
-       (user_id, species_id, is_shiny, sex, ball, origin, sterile, obtained_at, locked)
-     VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+       (user_id, species_id, is_shiny, sex, ball, origin, sterile, obtained_at, locked, form)
+     VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
     [
       userId,
       speciesId,
@@ -450,13 +504,14 @@ export function creditSpecies(userId, speciesId, isShiny, options, cb) {
       origin,
       obtainedAt,
       lockedByDefault(speciesId, isShiny) ? 1 : 0,
+      chosenForm,
     ],
     function (err) {
       if (err) return cb(err, null);
       // Une espèce de plus peut compléter un Pokédex : le Charme Chroma suit,
       // sans retarder celui qui vient d'obtenir son Pokémon.
       checkCharms(userId);
-      cb(null, { id: this.lastID, sex: chosenSex });
+      cb(null, { id: this.lastID, sex: chosenSex, form: chosenForm });
     }
   );
 }
@@ -551,7 +606,7 @@ export function reserveDuplicates(userId, group, quantity, cb) {
 }
 
 // Rend des individus réservés, à l'identique — même identifiant, même sexe,
-// même ball —, quand la suite de l'opération a échoué. Accepte aussi des lignes
+// même ball, même forme —, quand la suite de l'opération a échoué. Accepte aussi des lignes
 // modifiées : c'est ainsi qu'un individu change d'espèce en évoluant, ou de
 // dresseur en étant échangé, sans cesser d'être lui-même.
 export function restoreDuplicates(rows, cb = () => {}) {
@@ -572,8 +627,8 @@ export function restoreDuplicates(rows, cb = () => {}) {
     db.run(
       `INSERT INTO pokemon_owned
          (id, user_id, species_id, is_shiny, sex, ball, origin, sterile, obtained_at, pc_pos,
-          nickname, locked)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          nickname, locked, form)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         row.id,
         row.user_id,
@@ -587,6 +642,7 @@ export function restoreDuplicates(rows, cb = () => {}) {
         row.pc_pos ?? null,
         row.nickname ?? null,
         row.locked ? 1 : 0,
+        row.form ?? null,
       ],
       next
     );
@@ -598,28 +654,76 @@ export function restoreDuplicates(rows, cb = () => {}) {
 
 // L'aide qu'un objet apporte à une évolution, ou null. C'est le catalogue qui
 // la décrit — combien d'exemplaires de l'objet, combien de sacrifices ils
-// remplacent, et s'ils dispensent du coût en points — et cette fonction ne fait
-// que la relire et la refuser quand elle ne s'applique pas.
+// remplacent — et cette fonction ne fait que la relire et la refuser quand elle
+// ne s'applique pas.
 //
-// `from` enferme l'objet dans une lignée : une Pierre Feu ne sert que sur un
-// Évoli, et rien n'empêcherait autrement de la jeter sur un Chenipan.
+// Deux sortes d'objets ont une lignée : `targets` ({ espèce: forme }) donne une
+// forme que l'objet est seul à donner (Roche Royale, Catalyseur), `choose` les
+// espèces dont il laisse choisir la forme sans supplément (Évolyte). Rien
+// n'empêcherait sinon de jeter une Roche Royale sur un Chenipan.
 export function describeHelper(helperKey, speciesId) {
   if (!helperKey) return { helper: null };
   const item = getItem(helperKey);
   if (!item?.evolution) return { error: "Cet objet ne sert pas aux évolutions." };
 
-  const { copies = 1, quantity = 1, freePoints = false, from = null, target = null } =
+  const { copies = 1, quantity = 1, freePoints = false, targets = null, choose = null } =
     item.evolution;
-  if (from && Number(from) !== Number(speciesId)) {
-    const source = getSpecies(from);
+  const sources = targets
+    ? Object.keys(targets).map(Number)
+    : Array.isArray(choose)
+      ? choose.map(Number)
+      : null;
+  if (sources && !sources.includes(Number(speciesId))) {
+    const names = sources.map((id) => getSpecies(id)?.name).filter(Boolean);
     return {
-      error: `**${item.label}** ne s'utilise que sur ${source ? source.name : "une autre espèce"}.`,
+      error: `**${item.label}** ne s'utilise que sur ${names.join(", ") || "d'autres espèces"}.`,
     };
   }
   if (!Number.isInteger(quantity) || quantity <= 0 || !Number.isInteger(copies) || copies <= 0) {
     return { error: `**${item.label}** est mal configuré.` };
   }
-  return { helper: { item, copies, quantity, freePoints, target: target ? Number(target) : null } };
+  return {
+    helper: {
+      item,
+      copies,
+      quantity,
+      freePoints: Boolean(freePoints),
+      target: targets ? Number(targets[speciesId]) || null : null,
+      choose: Boolean(choose),
+    },
+  };
+}
+
+// Les objets qui peuvent servir à faire évoluer cette espèce, dans l'ordre du
+// catalogue : ceux de sa lignée, et ceux qui servent à toutes. Une génération
+// fermée garde les siens pour elle, et un objet dont la forme n'est pas encore
+// jouable n'est pas proposé.
+export function evolutionHelpers(speciesId) {
+  const species = getSpecies(speciesId);
+  if (!species) return [];
+  const open = new Set(evolutionTargets(species).map((target) => target.id));
+  return getItems().filter((item) => {
+    if (!item.evolution || !itemOpen(item)) return false;
+    const { helper, error } = describeHelper(item.key, speciesId);
+    return !error && (!helper.target || open.has(helper.target));
+  });
+}
+
+// Les objets d'évolution que ce dresseur a en assez grand nombre pour s'en
+// servir. Trois bonbons ou rien : deux ne remplacent pas deux tiers d'un
+// sacrifice. Le même tri pour /pk evolution et pour le site.
+export function usableHelpers(userId, cb) {
+  getInventory(userId, (err, rows) => {
+    if (err) return cb(err, []);
+    const helpers = [];
+    for (const row of rows || []) {
+      const item = getItem(row.item_key);
+      if (item?.evolution && row.count >= (item.evolution.quantity ?? 1)) {
+        helpers.push({ ...item, held: row.count });
+      }
+    }
+    cb(null, helpers);
+  });
 }
 
 // Métamorph, joker des évolutions. Ce n'est pas un objet mais un Pokémon, d'où
@@ -676,7 +780,13 @@ export function evolutionShortage(plan, owned = null) {
 // tarif « choix », plus cher que le tirage au sort.
 //
 // `helperKey` désigne un objet qui prend une partie de la facture à sa charge :
-// il remplace des sacrifices, parfois les points, et peut imposer la cible.
+// il tient lieu de sacrifices, et peut donner sa forme ou en laisser le choix.
+//
+// Les formes qu'un objet est seul à donner (itemOnlyTargets) sont hors de
+// portée sans lui : Ortide sans Pierre Soleil devient Rafflesia, Onix sans
+// Catalyseur n'évolue pas. `targets` ne garde donc que les formes ouvertes sans
+// objet — celles entre lesquelles le hasard et le choix tranchent — et
+// `needs` nomme les objets qui manquent quand il n'en reste aucune.
 export function describeEvolution(speciesId, chosenTargetId = null, helperKey = null) {
   const config = getPokemonConfig().evolution;
   const species = getSpecies(speciesId);
@@ -687,26 +797,48 @@ export function describeEvolution(speciesId, chosenTargetId = null, helperKey = 
     return { error: `${species.name} ne peut pas évoluer davantage.` };
   }
 
-  const targets = evolutionTargets(species);
-  if (!targets.length) return { error: `${species.name} n'a pas d'évolution.` };
+  const all = evolutionTargets(species);
+  if (!all.length) return { error: `${species.name} n'a pas d'évolution.` };
 
   const { helper, error } = describeHelper(helperKey, speciesId);
   if (error) return { error };
 
-  const branching = targets.length > 1;
-  // Une pierre désigne sa cible : c'est tout ce qui la distingue d'un bonbon, et
-  // ce qui en fait le seul moyen de choisir son Évoli sans payer le supplément.
-  const wanted = helper?.target ?? chosenTargetId;
-  const target = wanted
-    ? targets.find((t) => t.id === Number(wanted))
-    : branching
-    ? null
-    : targets[0];
-
-  if (wanted && !target) {
-    return { error: `${species.name} ne peut pas évoluer en cette forme.` };
+  const gated = itemOnlyTargets(species);
+  const targets = helper?.target ? all : all.filter((target) => !gated.has(target.id));
+  if (!targets.length) {
+    const needs = [...new Set([...gated.values()].flat())];
+    return {
+      error: `${species.name} n'évolue qu'avec ${needs.map((label) => `**${label}**`).join(" ou ")}.`,
+      needs,
+    };
   }
 
+  // Un objet à forme la donne : c'est lui qui trie, pas le dresseur. Encore
+  // faut-il que la forme soit jouable (une Pierre Soleil donnée avant la Gen 2).
+  if (helper?.target && !all.some((t) => t.id === helper.target)) {
+    return { error: `${species.name} ne peut pas encore évoluer avec **${helper.item.label}**.` };
+  }
+  if (helper?.target && chosenTargetId && Number(chosenTargetId) !== helper.target) {
+    return {
+      error: `**${helper.item.label}** fait évoluer ${species.name} en une seule forme.`,
+    };
+  }
+  const branching = !helper?.target && targets.length > 1;
+  const wanted = helper?.target ?? chosenTargetId;
+  const target = wanted
+    ? all.find((t) => t.id === Number(wanted) && (helper?.target || !gated.has(t.id)))
+    : branching
+      ? null
+      : targets[0];
+
+  if (wanted && !target) {
+    const needs = gated.get(Number(wanted));
+    return {
+      error: needs
+        ? `Pour cette forme, il faut ${needs.map((label) => `**${label}**`).join(" ou ")}.`
+        : `${species.name} ne peut pas évoluer en cette forme.`,
+    };
+  }
   // Sur une lignée à embranchement, le coût en points dépend de la cible :
   // un tirage aléatoire coûte le tarif normal du stade, choisir coûte plus cher.
   // Un bébé et sa forme adulte sont tous deux de stade 1 : son évolution coûte
@@ -715,12 +847,10 @@ export function describeEvolution(speciesId, chosenTargetId = null, helperKey = 
   const stageCost = config[referenceStage];
   if (!stageCost) return { error: "Aucun coût configuré pour ce stade." };
 
-  // Le supplément « choix » ne se paie que sur un choix DU JOUEUR : une pierre
-  // impose sa cible, ce n'est pas le dresseur qui trie.
+  // Le supplément « choix » ne se paie que sur un choix DU JOUEUR, sans objet
+  // qui le lui offre : l'Évolyte laisse choisir au tarif du stade.
   const basePoints =
-    branching && chosenTargetId && !helper?.target
-      ? config.branchChoicePoints
-      : stageCost.points;
+    branching && chosenTargetId && !helper?.choose ? config.branchChoicePoints : stageCost.points;
 
   // Le tarif du stade compte l'individu qui évolue parmi ses `duplicates` : il
   // ne se sacrifie pas, il change d'espèce en restant lui-même. L'aide retire
@@ -801,6 +931,7 @@ export function evolve(userId, group, chosenTargetId, helperKey, cb) {
         ...evolver,
         species_id: target.id,
         sex: sexAfterEvolution(target, evolver.sex),
+        form: formAfterEvolution(target, evolver.form),
       };
       restoreDuplicates([evolved], (err) => {
         if (err) return rendreTout(() => cb(err));
@@ -817,7 +948,7 @@ export function evolve(userId, group, chosenTargetId, helperKey, cb) {
               target,
               plan,
               spent,
-              evolved: { id: evolved.id, sex: evolved.sex },
+              evolved: { id: evolved.id, sex: evolved.sex, form: evolved.form ?? null },
               isShiny: Boolean(evolver.is_shiny),
             });
           }
@@ -1068,8 +1199,9 @@ export function createTrade(trade, cb) {
     `INSERT INTO pokemon_trades
        (from_user_id, to_user_id, offer_species_id, offer_is_shiny, offer_sex, offer_fertile,
         request_species_id, request_is_shiny, request_sex, request_fertile,
-        offer_pokemon_id, request_pokemon_id, created_at, expires_at, channel_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        offer_pokemon_id, request_pokemon_id, created_at, expires_at, channel_id,
+        offer_form, request_form)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       trade.fromUserId,
       trade.toUserId,
@@ -1086,6 +1218,8 @@ export function createTrade(trade, cb) {
       now,
       expiresAt,
       trade.channelId,
+      trade.offerForm ?? null,
+      trade.requestForm ?? null,
     ],
     function (err) {
       cb(err, this ? this.lastID : null);
@@ -1200,6 +1334,7 @@ export function acceptTrade(tradeId, cb) {
                 user_id: userId,
                 species_id: species.id,
                 sex: sexAfterEvolution(species, row.sex),
+                form: formAfterEvolution(species, row.form),
                 origin: "echange",
                 obtained_at: now,
                 // Il arrive comme une capture : verrouillé d'office s'il est

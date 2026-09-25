@@ -10,8 +10,15 @@
 // sur les mêmes données. Une table qui diverge de la réalité qu'elle décrit
 // serait pire que pas de table du tout : elle ferait régler le jeu à côté.
 import { getPokemonConfig, getSafariConfig } from "./config.js";
-import { allSpecies, isLegendary, spawnWeight } from "./data.js";
-import { getItems, itemDropWeight, itemLot, itemLotteryWeight } from "./items.js";
+import { allSpecies, isLegendary, itemOnlySpecies, spawnWeight } from "./data.js";
+import {
+  getItems,
+  heldItemChance,
+  itemDropWeight,
+  itemLot,
+  itemLotteryWeight,
+  lotteryWinChance,
+} from "./items.js";
 
 // Une ligne de table : un groupe de tirages qui partagent le même poids.
 // `count` vaut 1 pour un objet, et le nombre d'espèces pour un groupe de
@@ -49,21 +56,23 @@ function table({ key, name, note, subject, gate = null, lots = false, rows }) {
 }
 
 // Les espèces, groupées comme spawnWeight les traite : les exclues d'abord —
-// évolutions par échange et bébés, chacune dans sa ligne puisqu'on ne les
+// évolutions par échange ou par objet, et bébés, chacune dans sa ligne puisqu'on ne les
 // obtient pas de la même façon —, puis les légendaires, le reste par stade. Un
 // bébé rangé avec son stade prendrait le poids du groupe et gonflerait le
 // total d'espèces qui ne sortent jamais.
 function speciesRows(poolConfig) {
   const groups = new Map();
+  const itemOnly = itemOnlySpecies();
   for (const species of allSpecies()) {
-    const weight = spawnWeight(species, poolConfig);
-    const key = species.tradeEvolution
-      ? "Hors pool (échange)"
-      : species.isBaby
-        ? "Hors pool (œuf)"
-        : isLegendary(species)
-          ? "Légendaires"
-          : `Stade ${species.stage}`;
+    const weight = spawnWeight(species, poolConfig, itemOnly);
+    const key =
+      species.tradeEvolution || itemOnly.has(species.id)
+        ? "Hors pool (échange, objet)"
+        : species.isBaby
+          ? "Hors pool (œuf)"
+          : isLegendary(species)
+            ? "Légendaires"
+            : `Stade ${species.stage}`;
     const group = groups.get(key) ?? { label: key, count: 0, weight };
     group.count += 1;
     // Un groupe dont les membres n'auraient pas le même poids serait un bug de
@@ -77,14 +86,16 @@ function speciesRows(poolConfig) {
     "Stade 2",
     "Stade 3",
     "Légendaires",
-    "Hors pool (échange)",
+    "Hors pool (échange, objet)",
     "Hors pool (œuf)",
   ];
-  return [...groups.values()]
-    .sort((a, b) => ordre.indexOf(a.label) - ordre.indexOf(b.label))
-    // Les groupes se comptent au fil des espèces, mais c'est `row` qui fabrique
-    // une ligne : une seule définition de ce qu'est un total.
-    .map((group) => row(group.label, group.count, group.weight));
+  return (
+    [...groups.values()]
+      .sort((a, b) => ordre.indexOf(a.label) - ordre.indexOf(b.label))
+      // Les groupes se comptent au fil des espèces, mais c'est `row` qui fabrique
+      // une ligne : une seule définition de ce qu'est un total.
+      .map((group) => row(group.label, group.count, group.weight))
+  );
 }
 
 export function describeSpawnPool() {
@@ -110,7 +121,7 @@ export function describeSafariPool() {
 }
 
 export function describeDropPool() {
-  const chance = Number(getPokemonConfig().spawn?.heldItemChance) || 0;
+  const chance = heldItemChance();
   return table({
     key: "butin",
     name: "Butin des Pokémon",
@@ -128,11 +139,14 @@ export function describeDropPool() {
 // côte : c'est là, et nulle part ailleurs, qu'on voit qu'ils ont divergé.
 export function describeLotteryPool() {
   const lottery = getPokemonConfig().lottery ?? {};
-  const chance = Number(lottery.winChance) || 0;
+  const chance = lotteryWinChance();
   const raw = Number(lottery.lotDecay);
   // Annoncé en « N fois moins probable » : 0,5 se lit mal, « deux fois moins » se
   // lit tout seul.
-  const decay = (Number.isFinite(raw) && raw > 0 ? 1 / raw : 1).toFixed(1).replace(".0", "").replace(".", ",");
+  const decay = (Number.isFinite(raw) && raw > 0 ? 1 / raw : 1)
+    .toFixed(1)
+    .replace(".0", "")
+    .replace(".", ",");
   return table({
     key: "loterie",
     name: "Loterie quotidienne",
@@ -142,16 +156,14 @@ export function describeLotteryPool() {
     lots: true,
     rows: getItems().map((item) => {
       const { min, max } = itemLot(item);
-      return { ...row(item.label, 1, itemLotteryWeight(item)), lot: min === max ? `${min}` : `${min}-${max}` };
+      return {
+        ...row(item.label, 1, itemLotteryWeight(item)),
+        lot: min === max ? `${min}` : `${min}-${max}`,
+      };
     }),
   });
 }
 
 export function describeWeightTables() {
-  return [
-    describeSpawnPool(),
-    describeSafariPool(),
-    describeDropPool(),
-    describeLotteryPool(),
-  ];
+  return [describeSpawnPool(), describeSafariPool(), describeDropPool(), describeLotteryPool()];
 }

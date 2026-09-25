@@ -1801,5 +1801,86 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "feature",
+      "name": "La 2ᵉ génération ouvre le 30 octobre",
+      "description": "Vendredi 30 octobre à 18 h, 100 nouvelles espèces rejoignent le Pokédex, avec les œufs, trois nouveaux objets et un Charme Chroma de 2ᵉ génération.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-25T16:19:25.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "feature",
+      "name": "Objets d'évolution",
+      "description": "L'Évolyte remplace les Pierres Feu, Foudre et Eau (converties une pour une) : elle laisse choisir la forme d'Évoli sans payer de points. Dès la 2ᵉ génération, la Pierre Soleil, la Roche Royale et le Catalyseur donnent certaines formes, et chaque objet tient lieu d'un sacrifice.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-25T16:19:26.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "feature",
+      "name": "Parc safari : choix des générations",
+      "description": "Dès la 2ᵉ génération, tu choisis à l'entrée du parc safari les générations que tu vises.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-25T16:19:27.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "enhancement",
+      "name": "Objets d'évolution sur le site",
+      "description": "Dans la boîte du site, un objet d'évolution se choisit d'un clic sur son image.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-25T16:19:28.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "feature",
+      "name": "Zarbi et ses lettres",
+      "description": "Dès la 2ᵉ génération, chaque Zarbi porte l'une des 26 lettres, avec son image. La fiche de l'espèce compte celles que tu possèdes.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-25T17:27:15.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "enhancement",
+      "name": "Les objets de la 2ᵉ génération s'ajoutent",
+      "description": "À l'ouverture de la 2ᵉ génération, ses trois objets viennent en plus sans rendre les autres plus rares : à la loterie, ils prennent la place de « Rien ».",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-25T17:27:16.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "fix",
+      "name": "/admin poids s'affiche de nouveau",
+      "description": "La commande ne plante plus quand ses tableaux dépassent la limite de Discord : ils se poursuivent dans un champ suivant.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-25T17:27:17.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "chore",
+      "name": "Réglages du jeu versionnés",
+      "description": "Les réglages ajustés depuis Discord (prix des balls et des évolutions, objets tenus, parc safari…) font désormais partie de la configuration du bot.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-25T17:27:18.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    }
+  ]
 }

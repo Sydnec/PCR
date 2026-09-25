@@ -15,9 +15,17 @@ import {
   resolveIndividual,
   resolveSpecies,
   sacrificeFill,
+  usableHelpers,
 } from "../../modules/pokemon/collection.js";
-import { dittoSpecies, embedColor, getSpecies, spriteUrl } from "../../modules/pokemon/data.js";
-import { getInventory, getItem, getItems } from "../../modules/pokemon/items.js";
+import {
+  dittoSpecies,
+  embedColor,
+  evolutionTargets,
+  getSpecies,
+  itemOnlyTargets,
+  spriteUrl,
+} from "../../modules/pokemon/data.js";
+import { getItems, itemOpen } from "../../modules/pokemon/items.js";
 import {
   HINT_VALUE,
   displayName,
@@ -28,23 +36,6 @@ import {
 const pts = (value) => value.toLocaleString("fr-FR");
 // Une espèce absente, avec les mêmes champs que countBySpecies.
 const NO_ENTRY = { total: 0, normal: 0, shiny: 0, free: 0, freeNormal: 0 };
-
-// Les objets d'évolution que ce dresseur a en assez grand nombre pour s'en
-// servir. Trois bonbons ou rien : deux ne remplacent pas deux tiers d'un
-// sacrifice.
-function usableHelpers(userId, cb) {
-  getInventory(userId, (err, rows) => {
-    if (err) return cb(err, []);
-    const helpers = [];
-    for (const row of rows || []) {
-      const item = getItem(row.item_key);
-      if (item?.evolution && row.count >= (item.evolution.quantity ?? 1)) {
-        helpers.push({ ...item, held: row.count });
-      }
-    }
-    cb(null, helpers);
-  });
-}
 
 // Ce qu'une espèce permet de payer. `stock.total` compte ses individus, shiny
 // compris et celui qui évolue compris : une entrée de Pokédex est une espèce,
@@ -80,9 +71,16 @@ function evolutionPaths(speciesId, stock, helpers) {
   for (const helper of helpers) {
     const plan = describeEvolution(speciesId, null, helper.key);
     // Une aide qui ne change rien à ce qui manque n'a pas à encombrer l'écran :
-    // on ne la propose que si elle rend l'évolution possible, ou moins chère.
+    // on ne la propose que si elle rend l'évolution possible ou moins chère, ou
+    // si elle donne une forme — ou un choix — qu'on n'aurait pas sans elle.
     if (!canPay(plan, stock)) continue;
-    if (!paths.length || plan.points < base.points || plan.required < base.required) {
+    if (
+      !paths.length ||
+      plan.points < base.points ||
+      plan.required < base.required ||
+      plan.helper?.target ||
+      plan.helper?.choose
+    ) {
       paths.push({ plan, helper });
     }
   }
@@ -150,8 +148,12 @@ function listEvolvable(userId, cb) {
           evolvable.push({ speciesId, count: stock.total, shiny: stock.shiny });
           continue;
         }
-        const plan = describeEvolution(speciesId);
-        if (!plan.error) incomplete.push({ speciesId, count: stock.total, plan });
+        // L'objet exigé en poche, ce sont les exemplaires qui manquent : le
+        // plan avec lui donne le bon chiffre.
+        let plan = describeEvolution(speciesId);
+        const held = plan.needs && helpers.find((helper) => helper.evolution.targets?.[speciesId]);
+        if (held) plan = describeEvolution(speciesId, null, held.key);
+        if (!plan.error || plan.needs) incomplete.push({ speciesId, count: stock.total, plan });
       }
       // Les plus proches du seuil d'abord : ce sont les plus utiles à afficher.
       incomplete.sort((a, b) => b.count - a.count);
@@ -164,7 +166,10 @@ function listEvolvable(userId, cb) {
 // catalogue les décrit : le refus dit ce qui comblerait le manque.
 function helpersHint() {
   return getItems()
-    .filter((item) => item.evolution && !item.evolution.from)
+    .filter(
+      (item) =>
+        item.evolution && !item.evolution.targets && !item.evolution.choose && itemOpen(item)
+    )
     .map((item) => {
       const { quantity = 1, copies = 1 } = item.evolution;
       return (
@@ -173,6 +178,22 @@ function helpersHint() {
       );
     })
     .join("\n");
+}
+
+// Les formes qu'un objet est seul à donner, dites sous la description : Ortide
+// devient Rafflesia, et Joliflor avec une Pierre Soleil.
+function itemFormsLine(species) {
+  const gated = itemOnlyTargets(species);
+  const lines = evolutionTargets(species)
+    .filter((target) => gated.has(target.id))
+    .map(
+      (target) =>
+        `Avec ${gated
+          .get(target.id)
+          .map((label) => `**${label}**`)
+          .join(" ou ")} : **${target.name}**.`
+    );
+  return lines.length ? `\n${lines.join("\n")}` : "";
 }
 
 export default {
@@ -203,7 +224,8 @@ export default {
     // options sont lisibles pendant l'autocomplétion.
     if (focused.name === "individu") {
       const species = getSpecies(Number(interaction.options.get("espece")?.value));
-      if (!species) return hint(interaction, "⚠️ Choisis d'abord l'espèce dans l'option « espece »");
+      if (!species)
+        return hint(interaction, "⚠️ Choisis d'abord l'espèce dans l'option « espece »");
       return getIndividuals(interaction.user.id, (err, rows) => {
         if (err) {
           handleException("Autocomplétion d'évolution :", err);
@@ -215,7 +237,10 @@ export default {
           (row) => !row.last
         );
         if (!choices.length) {
-          return hint(interaction, `Aucun ${species.name} ne peut évoluer : il en reste toujours un`);
+          return hint(
+            interaction,
+            `Aucun ${species.name} ne peut évoluer : il en reste toujours un`
+          );
         }
         interaction.respond(choices).catch(() => {});
       });
@@ -240,9 +265,10 @@ export default {
       // Rien à proposer : on dit ce qui manque, espèce par espèce.
       const hints = incomplete
         .map((entry) => ({
-          name:
-            `⚠️ ${entry.plan.species.name} : ${entry.plan.required} exemplaires requis, ` +
-            `tu en as ${entry.count}`,
+          name: entry.plan.needs
+            ? `⚠️ ${getSpecies(entry.speciesId).name} : il faut ${entry.plan.needs.join(" ou ")}`
+            : `⚠️ ${entry.plan.species.name} : ${entry.plan.required} exemplaires requis, ` +
+              `tu en as ${entry.count}`,
           value: HINT_VALUE,
         }))
         .filter((choice) => choice.name.toLowerCase().includes(query))
@@ -271,11 +297,16 @@ export default {
           ? bySpecies
           : { speciesId: bySpecies.species.id, pokemonId: null };
       if (selector.error) {
-        return interaction.reply({ content: `❌ ${selector.error}`, flags: MessageFlags.Ephemeral });
+        return interaction.reply({
+          content: `❌ ${selector.error}`,
+          flags: MessageFlags.Ephemeral,
+        });
       }
       const { speciesId, pokemonId } = selector;
+      // Une espèce qui n'évolue qu'avec un objet (Onix et le Catalyseur) passe :
+      // l'écran proposera l'objet, ou dira qu'il manque.
       const plan = describeEvolution(speciesId);
-      if (plan.error) {
+      if (plan.error && !plan.needs) {
         return interaction.reply({
           content: `❌ ${plan.error}`,
           flags: MessageFlags.Ephemeral,
@@ -285,6 +316,7 @@ export default {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
       usableHelpers(interaction.user.id, (err, helpers) => {
+        const helpersRead = !err;
         if (err) {
           handleException("Lecture des objets d'évolution :", err);
           helpers = [];
@@ -294,7 +326,7 @@ export default {
         getIndividuals(interaction.user.id, (err, individuals) => {
           if (err) handleException("Lecture de la collection pour /pk evolution :", err);
           const counts = countBySpecies(err ? [] : individuals);
-          const species = plan.species;
+          const species = getSpecies(speciesId);
           const entry = counts.get(speciesId) ?? NO_ENTRY;
           const evolver = pokemonId ? selector.row : AUTO;
           const stock = stockOf(counts, speciesId, evolver);
@@ -322,12 +354,15 @@ export default {
             .setColor(embedColor(species, isShiny))
             .setThumbnail(spriteUrl(species, isShiny))
             .setDescription(
-              (plan.branching
-                ? `**${species.name}** peut évoluer en ${plan.targets
-                    .map((target) => `**${target.name}**`)
-                    .join(", ")}.\n\n` +
-                  `Tu peux laisser le hasard décider, ou payer plus cher pour choisir.`
-                : `**${species.name}** peut évoluer en **${plan.targets[0].name}**.`) +
+              (plan.error
+                ? `**${species.name}** ${plan.error.replace(`${species.name} `, "")}`
+                : plan.branching
+                  ? `**${species.name}** peut évoluer en ${plan.targets
+                      .map((target) => `**${target.name}**`)
+                      .join(", ")}.\n\n` +
+                    `Tu peux laisser le hasard décider, ou payer plus cher pour choisir.`
+                  : `**${species.name}** peut évoluer en **${plan.targets[0].name}**.`) +
+                itemFormsLine(species) +
                 (pokemonId
                   ? `\nIl garde son sexe, sa ball et sa fertilité${isShiny ? ", et reste shiny" : ""}.`
                   : `\nLe bot choisit : les sacrifices parmi les moins précieux, puis celui qui ` +
@@ -397,17 +432,28 @@ export default {
 
           // Un bouton par objet utilisable, dans une rangée à part : ce sont des
           // chemins moins chers, pas des variantes du premier. Discord en
-          // accepte cinq par rangée, et le catalogue n'en propose pas davantage.
+          // accepte cinq par rangée : on les compte parmi ceux qui s'appliquent
+          // à l'espèce, pas parmi tout l'inventaire.
           const aides = new ActionRowBuilder();
           const lignes = [];
-          for (const helper of helpers.slice(0, 5)) {
-            const aide = describeEvolution(speciesId, null, helper.key);
-            if (!canPay(aide, stock)) continue;
-            const cible = aide.target ? ` → ${aide.target.name}` : "";
+          const utiles = helpers
+            .map((helper) => ({ helper, aide: describeEvolution(speciesId, null, helper.key) }))
+            .filter(({ aide }) => canPay(aide, stock))
+            .slice(0, 5);
+          for (const { helper, aide } of utiles) {
+            // L'Évolyte mène au choix de la forme, les autres objets à la leur.
+            const choix = Boolean(aide.helper?.choose);
+            const cible = choix
+              ? " · choisir"
+              : aide.target && aide.helper?.target
+                ? ` → ${aide.target.name}`
+                : "";
             const prix = aide.points > 0 ? `${pts(aide.points)} pts` : "gratuit";
             aides.addComponents(
               new ButtonBuilder()
-                .setCustomId(`poke_evo|${speciesId}|${suffix}|random|${helper.key}`)
+                .setCustomId(
+                  `poke_evo|${speciesId}|${suffix}|${choix ? "choose" : "random"}|${helper.key}`
+                )
                 .setLabel(`${helper.label}${cible} (${prix})`)
                 .setEmoji(helper.emoji)
                 .setStyle(ButtonStyle.Secondary)
@@ -441,7 +487,10 @@ export default {
                 .setStyle(ButtonStyle.Secondary);
             if (plan.branching) {
               joker.addComponents(
-                bouton("random", `${fill.dittos}× ${metamorph.name} · hasard (${pts(plan.points)} pts)`),
+                bouton(
+                  "random",
+                  `${fill.dittos}× ${metamorph.name} · hasard (${pts(plan.points)} pts)`
+                ),
                 bouton(
                   "choose",
                   `${fill.dittos}× ${metamorph.name} · choisir ` +
@@ -485,6 +534,25 @@ export default {
                     `❌ Tes **${pts(entry.total)}** ${species.name} sont verrouillés 🛡️ : le bot ` +
                     `n'en fait jamais évoluer un de lui-même. Choisis celui qui évolue dans ` +
                     `l'option « individu » : une confirmation te sera demandée.`,
+                })
+                .catch(() => {});
+            }
+            // L'objet exigé manque, ou ce sont les exemplaires : avec l'objet en
+            // poche, c'est leur chiffre qu'on donne. Un inventaire illisible ne
+            // fait pas dire « tu n'en as pas ».
+            if (plan.error) {
+              const held = helpers.find((helper) => helper.evolution.targets?.[speciesId]);
+              const withItem = held ? describeEvolution(speciesId, null, held.key) : null;
+              return interaction
+                .editReply({
+                  content:
+                    withItem && !withItem.error
+                      ? `❌ ${evolutionShortage(withItem, err ? null : stock)}`
+                      : `❌ ${plan.error}` +
+                        (helpersRead
+                          ? ` Tu n'en as pas : ${plan.needs.length > 1 ? "ils se gagnent" : "il se gagne"} ` +
+                            `à la loterie ou sur les Pokémon qui en tiennent.`
+                          : ""),
                 })
                 .catch(() => {});
             }

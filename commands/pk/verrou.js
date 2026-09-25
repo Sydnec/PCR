@@ -93,7 +93,8 @@ export default {
           .catch(() => {});
       }
       const { pokemonId, row } = selector;
-      const name = `#${pokemonId} ${displayName(getSpecies(row.species_id), row.is_shiny, row.sex)}`;
+      const species = getSpecies(row.species_id);
+      const name = `#${pokemonId} ${displayName(species, row.is_shiny, row.sex, row.form)}`;
       toggleLock(interaction.user.id, pokemonId, (err, locked) => {
         if (err) {
           handleException("/pk verrou :", err);

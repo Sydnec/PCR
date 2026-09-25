@@ -133,8 +133,10 @@ export function sexMark(sex) {
 
 // Le nom d'un Pokémon, avec son sexe et son éclat. Nidoran porte déjà le sien
 // dans son nom : on ne le répète pas, sauf sous un surnom, qui le cache.
-export function pokemonName(species, shiny = false, sex = null, nickname = null) {
-  const name = nickname || (species?.name ?? "?");
+// `form` : la forme que l'API donne à l'individu (la lettre d'un Zarbi), qui
+// se lit après le nom comme dans les jeux — « Zarbi B ».
+export function pokemonName(species, shiny = false, sex = null, nickname = null, form = null) {
+  const name = nickname || `${species?.name ?? "?"}${form ? ` ${form.name}` : ""}`;
   const carries = !nickname && (name.includes("♂") || name.includes("♀"));
   const sexNode = carries ? null : sexMark(sex);
   return h(

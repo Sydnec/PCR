@@ -1,4 +1,4 @@
-import { EmbedBuilder } from "discord.js";
+import { EmbedBuilder, MessageFlags } from "discord.js";
 import { describeWeightTables } from "../../modules/pokemon/weights.js";
 
 // Les tables de tirage pondéré, converties en probabilités.
@@ -30,18 +30,21 @@ const entier = (value) => value.toLocaleString("fr-FR").replace(/[\u202F\u00A0]/
 const surN = (probability) =>
   probability > 0 && probability <= 0.5 ? `1/${entier(Math.round(1 / probability))}` : "—";
 
-function renderTable(table) {
+// Les lignes d'un tableau, en-tête et total compris, alignées pour un bloc de
+// code. Un objet à poids nul (un charme, un objet d'une génération fermée)
+// n'y figure pas : il n'est pas dans le tirage, et la phrase sous le titre le
+// nomme. Une catégorie d'espèces à poids nul reste, marquée « hors pool » :
+// elle dit combien d'espèces ne sortent jamais.
+function tableLines(table) {
   const gate = table.gate?.chance ?? 1;
   const multiple = table.rows.some((r) => r.count > 1);
+  const rows = multiple ? table.rows : table.rows.filter((r) => r.weight > 0);
 
   const head = multiple
     ? [table.subject, "espèces", "poids", "total", "part", "par espèce"]
     : [table.subject, "poids", ...(table.lots ? ["lot"] : []), "part", "au tirage", "soit"];
 
-  // Un poids nul n'est pas « 0,0 % de chances » : la ligne est simplement hors
-  // du tirage, que ce soit une évolution par échange ou un objet de collection.
-  // Afficher un pourcentage lui donnerait l'air d'être dans le pool.
-  const lines = table.rows.map((r) =>
+  const lines = rows.map((r) =>
     multiple
       ? [
           r.label,
@@ -54,10 +57,10 @@ function renderTable(table) {
       : [
           r.label,
           entier(r.weight),
-          ...(table.lots ? [r.weight > 0 ? r.lot ?? "1" : "—"] : []),
-          r.weight > 0 ? pourcent(r.share, 1) : "hors pool",
-          r.weight > 0 ? pourcent(gate * r.share, 3) : "—",
-          r.weight > 0 ? surN(gate * r.share) : "—",
+          ...(table.lots ? [r.lot ?? "1"] : []),
+          pourcent(r.share, 1),
+          pourcent(gate * r.share, 3),
+          surN(gate * r.share),
         ]
   );
 
@@ -81,14 +84,45 @@ function renderTable(table) {
       .map((cell, i) => (i === 0 ? cell.padEnd(widths[i]) : cell.padStart(widths[i])))
       .join("  ")
       .trimEnd();
+  return { head: format(head), body: [...lines, totalLine].map(format) };
+}
 
-  return [
-    "```",
-    format(head),
-    ...lines.map(format),
-    format(totalLine),
-    "```",
-  ].join("\n");
+// Discord refuse un champ de plus de 1 024 caractères, et tout le message
+// au-delà de 6 000 : la loterie y est arrivée à force d'objets. Un tableau trop
+// long se poursuit donc dans un champ « suite », en-tête répété, et les champs
+// se répartissent en autant de messages qu'il faut.
+const FIELD_MAX = 1024;
+const MESSAGE_MAX = 6000;
+
+function tableFields(table) {
+  const gate = table.gate ? ` — **${pourcent(table.gate.chance, 0)}** ${table.gate.label}` : "";
+  const outside = table.rows.some((r) => r.count > 1)
+    ? []
+    : table.rows.filter((r) => r.weight <= 0).map((r) => r.label);
+  const intro =
+    `*${table.note}*${gate}` + (outside.length ? `\nHors tirage : ${outside.join(", ")}.` : "");
+  const { head, body } = tableLines(table);
+
+  const fields = [];
+  let prefix = `${intro}\n`;
+  let chunk = [];
+  const block = (lines) => ["```", head, ...lines, "```"].join("\n");
+  const close = () =>
+    fields.push({
+      name: fields.length ? `${table.name} (suite)` : table.name,
+      value: prefix + block(chunk),
+      inline: false,
+    });
+  for (const line of body) {
+    if (chunk.length && (prefix + block([...chunk, line])).length > FIELD_MAX) {
+      close();
+      prefix = "";
+      chunk = [];
+    }
+    chunk.push(line);
+  }
+  close();
+  return fields;
 }
 
 export default {
@@ -117,27 +151,41 @@ export default {
       return interaction.editReply({ content: "❌ Table inconnue." });
     }
 
-    const embed = new EmbedBuilder()
-      .setTitle("⚖️ Tables de tirage pondéré")
-      .setColor(0x5865f2)
-      .setDescription(
-        "Un poids n'est pas un pourcentage : c'est une part du total de sa table. " +
-          "Doubler un poids ne double donc pas tout à fait son taux — il grossit " +
-          "aussi le total, et dilue légèrement les autres lignes."
-      );
+    const title = "⚖️ Tables de tirage pondéré";
+    const description =
+      "Un poids n'est pas un pourcentage : c'est une part du total de sa table. " +
+      "Doubler un poids ne double donc pas tout à fait son taux — il grossit " +
+      "aussi le total, et dilue légèrement les autres lignes.";
+    const footer = "Tout se règle via /admin config, à chaud.";
 
-    for (const table of tables) {
-      const gate = table.gate
-        ? ` — **${pourcent(table.gate.chance, 0)}** ${table.gate.label}`
-        : "";
-      embed.addFields({
-        name: table.name,
-        value: `*${table.note}*${gate}\n${renderTable(table)}`,
-        inline: false,
-      });
+    // Un message par tranche de 6 000 caractères : le premier porte le titre
+    // et l'explication, le dernier le pied de page.
+    const messages = [];
+    let fields = [];
+    let size = title.length + description.length + footer.length;
+    for (const field of tables.flatMap(tableFields)) {
+      const cost = field.name.length + field.value.length;
+      if (fields.length && (size + cost > MESSAGE_MAX || fields.length === 25)) {
+        messages.push(fields);
+        fields = [];
+        size = footer.length;
+      }
+      fields.push(field);
+      size += cost;
     }
+    messages.push(fields);
 
-    embed.setFooter({ text: "Tout se règle via /admin config, à chaud." });
-    await interaction.editReply({ embeds: [embed] }).catch(() => {});
+    const embeds = messages.map((list, index) => {
+      const embed = new EmbedBuilder().setColor(0x5865f2).addFields(list);
+      if (index === 0) embed.setTitle(title).setDescription(description);
+      if (index === messages.length - 1) embed.setFooter({ text: footer });
+      return embed;
+    });
+    await interaction.editReply({ embeds: [embeds[0]] }).catch(() => {});
+    for (const embed of embeds.slice(1)) {
+      await interaction
+        .followUp({ embeds: [embed], flags: MessageFlags.Ephemeral })
+        .catch(() => {});
+    }
   },
 };

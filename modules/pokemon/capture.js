@@ -325,8 +325,8 @@ export function resolveThrow(client, userId, spawnId, ballKey, { requireItem = f
             result: "CATCH",
           });
           // La ball qui l'a emportée reste attachée à l'individu, pour de bon,
-          // et il a le sexe que l'annonce montrait.
-          const options = { ball: ball.key, origin: "capture", sex: spawn.sex };
+          // et il a le sexe et la forme que l'annonce montrait.
+          const options = { ball: ball.key, origin: "capture", sex: spawn.sex, form: spawn.form };
           // S'il lâche son objet, c'est tiré AVANT d'annoncer la capture : le
           // message public doit dire « il lâche » et non « il tenait » quand un
           // bouton « Ramasser » apparaît juste en dessous.
@@ -458,11 +458,14 @@ export function throwMessage(outcome) {
           ? `Ta **${payment.label}** t'a été rendue.`
           : `Tes **${ball.price}** points ont été remboursés.`)
       );
-    case "miss":
+    case "miss": {
+      const { species, spawn } = outcome;
       return (
-        `❌ Raté ! **${displayName(outcome.species, outcome.spawn.is_shiny, outcome.spawn.sex)}** s'est dégagé de ` +
-        `ta ${ball.label}. (${mention}, ${(outcome.probability * 100).toFixed(1)} % de réussite)`
+        `❌ Raté ! **${displayName(species, spawn.is_shiny, spawn.sex, spawn.form)}** s'est ` +
+        `dégagé de ta ${ball.label}. (${mention}, ${(outcome.probability * 100).toFixed(1)} % ` +
+        `de réussite)`
       );
+    }
     case "catch": {
       const { item, dropped } = outcome.held ?? {};
       const butin = !item
@@ -472,9 +475,14 @@ export function throwMessage(outcome) {
           : `\n${item.emoji} Il tenait **${item.label}** !`;
       // Un shiny du Charme Chroma : normal pour le salon, shiny pour lui.
       const charm = outcome.charmed ? getCharmItem(outcome.species.generation) : null;
+      const name = displayName(
+        outcome.species,
+        outcome.shiny ?? outcome.spawn.is_shiny,
+        outcome.caught?.sex,
+        outcome.caught?.form ?? outcome.spawn.form
+      );
       return (
-        `🎉 Bravo ! **${displayName(outcome.species, outcome.shiny ?? outcome.spawn.is_shiny, outcome.caught?.sex)}** ` +
-        `rejoint ton Pokédex ! (${mention})` +
+        `🎉 Bravo ! **${name}** rejoint ton Pokédex ! (${mention})` +
         (charm ? `\n${charm.emoji} Il brillait pour toi, grâce à ton **${charm.label}** !` : "") +
         butin
       );

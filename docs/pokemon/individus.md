@@ -15,6 +15,14 @@ le distingue des autres.
 - **La fertilité** : un individu ne pond qu'un œuf dans sa vie, puis il devient stérile (voir
   [Œufs](oeufs.md)).
 - **Sa date d'arrivée** chez son dresseur actuel.
+- **Sa forme**, pour les espèces qui en ont : la lettre d'un **Zarbi**. Une seule entrée de
+  Pokédex pour toutes, mais chaque Zarbi porte sa lettre, tirée à parts égales à l'apparition — que
+  l'annonce montre, « Un Zarbi K sauvage apparaît ! » — ou au parc, avec son image. Les 26 lettres
+  d'Or et Argent arrivent avec la 2ᵉ génération ; « ! » et « ? », de Rubis et Saphir, viendront
+  avec la 3ᵉ. La lettre suit le Zarbi partout (boîte, échange, revente, autocomplétion), et la fiche
+  de l'espèce (`/pk info`, le site) compte celles qu'on possède : « Formes : 5/26 ». La règle du
+  dernier exemplaire reste celle de l'espèce : il reste toujours un Zarbi, quelle que soit sa
+  lettre.
 
 `/pk boite [pokemon] [membre]` les montre un par un, page par page : les plus récents, ou ceux
 d'une espèce.

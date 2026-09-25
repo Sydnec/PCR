@@ -229,7 +229,7 @@ export default {
         // astérisques en clair dans le message.
         const what = isItem
           ? `${result.item.emoji} **${result.quantity}× ${result.item.label}**`
-          : `**${result.quantity}× ${displayName(result.species, result.isShiny, result.sex)}**`;
+          : `**${result.quantity}× ${displayName(result.species, result.isShiny, result.sex, result.form)}**`;
         interaction
           .editReply({
             content: `✅ Tu revends ${what} pour **${points(result.points)}** points.`,

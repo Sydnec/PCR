@@ -23,6 +23,7 @@ import {
   safariBaitCapped,
   safariCatchProbability,
   safariFleeChance,
+  safariGenerations,
 } from "./data.js";
 import { creditSpecies, getOwnedVariants } from "./collection.js";
 import { consumeItem, getItem, getItemCount, grantItem } from "./items.js";
@@ -97,7 +98,7 @@ export function findFreeParkFor(userId, cb) {
 
 export function getSessionCatches(sessionId, cb) {
   db.all(
-    `SELECT species_id, is_shiny FROM pokemon_safari_catches
+    `SELECT species_id, is_shiny, form FROM pokemon_safari_catches
       WHERE session_id = ? ORDER BY id`,
     [sessionId],
     (err, rows) => cb(err, rows || [])
@@ -160,7 +161,11 @@ export function releaseShare(sessionId, cb = () => {}) {
 function rollNextEncounter(session, config, cb) {
   getCharms(session.user_id, (err, charms) => {
     if (err) handleException("Lecture des Charmes Chroma :", err);
-    storeNextEncounter(session.id, rollSafariEncounter(config, err ? [] : charms), cb);
+    storeNextEncounter(
+      session.id,
+      rollSafariEncounter(config, err ? [] : charms, safariGenerations(session.generations)),
+      cb
+    );
   });
 }
 
@@ -173,9 +178,17 @@ function storeNextEncounter(sessionId, encounter, cb) {
             encounter_is_shiny = ?,
             encounter_catch_rate = ?,
             encounter_sex = ?,
+            encounter_form = ?,
             encounter_bait = 0
       WHERE id = ?`,
-    [encounter.species.id, encounter.isShiny ? 1 : 0, encounter.catchRate, encounter.sex, sessionId],
+    [
+      encounter.species.id,
+      encounter.isShiny ? 1 : 0,
+      encounter.catchRate,
+      encounter.sex,
+      encounter.form,
+      sessionId,
+    ],
     (err) => cb(err)
   );
 }
@@ -278,14 +291,17 @@ function sessionExpiry(park, config) {
   return Math.max(floor, park?.expires_at ?? 0);
 }
 
-function startSession(userId, { park = null, entryCost = 0 }, cb) {
+// `generations` : celles que le visiteur vise, pour toute sa visite ; toutes
+// sans elles (safariGenerations).
+function startSession(userId, { park = null, entryCost = 0, generations = null }, cb) {
   const config = getSafariConfig();
   const now = Date.now();
   const parkId = park?.id ?? null;
+  const targeted = safariGenerations(generations);
 
   expireStaleSessions(userId, () => getCharms(userId, (err, charms) => {
     if (err) handleException("Lecture des Charmes Chroma :", err);
-    const encounter = rollSafariEncounter(config, err ? [] : charms);
+    const encounter = rollSafariEncounter(config, err ? [] : charms, targeted);
     if (!encounter) {
       return cb(new Error("Aucune espèce disponible pour le parc safari."));
     }
@@ -294,8 +310,8 @@ function startSession(userId, { park = null, entryCost = 0 }, cb) {
       `INSERT INTO pokemon_safari_sessions
          (park_id, user_id, actions_left, entry_cost, started_at, expires_at,
           encounter_no, encounter_species_id, encounter_is_shiny, encounter_catch_rate,
-          encounter_sex)
-       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`,
+          encounter_sex, encounter_form, generations)
+       VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?)`,
       [
         parkId,
         userId,
@@ -307,6 +323,8 @@ function startSession(userId, { park = null, entryCost = 0 }, cb) {
         encounter.isShiny ? 1 : 0,
         encounter.catchRate,
         encounter.sex,
+        encounter.form,
+        targeted ? targeted.join(",") : null,
       ],
       function (err) {
         // C'est la base qui arbitre, pas un SELECT préalable qui laisserait une
@@ -332,8 +350,9 @@ function startSession(userId, { park = null, entryCost = 0 }, cb) {
   }));
 }
 
-// Entrée gratuite par le bouton du message de parc.
-export function enterPark(userId, parkId, cb) {
+// Entrée gratuite par le bouton du message de parc. `generations` : celles que
+// le visiteur vise.
+export function enterPark(userId, parkId, { generations = null } = {}, cb) {
   // Une visite déjà ouverte passe avant toute autre considération, y compris la
   // fermeture du parc : celui qui reclique veut retrouver sa partie, et ses
   // actions lui restent acquises jusqu'à l'expiration de sa session.
@@ -353,7 +372,7 @@ export function enterPark(userId, parkId, cb) {
         });
       }
 
-      startSession(userId, { park, entryCost: 0 }, (err, result) => {
+      startSession(userId, { park, entryCost: 0, generations }, (err, result) => {
         if (err) return cb(err);
         // Une session rendue par la résolution de course n'est pas une entrée
         // de plus : le compteur du parc l'a déjà comptée.
@@ -374,7 +393,7 @@ const TICKET = "ticket_safari";
 // ignore le délai entre deux entrées payantes : ce délai borne ce qu'on peut
 // s'ACHETER, alors qu'un ticket se trouve — il est déjà rare par construction,
 // le brider deux fois reviendrait à ne pas le donner.
-export function startPaidSession(userId, cb) {
+export function startPaidSession(userId, { generations = null } = {}, cb) {
   const config = getSafariConfig();
   const price = Math.max(0, Math.round(config.entryPrice));
 
@@ -395,7 +414,7 @@ export function startPaidSession(userId, cb) {
       if (err) return cb(err);
       if (!used) return payer();
 
-      startSession(userId, { entryCost: 0 }, (err, result) => {
+      startSession(userId, { entryCost: 0, generations }, (err, result) => {
         // Le ticket revient si la visite n'a pas pu s'ouvrir — y compris quand
         // la résolution de course rend une visite déjà en cours, qui n'est pas
         // celle qu'on vient de payer.
@@ -442,7 +461,7 @@ export function startPaidSession(userId, cb) {
           );
         }
 
-        startSession(userId, { entryCost: price }, (err, result) => {
+        startSession(userId, { entryCost: price, generations }, (err, result) => {
           // Filet de sécurité pour les courses que la garde ci-dessus ne peut
           // pas couvrir. Chemin de remboursement unique et journalisé : on ne
           // rembourse qu'après un débit réussi, donc la ligne existe. Une
@@ -597,7 +616,8 @@ function resolveAction({ session, species, action, config }, cb) {
     config
   );
   const sex = session.encounter_sex;
-  const base = { species, isShiny, sex, probability, baitStacks: session.encounter_bait };
+  const form = session.encounter_form ?? null;
+  const base = { species, isShiny, sex, form, probability, baitStacks: session.encounter_bait };
   const done = (outcome, extra = {}) =>
     finishOrContinue(session.id, { ...base, outcome, ...extra }, cb);
 
@@ -643,7 +663,7 @@ function resolveAction({ session, species, action, config }, cb) {
     return done("MISS");
   }
 
-  const options = { ball: "safari", origin: "safari", sex };
+  const options = { ball: "safari", origin: "safari", sex, form };
   creditSpecies(session.user_id, species.id, isShiny, options, (err) => {
     if (err) return cb(err);
     recordSafariCatch({ userId: session.user_id, species, isShiny });
@@ -655,9 +675,9 @@ function resolveAction({ session, species, action, config }, cb) {
     );
 
     db.run(
-      `INSERT INTO pokemon_safari_catches (session_id, species_id, is_shiny, caught_at)
-       VALUES (?, ?, ?, ?)`,
-      [session.id, species.id, isShiny ? 1 : 0, Date.now()],
+      `INSERT INTO pokemon_safari_catches (session_id, species_id, is_shiny, caught_at, form)
+       VALUES (?, ?, ?, ?, ?)`,
+      [session.id, species.id, isShiny ? 1 : 0, Date.now(), form],
       (err) => {
         if (err) handleException("Enregistrement d'une capture du parc safari :", err);
         db.run(

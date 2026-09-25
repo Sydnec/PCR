@@ -2,7 +2,7 @@ import { handleException, log } from '../../modules/utils.js';
 import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, MessageFlags, StringSelectMenuBuilder, StringSelectMenuOptionBuilder} from 'discord.js';
 import pointsDb from '../../modules/points-db.js';
 import { addPoints, getBalance, spendPoints } from '../../modules/economy.js';
-import { handlePokemonButton } from '../../modules/pokemon/interactions.js';
+import { handlePokemonButton, handlePokemonSelect } from '../../modules/pokemon/interactions.js';
 import { pseudoOf } from '../../modules/pseudo.js';
 
 const name = 'interactionCreate';
@@ -367,6 +367,16 @@ async function execute(interaction, bot) {
     }
 
     if (interaction.isStringSelectMenu()) {
+        // Système Pokémon : ses menus vivent avec ses boutons.
+        if (interaction.customId.startsWith('poke_')) {
+            try {
+                await handlePokemonSelect(interaction);
+            } catch (err) {
+                handleException(err);
+            }
+            return;
+        }
+
         if (interaction.customId.startsWith('bet_resolve_select|')) {
             const [, betId, messageId] = interaction.customId.split('|');
             const selectedValue = interaction.values[0];

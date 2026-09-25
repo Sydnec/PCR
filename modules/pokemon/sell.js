@@ -124,7 +124,9 @@ export function sellPokemon(userId, { speciesId, isShiny, sex = null, pokemonId 
       pseudo(userId).then((seller) =>
         log(`Revente : ${seller} vend ${quantity}× ${name} pour ${points} pts`)
       );
-      cb(null, { ok: true, species, isShiny, sex, quantity, unit, points });
+      // Un individu désigné garde sa forme dans le message (« Zarbi B »).
+      const form = pokemonId ? (reserved[0]?.form ?? null) : null;
+      cb(null, { ok: true, species, isShiny, sex, form, quantity, unit, points });
     });
   });
 }

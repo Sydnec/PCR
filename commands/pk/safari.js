@@ -1,7 +1,14 @@
 import { MessageFlags } from "discord.js";
 import { handleException } from "../../modules/utils.js";
 import { getPokemonConfig, getSafariConfig } from "../../modules/pokemon/config.js";
-import { buildSafariView } from "../../modules/pokemon/embeds.js";
+import {
+  buildPaidEntryReply,
+  buildSafariGenerationPicker,
+  buildSafariView,
+  freeParkNotice,
+  safariPickerContent,
+} from "../../modules/pokemon/embeds.js";
+import { activeGeneration } from "../../modules/pokemon/data.js";
 import {
   findFreeParkFor,
   resumeSession,
@@ -62,59 +69,26 @@ export default {
           // Une visite offerte attend : on ne débite pas 5 000 points pour la
           // même chose sans le dire.
           if (freePark) {
+            return interaction.editReply({ content: freeParkNotice() }).catch(() => {});
+          }
+
+          // Plusieurs générations ouvertes : on choisit d'abord celles qu'on
+          // vise, et l'entrée se paie au bouton (poke_safari_go).
+          if (activeGeneration() > 1) {
             return interaction
               .editReply({
-                content:
-                  "🏕️ Un parc safari est ouvert en ce moment et **ton entrée est offerte** !\n" +
-                  "Utilise le bouton *« Entrer dans le parc »* sur son message plutôt que " +
-                  `de payer **${config.entryPrice}** points.`,
+                content: safariPickerContent("paid"),
+                components: buildSafariGenerationPicker("paid", 0),
               })
               .catch(() => {});
           }
 
-          startPaidSession(interaction.user.id, (err, result) => {
+          startPaidSession(interaction.user.id, {}, (err, result) => {
             if (err) {
               handleException(err);
               return erreur();
             }
-
-            // Ce que l'entrée a rendu, s'il a fallu défaire quelque chose. La
-            // phrase suit les DEUX sorties : un refus après un ticket consommé
-            // laissait croire que l'objet le plus rare du jeu avait été mangé
-            // pour rien.
-            const rendu = result.refunded
-              ? ` Tes **${result.refunded}** points t'ont été rendus.`
-              : result.ticketRendu
-                ? " Ton **Ticket Safari** t'a été rendu."
-                : "";
-
-            if (!result.ok) {
-              const content =
-                result.code === "COOLDOWN"
-                  ? `⏳ Tu as déjà visité le parc récemment. Prochaine entrée possible <t:${Math.floor(result.retryAt / 1000)}:R>.`
-                  : `❌ ${result.reason}`;
-              return interaction.editReply({ content: content + rendu }).catch(() => {});
-            }
-
-            // Le contenu s'écrit APRÈS l'étalement de la vue : celle-ci porte le
-            // sien (la phrase de reprise, ou null pour effacer ce qui traîne),
-            // et l'ordre inverse le ferait écraser.
-            //
-            // Une visite ouverte entre la vérification et le débit est rendue
-            // telle quelle : c'est une reprise, pas l'entrée qu'on vient de payer.
-            const view = buildSafariView(result.session, {
-              owned: result.owned,
-              resumed: result.resumed,
-            });
-            const content = result.resumed
-              ? view.content + rendu
-              : result.ticket
-                ? `🎟️ Tu présentes ton **${result.ticket.label}** à l'entrée et franchis les grilles ` +
-                  `du parc safari. **${config.actionsPerSession} actions**, et pas un point dépensé.`
-                : `🏕️ Tu paies **${config.entryPrice}** points et franchis les grilles du parc safari. ` +
-                  `**${config.actionsPerSession} actions**, et plus rien à débourser.`;
-
-            interaction.editReply({ ...view, content }).catch(() => {});
+            interaction.editReply(buildPaidEntryReply(result)).catch(() => {});
           });
         });
       });

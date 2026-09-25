@@ -11,8 +11,9 @@
 // consommé deux fois par deux clics simultanés serait exactement le bug que
 // spendPoints évite déjà sur les points.
 import db from "../points-db.js";
-import { handleException } from "../utils.js";
+import { handleException, log } from "../utils.js";
 import { getBall, getPokemonConfig } from "./config.js";
+import { activeGeneration } from "./data.js";
 
 // D'où vient le mouvement. Journalisé tel quel : le jour où un dresseur jure
 // n'avoir jamais reçu son ticket, c'est cette colonne qui répond.
@@ -36,9 +37,17 @@ function resolve(key, item) {
   };
 }
 
+// Une définition, et pas un reste : la configuration fusionne aussi les clés
+// que les défauts n'ont plus, si bien qu'un objet retiré du catalogue mais
+// retouché un jour depuis Discord y reviendrait en fragment ({ dropWeight }),
+// sans nom. Un objet se nomme, ou emprunte le nom de sa ball.
+const isDefined = (item) => Boolean(item && (item.label || item.ball));
+
 export function getItems() {
   const items = getPokemonConfig().items ?? {};
-  return Object.entries(items).map(([key, item]) => resolve(key, item));
+  return Object.entries(items)
+    .filter(([, item]) => isDefined(item))
+    .map(([key, item]) => resolve(key, item));
 }
 
 // Renvoie la définition d'un objet, ou null si la clé est inconnue.
@@ -49,7 +58,7 @@ export function getItem(key) {
   if (typeof key !== "string" || !Object.prototype.hasOwnProperty.call(items, key)) {
     return null;
   }
-  return resolve(key, items[key]);
+  return isDefined(items[key]) ? resolve(key, items[key]) : null;
 }
 
 // Le Charme Chroma d'une génération, tel que le catalogue le déclare
@@ -94,7 +103,13 @@ export function freeBallCount(inventory, ballKey) {
 // Un objet ne tombe que si le catalogue lui donne un poids. Celui dont l'effet
 // n'est pas encore branché n'en a pas, donc personne ne peut se retrouver avec
 // un objet qui ne fait rien.
-export const itemDropWeight = (item) => Math.max(0, Number(item?.dropWeight) || 0);
+//
+// Un objet d'une génération encore fermée ne tombe pas non plus : la Pierre
+// Soleil n'a rien à faire évoluer tant que Joliflor n'existe pas.
+export const itemOpen = (item) => Number(item?.generation ?? 1) <= activeGeneration();
+
+export const itemDropWeight = (item) =>
+  itemOpen(item) ? Math.max(0, Number(item?.dropWeight) || 0) : 0;
 
 // Le poids d'un objet à la loterie. Il retombe sur `dropWeight` tant que le
 // catalogue n'en dit rien, donc seuls les objets réellement retouchés portent la
@@ -107,6 +122,7 @@ export const itemDropWeight = (item) => Math.max(0, Number(item?.dropWeight) || 
 // objet. On dilue donc la loterie avec du poids de balls, et le butin ne bouge
 // pas d'un cheveu.
 export const itemLotteryWeight = (item) => {
+  if (!itemOpen(item)) return 0;
   const weight = Number(item?.lotteryWeight);
   return Number.isFinite(weight) && weight >= 0 ? weight : itemDropWeight(item);
 };
@@ -149,11 +165,37 @@ export function itemLot(item) {
   return { min, max: Math.max(min, borne(item?.lot?.max, min)) };
 }
 
+// La part des tirages qui donnent un objet, pour une table (`weightOf`). Le
+// réglage vaut pour les objets de la première génération ; ceux d'une
+// génération ouverte ensuite s'ajoutent par-dessus sans rien retirer aux
+// autres : chaque objet garde exactement sa chance d'avant, et les nouveaux
+// prennent leur place sur « rien ». Plafonnée à 1 ; sans objet de première
+// génération dans la table, le réglage s'applique tel quel.
+function openedChance(chance, weightOf) {
+  const setting = Math.max(0, Math.min(1, Number(chance) || 0));
+  const items = getItems();
+  const base = items
+    .filter((item) => Number(item.generation ?? 1) <= 1)
+    .reduce((sum, item) => sum + weightOf(item), 0);
+  if (!base) return setting;
+  const total = items.reduce((sum, item) => sum + weightOf(item), 0);
+  return Math.min(1, (setting * total) / base);
+}
+
+// Combien de Pokémon tiennent un objet (`spawn.heldItemChance` en première
+// génération), et combien de tirages de loterie donnent un lot
+// (`lottery.winChance`) : ce que tirent l'apparition et /pk loterie, et ce
+// qu'affichent la page Infos et /admin poids.
+export const heldItemChance = () =>
+  openedChance(getPokemonConfig().spawn?.heldItemChance, itemDropWeight);
+export const lotteryWinChance = () =>
+  openedChance(getPokemonConfig().lottery?.winChance, itemLotteryWeight);
+
 // Ce que tient un Pokémon qui vient d'apparaître, ou null. Tiré à l'apparition
 // et figé dans la ligne : ce qu'il porte lui appartient, ça ne se décide pas au
 // moment où quelqu'un l'attrape.
 export function rollHeldItem() {
-  const chance = Number(getPokemonConfig().spawn?.heldItemChance) || 0;
+  const chance = heldItemChance();
   if (chance <= 0 || Math.random() >= chance) return null;
   return pickWeightedItem(itemDropWeight)?.key ?? null;
 }
@@ -307,6 +349,89 @@ export function consumeItem(userId, key, quantity = 1, { source } = {}, cb = () 
       const consumed = this.changes === 1;
       if (consumed) logMovement(userId, key, -quantity, source);
       cb(null, consumed);
+    }
+  );
+}
+
+// ====================== MIGRATION ======================
+
+// Les Pierres Feu, Foudre et Eau deviennent des Évolytes, une pour une : elles
+// ne servaient qu'à Évoli, et l'Évolyte y choisit n'importe laquelle de ses
+// formes. Les objets tombés par terre et ceux que tient un Pokémon encore là
+// suivent, pour qu'aucun ramassage ne donne un objet sorti du catalogue.
+//
+// Pas de transaction : la connexion est partagée, un ROLLBACK emporterait les
+// écritures des autres (voir economy.js). Chaque lot se retire d'abord — gardé
+// sur le compte lu, this.changes tranche —, puis l'Évolyte se crédite par
+// grantItem, et la pierre revient si ce crédit échoue. Rejouable sans effet :
+// un lot converti est à zéro, un second passage n'a plus rien à prendre. À
+// retirer une fois déployé.
+const RETIRED_STONES = ["pierre_feu", "pierre_foudre", "pierre_eau"];
+const CONVERSION = "conversion-evolyte";
+
+export function migrateRetiredStones(cb = () => {}) {
+  const marks = RETIRED_STONES.map(() => "?").join(", ");
+  const run = (sql, params = []) =>
+    new Promise((resolve, reject) =>
+      db.run(sql, params, function (err) {
+        if (err) reject(err);
+        else resolve(this.changes);
+      })
+    );
+  const all = (sql, params = []) =>
+    new Promise((resolve, reject) =>
+      db.all(sql, params, (err, rows) => (err ? reject(err) : resolve(rows ?? [])))
+    );
+
+  const convert = async ({ user_id: userId, item_key: key, count }) => {
+    const taken = await run(
+      "UPDATE pokemon_inventory SET count = 0 WHERE user_id = ? AND item_key = ? AND count = ?",
+      [userId, key, count]
+    );
+    if (taken !== 1) return 0;
+    logMovement(userId, key, -count, CONVERSION);
+    try {
+      await new Promise((resolve, reject) =>
+        grantItem(userId, "evolyte", count, { source: CONVERSION }, (err) =>
+          err ? reject(err) : resolve()
+        )
+      );
+      return 1;
+    } catch (error) {
+      // La pierre revient telle quelle : rien ne se perd, on retentera au
+      // prochain démarrage.
+      await run(
+        "UPDATE pokemon_inventory SET count = count + ? WHERE user_id = ? AND item_key = ?",
+        [count, userId, key]
+      );
+      logMovement(userId, key, count, CONVERSION);
+      throw error;
+    }
+  };
+
+  (async () => {
+    const lots = await all(
+      `SELECT user_id, item_key, count FROM pokemon_inventory
+        WHERE item_key IN (${marks}) AND count > 0`,
+      RETIRED_STONES
+    );
+    let converted = 0;
+    for (const lot of lots) converted += await convert(lot);
+    await run(
+      `UPDATE pokemon_drops SET item_key = 'evolyte' WHERE item_key IN (${marks}) AND status = 'OPEN'`,
+      RETIRED_STONES
+    );
+    await run(
+      `UPDATE pokemon_spawns SET held_item = 'evolyte'
+        WHERE held_item IN (${marks}) AND status = 'ACTIVE'`,
+      RETIRED_STONES
+    );
+    if (converted) log(`Évolyte : ${converted} lot(s) de Pierres Feu, Foudre ou Eau convertis`);
+  })().then(
+    () => cb(null),
+    (error) => {
+      handleException("Conversion des pierres en Évolytes :", error);
+      cb(error);
     }
   );
 }

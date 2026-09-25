@@ -37,6 +37,14 @@ const POKEMON = {
   // fait d'une commande, `/admin config pokemon.generation 2`, sans release ni
   // redémarrage. La refermer cache ses espèces sans les retirer des collections.
   generation: 1,
+  // Les ouvertures programmées : à cette date, la génération s'ouvre d'elle-même
+  // — même bot éteint à l'heure dite, puisque rien n'attend un minuteur : la date
+  // est relue à chaque usage, comme `generation`, et la plus haute des deux
+  // l'emporte. Une date ISO avec son fuseau (+01:00 pour Paris en hiver). Pour
+  // annuler, une date lointaine ; pour refermer, il faut aussi l'annuler.
+  generationOpenings: {
+    2: "2026-10-30T18:00:00+01:00",
+  },
   spawn: {
     messagesPerSpawn: 40,
     minDelayMinutes: 60,
@@ -64,6 +72,10 @@ const POKEMON = {
     // et l'objet reste par terre pour le plus rapide. C'est la seule récompense
     // du jeu qui ne demande pas d'avoir gagné la course, et la seule chose qu'un
     // Pokémon qui s'échappe laisse derrière lui.
+    //
+    // La part vaut pour les objets de la 1re génération : ceux d'une génération
+    // ouverte ensuite s'y ajoutent sans rien retirer aux autres
+    // (heldItemChance dans pokemon/items.js).
     heldItemChance: 0.07,
     itemDropChance: 0.2,
     embedRefreshMs: 2000,
@@ -189,8 +201,10 @@ const POKEMON = {
   //
   // `evolution` le rend utilisable dans une évolution : `quantity` exemplaires
   // de l'objet tiennent lieu de `copies` sacrifices, `freePoints`
-  // dispense du coût en points, et `from`/`target` l'enferment dans une lignée
-  // précise — c'est ce qui fait des pierres des objets à Évoli.
+  // dispense du coût en points, et `choose` ou `targets` l'enferment dans des
+  // lignées précises (voir les objets d'évolution plus bas) — une Évolyte jetée
+  // sur un Chenipan est refusée. `generation` le garde hors du jeu tant que sa
+  // génération est fermée.
   //
   // Repère : avec 10 % de porteurs et 921 de poids total, la Master Ball tombe
   // une fois sur trois mille apparitions environ.
@@ -228,32 +242,58 @@ const POKEMON = {
       dropWeight: 80,
       lot: { min: 1, max: 2 },
     },
-    pierre_feu: {
-      label: "Pierre Feu",
-      emoji: "🔥",
-      sprite: "fire-stone",
-      description: "Fait évoluer un Évoli en Pyroli : un exemplaire suffit, et c'est gratuit.",
+    // Les objets d'évolution. Chacun tient lieu d'un sacrifice, et le coût en
+    // points reste celui du stade (modules/pokemon/collection.js). `choose` :
+    // les espèces dont il laisse choisir la forme sans supplément. `targets` :
+    // { espèce: forme } qu'il est seul à donner — sans lui, l'espèce prend son
+    // autre forme, ou n'évolue pas quand elle n'en a pas d'autre, et l'échange
+    // ne la fait pas évoluer non plus ; ces formes ne se croisent pas à l'état
+    // sauvage. `generation` : il ne tombe et ne se gagne qu'une fois cette
+    // génération ouverte.
+    evolyte: {
+      label: "Évolyte",
+      emoji: "🔮",
+      sprite: "eviolite",
+      description:
+        "Un Évoli qui évolue avec lui prend la forme de ton choix, sans payer de points. Il tient lieu d'un sacrifice.",
       sellValue: 500,
       dropWeight: 30,
-      evolution: { copies: 1, quantity: 1, freePoints: true, from: 133, target: 136 },
+      // Gratuite, comme les pierres qu'elle remplace : elle ne dispense de
+      // points que l'évolution d'Évoli, la seule qu'elle permet.
+      evolution: { copies: 1, quantity: 1, choose: [133], freePoints: true },
     },
-    pierre_foudre: {
-      label: "Pierre Foudre",
-      emoji: "⚡",
-      sprite: "thunder-stone",
-      description: "Fait évoluer un Évoli en Voltali : un exemplaire suffit, et c'est gratuit.",
+    pierre_soleil: {
+      label: "Pierre Soleil",
+      emoji: "☀️",
+      sprite: "sun-stone",
+      description:
+        "Un Ortide qui évolue avec elle devient Joliflor plutôt que Rafflesia. Elle tient lieu d'un sacrifice.",
       sellValue: 500,
       dropWeight: 30,
-      evolution: { copies: 1, quantity: 1, freePoints: true, from: 133, target: 135 },
+      generation: 2,
+      evolution: { copies: 1, quantity: 1, targets: { 44: 182 } },
     },
-    pierre_eau: {
-      label: "Pierre Eau",
-      emoji: "💧",
-      sprite: "water-stone",
-      description: "Fait évoluer un Évoli en Aquali : un exemplaire suffit, et c'est gratuit.",
+    roche_royale: {
+      label: "Roche Royale",
+      emoji: "👑",
+      sprite: "kings-rock",
+      description:
+        "Têtarte devient Tarpaud plutôt que Tartard, Ramoloss devient Roigada plutôt que Flagadoss. Elle tient lieu d'un sacrifice.",
       sellValue: 500,
       dropWeight: 30,
-      evolution: { copies: 1, quantity: 1, freePoints: true, from: 133, target: 134 },
+      generation: 2,
+      evolution: { copies: 1, quantity: 1, targets: { 61: 186, 79: 199 } },
+    },
+    catalyseur: {
+      label: "Catalyseur",
+      emoji: "⚙️",
+      sprite: "up-grade",
+      description:
+        "Sans lui, Onix, Insécateur, Hypocéan et Porygon n'évoluent pas. Il tient lieu d'un sacrifice.",
+      sellValue: 500,
+      dropWeight: 30,
+      generation: 2,
+      evolution: { copies: 1, quantity: 1, targets: { 95: 208, 123: 212, 117: 230, 137: 233 } },
     },
     pepite: {
       label: "Pépite",
@@ -267,7 +307,7 @@ const POKEMON = {
       label: "Ticket Safari",
       emoji: "🎟️",
       sprite: "pass",
-      description: "Une entrée pour le parc safari. Elle s'utilise, elle ne se monnaie pas.",
+      description: "Une entrée pour le parc safari.",
       dropWeight: 8,
     },
     ball_master: {
@@ -323,6 +363,10 @@ const POKEMON = {
   // son défaut d'origine — cinq Poké Balls tombaient aussi souvent qu'une seule.
   // À 0,5, un lot sur deux est le plus petit possible, et le gros lot redevient
   // un événement.
+  //
+  // `winChance` vaut pour les objets de la 1re génération : ceux d'une
+  // génération ouverte ensuite prennent leur place sur « rien », et aucun autre
+  // lot ne devient plus rare (lotteryWinChance dans pokemon/items.js).
   //
   // Repère aux réglages actuels : ~267 points de valeur par jour et par dresseur,
   // un dixième d'une journée de messages. Un gain sur deux est une ou deux Poké
@@ -622,6 +666,21 @@ function coerce(raw, fallback, key) {
     if (["true", "vrai", "oui", "1"].includes(normalized)) return { ok: true, value: true };
     if (["false", "faux", "non", "0"].includes(normalized)) return { ok: true, value: false };
     return { ok: false, reason: `\`${raw}\` n'est ni vrai ni faux.` };
+  }
+  // Une date d'ouverture illisible ne s'ouvrirait jamais, sans rien dire ; une
+  // date approximative ouvrirait trop tôt, et l'annonce ne se reprend pas.
+  // Date.parse accepte « 2 » (février 2001) et lit une heure sans fuseau dans
+  // celui du serveur : on exige donc une date ISO complète, fuseau compris.
+  if (type === "texte" && key.startsWith("pokemon.generationOpenings.")) {
+    const value = String(raw).trim();
+    const iso = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})$/;
+    if (!iso.test(value) || !Number.isFinite(Date.parse(value))) {
+      return {
+        ok: false,
+        reason: `\`${raw}\` n'est pas une date lisible : par exemple \`2026-10-30T18:00:00+01:00\`.`,
+      };
+    }
+    return { ok: true, value };
   }
   if (type === "liste") {
     const value = String(raw).split(",").map((part) => part.trim()).filter(Boolean);

@@ -12,11 +12,15 @@ import { getPointsHistory } from "../points-history.js";
 import {
   getCollection,
   getIndividuals,
+  getOwnedForms,
   getOwnedVariantsFor,
   resolveSelector,
   evolve,
   describeEvolution,
+  describeHelper,
+  evolutionHelpers,
   setLock,
+  usableHelpers,
   DITTO_HELPER,
 } from "../pokemon/collection.js";
 import { isFinalThrow, resolveThrow, startThrow, throwMessage } from "../pokemon/capture.js";
@@ -30,6 +34,7 @@ import {
   evolutionChain,
   evolutionTargets,
   femaleShare,
+  formOf,
   getAvailableSpecies,
   getSpecies,
   iconUrl,
@@ -44,13 +49,15 @@ import {
   safariBaitCapped,
   safariBaitFactor,
   safariCatchProbability,
+  safariGenerationChoices,
   safariFleeChance,
+  speciesForms,
   spriteUrl,
   typeColors,
 } from "../pokemon/data.js";
 import { getBalls, getPokemonConfig, getSafariConfig } from "../pokemon/config.js";
 import { announceDropClaim, claimDrop, getOpenDrops } from "../pokemon/drops.js";
-import { safariOutcomeLine } from "../pokemon/embeds.js";
+import { paidEntryRefund, safariOutcomeLine } from "../pokemon/embeds.js";
 import { getPc, movePokemon, renameBox, renamePokemon } from "../pokemon/pc.js";
 import {
   enterPark,
@@ -142,12 +149,27 @@ function speciesJson(species, families = babyFamilies()) {
   };
 }
 
+// La forme d'un individu, d'une apparition ou d'une rencontre — la lettre d'un
+// Zarbi —, avec ses images : null sans forme. Le site les affiche telles
+// quelles, à la place de celles de l'espèce.
+function formJson(species, key, shiny) {
+  const form = formOf(species, key);
+  if (!form) return null;
+  return {
+    key: form.key,
+    name: form.name,
+    icon: iconUrl(species, shiny, form.key),
+    sprite: spriteUrl(species, shiny, form.key),
+  };
+}
+
 function individualJson(row) {
   return {
     id: row.id,
     speciesId: row.species_id,
     shiny: Boolean(row.is_shiny),
     sex: row.sex,
+    form: formJson(getSpecies(row.species_id), row.form, Boolean(row.is_shiny)),
     ball: row.ball,
     origin: row.origin,
     fertile: !row.sterile,
@@ -227,6 +249,18 @@ async function resolveOwn(userId, body, label) {
   return selector;
 }
 
+// Les générations visées au parc safari : une liste d'entiers dans le corps,
+// ou rien pour toutes. Le jeu les revalide (safariGenerations) ; ici, on ne
+// laisse passer qu'une liste courte de nombres.
+function generationsOf(body) {
+  const list = body?.generations;
+  if (list === undefined || list === null) return null;
+  if (!Array.isArray(list) || list.length > 20 || !list.every(Number.isInteger)) {
+    throw new HttpError(400, "generations : une liste de générations.");
+  }
+  return list;
+}
+
 // Le résultat d'une action du jeu : { ok, reason } devient un 409 quand le jeu
 // refuse — ce n'est pas une panne, c'est une réponse.
 function outcome(result, data) {
@@ -259,6 +293,27 @@ async function lineageJson(userId, species) {
     speciesId: link.id,
     stage: link.stage,
     owned: owned.get(link.id) ?? { normal: 0, shiny: 0 },
+  }));
+}
+
+// Les formes d'une espèce qui en a, et celles que le dresseur possède : la
+// ligne « Formes » de la fiche Discord. null sans formes, ou sur une lecture
+// ratée — la fiche l'omet plutôt que d'annoncer zéro.
+async function formsJson(userId, species) {
+  const forms = speciesForms(species);
+  if (!forms.length) return null;
+  let owned;
+  try {
+    owned = await promise((cb) => getOwnedForms(userId, species.id, cb));
+  } catch (error) {
+    handleException("API web, lecture des formes :", error);
+    return null;
+  }
+  return forms.map((form) => ({
+    key: form.key,
+    name: form.name,
+    icon: iconUrl(species, false, form.key),
+    owned: owned.has(form.key),
   }));
 }
 
@@ -309,6 +364,7 @@ async function spawnJson(ctx, spawn, balance) {
       ? { label: charm.label, emoji: charm.emoji, image: itemImageUrl(charm.sprite), mine }
       : null,
     sex: spawn.sex ?? null,
+    form: formJson(species, spawn.form, Boolean(spawn.is_shiny) || mine),
     rarity: spawn.rarity,
     rarityLabel: RARITIES[spawn.rarity]?.label ?? null,
     // Figée à l'apparition, comme le taux de capture qui la fonde.
@@ -364,13 +420,18 @@ async function visitJson(session, owned) {
     actionsTotal: config.actionsPerSession,
     expiresAt: session.expires_at,
     finished,
-    catches: catches.map((row) => ({ speciesId: row.species_id, shiny: Boolean(row.is_shiny) })),
+    catches: catches.map((row) => ({
+      speciesId: row.species_id,
+      shiny: Boolean(row.is_shiny),
+      form: formJson(getSpecies(row.species_id), row.form, Boolean(row.is_shiny)),
+    })),
     ball: withImage(config.ball),
     encounter: species
       ? {
           speciesId: species.id,
           shiny: Boolean(session.encounter_is_shiny),
           sex: session.encounter_sex ?? null,
+          form: formJson(species, session.encounter_form, Boolean(session.encounter_is_shiny)),
           rarity: rarityOf(species),
           rarityLabel: RARITIES[rarityOf(species)].label,
           probability: safariCatchProbability(session.encounter_catch_rate, bait, config),
@@ -407,6 +468,8 @@ async function safariState(ctx) {
     retryAt: offer.retryAt,
     canBuy: !offer.blocked,
     blocked: offer.blocked,
+    // Les générations qu'on peut viser, dès qu'il y en a plus d'une.
+    generations: activeGeneration() > 1 ? safariGenerationChoices() : [],
   };
   return { json, ongoing: offer.ongoing };
 }
@@ -517,7 +580,10 @@ export const routes = [
     handler: async (ctx) => {
       const species = getAvailableSpecies(ctx.params.speciesId);
       if (!species) throw new HttpError(404, "Espèce inconnue.");
-      return { lineage: await lineageJson(ctx.user.id, species) };
+      return {
+        lineage: await lineageJson(ctx.user.id, species),
+        forms: await formsJson(ctx.user.id, species),
+      };
     },
   },
 
@@ -598,23 +664,56 @@ export const routes = [
   },
 
   // Ce qu'une évolution coûterait, sans rien faire : l'écran d'évolution.
+  // `helpers` : les objets qui peuvent y servir (evolutionHelpers), avec la
+  // forme qu'ils donnent ou le choix qu'ils laissent — joints aussi au refus
+  // d'une espèce qui n'évolue qu'avec l'un d'eux, pour que l'écran le propose.
   {
     method: "GET",
     path: "/api/species/:speciesId/evolution",
     handler: async (ctx) => {
+      const speciesId = Number(ctx.params.speciesId);
+      // Connecté, ce que le dresseur a en poche : `usable` suit le même tri que
+      // /pk evolution. Une lecture ratée omet l'information plutôt que de dire
+      // « tu n'en as aucun ».
+      let owned = null;
+      if (ctx.user) {
+        try {
+          const usable = await promise((cb) => usableHelpers(ctx.user.id, cb));
+          owned = new Map(usable.map((item) => [item.key, item.held]));
+        } catch (error) {
+          handleException("API web, objets d'évolution :", error);
+        }
+      }
+      const helpers = evolutionHelpers(speciesId).map((item) => {
+        const { helper } = describeHelper(item.key, speciesId);
+        return {
+          key: item.key,
+          label: item.label,
+          image: itemImageUrl(item.sprite),
+          quantity: helper.quantity,
+          target: helper.target,
+          choose: helper.choose,
+          held: owned ? (owned.get(item.key) ?? null) : null,
+          usable: owned ? owned.has(item.key) : null,
+        };
+      });
       const plan = describeEvolution(
-        Number(ctx.params.speciesId),
+        speciesId,
         ctx.query.targetId ? Number(ctx.query.targetId) : null,
         ctx.query.helper || null
       );
-      if (plan.error) throw new HttpError(409, plan.error);
+      if (plan.error) {
+        throw new HttpError(409, plan.error, plan.needs ? { needs: plan.needs, helpers } : null);
+      }
       return {
         targets: plan.targets.map((target) => target.id),
         target: plan.target?.id ?? null,
+        branching: plan.branching,
         sacrifices: plan.sacrifices,
         required: plan.required,
         points: plan.points,
         helper: plan.helper ? { key: plan.helper.item.key, quantity: plan.helper.quantity } : null,
+        helpers,
       };
     },
   },
@@ -647,6 +746,7 @@ export const routes = [
               speciesId: last.species_id,
               shiny: Boolean(last.is_shiny),
               sex: last.sex ?? null,
+              form: formJson(getSpecies(last.species_id), last.form, Boolean(last.is_shiny)),
               status: last.status,
               caughtBy: last.caught_by ? await trainerOf(ctx.bot, last.caught_by) : null,
               ball: last.caught_ball,
@@ -704,7 +804,9 @@ export const routes = [
     handler: async (ctx) => {
       const parkId = Number(ctx.body.parkId);
       if (!Number.isInteger(parkId) || parkId <= 0) throw new HttpError(400, "parkId invalide.");
-      const result = await promise((cb) => enterPark(ctx.user.id, parkId, cb));
+      const result = await promise((cb) =>
+        enterPark(ctx.user.id, parkId, { generations: generationsOf(ctx.body) }, cb)
+      );
       if (!result.ok) throw new HttpError(409, result.reason);
       // Une reprise n'est pas une entrée : le compteur du parc n'a pas bougé.
       if (!result.resumed) refreshParkMessage(ctx.bot, parkId);
@@ -722,15 +824,10 @@ export const routes = [
     auth: true,
     write: true,
     handler: async (ctx) => {
-      const result = await promise((cb) => startPaidSession(ctx.user.id, cb));
-      if (!result.ok) {
-        const rendu = result.refunded
-          ? ` Tes **${result.refunded}** points t'ont été rendus.`
-          : result.ticketRendu
-            ? " Ton **Ticket Safari** t'a été rendu."
-            : "";
-        throw new HttpError(409, `${result.reason}${rendu}`);
-      }
+      const result = await promise((cb) =>
+        startPaidSession(ctx.user.id, { generations: generationsOf(ctx.body) }, cb)
+      );
+      if (!result.ok) throw new HttpError(409, `${result.reason}${paidEntryRefund(result)}`);
       return {
         resumed: Boolean(result.resumed),
         ticket: result.ticket?.label ?? null,
@@ -862,7 +959,12 @@ export const routes = [
         final: isFinalThrow(outcome),
         remaining: outcome.remaining ?? null,
         pokemon: outcome.caught
-          ? { id: outcome.caught.id, sex: outcome.caught.sex, shiny: Boolean(outcome.shiny) }
+          ? {
+              id: outcome.caught.id,
+              sex: outcome.caught.sex,
+              shiny: Boolean(outcome.shiny),
+              form: formJson(outcome.species, outcome.caught.form, Boolean(outcome.shiny)),
+            }
           : null,
       };
     },
@@ -924,7 +1026,13 @@ export const routes = [
       const result = await promise((cb) => evolve(ctx.user.id, group, targetId, helper, cb));
       if (!result.ok && result.locked) throw new HttpError(409, result.reason, { locked: true });
       return outcome(result, ({ target, plan, spent, evolved, isShiny }) => ({
-        pokemon: { id: evolved.id, speciesId: target.id, sex: evolved.sex, shiny: isShiny },
+        pokemon: {
+          id: evolved.id,
+          speciesId: target.id,
+          sex: evolved.sex,
+          shiny: isShiny,
+          form: formJson(target, evolved.form, isShiny),
+        },
         // Les Métamorph qui ont comblé les sacrifices sont comptés à part : ce
         // ne sont pas des exemplaires de l'espèce.
         sacrificesSpent: spent.sacrifices,

@@ -157,6 +157,8 @@ const db = new sqlite3.Database(dbPath, (err) => {
     //   quelqu'un l'attrape, ni se rejouer à chaque lancer.
     // - `sex` : tiré à l'apparition pour que l'annonce le montre — et c'est
     //   celui qu'aura l'individu capturé. NULL pour une espèce asexuée.
+    // - `form` : sa forme d'apparence (la lettre d'un Zarbi), tirée de même ;
+    //   NULL pour une espèce qui n'en a pas.
     db.run(
       `CREATE TABLE IF NOT EXISTS pokemon_spawns (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -176,10 +178,12 @@ const db = new sqlite3.Database(dbPath, (err) => {
         flees_at INTEGER,
         held_item TEXT,
         sex TEXT,
-        charm_shiny INTEGER NOT NULL DEFAULT 0
+        charm_shiny INTEGER NOT NULL DEFAULT 0,
+        form TEXT
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_spawns :", err);
+        addColumn("pokemon_spawns", "form", "TEXT");
         // Garantie au niveau base : jamais deux spawns actifs en même temps.
         db.run(
           `CREATE UNIQUE INDEX IF NOT EXISTS idx_pokemon_spawn_active
@@ -239,6 +243,8 @@ const db = new sqlite3.Database(dbPath, (err) => {
     //   Du rangement, qui ne change rien au jeu (pokemon/pc.js).
     // - `locked` : verrouillé, il ne part jamais — ni revente, ni échange, ni
     //   sacrifice (lockedByDefault, /pk verrou).
+    // - `form` : sa forme d'apparence, la lettre d'un Zarbi ; NULL pour une
+    //   espèce qui n'en a pas. Une seule entrée de Pokédex pour toutes.
     db.run(
       `CREATE TABLE IF NOT EXISTS pokemon_owned (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -252,10 +258,12 @@ const db = new sqlite3.Database(dbPath, (err) => {
         obtained_at INTEGER NOT NULL,
         pc_pos INTEGER,
         nickname TEXT,
-        locked INTEGER NOT NULL DEFAULT 0
+        locked INTEGER NOT NULL DEFAULT 0,
+        form TEXT
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_owned :", err);
+        addColumn("pokemon_owned", "form", "TEXT");
         db.run(
           `CREATE INDEX IF NOT EXISTS idx_pokemon_owned_entry
              ON pokemon_owned(user_id, species_id, is_shiny)`,
@@ -349,10 +357,14 @@ const db = new sqlite3.Database(dbPath, (err) => {
         request_sex TEXT,
         request_fertile INTEGER,
         offer_pokemon_id INTEGER,
-        request_pokemon_id INTEGER
+        request_pokemon_id INTEGER,
+        offer_form TEXT,
+        request_form TEXT
       )`,
       (err) => {
-        if (err) handleException("Erreur création table pokemon_trades :", err);
+        if (err) return handleException("Erreur création table pokemon_trades :", err);
+        addColumn("pokemon_trades", "offer_form", "TEXT");
+        addColumn("pokemon_trades", "request_form", "TEXT");
       }
     );
 
@@ -564,10 +576,16 @@ const db = new sqlite3.Database(dbPath, (err) => {
         encounter_catch_rate INTEGER,
         encounter_bait INTEGER NOT NULL DEFAULT 0,
         encounter_sex TEXT,
-        shared_at INTEGER
+        shared_at INTEGER,
+        generations TEXT,
+        encounter_form TEXT
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_safari_sessions :", err);
+        // Les générations visées (« 1,2 »), NULL pour toutes ; la forme de la
+        // rencontre, comme celle d'une apparition.
+        addColumn("pokemon_safari_sessions", "generations", "TEXT");
+        addColumn("pokemon_safari_sessions", "encounter_form", "TEXT");
         // Une seule session à la fois par dresseur, garanti en base. Les index
         // se créent l'un après l'autre : sqlite3 n'ordonne pas deux db.run
         // successifs.
@@ -598,6 +616,19 @@ const db = new sqlite3.Database(dbPath, (err) => {
       }
     );
 
+    // Les générations déjà annoncées. La ligne est la revendication : un INSERT
+    // OR IGNORE dont this.changes dit qui annonce, si bien que deux passages du
+    // minuteur — ou un redémarrage à l'heure dite — n'annoncent qu'une fois.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_generations (
+        generation INTEGER PRIMARY KEY,
+        announced_at INTEGER NOT NULL
+      )`,
+      (err) => {
+        if (err) handleException("Erreur création table pokemon_generations :", err);
+      }
+    );
+
     // Captures du parc : alimente le bilan de fin de session.
     db.run(
       `CREATE TABLE IF NOT EXISTS pokemon_safari_catches (
@@ -605,10 +636,12 @@ const db = new sqlite3.Database(dbPath, (err) => {
         session_id INTEGER NOT NULL,
         species_id INTEGER NOT NULL,
         is_shiny INTEGER NOT NULL DEFAULT 0,
-        caught_at INTEGER NOT NULL
+        caught_at INTEGER NOT NULL,
+        form TEXT
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_safari_catches :", err);
+        addColumn("pokemon_safari_catches", "form", "TEXT");
         db.run(
           `CREATE INDEX IF NOT EXISTS idx_pokemon_safari_catches_session
              ON pokemon_safari_catches(session_id, id)`,
@@ -669,6 +702,19 @@ function createPointsLog() {
     });
   };
   next(statements);
+}
+
+// Ajoute une colonne aux bases qui l'ont précédée : une base neuve la reçoit
+// par son CREATE TABLE, une ancienne ici, une seule fois — le doublon est
+// attendu et ignoré. À appeler dans le rappel du CREATE TABLE, une fois la
+// table sûre d'exister. Chaque appel est temporaire, à retirer une fois
+// déployé.
+function addColumn(table, column, type) {
+  db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`, (err) => {
+    if (err && !/duplicate column/i.test(err.message)) {
+      handleException(`Erreur ajout de la colonne ${table}.${column} :`, err);
+    }
+  });
 }
 
 export default db;

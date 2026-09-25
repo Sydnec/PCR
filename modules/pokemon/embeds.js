@@ -4,6 +4,8 @@ import {
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
+  StringSelectMenuBuilder,
+  StringSelectMenuOptionBuilder,
 } from "discord.js";
 import { getBall, getPokemonConfig, getSafariConfig } from "./config.js";
 import { getCharmItem, getItem, sortByCatalogue } from "./items.js";
@@ -15,6 +17,7 @@ import {
   embedColor,
   evolutionChain,
   femaleShare,
+  formOf,
   getSpecies,
   isEggOnly,
   isEvolutionOnly,
@@ -25,7 +28,9 @@ import {
   safariBaitFactor,
   safariCatchProbability,
   safariFleeChance,
+  safariGenerationChoices,
   sexSymbol,
+  speciesForms,
   unobtainableMark,
   spriteUrl,
   tradeEvolutionTarget,
@@ -59,18 +64,23 @@ const ballResultIcon = (result) => (result === "CATCH" ? "✅" : "❌");
 // Le nom affiché porte la marque shiny partout où il apparaît, et le symbole
 // du sexe quand on parle d'un individu plutôt que d'une espèce — sauf pour les
 // Nidoran, dont le nom le porte déjà.
-export const displayName = (species, isShiny, sex = null) => {
+export const displayName = (species, isShiny, sex = null, form = null) => {
   const symbol = sex ? sexSymbol(sex) : "";
   const marked = symbol && !species.name.endsWith(symbol) ? ` ${symbol}` : "";
-  return `${isShiny ? "✨ " : ""}${species.name}${marked}`;
+  // La forme se lit comme dans les jeux : « Zarbi B ».
+  const variant = formOf(species, form);
+  return `${isShiny ? "✨ " : ""}${species.name}${variant ? ` ${variant.name}` : ""}${marked}`;
 };
 
 // Un groupe d'individus tel qu'une commande le désigne : « Pikachu ♀ », suivi
 // de sa fertilité quand elle compte — pour un échange ou une ponte, une femelle
 // stérile ne vaut pas une femelle fertile.
-export const describeGroup = (species, { isShiny, sex = null, fertile = null, pokemonId = null }) =>
+export const describeGroup = (
+  species,
+  { isShiny, sex = null, fertile = null, pokemonId = null, form = null }
+) =>
   (pokemonId ? `#${pokemonId} ` : "") +
-  displayName(species, isShiny, sex) +
+  displayName(species, isShiny, sex, form) +
   (fertile === null || fertile === undefined ? "" : fertile ? " (fertile)" : " (stérile)");
 
 // Ligne « difficulté » : les probabilités réelles par ball. Indispensable, car
@@ -102,13 +112,13 @@ export function buildSpawnEmbed(spawn, species, throws = [], announcement = null
   const rarity = RARITIES[spawn.rarity] ?? RARITIES[rarityOf(species)];
 
   // Le sexe dans le titre : un symbole, pas un emoji, donc Discord l'affiche.
-  const name = displayName(species, false, spawn.sex);
+  const name = displayName(species, false, spawn.sex, spawn.form);
   const embed = new EmbedBuilder()
     .setTitle(
       isShiny ? `✨ Un ${name} SHINY apparaît ! ✨` : `Un ${name} sauvage apparaît !`
     )
     .setColor(embedColor(species, isShiny))
-    .setImage(spriteUrl(species, isShiny))
+    .setImage(spriteUrl(species, isShiny, spawn.form))
     .addFields(
       {
         name: "Rareté",
@@ -256,7 +266,7 @@ export function buildSpeciesInfoEmbed(
   // catchRate se passe explicitement : une apparition fige le sien à la
   // naissance du spawn, et la fiche doit annoncer le même chiffre que l'embed
   // d'où l'on vient, pas celui d'un dataset régénéré entre-temps.
-  { owned = new Map(), isShiny = false, catchRate = species.catchRate } = {}
+  { owned = new Map(), isShiny = false, catchRate = species.catchRate, forms = null } = {}
 ) {
   const rarity = RARITIES[rarityOf(species)];
   const ball = referenceBall(catchRate);
@@ -304,6 +314,21 @@ export function buildSpeciesInfoEmbed(
       name: solo ? "Ton Pokédex" : STAGE_LABELS[stage - 1] ?? `Stade ${stage - 1}`,
       value: lines.join("\n"),
       inline: true,
+    });
+  }
+
+  // Les formes d'une espèce qui en a — les lettres de Zarbi : celles que le
+  // dresseur possède, sur celles que la génération ouverte connaît. Sans
+  // lecture de sa collection (`forms` null), le champ n'apparaît pas.
+  const known = speciesForms(species);
+  if (known.length && forms) {
+    const mine = known.filter((form) => forms.has(form.key));
+    embed.addFields({
+      name: "Formes",
+      value:
+        `**${mine.length}**/${known.length}` +
+        (mine.length ? ` : ${mine.map((form) => form.name).join(" ")}` : ""),
+      inline: false,
     });
   }
 
@@ -394,11 +419,12 @@ export function buildCaughtEmbed(
 
   return new EmbedBuilder()
     .setDescription(
-      `${ball?.emoji ?? ""} **${displayName(species, isShiny, spawn.sex)}** a été capturé par <@${winnerId}>` +
+      `${ball?.emoji ?? ""} **${displayName(species, isShiny, spawn.sex, spawn.form)}** a été ` +
+        `capturé par <@${winnerId}>` +
         (charm ? `, et il brillait grâce à son ${charm.emoji} **${charm.label}** !` : " !")
     )
     .setColor(embedColor(species, isShiny))
-    .setThumbnail(spriteUrl(species, isShiny))
+    .setThumbnail(spriteUrl(species, isShiny, spawn.form))
     .addFields(
       { name: "Lancers", value: `${spawn.throw_count}`, inline: true },
       ...heldItemField(spawn, { dropped }),
@@ -415,10 +441,10 @@ export function buildFledEmbed(spawn, species, spending, { dropped = false } = {
   const total = spending?.total ?? 0;
 
   return new EmbedBuilder()
-    .setTitle(`\u{1F4A8} ${displayName(species, isShiny, spawn.sex)} s'est enfui...`)
+    .setTitle(`\u{1F4A8} ${displayName(species, isShiny, spawn.sex, spawn.form)} s'est enfui...`)
     .setDescription("Personne n'a réussi à le capturer à temps.")
     .setColor(0x4f545c)
-    .setThumbnail(spriteUrl(species, isShiny))
+    .setThumbnail(spriteUrl(species, isShiny, spawn.form))
     .addFields(
       { name: "Lancers", value: `${spawn.throw_count}`, inline: true },
       ...heldItemField(spawn, { fled: true, dropped }),
@@ -555,7 +581,7 @@ export function individualChoices(rows, query, keep = () => true) {
       const ball = ballOf(row.ball);
       return {
         name:
-          `#${row.id} · ${species ? displayName(species, row.is_shiny, row.sex) : "?"}` +
+          `#${row.id} · ${species ? displayName(species, row.is_shiny, row.sex, row.form) : "?"}` +
           (ball ? ` · ${ball.label}` : "") +
           (row.sterile ? " · stérile" : "") +
           (row.locked ? " · 🛡️ verrouillé" : ""),
@@ -573,7 +599,7 @@ function individualLine(row) {
   const ball = ballOf(row.ball);
   const provenance = ball ? `${ball.emoji} ${ball.label}` : ORIGINS[row.origin] ?? "—";
   return (
-    `\`#${row.id}\` **${species ? displayName(species, row.is_shiny, row.sex) : "?"}**` +
+    `\`#${row.id}\` **${species ? displayName(species, row.is_shiny, row.sex, row.form) : "?"}**` +
     ` · ${provenance}` +
     (row.origin === "echange" ? " · reçu en échange" : "") +
     ` · ${shortDate(row.obtained_at)}` +
@@ -946,6 +972,7 @@ export function buildTradeEmbed(trade, status = "PENDING") {
       pokemonId: trade[`${prefix}_pokemon_id`] ?? null,
       isShiny: trade[`${prefix}_is_shiny`],
       sex: trade[`${prefix}_sex`] || null,
+      form: trade[`${prefix}_form`] || null,
       fertile:
         trade[`${prefix}_fertile`] === null || trade[`${prefix}_fertile`] === undefined
           ? null
@@ -959,7 +986,7 @@ export function buildTradeEmbed(trade, status = "PENDING") {
       `<@${trade.from_user_id}> propose **${side("offer", offered)}**\n` +
         `contre **${side("request", requested)}** de <@${trade.to_user_id}>.`
     )
-    .setThumbnail(spriteUrl(offered, trade.offer_is_shiny));
+    .setThumbnail(spriteUrl(offered, trade.offer_is_shiny, trade.offer_form));
 
   if (style.note) embed.addFields({ name: "Raison", value: style.note });
 
@@ -1086,7 +1113,7 @@ export function buildParkRow(parkId, { disabled = false } = {}) {
 // clic, il n'y a pas de fil de discussion où relire ce qui s'est passé.
 // Exportée : le site raconte l'action avec la même phrase.
 export function safariOutcomeLine(result, config) {
-  const name = displayName(result.species, result.isShiny, result.sex);
+  const name = displayName(result.species, result.isShiny, result.sex, result.form);
   switch (result.outcome) {
     case "CATCH":
       return `\u{1F389} **${name}** est capturé ! Il rejoint ton Pokédex.`;
@@ -1148,7 +1175,7 @@ function buildEncounterEmbed(session, species, config, { intro = null, owned = n
   // « Rareté | Type | Chances » puis « Ton Pokédex | Actions restantes ».
   const ownership = ownedLine(owned, isShiny);
 
-  const name = displayName(species, false, session.encounter_sex);
+  const name = displayName(species, false, session.encounter_sex, session.encounter_form);
   const embed = new EmbedBuilder()
     .setTitle(
       isShiny
@@ -1156,7 +1183,7 @@ function buildEncounterEmbed(session, species, config, { intro = null, owned = n
         : `Un ${name} sauvage vous observe...`
     )
     .setColor(embedColor(species, isShiny))
-    .setImage(spriteUrl(species, isShiny))
+    .setImage(spriteUrl(species, isShiny, session.encounter_form))
     .addFields(
       { name: "Rareté", value: `${rarity.icon} ${rarity.label}`, inline: true },
       { name: "Type", value: species.types.join(" / "), inline: true },
@@ -1269,6 +1296,109 @@ export function buildSafariView(
   };
 }
 
+// Le choix des générations visées au parc, avant d'y entrer : un menu à choix
+// multiple, toutes cochées par défaut, et le bouton qui entre. Le bouton porte
+// le choix dans son customId (« 1,2 ») : le menu réécrit le message à chaque
+// changement, rien n'est gardé en mémoire. `mode` : « park » pour l'entrée
+// gratuite d'un parc ouvert (`parkId`), « paid » pour /pk safari.
+export function buildSafariGenerationPicker(mode, parkId, selected = null) {
+  const choices = safariGenerationChoices();
+  const all = choices.map((choice) => choice.generation);
+  const valid = (selected ?? []).filter((generation) => all.includes(generation));
+  const chosen = valid.length ? valid : all;
+  const select = new StringSelectMenuBuilder()
+    .setCustomId(`poke_safari_gens|${mode}|${parkId}`)
+    .setPlaceholder("Les générations que tu vises")
+    .setMinValues(1)
+    .setMaxValues(choices.length)
+    .addOptions(
+      choices.map(({ generation, ordinal, species }) =>
+        new StringSelectMenuOptionBuilder()
+          .setLabel(`${ordinal} génération`)
+          .setDescription(`${species.toLocaleString("fr-FR")} espèces à croiser`)
+          .setValue(String(generation))
+          .setDefault(chosen.includes(generation))
+      )
+    );
+  const enter = new ButtonBuilder()
+    .setCustomId(`poke_safari_go|${mode}|${parkId}|${chosen.join(",")}`)
+    .setLabel("Entrer dans le parc")
+    .setEmoji("\u{1F33F}")
+    .setStyle(ButtonStyle.Success);
+  return [
+    new ActionRowBuilder().addComponents(select),
+    new ActionRowBuilder().addComponents(enter),
+  ];
+}
+
+// Une visite offerte attend : on ne débite pas le prix d'une entrée pour la
+// même chose sans le dire. /pk safari le dit avant le choix des générations,
+// son bouton d'entrée au clic.
+export function freeParkNotice() {
+  return (
+    "🏕️ Un parc safari est ouvert en ce moment et **ton entrée est offerte** !\n" +
+    "Utilise le bouton *« Entrer dans le parc »* sur son message plutôt que de payer " +
+    `**${getSafariConfig().entryPrice.toLocaleString("fr-FR")}** points.`
+  );
+}
+
+// Le message du choix des générations : ce qui attend derrière le bouton.
+export function safariPickerContent(mode) {
+  const config = getSafariConfig();
+  return (
+    "\u{1F33F} **Quelles générations vises-tu ?** Les rencontres de ta visite ne viendront que " +
+    "d'elles." +
+    (mode === "paid"
+      ? `\nL'entrée se règle au clic : un Ticket Safari s'il t'en reste, sinon ` +
+        `**${config.entryPrice.toLocaleString("fr-FR")}** points.`
+      : "\nTon entrée est offerte.")
+  );
+}
+
+// Ce que répond une entrée payante (startPaidSession) : la visite, ou le refus
+// et ce qui a été rendu. /pk safari et le bouton du choix des générations
+// répondent la même chose.
+// Ce que l'entrée a rendu, s'il a fallu défaire quelque chose. La phrase suit
+// les DEUX sorties : un refus après un ticket consommé laissait croire que
+// l'objet le plus rare du jeu avait été mangé pour rien. Discord et le site la
+// disent de la même façon.
+export const paidEntryRefund = (result) =>
+  result.refunded
+    ? ` Tes **${result.refunded.toLocaleString("fr-FR")}** points t'ont été rendus.`
+    : result.ticketRendu
+      ? " Ton **Ticket Safari** t'a été rendu."
+      : "";
+
+export function buildPaidEntryReply(result) {
+  const config = getSafariConfig();
+  const rendu = paidEntryRefund(result);
+
+  if (!result.ok) {
+    const content =
+      result.code === "COOLDOWN"
+        ? `⏳ Tu as déjà visité le parc récemment. Prochaine entrée possible <t:${Math.floor(result.retryAt / 1000)}:R>.`
+        : `❌ ${result.reason}`;
+    return { content: content + rendu, embeds: [], components: [] };
+  }
+
+  // Le contenu s'écrit APRÈS l'étalement de la vue : celle-ci porte le sien (la
+  // phrase de reprise, ou null pour effacer ce qui traîne), et l'ordre inverse
+  // le ferait écraser.
+  //
+  // Une visite ouverte entre la vérification et le débit est rendue telle
+  // quelle : c'est une reprise, pas l'entrée qu'on vient de payer.
+  const view = buildSafariView(result.session, { owned: result.owned, resumed: result.resumed });
+  const content = result.resumed
+    ? view.content + rendu
+    : result.ticket
+      ? `🎟️ Tu présentes ton **${result.ticket.label}** à l'entrée et franchis les grilles ` +
+        `du parc safari. **${config.actionsPerSession} actions**, et pas un point dépensé.`
+      : `🏕️ Tu paies **${config.entryPrice.toLocaleString("fr-FR")}** points et franchis ` +
+        `les grilles du parc safari. **${config.actionsPerSession} actions**, et plus rien ` +
+        `à débourser.`;
+  return { ...view, content };
+}
+
 // `author` bascule le bilan en version publique : même embed, signé. Une
 // seconde fonction aurait divergé du privé au premier champ ajouté.
 export function buildSafariRecapEmbed(
@@ -1283,7 +1413,7 @@ export function buildSafariRecapEmbed(
     const species = getSpecies(row.species_id);
     if (!species) return null;
     const rarity = RARITIES[rarityOf(species)];
-    return `${rarity.icon} ${displayName(species, row.is_shiny)}`;
+    return `${rarity.icon} ${displayName(species, row.is_shiny, null, row.form)}`;
   });
   const caught = lines.filter(Boolean);
 
