@@ -1767,6 +1767,16 @@
       "commit": "pending",
       "timestamp": "2026-09-25T10:57:14.000Z",
       "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "feature",
+      "name": "/pk doublons : garder de quoi évoluer",
+      "description": "Nouvelle option evolutions sur /pk doublons : elle met de côté ce qu'il faut pour les évolutions qui manquent au Pokédex du dresseur, évolutions d'évolutions comprises, et ne montre que le vrai surplus.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-25T11:46:51.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
     }
   ]
 }

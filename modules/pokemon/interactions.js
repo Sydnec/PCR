@@ -277,7 +277,7 @@ function showBoxPage(interaction, ownerId, speciesId, page) {
 // ---------------------- Doublons ----------------------
 
 // La page demandée des doublons, relue en base à chaque clic, comme la boîte.
-function showDuplicatesPage(interaction, ownerId, page) {
+function showDuplicatesPage(interaction, ownerId, page, { reserve = false } = {}) {
   getIndividuals(ownerId, async (err, rows) => {
     if (err) {
       handleException("Lecture des doublons :", err);
@@ -289,29 +289,29 @@ function showDuplicatesPage(interaction, ownerId, page) {
     } catch (error) {
       // Dresseur parti du serveur : on affiche quand même ses doublons.
     }
-    const list = listDuplicates(rows);
+    const list = listDuplicates(rows, { reserve });
     await interaction
       .update({
-        embeds: [buildDuplicatesEmbed(list, { user: owner, page })],
-        components: [buildDuplicatesRow(ownerId, page, list.length)],
+        embeds: [buildDuplicatesEmbed(list, { user: owner, page, reserve })],
+        components: [buildDuplicatesRow(ownerId, page, list.length, { reserve })],
       })
       .catch(() => {});
   });
 }
 
 // L'inverse, qui a cette espèce en double : relu à chaque clic lui aussi.
-function showSpeciesDuplicatesPage(interaction, speciesId, page) {
+function showSpeciesDuplicatesPage(interaction, speciesId, page, { reserve = false } = {}) {
   const species = getSpecies(speciesId);
   if (!species) return ephemeral(interaction, "❌ Espèce inconnue.");
-  getSpeciesDuplicates(species.id, (err, list) => {
+  getSpeciesDuplicates(species.id, { reserve }, (err, list) => {
     if (err) {
       handleException("Lecture des doublons d'une espèce :", err);
       return ephemeral(interaction, "❌ Impossible de lire les doublons.");
     }
     interaction
       .update({
-        embeds: [buildSpeciesDuplicatesEmbed(species, list, { page })],
-        components: [buildSpeciesDuplicatesRow(species.id, page, list.length)],
+        embeds: [buildSpeciesDuplicatesEmbed(species, list, { page, reserve })],
+        components: [buildSpeciesDuplicatesRow(species.id, page, list.length, { reserve })],
       })
       .catch(() => {});
   });
@@ -745,10 +745,16 @@ export async function handlePokemonButton(interaction) {
       return showBoxPage(interaction, args[0], Number(args[1]) || null, Number(args[2]) || 0);
 
     case "poke_dup":
-      return showDuplicatesPage(interaction, args[0], Number(args[1]) || 0);
+    case "poke_dupr":
+      return showDuplicatesPage(interaction, args[0], Number(args[1]) || 0, {
+        reserve: action === "poke_dupr",
+      });
 
     case "poke_dupsp":
-      return showSpeciesDuplicatesPage(interaction, Number(args[0]), Number(args[1]) || 0);
+    case "poke_dupspr":
+      return showSpeciesDuplicatesPage(interaction, Number(args[0]), Number(args[1]) || 0, {
+        reserve: action === "poke_dupspr",
+      });
 
     // Le cinquième segment, facultatif, est l'objet qui aide l'évolution : une
     // pierre impose alors sa cible, un bonbon remplace un sacrifice manquant.
