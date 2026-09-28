@@ -3,9 +3,14 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  ContainerBuilder,
   EmbedBuilder,
+  MediaGalleryBuilder,
+  MediaGalleryItemBuilder,
+  MessageFlags,
   StringSelectMenuBuilder,
   StringSelectMenuOptionBuilder,
+  TextDisplayBuilder,
 } from "discord.js";
 import { getBall, getPokemonConfig, getSafariConfig } from "./config.js";
 import { getCharmItem, getItem, sortByCatalogue } from "./items.js";
@@ -1479,37 +1484,66 @@ export function buildSafariRecapEmbed(
 
 // ====================== VITRINE ======================
 
-// Un encart par Pokémon exposé, dans l'ordre de la vitrine : son image, son
-// surnom s'il en a un, et ce qui le distingue — rareté, ball, date d'arrivée.
-// Le titre ne porte ni emoji du serveur ni mention, que Discord n'y rend pas.
-export function buildShowcaseEmbeds(rows) {
-  return rows
-    .map((row) => {
-      const species = getSpecies(row.species_id);
-      if (!species) return null;
-      const shiny = Boolean(row.is_shiny);
-      const name = displayName(species, shiny, row.sex, row.form);
-      const rarity = RARITIES[rarityOf(species)];
-      return new EmbedBuilder()
-        .setTitle(row.nickname || name)
-        .setColor(embedColor(species, shiny))
-        .setThumbnail(spriteUrl(species, shiny, row.form))
-        .setDescription(
-          [
-            row.nickname ? `**${name}**` : null,
-            `${rarity.icon} ${rarity.label} · Pokédex ${dexNumber(species)}`,
-            `${provenanceOf(row)} · depuis le ${shortDate(row.obtained_at)}`,
-          ]
-            .filter(Boolean)
-            .join("\n")
+// La vitrine en un seul bloc, au format « conteneur » de Discord : un embed
+// ne porte qu'une image, un conteneur en aligne jusqu'à dix. Sous l'en-tête,
+// les images en grille (trois par ligne pour six, comme sur le site), puis une
+// ligne par Pokémon dans le même ordre, numérotée pour s'y retrouver. `intro`
+// précède le bloc, pour dire ce qui vient de changer ; seule sa propre vitrine
+// porte le bouton qui la montre dans le salon. Le message qui en sort ne peut
+// plus porter de `content` : sa réponse se modifie avec showcaseNotice.
+export function buildShowcaseMessage(rows, { title, intro = null, shareable = false }) {
+  const shown = rows
+    .map((row) => ({ row, species: getSpecies(row.species_id) }))
+    .filter(({ species }) => species);
+  const names = shown.map(({ row, species }) =>
+    displayName(species, Boolean(row.is_shiny), row.sex, row.form)
+  );
+  const lines = shown.map(({ row, species }, index) => {
+    const rarity = RARITIES[rarityOf(species)];
+    return (
+      `**${index + 1}.** ` +
+      (row.nickname ? `**${row.nickname}** · ${names[index]}` : `**${names[index]}**`) +
+      ` · ${rarity.icon} ${rarity.label} · ${provenanceOf(row)} · \`#${row.id}\``
+    );
+  });
+
+  const container = new ContainerBuilder().addTextDisplayComponents(
+    new TextDisplayBuilder().setContent(`### 🏆 ${title}`)
+  );
+  if (shown.length) {
+    const [first] = shown;
+    container
+      .setAccentColor(embedColor(first.species, Boolean(first.row.is_shiny)))
+      .addMediaGalleryComponents(
+        new MediaGalleryBuilder().addItems(
+          shown.map(({ row, species }, index) =>
+            new MediaGalleryItemBuilder()
+              .setURL(spriteUrl(species, Boolean(row.is_shiny), row.form))
+              .setDescription(row.nickname || names[index])
+          )
         )
-        .setFooter({ text: `#${row.id}` });
-    })
-    .filter(Boolean);
+      )
+      .addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join("\n")));
+  }
+  return {
+    components: [
+      ...(intro ? [new TextDisplayBuilder().setContent(intro)] : []),
+      container,
+      ...(shareable ? [buildShowcaseShareRow()] : []),
+    ],
+    flags: MessageFlags.IsComponentsV2,
+  };
 }
 
+// Ce qui remplace une vitrine affichée (« ✅ montrée dans… ») : un message au
+// format conteneur le reste, et n'accepte plus qu'un texte en composant.
+export const showcaseNotice = (text) => ({
+  components: [new TextDisplayBuilder().setContent(text)],
+  flags: MessageFlags.IsComponentsV2,
+});
+
 // Le bouton qui montre sa propre vitrine dans le salon.
-export function buildShowcaseShareRow() {
+function buildShowcaseShareRow() {
   return new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId("poke_showcase_share")

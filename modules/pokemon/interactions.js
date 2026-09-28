@@ -62,10 +62,11 @@ import {
   buildSpeciesInfoEmbed,
   buildTradeEmbed,
   buildTradeRow,
-  buildShowcaseEmbeds,
+  buildShowcaseMessage,
   displayName,
   freeParkNotice,
   safariPickerContent,
+  showcaseNotice,
 } from "./embeds.js";
 
 const ephemeral = (interaction, content) =>
@@ -793,8 +794,7 @@ async function handleShowcaseShare(interaction) {
   await interaction.deferUpdate().catch(() => {});
   try {
     await channel.send({
-      content: `🏆 Vitrine de <@${userId}>`,
-      embeds: buildShowcaseEmbeds(rows),
+      ...buildShowcaseMessage(rows, { title: `Vitrine de <@${userId}>` }),
       allowedMentions: { parse: [] },
     });
   } catch (error) {
@@ -815,7 +815,7 @@ async function handleShowcaseShare(interaction) {
   }
   log(`Vitrine de ${pseudoOf(interaction)} montrée dans #${channel.name ?? channel.id}`);
   await interaction
-    .editReply({ content: `✅ Ta vitrine est montrée dans ${channel}.`, components: [] })
+    .editReply(showcaseNotice(`✅ Ta vitrine est montrée dans ${channel}.`))
     .catch(() => {});
 }
 
