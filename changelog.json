@@ -1905,5 +1905,26 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "feature",
+      "name": "Vitrine",
+      "description": "Avec /pk vitrine, expose jusqu'à 6 de tes Pokémon, regarde celles des autres et montre la tienne dans le salon d'un clic. Sur le site aussi : l'étoile dans la boîte et l'onglet Vitrine.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-28T11:17:50.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "feature",
+      "name": "Page Dresseurs sur le site",
+      "description": "Une page liste tous les dresseurs et ouvre le profil de chacun : son Pokédex et sa vitrine.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-28T11:29:08.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    }
+  ]
 }

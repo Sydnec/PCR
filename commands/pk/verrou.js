@@ -10,6 +10,7 @@ import { getSpecies } from "../../modules/pokemon/data.js";
 import {
   displayName,
   individualChoices,
+  ownedSpeciesChoices,
   respondHint as hint,
 } from "../../modules/pokemon/embeds.js";
 
@@ -57,21 +58,7 @@ export default {
         if (!choices.length) return hint(interaction, `Tu n'as plus de ${species.name}`);
         return interaction.respond(choices).catch(() => {});
       }
-      const needle = query.toLowerCase();
-      const choices = [...countBySpecies(rows)]
-        .map(([speciesId, { total, free }]) => {
-          const species = getSpecies(speciesId);
-          if (!species) return null;
-          const locked = total - free;
-          return {
-            name:
-              `${species.name} (×${total.toLocaleString("fr-FR")}` +
-              `${locked ? `, dont ${locked.toLocaleString("fr-FR")} 🛡️` : ""})`,
-            value: String(speciesId),
-          };
-        })
-        .filter((choice) => choice && choice.name.toLowerCase().includes(needle))
-        .slice(0, 25);
+      const choices = ownedSpeciesChoices(countBySpecies(rows), query);
       if (!choices.length) return hint(interaction, "Aucun Pokémon de ta boîte ne correspond");
       interaction.respond(choices).catch(() => {});
     });

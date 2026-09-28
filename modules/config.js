@@ -163,6 +163,11 @@ const POKEMON = {
   },
   pokedex: { pageSize: 30 },
   box: { pageSize: 15 },
+  // La vitrine : les Pokémon qu'un dresseur expose aux autres, `slots` au plus,
+  // comme une équipe. Du décor, qui ne change rien au jeu. Le bouton qui la
+  // montre dans le salon attend `shareCooldownMinutes` entre deux envois : de
+  // quoi frimer, pas inonder le salon.
+  showcase: { slots: 6, shareCooldownMinutes: 60 },
   // La boîte PC du site : des boîtes de `slotsPerBox` places, sur `columns`
   // colonnes, qu'on nomme et où l'on range ses Pokémon comme on veut. Il y en a
   // toujours au moins `minBoxes`, et une vide après la dernière occupée pour
@@ -617,6 +622,8 @@ const BOUNDS = {
   // Pokédex au nombre de pages infini et vide.
   "pokemon.pokedex.pageSize": { min: 1 },
   "pokemon.box.pageSize": { min: 1, max: 25 },
+  // Un encart par Pokémon exposé, et Discord n'en accepte que dix par message.
+  "pokemon.showcase.slots": { min: 1, max: 10 },
   // Changer la taille d'une boîte redistribue les places : on la borne à ce
   // qu'une grille affiche lisiblement.
   "pokemon.pc.slotsPerBox": { min: 6, max: 60 },

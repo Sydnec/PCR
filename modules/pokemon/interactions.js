@@ -31,6 +31,7 @@ import {
   startPaidSession,
 } from "./safari.js";
 import { activeGeneration, getSpecies } from "./data.js";
+import { claimShowcaseShare, getShowcase, releaseShowcaseShare } from "./showcase.js";
 import {
   DITTO_HELPER,
   acceptTrade,
@@ -61,6 +62,7 @@ import {
   buildSpeciesInfoEmbed,
   buildTradeEmbed,
   buildTradeRow,
+  buildShowcaseEmbeds,
   displayName,
   freeParkNotice,
   safariPickerContent,
@@ -651,6 +653,23 @@ const ENVOI_IMPOSSIBLE = new Set([
 // que le bot lui avait mis sous les yeux, dans le salon même où le parc s'était
 // annoncé — et ce bouton ne poste rien d'autre que le bilan d'une visite que le
 // bot a lui-même arbitrée.
+// Ce qui empêcherait le bot de publier un embed dans ce salon, ou null : le
+// partage du bilan du parc et celui de la vitrine le vérifient avant de rien
+// revendiquer.
+function postingProblem(interaction, channel) {
+  const envoi = channel.isThread()
+    ? PermissionFlagsBits.SendMessagesInThreads
+    : PermissionFlagsBits.SendMessages;
+  // EmbedLinks en plus de l'envoi : sans elle Discord refuse l'embed, et la
+  // garde raterait la seule chose qu'elle est censée voir venir.
+  const moi = channel.permissionsFor(interaction.guild?.members.me);
+  if (!moi?.has([PermissionFlagsBits.ViewChannel, envoi, PermissionFlagsBits.EmbedLinks])) {
+    return `❌ Je ne peux pas publier d'embed dans ${channel}.`;
+  }
+  if (channel.isThread() && channel.locked) return `❌ ${channel} est verrouillé.`;
+  return null;
+}
+
 function handleSafariShare(interaction, sessionId) {
   const channel = interaction.channel;
   if (!channel) return ephemeral(interaction, "❌ Salon introuvable.");
@@ -674,18 +693,8 @@ function handleSafariShare(interaction, sessionId) {
       }
       if (!result.ok) return dire(`❌ ${result.reason}`);
 
-      const envoi = channel.isThread()
-        ? PermissionFlagsBits.SendMessagesInThreads
-        : PermissionFlagsBits.SendMessages;
-      // EmbedLinks en plus de l'envoi : sans elle Discord refuse l'embed, et la
-      // garde raterait la seule chose qu'elle est censée voir venir.
-      const moi = channel.permissionsFor(interaction.guild?.members.me);
-      if (!moi?.has([PermissionFlagsBits.ViewChannel, envoi, PermissionFlagsBits.EmbedLinks])) {
-        return dire(`❌ Je ne peux pas publier d'embed dans ${channel}.`);
-      }
-      if (channel.isThread() && channel.locked) {
-        return dire(`❌ ${channel} est verrouillé.`);
-      }
+      const probleme = postingProblem(interaction, channel);
+      if (probleme) return dire(probleme);
 
       const claim = await new Promise((resolve) =>
         claimShare(result.session.id, (err, ok) => resolve({ err, ok }))
@@ -744,6 +753,70 @@ function handleSafariShare(interaction, sessionId) {
       await dire("❌ Erreur pendant le partage.");
     }
   });
+}
+
+// Montrer sa vitrine dans le salon. Un envoi par dresseur toutes les
+// `shareCooldownMinutes`, revendiqué en base avant l'envoi et rendu s'il n'a
+// pas pu partir — comme le partage du bilan du parc. La vitrine se relit au
+// moment d'envoyer : c'est celle d'aujourd'hui qui part, pas celle de l'écran.
+async function handleShowcaseShare(interaction) {
+  const channel = interaction.channel;
+  if (!channel) return ephemeral(interaction, "❌ Salon introuvable.");
+  const probleme = postingProblem(interaction, channel);
+  if (probleme) return ephemeral(interaction, probleme);
+
+  const userId = interaction.user.id;
+  const rows = await new Promise((resolve) =>
+    getShowcase(userId, (err, list) => {
+      if (err) handleException("Lecture de la vitrine :", err);
+      resolve(err ? null : list);
+    })
+  );
+  if (!rows) return ephemeral(interaction, "❌ Erreur base de données.");
+  if (!rows.length) return ephemeral(interaction, "❌ Ta vitrine est vide.");
+
+  const claim = await new Promise((resolve) =>
+    claimShowcaseShare(userId, (err, result) => resolve({ err, result }))
+  );
+  if (claim.err) {
+    handleException("Revendication de l'envoi de la vitrine :", claim.err);
+    return ephemeral(interaction, "❌ Erreur base de données.");
+  }
+  if (!claim.result.ok) {
+    return ephemeral(
+      interaction,
+      `⏳ Ta vitrine a déjà été montrée il y a peu : prochain envoi possible ` +
+        `<t:${Math.ceil(claim.result.retryAt / 1000)}:R>.`
+    );
+  }
+
+  await interaction.deferUpdate().catch(() => {});
+  try {
+    await channel.send({
+      content: `🏆 Vitrine de <@${userId}>`,
+      embeds: buildShowcaseEmbeds(rows),
+      allowedMentions: { parse: [] },
+    });
+  } catch (error) {
+    handleException("Envoi de la vitrine :", error);
+    if (ENVOI_IMPOSSIBLE.has(error?.code)) {
+      releaseShowcaseShare(userId, claim.result.sharedAt, (err) => {
+        if (err) handleException("Restitution de l'envoi de la vitrine :", err);
+      });
+    }
+    return interaction
+      .followUp({
+        content: ENVOI_IMPOSSIBLE.has(error?.code)
+          ? `❌ Je n'ai pas pu publier dans ${channel}. Tu peux réessayer.`
+          : "⚠️ L'envoi a échoué, mais il a peut-être abouti quand même : va voir le salon.",
+        flags: MessageFlags.Ephemeral,
+      })
+      .catch(() => {});
+  }
+  log(`Vitrine de ${pseudoOf(interaction)} montrée dans #${channel.name ?? channel.id}`);
+  await interaction
+    .editReply({ content: `✅ Ta vitrine est montrée dans ${channel}.`, components: [] })
+    .catch(() => {});
 }
 
 function handleSafariAction(interaction, action, sessionId, token) {
@@ -893,6 +966,13 @@ export async function handlePokemonButton(interaction) {
 
     case "poke_safari_share":
       return handleSafariShare(interaction, args[0]);
+
+    case "poke_showcase_share":
+      // Asynchrone et détaché du routeur : une exception ne doit pas partir en
+      // rejet non capturé.
+      return handleShowcaseShare(interaction).catch((error) =>
+        handleException("Envoi de la vitrine :", error)
+      );
 
     case "poke_trade_accept":
       return handleTradeButton(interaction, "accept", args[0]);

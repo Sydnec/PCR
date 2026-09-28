@@ -551,9 +551,10 @@ export function toggleLock(userId, pokemonId, cb) {
 // dernier de son espèce — avec un Salamèche et un Salamèche shiny, l'un ou
 // l'autre peut partir.
 //
-// Parmi les candidats, on prend d'abord ce qui vaut le moins — les normaux
-// avant les shiny, puis les stériles, puis les plus récents : un individu
-// encore capable de pondre ne part qu'en dernier. Une variante absente du
+// Parmi les candidats, on prend d'abord ce qui vaut le moins — ceux qui ne
+// sont pas en vitrine, puis les normaux avant les shiny, puis les stériles,
+// puis les plus récents : un individu encore capable de pondre ne part qu'en
+// dernier, et un exposé après tous les autres. Une variante absente du
 // groupe veut dire « shiny ou non ». Un verrouillé n'est jamais candidat, sauf
 // avec `withLocked` : l'individu qui évolue ne quitte pas la boîte, il revient
 // sous sa nouvelle forme — et même alors, un ouvert passe avant lui.
@@ -585,7 +586,8 @@ export function reserveDuplicates(userId, group, quantity, cb) {
     `DELETE FROM pokemon_owned
       WHERE id IN (
         SELECT o.id FROM pokemon_owned o WHERE ${filter}
-         ORDER BY o.locked ASC, o.is_shiny ASC, o.sterile DESC, o.obtained_at DESC, o.id DESC
+         ORDER BY o.locked ASC, o.showcase_pos IS NOT NULL, o.is_shiny ASC, o.sterile DESC,
+                  o.obtained_at DESC, o.id DESC
          LIMIT $quantity)
         AND (SELECT COUNT(*) FROM pokemon_owned o WHERE ${filter}) >= $quantity
         AND (SELECT COUNT(*) FROM pokemon_owned WHERE user_id = $user AND species_id = $species)
@@ -620,15 +622,15 @@ export function restoreDuplicates(rows, cb = () => {}) {
       for (const userId of new Set(rows.map((entry) => entry.user_id))) checkCharms(userId);
       return cb(null);
     }
-    // La place dans la boîte PC, le surnom et le verrou reviennent avec lui :
-    // un Pokémon qui évolue, ou qu'une compensation remet en place, reste où
-    // son dresseur l'avait rangé, sous le nom et la protection qu'il lui avait
-    // donnés.
+    // La place dans la boîte PC, le surnom, le verrou et le rang en vitrine
+    // reviennent avec lui : un Pokémon qui évolue, ou qu'une compensation remet
+    // en place, reste où son dresseur l'avait rangé, sous le nom et la
+    // protection qu'il lui avait donnés.
     db.run(
       `INSERT INTO pokemon_owned
          (id, user_id, species_id, is_shiny, sex, ball, origin, sterile, obtained_at, pc_pos,
-          nickname, locked, form)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          nickname, locked, form, showcase_pos)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         row.id,
         row.user_id,
@@ -643,6 +645,7 @@ export function restoreDuplicates(rows, cb = () => {}) {
         row.nickname ?? null,
         row.locked ? 1 : 0,
         row.form ?? null,
+        row.showcase_pos ?? null,
       ],
       next
     );
@@ -1342,8 +1345,9 @@ export function acceptTrade(tradeId, cb) {
                 locked: lockedByDefault(species.id, row.is_shiny) ? 1 : 0,
                 // Sa place était celle du PC de l'autre : chez son nouveau
                 // dresseur, il prend la première libre. Son surnom le suit,
-                // comme dans les jeux.
+                // comme dans les jeux ; la vitrine de l'autre, non.
                 pc_pos: null,
+                showcase_pos: null,
               };
             };
             const arrivals = [arrive(mine, trade.to_user_id), arrive(theirs, trade.from_user_id)];

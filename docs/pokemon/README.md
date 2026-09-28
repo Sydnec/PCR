@@ -35,6 +35,14 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
     échange, qu'on obtient en recevant le premier stade. Les verrouillés servent
     d'abord à évoluer et à rester au Pokédex, seuls les libres se sacrifient. Ce qui est mis de côté
     reste échangeable : l'option ne change que ce que la liste montre.
+- `/pk vitrine voir [membre]` / `/pk vitrine ajouter <espece> <individu> [place]` /
+  `/pk vitrine retirer <pokemon>` : la **vitrine**, où chacun expose jusqu'à six Pokémon
+  (`pokemon.showcase.slots`) aux autres, un encart par Pokémon avec son image, son surnom, sa ball et
+  sa date d'arrivée. C'est du décor : un Pokémon exposé reste jouable, mais le bot le sacrifie ou le
+  revend en dernier quand il choisit lui-même. Revendu, échangé ou sacrifié, il quitte la vitrine ;
+  s'il évolue, il y reste. Sa propre vitrine porte un bouton **« 📤 Montrer à tout le monde »** qui
+  la publie dans le salon, une fois par heure au plus (`pokemon.showcase.shareCooldownMinutes`).
+  Réponses privées.
 - `/pk verrou <espece> <individu>` : verrouille ou déverrouille un Pokémon. **Verrouillé, il ne part
   jamais** — ni revente, ni échange, ni sacrifice — mais peut encore évoluer, après confirmation,
   et pondre. Les shiny et les légendaires arrivent verrouillés (`pokemon.lockByDefault`), y compris
@@ -46,8 +54,8 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
   difficulté, répartition mâle/femelle, et la lignée évolutive stade par stade avec ce que le
   dresseur en a déjà.
 - `/pk evolution <espece> [individu]` : fait évoluer un Pokémon de l'espèce. L'individu est
-  facultatif : sans lui, le bot prend les sacrifices parmi les moins précieux — les normaux avant
-  les shiny, puis les stériles, puis les plus récents —, fait évoluer le suivant, et ne touche
+  facultatif : sans lui, le bot prend les sacrifices parmi les moins précieux — hors vitrine, les
+  normaux avant les shiny, puis les stériles, puis les plus récents —, fait évoluer le suivant, et ne touche
   jamais à un verrouillé. Celui qui évolue reste lui-même : même numéro, même ball, même sexe,
   même fertilité, shiny s'il l'était, et verrouillé s'il l'était — un verrouillé évolue après une
   confirmation, s'il est choisi. Les autres Pokémon de l'évolution sont des **sacrifices** : des

@@ -12,6 +12,7 @@ import { getPointsHistory } from "../points-history.js";
 import {
   getCollection,
   getIndividuals,
+  getLeaderboard,
   getOwnedForms,
   getOwnedVariantsFor,
   resolveSelector,
@@ -58,6 +59,15 @@ import {
 import { getBalls, getPokemonConfig, getSafariConfig } from "../pokemon/config.js";
 import { announceDropClaim, claimDrop, getOpenDrops } from "../pokemon/drops.js";
 import { paidEntryRefund, safariOutcomeLine } from "../pokemon/embeds.js";
+import {
+  addToShowcase,
+  getShowcase,
+  listShowcases,
+  moveInShowcase,
+  orderShowcase,
+  removeFromShowcase,
+  showcaseSlots,
+} from "../pokemon/showcase.js";
 import { getPc, movePokemon, renameBox, renamePokemon } from "../pokemon/pc.js";
 import {
   enterPark,
@@ -177,6 +187,7 @@ function individualJson(row) {
     locked: Boolean(row.locked),
     obtainedAt: row.obtained_at,
     nickname: row.nickname ?? null,
+    showcased: row.showcase_pos !== null && row.showcase_pos !== undefined,
   };
 }
 
@@ -315,6 +326,20 @@ async function formsJson(userId, species) {
     icon: iconUrl(species, false, form.key),
     owned: owned.has(form.key),
   }));
+}
+
+// La vitrine d'un dresseur telle que le site la montre.
+async function showcaseJson(ctx, userId) {
+  const [trainer, rows] = await Promise.all([
+    trainerOf(ctx.bot, userId),
+    promise((cb) => getShowcase(userId, cb)),
+  ]);
+  return {
+    trainer,
+    mine: userId === ctx.user.id,
+    slots: showcaseSlots(),
+    pokemon: rows.map(individualJson),
+  };
 }
 
 // Une ball ou un objet tel que le site l'affiche : son emoji Discord, et son
@@ -914,6 +939,112 @@ export const routes = [
       const changed = await promise((cb) => setLock(ctx.user.id, pokemonId, ctx.body.locked, cb));
       if (!changed) throw new HttpError(404, `Le Pokémon #${pokemonId} n'est pas dans ta boîte.`);
       return { id: pokemonId, locked: ctx.body.locked };
+    },
+  },
+
+  // La vitrine d'un dresseur, comme /pk vitrine voir : les Pokémon qu'il
+  // expose, dans l'ordre. Réservée aux membres connectés, comme sa boîte.
+  {
+    method: "GET",
+    path: "/api/users/:userId/showcase",
+    auth: true,
+    handler: async (ctx) => {
+      const userId = targetOf(ctx);
+      return showcaseJson(ctx, userId);
+    },
+  },
+
+  // Tous les dresseurs — ceux qui ont au moins un Pokémon —, dans l'ordre du
+  // classement (/pk classement) : la page Dresseurs du site. Un membre parti du
+  // serveur n'y figure plus.
+  {
+    method: "GET",
+    path: "/api/trainers",
+    auth: true,
+    handler: async (ctx) => {
+      // -1 : aucune limite pour SQLite, tous les dresseurs.
+      const [rows, showcases] = await Promise.all([
+        promise((cb) => getLeaderboard(-1, cb)),
+        promise((cb) => listShowcases(cb)),
+      ]);
+      const shown = new Map(showcases.map((row) => [row.user_id, row.count]));
+      const trainers = await Promise.all(
+        rows.map(async (row) => ({
+          ...(await trainerOf(ctx.bot, row.user_id)),
+          species: row.dex,
+          shinies: row.shinies,
+          total: row.total,
+          showcase: shown.get(row.user_id) ?? 0,
+        }))
+      );
+      return { dexSize: dexSize(), trainers: trainers.filter((trainer) => trainer.name) };
+    },
+  },
+
+  // Les dresseurs qui exposent quelque chose, les vitrines les plus garnies
+  // d'abord. Un membre parti du serveur n'y figure plus.
+  {
+    method: "GET",
+    path: "/api/showcases",
+    auth: true,
+    handler: async (ctx) => {
+      const rows = await promise((cb) => listShowcases(cb));
+      const trainers = await Promise.all(
+        rows.map(async (row) => ({ ...(await trainerOf(ctx.bot, row.user_id)), count: row.count }))
+      );
+      return { slots: showcaseSlots(), trainers: trainers.filter((trainer) => trainer.name) };
+    },
+  },
+
+  // Exposer un Pokémon (`shown` vrai, à la place `place` s'il y en a une) ou le
+  // retirer, comme /pk vitrine ajouter et retirer. Rend la vitrine telle que
+  // la base la voit ensuite.
+  {
+    method: "POST",
+    path: "/api/me/showcase",
+    auth: true,
+    write: true,
+    handler: async (ctx) => {
+      const pokemonId = Number(ctx.body.pokemonId);
+      if (!Number.isInteger(pokemonId) || pokemonId <= 0) {
+        throw new HttpError(400, "pokemonId invalide.");
+      }
+      if (typeof ctx.body.shown !== "boolean") throw new HttpError(400, "shown : true ou false.");
+      const place = ctx.body.place === undefined ? null : Number(ctx.body.place);
+      if (place !== null && (!Number.isInteger(place) || place < 1)) {
+        throw new HttpError(400, "place : un entier à partir de 1.");
+      }
+      if (ctx.body.shown) {
+        const result = await promise((cb) => addToShowcase(ctx.user.id, pokemonId, cb));
+        if (!result.ok) throw new HttpError(409, result.reason);
+        if (place) await promise((cb) => moveInShowcase(ctx.user.id, pokemonId, place, cb));
+      } else {
+        const removed = await promise((cb) => removeFromShowcase(ctx.user.id, pokemonId, cb));
+        if (!removed) throw new HttpError(409, `Le Pokémon #${pokemonId} n'est pas dans ta vitrine.`);
+      }
+      return showcaseJson(ctx, ctx.user.id);
+    },
+  },
+
+  // Ranger sa vitrine : `order`, les identifiants dans l'ordre voulu. Seuls les
+  // Pokémon encore exposés bougent.
+  {
+    method: "POST",
+    path: "/api/me/showcase/order",
+    auth: true,
+    write: true,
+    handler: async (ctx) => {
+      const order = ctx.body?.order;
+      if (
+        !Array.isArray(order) ||
+        !order.length ||
+        order.length > showcaseSlots() ||
+        !order.every((id) => Number.isInteger(id) && id > 0)
+      ) {
+        throw new HttpError(400, "order : la liste des Pokémon exposés, dans l'ordre.");
+      }
+      await promise((cb) => orderShowcase(ctx.user.id, order, cb));
+      return showcaseJson(ctx, ctx.user.id);
     },
   },
 

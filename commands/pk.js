@@ -15,14 +15,16 @@ import inventaire from "./pk/inventaire.js";
 import loterie from "./pk/loterie.js";
 import safari from "./pk/safari.js";
 import web from "./pk/web.js";
+import vitrine from "./pk/vitrine.js";
 
 // Routeur du jeu Pokémon : toutes ses commandes vivent sous /pk, comme celles
 // d'administration sous /admin. Chaque sous-commande garde son fichier dans
 // commands/pk/ — un répertoire que le chargeur ignore, puisqu'il ne retient
 // que les .js à la racine de commands/.
 //
-// Deux d'entre elles ont leurs propres sous-commandes (/pk revendre pokemon,
-// /pk oeuf pondre) : elles déclarent `group: true` et deviennent des groupes.
+// Trois d'entre elles ont leurs propres sous-commandes (/pk revendre pokemon,
+// /pk oeuf pondre, /pk vitrine voir) : elles déclarent `group: true` et
+// deviennent des groupes.
 const SUBCOMMANDS = [
   pokedex,
   boite,
@@ -37,6 +39,7 @@ const SUBCOMMANDS = [
   inventaire,
   loterie,
   safari,
+  vitrine,
   web,
 ];
 

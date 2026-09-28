@@ -701,6 +701,163 @@ input[type="number"] {
   background: var(--surface-2);
 }
 
+/* ---------- Vitrine ---------- */
+
+.showcase-section {
+  margin-bottom: 24px;
+}
+
+.showcase-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.showcase-mon,
+.showcase-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  text-align: center;
+}
+
+.showcase-empty {
+  justify-content: center;
+  min-height: 150px;
+}
+
+.showcase-moving {
+  outline: 2px solid var(--accent);
+}
+
+.showcase-sprite {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+}
+
+.showcase-name {
+  overflow-wrap: anywhere;
+}
+
+.showcase-tools {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.showcase-trainers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.showcase-trainers .button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.showcase-trainers .button[aria-pressed="true"] {
+  border-color: var(--accent);
+}
+
+.showcase-trainers .avatar {
+  border-radius: 50%;
+}
+
+/* ---------- Dresseurs ---------- */
+
+.trainers-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.trainer-column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.trainer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.trainer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+}
+
+.trainer[aria-pressed="true"] {
+  border-color: var(--accent);
+}
+
+.trainer-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.trainer .avatar,
+.trainer-head .avatar {
+  flex: none;
+  border-radius: 50%;
+}
+
+.trainer-profile {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.trainer-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.trainer-head h2,
+.trainer-head p {
+  margin: 0;
+}
+
+/* Sur grand écran, la vitrine d'un profil tient en deux rangées de trois ;
+   sur un téléphone, elle reprend la grille de la page Vitrine. */
+.trainer-body .showcase-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 800px) {
+  .trainers-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .trainer-body .showcase-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
+}
+
+/* L'étoile de la vitrine, allumée quand le Pokémon y est exposé. */
+.icon-button[aria-pressed="true"] {
+  color: var(--accent);
+}
+
 /* Le verrou : un interrupteur, précédé du bouclier. */
 .lock-toggle {
   display: inline-flex;
@@ -1373,6 +1530,15 @@ input[type="number"] {
   right: 2px;
   width: 14px;
   height: 14px;
+}
+
+.pc-star {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  color: var(--accent);
 }
 
 /* Les sprites ont une large marge transparente : agrandis, ils remplissent la

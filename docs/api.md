@@ -57,6 +57,9 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
 | `GET /api/users/:userId/box` 🔒 | `{ total, page, pages, pageSize, items }` |
 | `GET /api/users/:userId/inventory` 🔒 | `{ items: [{ key, label, emoji, description, count }] }` |
 | `GET /api/me/egg` 🔒 | `{ egg }` ou `{ egg: null }` — `egg.shinyParents` et `egg.shinyFactor` : le bonus de shiny des parents ; `egg.charmFactor` : celui du Charme Chroma du dresseur |
+| `GET /api/users/:userId/showcase` 🔒 | `{ trainer, mine, slots, pokemon }` — la vitrine d'un dresseur (`me` pour la sienne), ses Pokémon dans l'ordre |
+| `GET /api/trainers` 🔒 | `{ dexSize, trainers }` — tous les dresseurs ayant au moins un Pokémon, dans l'ordre du classement : `id`, `name`, `avatar`, `species` (espèces distinctes), `shinies`, `total`, `showcase` (Pokémon en vitrine) |
+| `GET /api/showcases` 🔒 | `{ slots, trainers }` — les dresseurs qui exposent quelque chose (`id`, `name`, `avatar`, `count`), les vitrines les plus garnies d'abord |
 | `GET /api/me/lineage/:speciesId` 🔒 | `{ lineage, forms }` — la lignée et ce que le dresseur possède de chaque maillon ; `forms`, pour une espèce à formes (Zarbi), chacune avec `key`, `name`, `icon` et `owned`, `null` sinon |
 | `GET /api/spawn` 🔒 | `{ refreshSeconds, cooldownSeconds, pausedUntil, wallet, safari, spawn, last, drops }` — l'apparition du salon. `spawn.charm` (ou `null`) : elle ne brille que pour les porteurs du Charme Chroma de sa génération (`label`, `image`, `mine` : le visiteur en est un, et `spawn.shiny` est alors vrai pour lui) |
 | `GET /api/safari` 🔒 | `{ offer, visit }` — ce que le dresseur peut faire du parc, et sa visite en cours (`null` sinon) |
@@ -74,7 +77,7 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
 ```
 
 `last` : dernier de son espèce (shiny compris), il ne peut pas partir. `locked` : verrouillé, il ne
-part pas non plus. `form` : sa forme pour une espèce qui en a — la lettre d'un Zarbi —,
+part pas non plus. `showcased` : exposé dans la vitrine de son dresseur. `form` : sa forme pour une espèce qui en a — la lettre d'un Zarbi —,
 `{ key, name, icon, sprite }` avec ses images (qui remplacent celles de l'espèce), `null` sinon ;
 l'apparition, la rencontre du parc et ses captures la portent de même. Une espèce porte `obtention` (`wild`,
 `evolution` ou `egg`), `femaleShare` (`null` si asexuée), `breeder` (parent possible d'un œuf),
@@ -135,6 +138,8 @@ ou par un groupe `{ "speciesId": 25, "isShiny": false, "sex": "F" }` — les deu
 | `POST /api/me/pc/move` | `{ pokemonId, pos }` | la boîte PC relue — l'occupant de la case prend l'ancienne place |
 | `POST /api/me/pc/boxes/:box/name` | `{ name }` | `{ name, custom }` — vide : nom par défaut |
 | `POST /api/me/pokemon/:id/nickname` | `{ nickname }` | `{ nickname }` — vide : plus de surnom |
+| `POST /api/me/showcase` | `{ pokemonId, shown, place? }` | la vitrine (comme `GET …/showcase`) — `shown` vrai l'expose (au bout, ou à la place `place`), faux le retire ; 409 si la vitrine est pleine ou s'il n'y est pas |
+| `POST /api/me/showcase/order` | `{ order }` (identifiants, dans l'ordre voulu) | la vitrine — seuls les Pokémon encore exposés bougent |
 | `POST /api/me/pokemon/:id/lock` | `{ locked }` (booléen) | `{ id, locked }` — verrouillé, il ne part plus (ni revente, ni échange, ni sacrifice) |
 | `POST /api/admin/config` 🔑 | `{ path, value }` | `{ path, before, after }` — comme `/admin config` |
 

@@ -245,6 +245,8 @@ const db = new sqlite3.Database(dbPath, (err) => {
     //   sacrifice (lockedByDefault, /pk verrou).
     // - `form` : sa forme d'apparence, la lettre d'un Zarbi ; NULL pour une
     //   espèce qui n'en a pas. Une seule entrée de Pokédex pour toutes.
+    // - `showcase_pos` : son rang dans la vitrine de son dresseur, NULL s'il n'y
+    //   est pas (pokemon/showcase.js). Du décor, comme sa case du PC.
     db.run(
       `CREATE TABLE IF NOT EXISTS pokemon_owned (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -259,11 +261,13 @@ const db = new sqlite3.Database(dbPath, (err) => {
         pc_pos INTEGER,
         nickname TEXT,
         locked INTEGER NOT NULL DEFAULT 0,
-        form TEXT
+        form TEXT,
+        showcase_pos INTEGER
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_owned :", err);
         addColumn("pokemon_owned", "form", "TEXT");
+        addColumn("pokemon_owned", "showcase_pos", "INTEGER");
         db.run(
           `CREATE INDEX IF NOT EXISTS idx_pokemon_owned_entry
              ON pokemon_owned(user_id, species_id, is_shiny)`,
@@ -613,6 +617,18 @@ const db = new sqlite3.Database(dbPath, (err) => {
             );
           }
         );
+      }
+    );
+
+    // Le dernier envoi de la vitrine de chaque dresseur dans un salon : la ligne
+    // est la revendication du délai entre deux envois (claimShowcaseShare).
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_showcase_shares (
+        user_id TEXT PRIMARY KEY,
+        shared_at INTEGER NOT NULL
+      )`,
+      (err) => {
+        if (err) handleException("Erreur création table pokemon_showcase_shares :", err);
       }
     );
 
