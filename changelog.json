@@ -1,7 +1,24 @@
 {
-  "version": "1.16.2",
-  "lastUpdated": "2026-09-28T11:40:57.397Z",
+  "version": "1.16.3",
+  "lastUpdated": "2026-09-28T11:55:05.768Z",
   "releases": [
+    {
+      "version": "1.16.3",
+      "date": "2026-09-28",
+      "title": "Release 1.16.3",
+      "features": [
+        {
+          "type": "enhancement",
+          "name": "Vitrine en un seul bloc",
+          "description": "/pk vitrine voir montre la vitrine en un seul bloc, plus compact : les images en grille, puis la liste des Pokémon.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-28T11:48:10.000Z",
+          "branch": "claude/adoring-darwin-4o541o"
+        }
+      ]
+    },
     {
       "version": "1.16.2",
       "date": "2026-09-28",
@@ -1932,16 +1949,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "enhancement",
-      "name": "Vitrine en un seul bloc",
-      "description": "/pk vitrine voir montre la vitrine en un seul bloc, plus compact : les images en grille, puis la liste des Pokémon.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-28T11:48:10.000Z",
-      "branch": "claude/adoring-darwin-4o541o"
-    }
-  ]
+  "pending": []
 }
