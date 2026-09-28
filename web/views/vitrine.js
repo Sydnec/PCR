@@ -1,13 +1,11 @@
-// La vitrine : les Pokémon que chacun expose aux autres, comme /pk vitrine. La
-// sienne se range ici — glisser un Pokémon sur un autre, ou « Déplacer » puis
-// un clic sur sa nouvelle place, au doigt — et celles des autres se regardent.
-// On y expose un Pokémon depuis sa fiche dans la boîte (l'étoile). C'est l'API
-// qui range : la page redessine la vitrine qu'elle lui renvoie.
+// La vitrine : les Pokémon qu'on expose aux autres, comme /pk vitrine. La page
+// ne montre que la sienne — celles des autres se regardent dans Dresseurs — et
+// la range : glisser un Pokémon sur un autre, ou « Déplacer » puis un clic sur
+// sa nouvelle place, au doigt. On y expose un Pokémon depuis sa fiche dans la
+// boîte (l'étoile). C'est l'API qui range : la page redessine la vitrine
+// qu'elle lui renvoie.
 import { icon } from "../icons.js";
 import { api, dateFr, fmt, h, itemIcon, pokemonName, toast } from "../lib.js";
-
-// « de Sacha », « d'Ondine ».
-const ofName = (name) => (/^[aeiouyàâäéèêëîïôöûüù]/i.test(name) ? `d'${name}` : `de ${name}`);
 
 // Un Pokémon exposé : son image, son nom, sa ball et sa date d'arrivée. La
 // page Dresseurs montre les vitrines avec le même rendu.
@@ -54,15 +52,11 @@ export function showcaseGrid(ctx, pokemon, empty = "Rien d'exposé pour le momen
 }
 
 export async function render(ctx) {
-  const params = new URLSearchParams(location.search);
-  let viewing = /^\d{5,25}$/.test(params.get("user") ?? "") ? params.get("user") : null;
-  let [mine, list] = await Promise.all([api("/api/users/me/showcase"), api("/api/showcases")]);
+  let mine = await api("/api/users/me/showcase");
   let moving = null;
   let dragging = null;
 
   const own = h("section", { class: "showcase-section" });
-  const others = h("section", { class: "showcase-section" });
-  const viewer = h("section", { class: "showcase-section", hidden: true });
 
   async function save(request) {
     try {
@@ -146,7 +140,8 @@ export async function render(ctx) {
         { class: "muted small" },
         moving
           ? "Touche la place où le mettre, ou « Annuler le déplacement »."
-          : "Expose un Pokémon depuis sa fiche dans la boîte (l'étoile), ou avec /pk vitrine " +
+          : "Glisse un Pokémon sur un autre pour changer sa place (au doigt : « Déplacer »). " +
+              "Expose-en un depuis sa fiche dans la boîte (l'étoile), ou avec /pk vitrine " +
               "ajouter. Pour la montrer dans un salon : /pk vitrine voir, puis « Montrer à tout " +
               "le monde »."
       ),
@@ -161,70 +156,12 @@ export async function render(ctx) {
     );
   }
 
-  async function show(userId) {
-    viewing = userId;
-    const url = new URL(location.href);
-    url.searchParams.set("user", userId);
-    history.replaceState(null, "", url);
-    drawOthers();
-    viewer.hidden = false;
-    viewer.replaceChildren(h("p", { class: "muted" }, "Chargement…"));
-    try {
-      const showcase = await api(`/api/users/${userId}/showcase`);
-      if (viewing !== userId) return;
-      viewer.replaceChildren(
-        h("h2", {}, `Vitrine ${ofName(showcase.trainer.name ?? "?")}`),
-        showcaseGrid(ctx, showcase.pokemon)
-      );
-    } catch (error) {
-      viewer.replaceChildren(h("p", { class: "notice error" }, error.message));
-    }
-  }
-
-  function drawOthers() {
-    const trainers = list.trainers.filter((trainer) => trainer.id !== ctx.me.user.id);
-    others.replaceChildren(
-      h("h2", {}, "Les vitrines des dresseurs"),
-      trainers.length
-        ? h(
-            "div",
-            { class: "showcase-trainers" },
-            trainers.map((trainer) =>
-              h(
-                "button",
-                {
-                  type: "button",
-                  class: "button",
-                  "aria-pressed": String(trainer.id === viewing),
-                  onclick: () => show(trainer.id),
-                },
-                trainer.avatar
-                  ? h("img", {
-                      class: "avatar",
-                      src: trainer.avatar,
-                      alt: "",
-                      width: 24,
-                      height: 24,
-                    })
-                  : null,
-                ` ${trainer.name} · ${fmt(trainer.count)}/${fmt(list.slots)}`
-              )
-            )
-          )
-        : h("p", { class: "muted" }, "Personne d'autre n'expose encore de Pokémon.")
-    );
-  }
-
   drawOwn();
-  drawOthers();
-  if (viewing && viewing !== ctx.me.user.id) show(viewing);
 
   return h(
     "section",
     { class: "view" },
     h("div", { class: "view-head" }, h("h1", {}, "Vitrine")),
-    own,
-    others,
-    viewer
+    own
   );
 }

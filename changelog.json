@@ -1959,6 +1959,16 @@
       "commit": "pending",
       "timestamp": "2026-09-28T12:04:30.000Z",
       "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "enhancement",
+      "name": "Page Vitrine recentrée sur la tienne",
+      "description": "Sur le site, la page Vitrine ne montre plus que ta vitrine ; celles des autres se regardent dans Dresseurs.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-28T12:10:40.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
     }
   ]
 }
