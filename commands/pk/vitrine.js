@@ -22,6 +22,7 @@ import {
   removeFromShowcase,
   showcaseSlots,
 } from "../../modules/pokemon/showcase.js";
+import { renderShowcaseImage } from "../../modules/pokemon/showcase-image.js";
 
 // La vitrine : jusqu'à six Pokémon qu'un dresseur expose aux autres, pour
 // frimer. Du décor, qui ne change rien au jeu (pokemon/showcase.js). Sa propre
@@ -34,31 +35,36 @@ const nameOf = (row) => {
 // « de Sacha », « d'Ondine ».
 const ofName = (name) => (/^[aeiouyàâäéèêëîïôöûüù]/i.test(name) ? `d'${name}` : `de ${name}`);
 
-// Les drapeaux de la réponse s'ajoutent à l'éphémère : une vitrine arrive au
-// format conteneur (buildShowcaseMessage).
 const ephemeral = (interaction, payload) =>
-  interaction
-    .reply({ ...payload, flags: MessageFlags.Ephemeral | (payload.flags ?? 0) })
-    .catch(() => {});
+  interaction.reply({ ...payload, flags: MessageFlags.Ephemeral }).catch(() => {});
 
-// La vitrine d'un dresseur, telle que /pk vitrine voir la montre. `intro`
-// précède la vitrine, pour dire ce qui vient de changer.
-function showcaseReply(rows, { mine, name, intro = null }) {
+// Répond avec la vitrine d'un dresseur, telle que /pk vitrine voir la montre.
+// `intro` précède la vitrine, pour dire ce qui vient de changer. Dessiner son
+// image demande de télécharger les illustrations : la réponse est différée
+// d'abord, Discord ne laissant que trois secondes pour répondre.
+async function replyShowcase(interaction, rows, { mine, name, intro = null }) {
   const slots = showcaseSlots();
   if (!rows.length) {
-    return {
+    return ephemeral(interaction, {
       content:
         (intro ? `${intro}\n` : "") +
         (mine
           ? `🏆 Ta vitrine est vide : expose jusqu'à ${slots} Pokémon avec \`/pk vitrine ajouter\`.`
           : `🏆 **${name}** n'expose encore aucun Pokémon.`),
-    };
+    });
   }
-  return buildShowcaseMessage(rows, {
-    title: mine ? `Ta vitrine · ${rows.length}/${slots}` : `Vitrine ${ofName(name)}`,
-    intro,
-    shareable: mine,
-  });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral }).catch(() => {});
+  const image = await renderShowcaseImage(rows);
+  await interaction
+    .editReply(
+      buildShowcaseMessage(rows, {
+        title: mine ? `Ta vitrine · ${rows.length}/${slots}` : `Vitrine ${ofName(name)}`,
+        intro,
+        shareable: mine,
+        image,
+      })
+    )
+    .catch(() => {});
 }
 
 export default {
@@ -169,7 +175,7 @@ export default {
       // que la base la voit, pas telle qu'on croit l'avoir laissée.
       const showMine = (intro) =>
         getShowcase(interaction.user.id, (err, rows) =>
-          err ? fail(err) : ephemeral(interaction, showcaseReply(rows, { mine: true, intro }))
+          err ? fail(err) : replyShowcase(interaction, rows, { mine: true, intro })
         );
 
       if (action === "voir") {
@@ -182,10 +188,7 @@ export default {
         return getShowcase(user.id, (err, rows) =>
           err
             ? fail(err)
-            : ephemeral(
-                interaction,
-                showcaseReply(rows, { mine: user.id === interaction.user.id, name })
-              )
+            : replyShowcase(interaction, rows, { mine: user.id === interaction.user.id, name })
         );
       }
 

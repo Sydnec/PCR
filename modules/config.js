@@ -166,8 +166,10 @@ const POKEMON = {
   // La vitrine : les Pokémon qu'un dresseur expose aux autres, `slots` au plus,
   // comme une équipe. Du décor, qui ne change rien au jeu. Le bouton qui la
   // montre dans le salon attend `shareCooldownMinutes` entre deux envois : de
-  // quoi frimer, pas inonder le salon.
-  showcase: { slots: 6, shareCooldownMinutes: 60 },
+  // quoi frimer, pas inonder le salon. Sur Discord, ses Pokémon sont dessinés
+  // dans une seule image, en cases de `imageCell` pixels, trois par ligne ; une
+  // illustration qui ne répond pas en `imageTimeoutSeconds` laisse sa case vide.
+  showcase: { slots: 6, shareCooldownMinutes: 60, imageCell: 128, imageTimeoutSeconds: 5 },
   // La boîte PC du site : des boîtes de `slotsPerBox` places, sur `columns`
   // colonnes, qu'on nomme et où l'on range ses Pokémon comme on veut. Il y en a
   // toujours au moins `minBoxes`, et une vide après la dernière occupée pour
@@ -622,8 +624,13 @@ const BOUNDS = {
   // Pokédex au nombre de pages infini et vide.
   "pokemon.pokedex.pageSize": { min: 1 },
   "pokemon.box.pageSize": { min: 1, max: 25 },
-  // Un encart par Pokémon exposé, et Discord n'en accepte que dix par message.
+  // Au-delà de dix, la vitrine ne tient plus d'un coup d'œil, ni sa grille ni
+  // sa liste.
   "pokemon.showcase.slots": { min: 1, max: 10 },
+  // Une case assez grande pour reconnaître le Pokémon, assez petite pour que
+  // trois tiennent sur un téléphone.
+  "pokemon.showcase.imageCell": { min: 48, max: 256 },
+  "pokemon.showcase.imageTimeoutSeconds": { min: 1, max: 30 },
   // Changer la taille d'une boîte redistribue les places : on la borne à ce
   // qu'une grille affiche lisiblement.
   "pokemon.pc.slotsPerBox": { min: 6, max: 60 },

@@ -1949,5 +1949,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Images de la vitrine à taille fixe",
+      "description": "Dans /pk vitrine, les Pokémon s'affichent un peu plus petits, trois par ligne, et gardent la même taille qu'il y en ait un ou six.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-28T12:04:30.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
+    }
+  ]
 }

@@ -1,6 +1,7 @@
 // Construction des embeds et des boutons du système de capture.
 import {
   ActionRowBuilder,
+  AttachmentBuilder,
   ButtonBuilder,
   ButtonStyle,
   ContainerBuilder,
@@ -1484,14 +1485,20 @@ export function buildSafariRecapEmbed(
 
 // ====================== VITRINE ======================
 
-// La vitrine en un seul bloc, au format « conteneur » de Discord : un embed
-// ne porte qu'une image, un conteneur en aligne jusqu'à dix. Sous l'en-tête,
-// les images en grille (trois par ligne pour six, comme sur le site), puis une
-// ligne par Pokémon dans le même ordre, numérotée pour s'y retrouver. `intro`
-// précède le bloc, pour dire ce qui vient de changer ; seule sa propre vitrine
-// porte le bouton qui la montre dans le salon. Le message qui en sort ne peut
-// plus porter de `content` : sa réponse se modifie avec showcaseNotice.
-export function buildShowcaseMessage(rows, { title, intro = null, shareable = false }) {
+const SHOWCASE_IMAGE = "vitrine.png";
+
+// La vitrine en un seul bloc, au format « conteneur » de Discord : sous
+// l'en-tête, l'image de ses Pokémon en grille (`image`, de
+// renderShowcaseImage, jointe au message ; omise si elle n'a pas pu se
+// dessiner), puis une ligne par Pokémon dans le même ordre, numérotée pour s'y
+// retrouver. `intro` précède le bloc, pour dire ce qui vient de changer ; seule
+// sa propre vitrine porte le bouton qui la montre dans le salon. Le message qui
+// en sort ne peut plus porter de `content` : sa réponse se modifie avec
+// showcaseNotice.
+export function buildShowcaseMessage(
+  rows,
+  { title, intro = null, shareable = false, image = null }
+) {
   const shown = rows
     .map((row) => ({ row, species: getSpecies(row.species_id) }))
     .filter(({ species }) => species);
@@ -1512,18 +1519,17 @@ export function buildShowcaseMessage(rows, { title, intro = null, shareable = fa
   );
   if (shown.length) {
     const [first] = shown;
-    container
-      .setAccentColor(embedColor(first.species, Boolean(first.row.is_shiny)))
-      .addMediaGalleryComponents(
+    container.setAccentColor(embedColor(first.species, Boolean(first.row.is_shiny)));
+    if (image) {
+      container.addMediaGalleryComponents(
         new MediaGalleryBuilder().addItems(
-          shown.map(({ row, species }, index) =>
-            new MediaGalleryItemBuilder()
-              .setURL(spriteUrl(species, Boolean(row.is_shiny), row.form))
-              .setDescription(row.nickname || names[index])
-          )
+          new MediaGalleryItemBuilder()
+            .setURL(`attachment://${SHOWCASE_IMAGE}`)
+            .setDescription(names.join(", ").slice(0, 1024))
         )
-      )
-      .addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join("\n")));
+      );
+    }
+    container.addTextDisplayComponents(new TextDisplayBuilder().setContent(lines.join("\n")));
   }
   return {
     components: [
@@ -1531,14 +1537,17 @@ export function buildShowcaseMessage(rows, { title, intro = null, shareable = fa
       container,
       ...(shareable ? [buildShowcaseShareRow()] : []),
     ],
+    files: image ? [new AttachmentBuilder(image, { name: SHOWCASE_IMAGE })] : [],
     flags: MessageFlags.IsComponentsV2,
   };
 }
 
 // Ce qui remplace une vitrine affichée (« ✅ montrée dans… ») : un message au
-// format conteneur le reste, et n'accepte plus qu'un texte en composant.
+// format conteneur le reste, et n'accepte plus qu'un texte en composant. Son
+// image part avec lui.
 export const showcaseNotice = (text) => ({
   components: [new TextDisplayBuilder().setContent(text)],
+  attachments: [],
   flags: MessageFlags.IsComponentsV2,
 });
 
