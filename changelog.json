@@ -1937,7 +1937,7 @@
       "type": "enhancement",
       "name": "Vitrine en un seul bloc",
       "description": "/pk vitrine voir montre la vitrine en un seul bloc, plus compact : les images en grille, puis la liste des Pokémon.",
-      "announce": true,
+      "announce": false,
       "author": "Sydnec",
       "commit": "pending",
       "timestamp": "2026-09-28T11:48:10.000Z",
