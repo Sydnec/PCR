@@ -440,6 +440,25 @@ export const DEFAULTS = {
     // chaque onglet ouvert.
     spawnRefreshSeconds: 5,
   },
+  // La réécriture des liens X et Instagram vers leurs miroirs (modules/links.js).
+  links: {
+    // Sous la copie d'un tweet qui n'est pas en français, un bouton « Traduire »
+    // répond en éphémère par sa traduction, demandée à api.fxtwitter.com.
+    translation: {
+      // Coupé, plus aucune copie ne reçoit de bouton ; ceux déjà publiés
+      // répondent encore.
+      enabled: true,
+      // Au-delà, l'API est tenue pour muette. Lire la langue d'un tweet est
+      // rapide : la copie reste alors sans bouton. Le traduire l'est moins, et
+      // le clic, déjà différé, peut attendre : il répond alors de réessayer.
+      lookupTimeoutSeconds: 3,
+      translateTimeoutSeconds: 10,
+      // Chaque tweet d'une copie coûte une requête pour connaître sa langue :
+      // un message qui en alignerait des dizaines ne doit pas marteler l'API.
+      // Discord ne range de toute façon que 5 boutons par rangée.
+      maxTweets: 3,
+    },
+  },
   // Pot commun : chacun cotise une part de sa fortune, et la cagnotte repart en
   // parts égales. Un impôt sur le capital, en somme — les gros soldes financent,
   // tout le monde reçoit la même chose.
@@ -618,6 +637,10 @@ const BOUNDS = {
   // À 0, chaque onglet ouvert relirait l'apparition en boucle.
   "web.spawnRefreshSeconds": { min: 2, max: 60 },
   "web.accessDenialCacheSeconds": { min: 0, max: 3600 },
+  // À 0, chaque requête vers FxTwitter serait abandonnée avant de partir. Au
+  // clic, Discord ne laisse que 15 minutes pour répondre.
+  "links.translation.lookupTimeoutSeconds": { min: 1, max: 60 },
+  "links.translation.translateTimeoutSeconds": { min: 1, max: 60 },
   // Math.floor(Math.random() * odds) === 0 : à 0, tout devient shiny.
   "pokemon.spawn.shinyOdds": { min: 1 },
   "pokemon.safari.shinyOdds": { min: 1 },

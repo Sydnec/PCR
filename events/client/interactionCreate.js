@@ -4,6 +4,7 @@ import pointsDb from '../../modules/points-db.js';
 import { addPoints, getBalance, spendPoints } from '../../modules/economy.js';
 import { handlePokemonButton, handlePokemonSelect } from '../../modules/pokemon/interactions.js';
 import { pseudoOf } from '../../modules/pseudo.js';
+import { TRANSLATE_BUTTON, replyTweetTranslation } from '../../modules/links.js';
 
 const name = 'interactionCreate';
 const once = false;
@@ -102,6 +103,16 @@ async function execute(interaction, bot) {
         if (customId.startsWith('poke_')) {
             try {
                 await handlePokemonButton(interaction);
+            } catch (err) {
+                handleException(err);
+            }
+            return;
+        }
+
+        // « Traduire » sous la copie d'un tweet étranger.
+        if (customId.startsWith(`${TRANSLATE_BUTTON}|`)) {
+            try {
+                await replyTweetTranslation(interaction);
             } catch (err) {
                 handleException(err);
             }

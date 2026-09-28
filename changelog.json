@@ -1,7 +1,24 @@
 {
-  "version": "1.16.0",
-  "lastUpdated": "2026-09-25T17:45:11.677Z",
+  "version": "1.16.1",
+  "lastUpdated": "2026-09-28T11:06:55.214Z",
   "releases": [
+    {
+      "version": "1.16.1",
+      "date": "2026-09-28",
+      "title": "Release 1.16.1",
+      "features": [
+        {
+          "type": "feature",
+          "name": "Bouton Traduire sous les tweets",
+          "description": "Sous un lien X vers un tweet qui n'est pas en français, le bouton Traduire t'en montre la traduction, visible de toi seul.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-28T10:44:16.000Z",
+          "branch": "claude/determined-galileo-3od1th"
+        }
+      ]
+    },
     {
       "version": "1.16.0",
       "date": "2026-09-25",
