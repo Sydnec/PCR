@@ -773,6 +773,102 @@ input[type="number"] {
   border-radius: 50%;
 }
 
+/* ---------- Dresseurs ---------- */
+
+.trainers-layout {
+  display: grid;
+  grid-template-columns: minmax(220px, 280px) 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.trainer-column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.trainer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.trainer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+}
+
+.trainer[aria-pressed="true"] {
+  border-color: var(--accent);
+}
+
+.trainer-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.trainer .avatar,
+.trainer-head .avatar {
+  flex: none;
+  border-radius: 50%;
+}
+
+.trainer-profile {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.trainer-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.trainer-head h2,
+.trainer-head p {
+  margin: 0;
+}
+
+.trainer-box {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.trainer-mon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+@media (max-width: 800px) {
+  .trainers-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* L'étoile de la vitrine, allumée quand le Pokémon y est exposé. */
 .icon-button[aria-pressed="true"] {
   color: var(--accent);

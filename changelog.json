@@ -1898,6 +1898,16 @@
       "commit": "pending",
       "timestamp": "2026-09-28T11:17:50.000Z",
       "branch": "claude/adoring-darwin-4o541o"
+    },
+    {
+      "type": "feature",
+      "name": "Page Dresseurs sur le site",
+      "description": "Une page liste tous les dresseurs et ouvre le profil de chacun : son Pokédex, sa vitrine, sa boîte et son sac.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-28T11:29:08.000Z",
+      "branch": "claude/adoring-darwin-4o541o"
     }
   ]
 }

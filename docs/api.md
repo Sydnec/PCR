@@ -58,6 +58,7 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
 | `GET /api/users/:userId/inventory` 🔒 | `{ items: [{ key, label, emoji, description, count }] }` |
 | `GET /api/me/egg` 🔒 | `{ egg }` ou `{ egg: null }` — `egg.shinyParents` et `egg.shinyFactor` : le bonus de shiny des parents ; `egg.charmFactor` : celui du Charme Chroma du dresseur |
 | `GET /api/users/:userId/showcase` 🔒 | `{ trainer, mine, slots, pokemon }` — la vitrine d'un dresseur (`me` pour la sienne), ses Pokémon dans l'ordre |
+| `GET /api/trainers` 🔒 | `{ dexSize, trainers }` — tous les dresseurs ayant au moins un Pokémon, dans l'ordre du classement : `id`, `name`, `avatar`, `species` (espèces distinctes), `shinies`, `total`, `showcase` (Pokémon en vitrine) |
 | `GET /api/showcases` 🔒 | `{ slots, trainers }` — les dresseurs qui exposent quelque chose (`id`, `name`, `avatar`, `count`), les vitrines les plus garnies d'abord |
 | `GET /api/me/lineage/:speciesId` 🔒 | `{ lineage, forms }` — la lignée et ce que le dresseur possède de chaque maillon ; `forms`, pour une espèce à formes (Zarbi), chacune avec `key`, `name`, `icon` et `owned`, `null` sinon |
 | `GET /api/spawn` 🔒 | `{ refreshSeconds, cooldownSeconds, pausedUntil, wallet, safari, spawn, last, drops }` — l'apparition du salon. `spawn.charm` (ou `null`) : elle ne brille que pour les porteurs du Charme Chroma de sa génération (`label`, `image`, `mine` : le visiteur en est un, et `spawn.shiny` est alors vrai pour lui) |

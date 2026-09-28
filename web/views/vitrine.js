@@ -9,6 +9,50 @@ import { api, dateFr, fmt, h, itemIcon, pokemonName, toast } from "../lib.js";
 // « de Sacha », « d'Ondine ».
 const ofName = (name) => (/^[aeiouyàâäéèêëîïôöûüù]/i.test(name) ? `d'${name}` : `de ${name}`);
 
+// Un Pokémon exposé : son image, son nom, sa ball et sa date d'arrivée. La
+// page Dresseurs montre les vitrines avec le même rendu.
+export function showcaseMon(ctx, mon) {
+  const species = ctx.species.get(mon.speciesId);
+  const ball = mon.ball ? ctx.balls.get(mon.ball) : null;
+  return [
+    h("img", {
+      class: "showcase-sprite",
+      src: mon.form?.sprite ?? (mon.shiny ? species?.spriteShiny : species?.sprite),
+      alt: "",
+      loading: "lazy",
+    }),
+    h(
+      "strong",
+      { class: "showcase-name" },
+      pokemonName(species, mon.shiny, mon.sex, mon.nickname, mon.form)
+    ),
+    mon.nickname
+      ? h(
+          "span",
+          { class: "muted small" },
+          `${species?.name ?? "?"}${mon.form ? ` ${mon.form.name}` : ""}`
+        )
+      : null,
+    h(
+      "span",
+      { class: "muted small" },
+      ball ? [itemIcon(ball), " "] : null,
+      dateFr(mon.obtainedAt)
+    ),
+  ];
+}
+
+// Une vitrine en lecture seule, ou la phrase qui dit qu'elle est vide.
+export function showcaseGrid(ctx, pokemon, empty = "Rien d'exposé pour le moment.") {
+  return pokemon.length
+    ? h(
+        "ol",
+        { class: "showcase-grid" },
+        pokemon.map((mon) => h("li", { class: "showcase-mon" }, ...showcaseMon(ctx, mon)))
+      )
+    : h("p", { class: "muted" }, empty);
+}
+
 export async function render(ctx) {
   const params = new URLSearchParams(location.search);
   let viewing = /^\d{5,25}$/.test(params.get("user") ?? "") ? params.get("user") : null;
@@ -19,38 +63,6 @@ export async function render(ctx) {
   const own = h("section", { class: "showcase-section" });
   const others = h("section", { class: "showcase-section" });
   const viewer = h("section", { class: "showcase-section", hidden: true });
-
-  // Un Pokémon exposé : son image, son nom, sa ball et sa date d'arrivée.
-  function monView(mon) {
-    const species = ctx.species.get(mon.speciesId);
-    const ball = mon.ball ? ctx.balls.get(mon.ball) : null;
-    return [
-      h("img", {
-        class: "showcase-sprite",
-        src: mon.form?.sprite ?? (mon.shiny ? species?.spriteShiny : species?.sprite),
-        alt: "",
-        loading: "lazy",
-      }),
-      h(
-        "strong",
-        { class: "showcase-name" },
-        pokemonName(species, mon.shiny, mon.sex, mon.nickname, mon.form)
-      ),
-      mon.nickname
-        ? h(
-            "span",
-            { class: "muted small" },
-            `${species?.name ?? "?"}${mon.form ? ` ${mon.form.name}` : ""}`
-          )
-        : null,
-      h(
-        "span",
-        { class: "muted small" },
-        ball ? [itemIcon(ball), " "] : null,
-        dateFr(mon.obtainedAt)
-      ),
-    ];
-  }
 
   async function save(request) {
     try {
@@ -96,7 +108,7 @@ export async function render(ctx) {
           if (moving && moving !== mon.id) moveTo(moving, mon.id);
         },
       },
-      ...monView(mon),
+      ...showcaseMon(ctx, mon),
       h(
         "span",
         { class: "showcase-tools" },
@@ -162,13 +174,7 @@ export async function render(ctx) {
       if (viewing !== userId) return;
       viewer.replaceChildren(
         h("h2", {}, `Vitrine ${ofName(showcase.trainer.name ?? "?")}`),
-        showcase.pokemon.length
-          ? h(
-              "ol",
-              { class: "showcase-grid" },
-              showcase.pokemon.map((mon) => h("li", { class: "showcase-mon" }, ...monView(mon)))
-            )
-          : h("p", { class: "muted" }, "Rien d'exposé pour le moment.")
+        showcaseGrid(ctx, showcase.pokemon)
       );
     } catch (error) {
       viewer.replaceChildren(h("p", { class: "notice error" }, error.message));

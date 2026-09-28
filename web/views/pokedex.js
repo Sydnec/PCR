@@ -24,6 +24,25 @@ const OBTENTION = {
 
 export async function render(ctx) {
   const dex = await api("/api/users/me/pokedex");
+  const panel = pokedexPanel(ctx, dex);
+  return h(
+    "section",
+    { class: "view" },
+    h(
+      "div",
+      { class: "view-head" },
+      h("h1", {}, "Pokédex"),
+      h("p", { class: "muted" }, panel.summary)
+    ),
+    panel.nodes
+  );
+}
+
+// Le Pokédex d'un dresseur (`dex` : la réponse de /api/users/:id/pokedex) : le
+// décompte, la barre, les filtres et la grille. Le sien et celui d'un autre
+// dresseur (page Dresseurs) se dessinent pareil ; seule la fiche d'une espèce,
+// qui montre ce que *tu* en possèdes, ne s'ouvre que sur le sien.
+export function pokedexPanel(ctx, dex, { mine = true } = {}) {
   const owned = new Map();
   for (const entry of dex.entries) {
     const counts = owned.get(entry.speciesId) ?? { normal: 0, shiny: 0 };
@@ -47,7 +66,7 @@ export async function render(ctx) {
     });
     grid.replaceChildren(
       ...(visible.length
-        ? visible.map((species) => card(ctx, species, owned.get(species.id)))
+        ? visible.map((species) => card(ctx, species, owned.get(species.id), mine))
         : [h("p", { class: "muted empty-grid" }, "Aucune espèce ne correspond.")])
     );
   }
@@ -77,45 +96,36 @@ export async function render(ctx) {
   );
 
   draw();
-  return h(
-    "section",
-    { class: "view" },
-    h(
-      "div",
-      { class: "view-head" },
-      h("h1", {}, "Pokédex"),
+  return {
+    summary: `${fmt(owned.size)} / ${fmt(dex.dexSize)} espèces (${percent} %) · ${fmt(shinies)} shiny`,
+    nodes: [
+      progressBar(percent),
       h(
-        "p",
-        { class: "muted" },
-        `${fmt(owned.size)} / ${fmt(dex.dexSize)} espèces (${percent} %) · ${fmt(shinies)} shiny`
-      )
-    ),
-    progressBar(percent),
-    h(
-      "div",
-      { class: "toolbar" },
-      tabs,
-      h("input", {
-        type: "search",
-        placeholder: "Chercher un Pokémon…",
-        "aria-label": "Chercher un Pokémon",
-        oninput: (event) => {
-          search = event.target.value;
-          draw();
-        },
-      })
-    ),
-    grid
-  );
+        "div",
+        { class: "toolbar" },
+        tabs,
+        h("input", {
+          type: "search",
+          placeholder: "Chercher un Pokémon…",
+          "aria-label": "Chercher un Pokémon",
+          oninput: (event) => {
+            search = event.target.value;
+            draw();
+          },
+        })
+      ),
+      grid,
+    ],
+  };
 }
 
-function card(ctx, species, counts) {
+function card(ctx, species, counts, mine = true) {
   const has = Boolean(counts);
   return h(
-    "button",
+    mine ? "button" : "div",
     {
       class: `card${has ? "" : " card-missing"}`,
-      onclick: () => openSpecies(ctx, species, counts),
+      onclick: mine ? () => openSpecies(ctx, species, counts) : null,
     },
     h("img", {
       class: "sprite",

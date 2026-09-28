@@ -12,6 +12,7 @@ import { getPointsHistory } from "../points-history.js";
 import {
   getCollection,
   getIndividuals,
+  getLeaderboard,
   getOwnedForms,
   getOwnedVariantsFor,
   resolveSelector,
@@ -950,6 +951,33 @@ export const routes = [
     handler: async (ctx) => {
       const userId = targetOf(ctx);
       return showcaseJson(ctx, userId);
+    },
+  },
+
+  // Tous les dresseurs — ceux qui ont au moins un Pokémon —, dans l'ordre du
+  // classement (/pk classement) : la page Dresseurs du site. Un membre parti du
+  // serveur n'y figure plus.
+  {
+    method: "GET",
+    path: "/api/trainers",
+    auth: true,
+    handler: async (ctx) => {
+      // -1 : aucune limite pour SQLite, tous les dresseurs.
+      const [rows, showcases] = await Promise.all([
+        promise((cb) => getLeaderboard(-1, cb)),
+        promise((cb) => listShowcases(cb)),
+      ]);
+      const shown = new Map(showcases.map((row) => [row.user_id, row.count]));
+      const trainers = await Promise.all(
+        rows.map(async (row) => ({
+          ...(await trainerOf(ctx.bot, row.user_id)),
+          species: row.dex,
+          shinies: row.shinies,
+          total: row.total,
+          showcase: shown.get(row.user_id) ?? 0,
+        }))
+      );
+      return { dexSize: dexSize(), trainers: trainers.filter((trainer) => trainer.name) };
     },
   },
 
