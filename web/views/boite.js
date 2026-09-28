@@ -390,7 +390,8 @@ export async function render(ctx) {
         loading: "lazy",
         draggable: "false",
       }),
-      mon.locked ? icon("shield", { className: "pc-lock" }) : null
+      mon.locked ? icon("shield", { className: "pc-lock" }) : null,
+      mon.showcased ? icon("star", { className: "pc-star" }) : null
     );
   }
 
@@ -627,6 +628,30 @@ function pokemonActions(ctx, item, species, targets, { renamed, relocked, move, 
   });
   const lockToggle = h("label", { class: "lock-toggle" }, icon("shield"), lock);
 
+  // La vitrine : l'étoile l'y expose ou l'en retire, comme /pk vitrine. C'est
+  // l'API qui dit s'il reste une place.
+  const star = iconButton("star", "", async () => {
+    star.disabled = true;
+    try {
+      await api("/api/me/showcase", {
+        method: "POST",
+        body: { pokemonId: item.id, shown: !item.showcased },
+      });
+      item.showcased = !item.showcased;
+      toast(
+        item.showcased
+          ? `#${item.id} est exposé dans ta vitrine.`
+          : `#${item.id} quitte ta vitrine.`,
+        "success"
+      );
+      relocked();
+    } catch (error) {
+      toast(error.message, "error");
+    }
+    star.disabled = false;
+    update();
+  });
+
   const sell = value ? iconButton("tag", "", () => toggle("sell")) : null;
   const evolve = targets.length ? iconButton("evolve", "", () => toggle("evolve")) : null;
   const notes = h("div", { class: "pokemon-notes" });
@@ -637,6 +662,8 @@ function pokemonActions(ctx, item, species, targets, { renamed, relocked, move, 
   // n'évolue, un verrouillé ne se revend pas. La bulle d'un bouton grisé dit
   // pourquoi, et la note sous la barre aussi, pour qui n'a pas de souris.
   function update() {
+    star.setAttribute("aria-pressed", String(Boolean(item.showcased)));
+    relabel(star, item.showcased ? "Retirer de la vitrine" : "Exposer dans la vitrine");
     lockToggle.title = item.locked
       ? "Verrouillé : il ne part jamais, ni revente, ni échange, ni sacrifice"
       : "Verrouiller : le protéger de la revente, des échanges et des sacrifices";
@@ -951,6 +978,7 @@ function pokemonActions(ctx, item, species, targets, { renamed, relocked, move, 
       { class: "pokemon-toolbar" },
       nickname,
       lockToggle,
+      star,
       iconButton("move", "Déplacer", move),
       sell,
       evolve

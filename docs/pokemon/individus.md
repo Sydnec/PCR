@@ -58,8 +58,9 @@ listes des commandes.
 
 ## Qui part quand on cède
 
-Quand le bot choisit lui-même, il cède ce qui vaut le moins : les **normaux avant les shiny**, puis
-les **stériles**, puis **les plus récents** — et jamais un verrouillé.
+Quand le bot choisit lui-même, il cède ce qui vaut le moins : ceux qui ne sont **pas en vitrine**,
+les **normaux avant les shiny**, puis les **stériles**, puis **les plus récents** — et jamais un
+verrouillé.
 
 - **Revente** : un individu précis, ou `quantite` normaux de l'espèce choisis par le bot. Un shiny
   se choisit, il ne part jamais dans le lot.

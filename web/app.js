@@ -11,6 +11,7 @@ import * as boite from "./views/boite.js";
 import * as pokedex from "./views/pokedex.js";
 import * as sac from "./views/sac.js";
 import * as oeuf from "./views/oeuf.js";
+import * as vitrine from "./views/vitrine.js";
 import * as infos from "./views/infos.js";
 import * as admin from "./views/admin.js";
 
@@ -24,6 +25,7 @@ const ROUTES = {
   "/pokedex": pokedex,
   "/sac": sac,
   "/oeuf": oeuf,
+  "/vitrine": vitrine,
   "/infos": infos,
   "/admin": admin,
 };

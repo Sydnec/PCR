@@ -584,26 +584,54 @@ export function individualChoices(rows, query, keep = () => true) {
           `#${row.id} · ${species ? displayName(species, row.is_shiny, row.sex, row.form) : "?"}` +
           (ball ? ` · ${ball.label}` : "") +
           (row.sterile ? " · stérile" : "") +
-          (row.locked ? " · 🛡️ verrouillé" : ""),
+          (row.locked ? " · 🛡️ verrouillé" : "") +
+          (row.showcase_pos !== null && row.showcase_pos !== undefined ? " · 🏆 en vitrine" : ""),
         value: `#${row.id}`,
       };
     });
+}
+
+// Les espèces d'une boîte dont le nom contient la saisie, avec leurs
+// exemplaires et leurs verrouillés : le premier temps des commandes qui visent
+// un Pokémon précis (/pk verrou, /pk vitrine). `counts` : countBySpecies.
+export function ownedSpeciesChoices(counts, query) {
+  const needle = String(query ?? "").toLowerCase();
+  return [...counts]
+    .map(([speciesId, { total, free }]) => {
+      const species = getSpecies(speciesId);
+      if (!species) return null;
+      const locked = total - free;
+      return {
+        name:
+          `${species.name} (×${total.toLocaleString("fr-FR")}` +
+          `${locked ? `, dont ${locked.toLocaleString("fr-FR")} 🛡️` : ""})`,
+        value: String(speciesId),
+      };
+    })
+    .filter((choice) => choice && choice.name.toLowerCase().includes(needle))
+    .slice(0, 25);
 }
 
 // Une ligne par individu : sexe, espèce, ball, date d'arrivée, et ce qui le
 // distingue des autres — verrouillé (🛡️), ou qui a déjà pondu. Le dernier de
 // son espèce n'y est pas marqué : ce n'est pas lui que la règle garde, mais un
 // individu quelconque de l'espèce, et le pied de page le dit.
+// D'où vient un individu : sa ball, ou à défaut son origine.
+function provenanceOf(row) {
+  const ball = ballOf(row.ball);
+  return ball ? `${ball.emoji} ${ball.label}` : ORIGINS[row.origin] ?? "—";
+}
+
 function individualLine(row) {
   const species = getSpecies(row.species_id);
-  const ball = ballOf(row.ball);
-  const provenance = ball ? `${ball.emoji} ${ball.label}` : ORIGINS[row.origin] ?? "—";
+  const provenance = provenanceOf(row);
   return (
     `\`#${row.id}\` **${species ? displayName(species, row.is_shiny, row.sex, row.form) : "?"}**` +
     ` · ${provenance}` +
     (row.origin === "echange" ? " · reçu en échange" : "") +
     ` · ${shortDate(row.obtained_at)}` +
     (row.locked ? " · 🛡️" : "") +
+    (row.showcase_pos !== null && row.showcase_pos !== undefined ? " · 🏆" : "") +
     (row.sterile ? " · stérile" : "")
   );
 }
@@ -1447,4 +1475,46 @@ export function buildSafariRecapEmbed(
 
   if (author) embed.setThumbnail(author.avatarURL);
   return embed;
+}
+
+// ====================== VITRINE ======================
+
+// Un encart par Pokémon exposé, dans l'ordre de la vitrine : son image, son
+// surnom s'il en a un, et ce qui le distingue — rareté, ball, date d'arrivée.
+// Le titre ne porte ni emoji du serveur ni mention, que Discord n'y rend pas.
+export function buildShowcaseEmbeds(rows) {
+  return rows
+    .map((row) => {
+      const species = getSpecies(row.species_id);
+      if (!species) return null;
+      const shiny = Boolean(row.is_shiny);
+      const name = displayName(species, shiny, row.sex, row.form);
+      const rarity = RARITIES[rarityOf(species)];
+      return new EmbedBuilder()
+        .setTitle(row.nickname || name)
+        .setColor(embedColor(species, shiny))
+        .setThumbnail(spriteUrl(species, shiny, row.form))
+        .setDescription(
+          [
+            row.nickname ? `**${name}**` : null,
+            `${rarity.icon} ${rarity.label} · Pokédex ${dexNumber(species)}`,
+            `${provenanceOf(row)} · depuis le ${shortDate(row.obtained_at)}`,
+          ]
+            .filter(Boolean)
+            .join("\n")
+        )
+        .setFooter({ text: `#${row.id}` });
+    })
+    .filter(Boolean);
+}
+
+// Le bouton qui montre sa propre vitrine dans le salon.
+export function buildShowcaseShareRow() {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId("poke_showcase_share")
+      .setLabel("Montrer à tout le monde")
+      .setEmoji("\u{1F4E4}")
+      .setStyle(ButtonStyle.Secondary)
+  );
 }
