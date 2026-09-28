@@ -1,7 +1,34 @@
 {
-  "version": "1.16.1",
-  "lastUpdated": "2026-09-28T11:06:55.214Z",
+  "version": "1.16.2",
+  "lastUpdated": "2026-09-28T11:40:57.397Z",
   "releases": [
+    {
+      "version": "1.16.2",
+      "date": "2026-09-28",
+      "title": "Release 1.16.2",
+      "features": [
+        {
+          "type": "feature",
+          "name": "Vitrine",
+          "description": "Avec /pk vitrine, expose jusqu'à 6 de tes Pokémon, regarde celles des autres et montre la tienne dans le salon d'un clic. Sur le site aussi : l'étoile dans la boîte et l'onglet Vitrine.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-28T11:17:50.000Z",
+          "branch": "claude/adoring-darwin-4o541o"
+        },
+        {
+          "type": "feature",
+          "name": "Page Dresseurs sur le site",
+          "description": "Une page liste tous les dresseurs et ouvre le profil de chacun : son Pokédex et sa vitrine.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-28T11:29:08.000Z",
+          "branch": "claude/adoring-darwin-4o541o"
+        }
+      ]
+    },
     {
       "version": "1.16.1",
       "date": "2026-09-28",
@@ -1905,26 +1932,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "feature",
-      "name": "Vitrine",
-      "description": "Avec /pk vitrine, expose jusqu'à 6 de tes Pokémon, regarde celles des autres et montre la tienne dans le salon d'un clic. Sur le site aussi : l'étoile dans la boîte et l'onglet Vitrine.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-28T11:17:50.000Z",
-      "branch": "claude/adoring-darwin-4o541o"
-    },
-    {
-      "type": "feature",
-      "name": "Page Dresseurs sur le site",
-      "description": "Une page liste tous les dresseurs et ouvre le profil de chacun : son Pokédex et sa vitrine.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-28T11:29:08.000Z",
-      "branch": "claude/adoring-darwin-4o541o"
-    }
-  ]
+  "pending": []
 }
