@@ -1902,7 +1902,7 @@
     {
       "type": "feature",
       "name": "Page Dresseurs sur le site",
-      "description": "Une page liste tous les dresseurs et ouvre le profil de chacun : son Pokédex, sa vitrine, sa boîte et son sac.",
+      "description": "Une page liste tous les dresseurs et ouvre le profil de chacun : son Pokédex et sa vitrine.",
       "announce": false,
       "author": "Sydnec",
       "commit": "pending",

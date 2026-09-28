@@ -837,35 +837,19 @@ input[type="number"] {
   margin: 0;
 }
 
-.trainer-box {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.trainer-mon {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  text-align: center;
-  overflow-wrap: anywhere;
-}
-
-.pager {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  margin-top: 12px;
+/* Sur grand écran, la vitrine d'un profil tient en deux rangées de trois ;
+   sur un téléphone, elle reprend la grille de la page Vitrine. */
+.trainer-body .showcase-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 @media (max-width: 800px) {
   .trainers-layout {
     grid-template-columns: 1fr;
+  }
+
+  .trainer-body .showcase-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   }
 }
 

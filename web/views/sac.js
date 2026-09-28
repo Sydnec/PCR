@@ -13,34 +13,29 @@ export async function render(ctx) {
       h("span", { class: "muted" }, "Solde"),
       h("strong", {}, `${fmt(ctx.me.balance)} pts`)
     ),
-    itemsList(
-      items,
-      "Ton sac est vide. Les objets se trouvent sur les Pokémon capturés et à la loterie (/pk loterie)."
-    )
-  );
-}
-
-// Les objets d'un sac, ou `empty` s'il n'y en a aucun. La page Dresseurs montre
-// le sac des autres avec le même rendu.
-export function itemsList(items, empty) {
-  return items.length
-    ? h(
-        "ul",
-        { class: "items" },
-        items.map((item) =>
-          h(
-            "li",
-            { class: "item" },
-            h("span", { class: "item-icon" }, itemIcon(item)),
+    items.length
+      ? h(
+          "ul",
+          { class: "items" },
+          items.map((item) =>
             h(
-              "span",
-              { class: "item-text" },
-              h("strong", {}, item.label),
-              item.description ? h("span", { class: "muted small" }, item.description) : null
-            ),
-            h("span", { class: "item-count" }, `×${fmt(item.count)}`)
+              "li",
+              { class: "item" },
+              h("span", { class: "item-icon" }, itemIcon(item)),
+              h(
+                "span",
+                { class: "item-text" },
+                h("strong", {}, item.label),
+                item.description ? h("span", { class: "muted small" }, item.description) : null
+              ),
+              h("span", { class: "item-count" }, `×${fmt(item.count)}`)
+            )
           )
         )
-      )
-    : h("p", { class: "muted" }, empty);
+      : h(
+          "p",
+          { class: "muted" },
+          "Ton sac est vide. Les objets se trouvent sur les Pokémon capturés et à la loterie (/pk loterie)."
+        )
+  );
 }
