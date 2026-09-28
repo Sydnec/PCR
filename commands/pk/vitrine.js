@@ -9,8 +9,7 @@ import {
 } from "../../modules/pokemon/collection.js";
 import { getSpecies } from "../../modules/pokemon/data.js";
 import {
-  buildShowcaseEmbeds,
-  buildShowcaseShareRow,
+  buildShowcaseMessage,
   displayName,
   individualChoices,
   ownedSpeciesChoices,
@@ -35,16 +34,17 @@ const nameOf = (row) => {
 // « de Sacha », « d'Ondine ».
 const ofName = (name) => (/^[aeiouyàâäéèêëîïôöûüù]/i.test(name) ? `d'${name}` : `de ${name}`);
 
+// Les drapeaux de la réponse s'ajoutent à l'éphémère : une vitrine arrive au
+// format conteneur (buildShowcaseMessage).
 const ephemeral = (interaction, payload) =>
-  interaction.reply({ ...payload, flags: MessageFlags.Ephemeral }).catch(() => {});
+  interaction
+    .reply({ ...payload, flags: MessageFlags.Ephemeral | (payload.flags ?? 0) })
+    .catch(() => {});
 
 // La vitrine d'un dresseur, telle que /pk vitrine voir la montre. `intro`
-// précède l'en-tête, pour dire ce qui vient de changer.
+// précède la vitrine, pour dire ce qui vient de changer.
 function showcaseReply(rows, { mine, name, intro = null }) {
   const slots = showcaseSlots();
-  const head = mine
-    ? `🏆 **Ta vitrine** (${rows.length}/${slots})`
-    : `🏆 **Vitrine ${ofName(name)}**`;
   if (!rows.length) {
     return {
       content:
@@ -54,11 +54,11 @@ function showcaseReply(rows, { mine, name, intro = null }) {
           : `🏆 **${name}** n'expose encore aucun Pokémon.`),
     };
   }
-  return {
-    content: (intro ? `${intro}\n` : "") + head,
-    embeds: buildShowcaseEmbeds(rows),
-    components: mine ? [buildShowcaseShareRow()] : [],
-  };
+  return buildShowcaseMessage(rows, {
+    title: mine ? `Ta vitrine · ${rows.length}/${slots}` : `Vitrine ${ofName(name)}`,
+    intro,
+    shareable: mine,
+  });
 }
 
 export default {

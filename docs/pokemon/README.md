@@ -37,8 +37,8 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
     reste échangeable : l'option ne change que ce que la liste montre.
 - `/pk vitrine voir [membre]` / `/pk vitrine ajouter <espece> <individu> [place]` /
   `/pk vitrine retirer <pokemon>` : la **vitrine**, où chacun expose jusqu'à six Pokémon
-  (`pokemon.showcase.slots`) aux autres, un encart par Pokémon avec son image, son surnom, sa ball et
-  sa date d'arrivée. C'est du décor : un Pokémon exposé reste jouable, mais le bot le sacrifie ou le
+  (`pokemon.showcase.slots`) aux autres, en un seul bloc : leurs images en grille, puis une ligne
+  par Pokémon avec son surnom, sa rareté, sa ball et son identifiant. C'est du décor : un Pokémon exposé reste jouable, mais le bot le sacrifie ou le
   revend en dernier quand il choisit lui-même. Revendu, échangé ou sacrifié, il quitte la vitrine ;
   s'il évolue, il y reste. Sa propre vitrine porte un bouton **« 📤 Montrer à tout le monde »** qui
   la publie dans le salon, une fois par heure au plus (`pokemon.showcase.shareCooldownMinutes`).
