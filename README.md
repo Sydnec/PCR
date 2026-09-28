@@ -47,6 +47,8 @@ safari. Chaque semaine, un pot commun prélève un pourcentage des soldes et le 
 - **Personnalisation** : `/color` - Changement de la couleur du pseudo.
 - **Threads** : `/join` - Rejoindre rapidement un fil de discussion.
 - **Aide** : `/help` - Liste des commandes disponibles.
+- **Liens X et Instagram** : republiés vers des miroirs qui en affichent l'aperçu, avec un bouton
+  « Traduire » sous les tweets écrits dans une autre langue que le français.
 
 ### 🛡️ Modération & Administration
 

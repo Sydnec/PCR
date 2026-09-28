@@ -4,7 +4,7 @@ import pointsDb from "../../modules/points-db.js";
 import { registerMessageForSpawn } from "../../modules/pokemon/spawn.js";
 import { countEggMessage } from "../../modules/pokemon/eggs.js";
 import { emojiRegex } from "../../modules/regex.js";
-import { rewriteSocialLinks } from "../../modules/links.js";
+import { rewriteSocialLinks, translateButtons } from "../../modules/links.js";
 import { getConfig } from "../../modules/config.js";
 import dotenv from "dotenv";
 
@@ -162,13 +162,26 @@ async function execute(message) {
     const rewritten = rewriteSocialLinks(messageContent);
     // Un message Discord tient en 2 000 caractères : au-delà, la copie
     // échouerait, et l'original reste.
-    const repost = rewritten && `<@${message.author.id}> a envoyé :\n${rewritten}`;
+    const repost = rewritten && `<@${message.author.id}> a envoyé :\n${rewritten.text}`;
     if (repost && repost.length <= 2000) {
+      // La langue des tweets se demande pendant l'envoi : la copie n'attend
+      // pas l'API, ses boutons « Traduire » la rejoignent ensuite.
+      const buttons = translateButtons(rewritten.tweetIds);
       message.channel
         // La mention dit qui l'a envoyé, sans le notifier.
         .send({ content: repost, allowedMentions: { parse: [] } })
-        // L'original ne part qu'une fois la copie publiée : rien ne se perd.
-        .then(() => message.delete())
+        .then((copy) =>
+          Promise.all([
+            // L'original ne part qu'une fois la copie publiée : rien ne se perd.
+            message.delete(),
+            // Indépendant : un original déjà supprimé, ou qu'on n'a pas le
+            // droit de supprimer, ne prive pas la copie de ses boutons.
+            buttons.then(
+              (row) =>
+                row && copy.edit({ components: [row], allowedMentions: { parse: [] } })
+            ),
+          ])
+        )
         .catch((err) => handleException("Remplacement de lien :", err));
     }
   } catch (err) {
