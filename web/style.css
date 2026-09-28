@@ -753,26 +753,6 @@ input[type="number"] {
   margin-top: 4px;
 }
 
-.showcase-trainers {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.showcase-trainers .button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.showcase-trainers .button[aria-pressed="true"] {
-  border-color: var(--accent);
-}
-
-.showcase-trainers .avatar {
-  border-radius: 50%;
-}
-
 /* ---------- Dresseurs ---------- */
 
 .trainers-layout {

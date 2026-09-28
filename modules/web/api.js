@@ -981,21 +981,6 @@ export const routes = [
     },
   },
 
-  // Les dresseurs qui exposent quelque chose, les vitrines les plus garnies
-  // d'abord. Un membre parti du serveur n'y figure plus.
-  {
-    method: "GET",
-    path: "/api/showcases",
-    auth: true,
-    handler: async (ctx) => {
-      const rows = await promise((cb) => listShowcases(cb));
-      const trainers = await Promise.all(
-        rows.map(async (row) => ({ ...(await trainerOf(ctx.bot, row.user_id)), count: row.count }))
-      );
-      return { slots: showcaseSlots(), trainers: trainers.filter((trainer) => trainer.name) };
-    },
-  },
-
   // Exposer un Pokémon (`shown` vrai, à la place `place` s'il y en a une) ou le
   // retirer, comme /pk vitrine ajouter et retirer. Rend la vitrine telle que
   // la base la voit ensuite.

@@ -32,6 +32,7 @@ import {
 } from "./safari.js";
 import { activeGeneration, getSpecies } from "./data.js";
 import { claimShowcaseShare, getShowcase, releaseShowcaseShare } from "./showcase.js";
+import { renderShowcaseImage } from "./showcase-image.js";
 import {
   DITTO_HELPER,
   acceptTrade,
@@ -792,9 +793,10 @@ async function handleShowcaseShare(interaction) {
   }
 
   await interaction.deferUpdate().catch(() => {});
+  const image = await renderShowcaseImage(rows);
   try {
     await channel.send({
-      ...buildShowcaseMessage(rows, { title: `Vitrine de <@${userId}>` }),
+      ...buildShowcaseMessage(rows, { title: `Vitrine de <@${userId}>`, image }),
       allowedMentions: { parse: [] },
     });
   } catch (error) {

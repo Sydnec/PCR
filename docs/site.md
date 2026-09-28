@@ -17,7 +17,7 @@ en donne le lien, en réponse privée (ou dit que le site n'est pas en ligne, ou
 | **Pokédex** | Toutes les espèces des générations ouvertes, celles qu'on possède en couleur. La fiche d'une espèce montre sa lignée et ce que tu en possèdes. |
 | **Sac** | Le solde et les objets. |
 | **Œuf** | L'œuf qui couve, ou le formulaire pour en **pondre** un. |
-| **Vitrine** | Ta vitrine, comme `/pk vitrine` : les Pokémon que tu exposes, à ranger en glissant l'un sur l'autre (ou « Déplacer » puis la place voulue, au doigt) ou à retirer, et les vitrines des autres dresseurs. Un Pokémon s'expose depuis sa fiche dans la boîte, avec l'étoile. La publier dans un salon se fait sur Discord. |
+| **Vitrine** | Ta vitrine, comme `/pk vitrine` : les Pokémon que tu exposes, à ranger en glissant l'un sur l'autre (ou « Déplacer » puis la place voulue, au doigt) ou à retirer. Les vitrines des autres se regardent dans **Dresseurs**. Un Pokémon s'expose depuis sa fiche dans la boîte, avec l'étoile. La publier dans un salon se fait sur Discord. |
 | **Dresseurs** | Tous les dresseurs — ceux qui ont au moins un Pokémon —, du plus grand Pokédex au plus petit, avec une recherche. Un clic ouvre le profil : son **Pokédex** et sa **vitrine**. Rien que de la lecture, que Discord montre aussi avec un membre (`/pk pokedex`, `/pk vitrine voir`). Le dresseur et l'onglet ouverts sont dans l'adresse (`/dresseurs?user=…&onglet=vitrine`), pour partager un lien. |
 | **Infos** | Les règles en bref, avec un sommaire : points, apparitions et raretés, chances de capture par ball et par difficulté, objets (qui les tient, loterie, revente), évolution, œufs, échanges et revente, verrou, parc safari, et les commandes `/pk`. Chaque chiffre vient des réglages en cours. |
 
