@@ -1888,5 +1888,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "feature",
+      "name": "Bouton Traduire sous les tweets",
+      "description": "Sous un lien X vers un tweet qui n'est pas en français, le bouton Traduire t'en montre la traduction, visible de toi seul.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-28T10:44:16.000Z",
+      "branch": "claude/determined-galileo-3od1th"
+    }
+  ]
 }
