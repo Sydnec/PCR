@@ -8,11 +8,13 @@
   apparaître un nouveau. Tant qu'un Pokémon est là, ce sont le seuil de messages et
   le délai minimum (~40 messages et 1 h) qui décident du moment où il s'enfuit, remplacé par le
   suivant. Un délai plancher après capture est disponible (`minDelayAfterEndMinutes`, à 0 par défaut)
-  si l'enchaînement devient trop rapide.
+  si l'enchaînement devient trop rapide. **Un légendaire fait exception** : les messages ne le
+  chassent jamais, seuls sa durée de vie ou une capture le retirent.
 - **Fuite autonome** : chaque apparition reçoit une durée de vie tirée au hasard entre 3 et 6 heures
   (`fleeAfterMinutes`). Passé ce délai, un Pokémon que personne n'a capturé s'enfuit de lui-même,
   sans dépendre de l'activité du serveur — un salon silencieux ne reste donc jamais figé sur le même
-  Pokémon. La durée de vie n'est jamais affichée.
+  Pokémon. La durée de vie n'est jamais affichée. Celle d'un légendaire est multipliée par
+  `legendaryFleeMultiplier` (2 par défaut), sur le minimum comme sur le maximum.
 - **Course à un vainqueur** : tout le monde peut lancer autant de balls qu'il veut, le premier jet
   réussi remporte le Pokémon. Les balls ratées sont définitivement perdues.
 - **Panneau de relance** : la réponse privée à un lancer porte elle-même les quatre balls et se
@@ -26,7 +28,10 @@
   lance par le même chemin — même prix, même cooldown, même course.
 - **4 balls** : Poké Ball (×1), Super Ball (×2), Hyper Ball (×4) et Master Ball (capture garantie,
   avec confirmation obligatoire). Les probabilités suivent la formule officielle de la génération 3,
-  à partir du taux de capture réel de chaque espèce.
+  à partir du taux de capture réel de chaque espèce, **relevé à un plancher**
+  (`capture.minCatchRate`, 10) : on ne peut pas affaiblir un Pokémon avant de lancer, et les
+  légendaires à taux 3 n'auraient jamais été attrapés. Le plancher vaut partout — lancers,
+  probabilités affichées, parc safari — et ne touche que les taux plus bas que lui.
 - **Shiny** (~1/500) : une variante de l'espèce, pas une entrée de Pokédex à part. Le Pokédex dit
   combien on en a.
 - **Le sexe se voit dès l'apparition** : l'annonce le montre (« Un Pikachu ♀ sauvage apparaît ! »),

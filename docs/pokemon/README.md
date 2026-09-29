@@ -103,8 +103,8 @@ les siens — facultatif pour l'évolution et la revente. `/pk oeuf pondre` acce
 
 Tous les nombres (prix, multiplicateurs, taux de shiny, cadence, poids de rareté,
 coûts d'évolution, et l'intégralité du parc safari dans `pokemon.safari`) vivent dans le bloc
-`pokemon` de `config.json`, relu à l'exécution — ils sont donc modifiables **sans redémarrer le
-bot**. Le curseur `capture.globalMultiplier` rend l'ensemble du jeu
+`pokemon` de la [configuration](../configuration.md), relu à l'exécution — ils sont donc
+modifiables **sans redémarrer le bot**. Le curseur `capture.globalMultiplier` rend l'ensemble du jeu
 plus ou moins difficile tout en préservant la hiérarchie entre espèces. Le `duplicates` d'un stade
 d'évolution (`pokemon.evolution.2.duplicates`…) compte l'individu qui évolue : il sacrifie un
 exemplaire de moins.

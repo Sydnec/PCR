@@ -32,6 +32,7 @@ import {
   charmFactor,
   dexSize,
   difficultyOf,
+  effectiveCatchRate,
   evolutionChain,
   evolutionTargets,
   femaleShare,
@@ -143,7 +144,8 @@ function speciesJson(species, families = babyFamilies()) {
     baby: Boolean(species.isBaby),
     genderless: isGenderless(species),
     femaleShare: femaleShare(species),
-    catchRate: species.catchRate,
+    // Le taux effectif (plancher compris) : c'est celui que le site affiche.
+    catchRate: effectiveCatchRate(species.catchRate),
     obtention: obtention(species),
     // Parent possible d'un œuf : de quoi proposer les bons candidats, la ponte
     // tranchant de toute façon.

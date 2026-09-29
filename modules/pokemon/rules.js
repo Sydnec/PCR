@@ -14,6 +14,7 @@ import {
   charmMultiplier,
   difficultyOf,
   dittoSpecies,
+  effectiveCatchRate,
   itemImageUrl,
   probabilitiesByBall,
   rarityOf,
@@ -73,10 +74,11 @@ function catchTable(spawnConfig) {
   const itemOnly = itemOnlySpecies();
   for (const species of allSpecies()) {
     if (spawnWeight(species, spawnConfig, itemOnly) <= 0) continue;
-    const { level, label } = difficultyOf(species.catchRate);
+    const rate = effectiveCatchRate(species.catchRate);
+    const { level, label } = difficultyOf(rate);
     const band = bands.get(level) ?? { level, label, min: Infinity, max: -Infinity };
-    band.min = Math.min(band.min, species.catchRate);
-    band.max = Math.max(band.max, species.catchRate);
+    band.min = Math.min(band.min, rate);
+    band.max = Math.max(band.max, rate);
     bands.set(level, band);
   }
   return [...bands.values()]
@@ -224,6 +226,7 @@ export function describeRules(bot) {
       minDelayMinutes: config.spawn.minDelayMinutes,
       afterEndMinutes: config.spawn.minDelayAfterEndMinutes,
       fleeMinutes: config.spawn.fleeAfterMinutes,
+      legendaryFleeMultiplier: config.spawn.legendaryFleeMultiplier,
       shinyOdds: config.spawn.shinyOdds,
       heldItemChance: heldItemChance(),
       itemDropChance: config.spawn.itemDropChance,

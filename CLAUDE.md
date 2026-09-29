@@ -85,7 +85,8 @@ le rôle de `pcr release`.
   rangement du PC (`modules/pokemon/pc.js` : places, noms de boîtes), qui ne change rien
   au jeu.
 - **Aucun nombre en dur** : prix, poids, taux et durées vivent dans `modules/config.js`
-  (`DEFAULTS`) et `config.json`, relus à l'exécution. Ce qui s'affiche se calcule avec les mêmes
+  (`DEFAULTS`, toutes les valeurs de base), relus à l'exécution avec les ajustements à chaud de
+  `config.json` (hors git, écrit par `/admin config`). Ce qui s'affiche se calcule avec les mêmes
   fonctions que ce qui se tire, jamais recopié.
 
 ### Discord

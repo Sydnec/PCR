@@ -1,5 +1,5 @@
-// Propriétaire unique de config.json : lecture à chaud, valeurs par défaut, et
-// écriture depuis /admin config.
+// Propriétaire unique de la configuration : lecture à chaud, valeurs par défaut,
+// et écriture depuis /admin config.
 //
 // Le fichier était jusqu'ici lu à deux endroits indépendants — ici pour le bloc
 // Pokémon, et dans messageCreate.js en lecture brute sans défauts. Tant que
@@ -12,23 +12,37 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { handleException } from "./utils.js";
+import { handleException, log } from "./utils.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const configPath = path.join(__dirname, "../config.json");
-// C'est ICI qu'écrit /admin config, jamais dans config.json.
+// Deux couches : DEFAULTS, qui porte TOUTES les valeurs de base et se décide en
+// revue de code, puis config.json, l'ajustement à chaud — c'est ICI qu'écrit
+// /admin config. La propriété « clé absente = valeur du dessous » tient à chaque
+// étage : supprimer config.json revient exactement aux valeurs du code.
 //
-// config.json est suivi par git, et le déploiement enchaîne `git checkout main`
-// puis `git pull` sous `set -e` : un fichier suivi modifié sur le serveur fait
-// échouer le déploiement suivant, et `pcr release` refuse de partir d'un arbre
-// sale. Une commande qui écrirait dans config.json casserait donc la chaîne de
-// livraison au premier usage.
-//
-// La surcharge est un troisième étage de la fusion : DEFAULTS, puis config.json
-// (le réglage versionné, décidé en revue), puis ce fichier (l'ajustement fait
-// depuis Discord). La propriété « clé absente = valeur du dessous » tient à
-// chaque étage.
-const overridePath = path.join(__dirname, "../config.local.json");
+// config.json n'est PAS suivi par git. Le déploiement enchaîne `git checkout
+// main` puis `git pull` sous `set -e` : un fichier suivi modifié sur le serveur
+// fait échouer le déploiement suivant, et `pcr release` refuse de partir d'un
+// arbre sale. Un réglage à chaud écrit dans un fichier suivi casserait donc la
+// chaîne de livraison dès le premier usage.
+const overridePath = path.join(__dirname, "../config.json");
+
+// Avant, /admin config écrivait dans config.local.json, et config.json était le
+// réglage versionné — dont toutes les valeurs vivent désormais dans DEFAULTS.
+// Le premier démarrage reprend donc l'ancienne surcharge sous son nouveau nom :
+// sans cela, les réglages posés depuis Discord seraient ignorés en silence. Elle
+// prend la place de l'ancien config.json, qu'elle recouvre sans rien perdre.
+const legacyOverridePath = path.join(__dirname, "../config.local.json");
+function migrateLegacyOverride() {
+  if (!fs.existsSync(legacyOverridePath)) return;
+  try {
+    fs.renameSync(legacyOverridePath, overridePath);
+    log("config.local.json repris comme config.json (réglages à chaud)");
+  } catch (error) {
+    handleException("Reprise de config.local.json comme config.json impossible :", error);
+  }
+}
+migrateLegacyOverride();
 
 const POKEMON = {
   enabled: true,
@@ -46,24 +60,28 @@ const POKEMON = {
     2: "2026-10-30T18:00:00+01:00",
   },
   spawn: {
-    messagesPerSpawn: 40,
-    minDelayMinutes: 60,
+    messagesPerSpawn: 20,
+    minDelayMinutes: 1,
     // Délai plancher avant qu'un nouveau Pokémon apparaisse une fois le
     // précédent capturé ou enfui. À 0, il apparaît dès le message suivant.
     minDelayAfterEndMinutes: 0,
     // Durée de vie d'un Pokémon non capturé : il s'enfuit de lui-même après un
     // délai tiré au hasard dans cet intervalle, sans dépendre de l'activité.
-    fleeAfterMinutes: { min: 180, max: 360 },
+    fleeAfterMinutes: { min: 45, max: 90 },
+    // Un légendaire est un événement rare : il reste ce facteur de fois plus
+    // longtemps (le min ET le max), et le seuil de messages ne le remplace
+    // jamais — seuls son échéance et une capture le font partir.
+    legendaryFleeMultiplier: 2,
     shinyOdds: 500,
-    // Le stade 2 pèse 60 % d'un stade 1, le stade 3 un quart : les évolutions
-    // restent plus rares que leur forme de base, comme dans les jeux, sans être
-    // introuvables. 35 et 10 en faisaient des curiosités — un stade 3 sur 75
-    // apparitions.
-    weightsByStage: { 1: 100, 2: 60, 3: 25 },
+    // Le stade 2 pèse 60 contre 70 pour un stade 1, le stade 3 un peu plus d'un
+    // tiers : les évolutions restent plus rares que leur forme de base, comme
+    // dans les jeux, sans être introuvables. 35 et 10 (contre 100) en faisaient
+    // des curiosités — un stade 3 sur 75 apparitions.
+    weightsByStage: { 1: 70, 2: 60, 3: 25 },
     legendaryWeight: 8,
     pingRarities: ["RARE", "LEGENDAIRE"],
     throwLogSize: 8,
-    // Un Pokémon sur quinze tient quelque chose. C'est tiré à l'apparition et
+    // Un Pokémon sur sept environ tient quelque chose. C'est tiré à l'apparition et
     // figé dans la ligne, comme le shiny et le taux de capture : ce que porte un
     // Pokémon lui appartient, ça ne se retire pas au moment où on l'attrape.
     //
@@ -76,13 +94,18 @@ const POKEMON = {
     // La part vaut pour les objets de la 1re génération : ceux d'une génération
     // ouverte ensuite s'y ajoutent sans rien retirer aux autres
     // (heldItemChance dans pokemon/items.js).
-    heldItemChance: 0.07,
+    heldItemChance: 0.15,
     itemDropChance: 0.2,
     embedRefreshMs: 2000,
   },
   capture: {
     globalMultiplier: 1,
-    throwCooldownSeconds: 5,
+    // Plancher du taux de capture. Dans les jeux, on affaiblit un Pokémon avant
+    // de lancer ; ici c'est impossible, et les légendaires à taux 3 devenaient
+    // inatteignables. Un taux plus bas est relevé à cette valeur, partout : les
+    // lancers, les probabilités affichées, le parc safari.
+    minCatchRate: 10,
+    throwCooldownSeconds: 3,
     // Les emoji des balls sont ceux du serveur, au format Discord `<:nom:id>`.
     // C'est l'identifiant qui décide de l'image affichée, jamais le nom : le
     // renommer côté serveur ne casse rien, le supprimer si. Ce format-là rend
@@ -98,28 +121,28 @@ const POKEMON = {
         label: "Poké Ball",
         emoji: "<:pokeball:1551325915160514690>",
         sprite: "poke-ball",
-        price: 150,
+        price: 100,
         multiplier: 1,
       },
       super: {
         label: "Super Ball",
         emoji: "<:superball:1551325951361679411>",
         sprite: "great-ball",
-        price: 400,
+        price: 200,
         multiplier: 2,
       },
       hyper: {
         label: "Hyper Ball",
         emoji: "<:hyperball:1551326031431077898>",
         sprite: "ultra-ball",
-        price: 1000,
+        price: 400,
         multiplier: 4,
       },
       master: {
         label: "Master Ball",
         emoji: "<:masterball:1551326387455926432>",
         sprite: "master-ball",
-        price: 50000,
+        price: 6000,
         multiplier: 255,
         guaranteed: true,
       },
@@ -129,9 +152,9 @@ const POKEMON = {
     // Le tarif du stade atteint. Un bébé qui devient adulte (Pichu → Pikachu,
     // à partir de la génération 2) paie celui du stade 2, comme toute première
     // évolution.
-    2: { duplicates: 5, points: 500 },
-    3: { duplicates: 10, points: 2000 },
-    branchChoicePoints: 1000,
+    2: { duplicates: 2, points: 1500 },
+    3: { duplicates: 2, points: 3000 },
+    branchChoicePoints: 3000,
     // `duplicates` compte l'individu qui évolue : il en sacrifie un de moins.
     // Métamorph, joker des évolutions : autant de Métamorph, shiny ou non,
     // tiennent lieu d'un sacrifice manquant.
@@ -180,7 +203,7 @@ const POKEMON = {
     minBoxes: 8,
     maxBoxes: 60,
     boxNameLength: 20,
-    nicknameLength: 12,
+    nicknameLength: 20,
   },
   // Catalogue des objets. L'inventaire ne stocke qu'une clé et un compteur :
   // c'est ici que la clé prend un nom et une icône, réglables à chaud comme ceux
@@ -200,11 +223,11 @@ const POKEMON = {
   //
   // `lotteryWeight` remplace `dropWeight` à la loterie, et seulement là. Les deux
   // tables ont été la même jusqu'à ce que la loterie doive donner quelque chose
-  // sept fois sur dix : ouvrir sa porte rendait les lots rares d'autant plus
-  // fréquents, alors qu'un Pokémon sur quinze tient toujours un objet. Les balls
-  // y pèsent donc plus lourd (640 et 330 contre 400 et 200), ce qui ramène la
-  // Pépite et la Master Ball à la cadence qu'elles avaient à 50 % — une tous les
-  // 92 jours, une tous les 615 — sans toucher à ce que tiennent les Pokémon.
+  // trois fois sur quatre : ouvrir sa porte rendait les lots rares d'autant plus
+  // fréquents, alors qu'un Pokémon sur sept seulement tient un objet. Les balls
+  // y pèsent donc plus lourd (640 et 330 contre 400 et 200), ce qui garde la
+  // Pépite et la Master Ball rares — une tous les 34 jours, une tous les 841 —
+  // sans toucher à ce que tiennent les Pokémon.
   //
   // `evolution` le rend utilisable dans une évolution : `quantity` exemplaires
   // de l'objet tiennent lieu de `copies` sacrifices, `freePoints`
@@ -213,7 +236,7 @@ const POKEMON = {
   // sur un Chenipan est refusée. `generation` le garde hors du jeu tant que sa
   // génération est fermée.
   //
-  // Repère : avec 10 % de porteurs et 921 de poids total, la Master Ball tombe
+  // Repère : avec 15 % de porteurs et 892 de poids total, la Master Ball tombe
   // une fois sur trois mille apparitions environ.
   //
   // Ajouter un objet demande de toucher ici ET au code qui le consomme :
@@ -241,7 +264,7 @@ const POKEMON = {
       sellValue: 300,
       dropWeight: 120,
       evolution: { copies: 1, quantity: 3 },
-      lot: { min: 1, max: 2 },
+      lot: { min: 1, max: 3 },
     },
     ball_hyper: {
       ball: "hyper",
@@ -264,7 +287,7 @@ const POKEMON = {
       description:
         "Un Évoli qui évolue avec lui prend la forme de ton choix, sans payer de points. Il tient lieu d'un sacrifice.",
       sellValue: 500,
-      dropWeight: 30,
+      dropWeight: 20,
       // Gratuite, comme les pierres qu'elle remplace : elle ne dispense de
       // points que l'évolution d'Évoli, la seule qu'elle permet.
       evolution: { copies: 1, quantity: 1, choose: [133], freePoints: true },
@@ -276,7 +299,7 @@ const POKEMON = {
       description:
         "Un Ortide qui évolue avec elle devient Joliflor plutôt que Rafflesia. Elle tient lieu d'un sacrifice.",
       sellValue: 500,
-      dropWeight: 30,
+      dropWeight: 20,
       generation: 2,
       evolution: { copies: 1, quantity: 1, targets: { 44: 182 } },
     },
@@ -287,7 +310,7 @@ const POKEMON = {
       description:
         "Têtarte devient Tarpaud plutôt que Tartard, Ramoloss devient Roigada plutôt que Flagadoss. Elle tient lieu d'un sacrifice.",
       sellValue: 500,
-      dropWeight: 30,
+      dropWeight: 20,
       generation: 2,
       evolution: { copies: 1, quantity: 1, targets: { 61: 186, 79: 199 } },
     },
@@ -298,7 +321,7 @@ const POKEMON = {
       description:
         "Sans lui, Onix, Insécateur, Hypocéan et Porygon n'évoluent pas. Il tient lieu d'un sacrifice.",
       sellValue: 500,
-      dropWeight: 30,
+      dropWeight: 20,
       generation: 2,
       evolution: { copies: 1, quantity: 1, targets: { 95: 208, 123: 212, 117: 230, 137: 233 } },
     },
@@ -307,20 +330,20 @@ const POKEMON = {
       emoji: "💎",
       sprite: "nugget",
       description: "Ça brille, et ça ne sert qu'à ça : se revendre.",
-      sellValue: 2000,
-      dropWeight: 20,
+      sellValue: 4000,
+      dropWeight: 50,
     },
     ticket_safari: {
       label: "Ticket Safari",
       emoji: "🎟️",
       sprite: "pass",
       description: "Une entrée pour le parc safari.",
-      dropWeight: 8,
+      dropWeight: 20,
     },
     ball_master: {
       ball: "master",
       description: "La capture garantie, offerte. Autant dire qu'elle ne se trouve pas.",
-      dropWeight: 3,
+      dropWeight: 2,
     },
     // Les charmes ne tombent pas et ne se revendent pas : ils se gagnent en
     // complétant un Pokédex, une fois pour toutes (modules/pokemon/charms.js).
@@ -362,8 +385,8 @@ const POKEMON = {
   //
   // Il tire dans la même table que le butin des Pokémon, `dropWeight`, parce
   // qu'il n'y a qu'un ordre de rareté dans le jeu et qu'en maintenir deux, c'est
-  // les voir diverger. Seule la porte d'entrée change : 7 % des Pokémon tiennent
-  // un objet, la moitié des tirages en donnent un.
+  // les voir diverger. Seule la porte d'entrée change : 15 % des Pokémon tiennent
+  // un objet, les trois quarts des tirages en donnent un.
   //
   // `lotDecay` donne sa forme au lot : chaque exemplaire de plus est `lotDecay`
   // fois moins probable que le précédent. À 1 le tirage est uniforme, et c'était
@@ -375,28 +398,28 @@ const POKEMON = {
   // génération ouverte ensuite prennent leur place sur « rien », et aucun autre
   // lot ne devient plus rare (lotteryWinChance dans pokemon/items.js).
   //
-  // Repère aux réglages actuels : ~267 points de valeur par jour et par dresseur,
+  // Repère aux réglages actuels : ~339 points de valeur par jour et par dresseur,
   // un dixième d'une journée de messages. Un gain sur deux est une ou deux Poké
   // Balls, ou une Super Ball.
   lottery: {
     enabled: true,
-    winChance: 0.7,
+    winChance: 0.75,
     lotDecay: 0.5,
   },
   safari: {
     enabled: true,
-    randomChancePerHour: 0.01,
-    minHoursBetweenParks: 48,
+    randomChancePerHour: 0.04,
+    minHoursBetweenParks: 24,
     parkDurationHours: 24,
-    spawnPauseHours: 6,
+    spawnPauseHours: 4,
     // Une visite court jusqu'à la fermeture du parc ; ceci n'en est que le
     // plancher, pour qui entre juste avant la fin — et toute la durée d'une
     // entrée payante, qui n'a pas de parc derrière elle.
     sessionMinDurationMinutes: 60,
     actionsPerSession: 25,
     entryPrice: 5000,
-    entryCooldownHours: 24,
-    ball: { label: "Safari Ball", emoji: "\u{1F7E2}", sprite: "safari-ball", multiplier: 1.5 },
+    entryCooldownHours: 12,
+    ball: { label: "Safari Ball", emoji: "<:safariball:1552972083909234811>", sprite: "safari-ball", multiplier: 1.5 },
     // Multiplicatif et cumulable, mais plafonné : deux appâts atteignent le
     // plafond, le troisième est une action gaspillée. C'est là qu'est le choix.
     baitMultiplier: 2,
@@ -407,9 +430,10 @@ const POKEMON = {
     wildFleeChance: 0.05,
     wildFleeChancePerBait: 0.03,
     shinyOdds: 250,
-    // La compensation suit le malus sauvage, qui s'est adouci : ×1,5 au
-    // stade 2, ×2,4 au stade 3, ×3 pour un légendaire.
-    weightsByStage: { 1: 100, 2: 90, 3: 60 },
+    // La compensation suit le malus sauvage, qui s'est adouci. Par rapport à
+    // l'état sauvage : ×0,7 pour un stade 1, autant pour un stade 2, ×1,6 au
+    // stade 3, ×3 pour un légendaire.
+    weightsByStage: { 1: 50, 2: 60, 3: 40 },
     legendaryWeight: 24,
   },
 };
@@ -440,7 +464,7 @@ export const DEFAULTS = {
     // Cadence à laquelle l'onglet Capture relit l'apparition en cours : assez
     // vif pour suivre une course, assez lent pour ne pas marteler le serveur à
     // chaque onglet ouvert.
-    spawnRefreshSeconds: 5,
+    spawnRefreshSeconds: 3,
   },
   // La réécriture des liens X et Instagram vers leurs miroirs (modules/links.js).
   links: {
@@ -536,7 +560,7 @@ export function configOverrideStatus() {
       ok: false,
       exists: true,
       reason:
-        "⚠️ `config.local.json` est illisible : **tous les réglages modifiés depuis Discord sont " +
+        "⚠️ `config.json` est illisible : **tous les réglages modifiés depuis Discord sont " +
         `ignorés** et les valeurs par défaut s'appliquent. Détail : ${error.message}`,
     };
   }
@@ -544,7 +568,7 @@ export function configOverrideStatus() {
 
 // Relu à chaque appel : tous les nombres du bot sont ajustables sans redémarrer.
 export function getConfig() {
-  return merge(merge(DEFAULTS, readLayer(configPath)), readLayer(overridePath, { optional: true }));
+  return merge(DEFAULTS, readLayer(overridePath, { optional: true }));
 }
 
 // ====================== SCHÉMA ======================
@@ -770,11 +794,11 @@ export function writeConfigValue(path, raw) {
     node[segments.at(-1)] = coerced.value;
     saveOverride(next);
   } catch (error) {
-    handleException("Écriture de config.local.json impossible :", error);
+    handleException("Écriture de config.json impossible :", error);
     return {
       ok: false,
       reason:
-        "Impossible d'écrire la surcharge de configuration — `config.local.json` est peut-être illisible.",
+        "Impossible d'écrire la surcharge de configuration — `config.json` est peut-être illisible.",
     };
   }
 

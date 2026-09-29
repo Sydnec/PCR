@@ -632,9 +632,12 @@ function resolveAction({ session, species, action, config }, cb) {
           baitStacks: stacks,
           probability: safariCatchProbability(session.encounter_catch_rate, stacks, config),
         };
-        // Le tirage se fait à la nervosité d'APRÈS la baie : c'est le fait de
-        // manger qui met le Pokémon sur ses gardes.
-        if (Math.random() < safariFleeChance(stacks, config)) {
+        // Le tirage se fait à la nervosité d'AVANT la baie : le risque affiché
+        // au dresseur est celui de sa prochaine action, appât compris. Manger
+        // ne met le Pokémon sur ses gardes que pour la suite — le premier appât
+        // vaut donc un lancer à jeun (5 %), et l'écran annonce 8 % parce que
+        // c'est ce que risquera la prochaine ball.
+        if (Math.random() < safariFleeChance(session.encounter_bait, config)) {
           return rollNextEncounter(session, config, (err) =>
             err ? cb(err) : done("BAIT_FLED", extra)
           );
