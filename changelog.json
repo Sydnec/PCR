@@ -1986,6 +1986,16 @@
       "commit": "pending",
       "timestamp": "2026-09-29T08:44:53.000Z",
       "branch": "claude/vibrant-brown-s7suxt"
+    },
+    {
+      "type": "enhancement",
+      "name": "Légendaires plus accessibles",
+      "description": "Les légendaires sont un peu plus faciles à attraper (au sauvage comme au parc safari), restent deux fois plus longtemps et ne sont plus chassés par les messages. La Master Ball passe à 6 000 points.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-29T19:14:02.000Z",
+      "branch": "claude/vibrant-brown-s7suxt"
     }
   ]
 }
