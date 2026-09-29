@@ -2006,6 +2006,16 @@
       "commit": "pending",
       "timestamp": "2026-09-29T19:23:19.000Z",
       "branch": "claude/vibrant-brown-s7suxt"
+    },
+    {
+      "type": "enhancement",
+      "name": "Parc safari : premier appât moins risqué",
+      "description": "Le risque de fuite d'un appât se tire avant que la baie ne le rende nerveux : le premier appât ne risque que 5 %, le second 8 %.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-29T19:41:05.000Z",
+      "branch": "claude/vibrant-brown-s7suxt"
     }
   ]
 }
