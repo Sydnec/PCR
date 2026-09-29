@@ -128,7 +128,7 @@ const POKEMON = {
         label: "Master Ball",
         emoji: "<:masterball:1551326387455926432>",
         sprite: "master-ball",
-        price: 50000,
+        price: 6000,
         multiplier: 255,
         guaranteed: true,
       },

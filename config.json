@@ -34,7 +34,7 @@
 				"poke": { "emoji": "<:pokeball:1551325915160514690>", "price": 100, "multiplier": 1 },
 				"super": { "emoji": "<:superball:1551325951361679411>", "price": 200, "multiplier": 2 },
 				"hyper": { "emoji": "<:hyperball:1551326031431077898>", "price": 400, "multiplier": 4 },
-				"master": { "emoji": "<:masterball:1551326387455926432>", "price": 6000, "multiplier": 255 }
+				"master": { "emoji": "<:masterball:1551326387455926432>", "multiplier": 255 }
 			}
 		},
 		"items": {
