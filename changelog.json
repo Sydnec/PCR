@@ -1996,6 +1996,16 @@
       "commit": "pending",
       "timestamp": "2026-09-29T19:14:02.000Z",
       "branch": "claude/vibrant-brown-s7suxt"
+    },
+    {
+      "type": "chore",
+      "name": "Réglages de base déplacés dans le code",
+      "description": "Les valeurs de base du jeu vivent maintenant dans le code, et config.json ne contient plus que les réglages faits à chaud.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-29T19:23:19.000Z",
+      "branch": "claude/vibrant-brown-s7suxt"
     }
   ]
 }
