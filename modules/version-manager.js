@@ -15,7 +15,7 @@ export function readChangelog() {
         return JSON.parse(fs.readFileSync(CHANGELOG_FILE, 'utf8'));
     } catch (error) {
         if (error.code !== 'ENOENT') {
-            throw new Error(`Erreur lors de la lecture du changelog: ${error.message}`);
+            throw new Error(`Erreur lors de la lecture du changelog: ${error.message}`, { cause: error });
         }
     }
     // Absent : on le crée, sans jamais écraser (wx) un fichier apparu entre-temps.
@@ -30,7 +30,7 @@ export function readChangelog() {
         return defaultChangelog;
     } catch (error) {
         if (error.code !== 'EEXIST') {
-            throw new Error(`Erreur lors de la création du changelog: ${error.message}`);
+            throw new Error(`Erreur lors de la création du changelog: ${error.message}`, { cause: error });
         }
     }
     // Apparu entre-temps : on le lit, une fois. Un lien vers un fichier absent
@@ -38,7 +38,7 @@ export function readChangelog() {
     try {
         return JSON.parse(fs.readFileSync(CHANGELOG_FILE, 'utf8'));
     } catch (error) {
-        throw new Error(`Erreur lors de la lecture du changelog: ${error.message}`);
+        throw new Error(`Erreur lors de la lecture du changelog: ${error.message}`, { cause: error });
     }
 }
 
@@ -51,7 +51,7 @@ export function saveChangelog(changelog) {
         fs.writeFileSync(CHANGELOG_FILE, JSON.stringify(changelog, null, 2));
         return true;
     } catch (error) {
-        throw new Error(`Erreur lors de la sauvegarde du changelog: ${error.message}`);
+        throw new Error(`Erreur lors de la sauvegarde du changelog: ${error.message}`, { cause: error });
     }
 }
 
@@ -87,7 +87,7 @@ export function addPendingFeature(featureInfo) {
             return null;
         }
     } catch (error) {
-        throw new Error(`Erreur lors de l'ajout de la feature: ${error.message}`);
+        throw new Error(`Erreur lors de l'ajout de la feature: ${error.message}`, { cause: error });
     }
 }
 
@@ -143,7 +143,7 @@ export function createRelease(versionType = 'patch', customTitle = null) {
         return release;
         
     } catch (error) {
-        throw new Error(`Erreur lors de la création de la release: ${error.message}`);
+        throw new Error(`Erreur lors de la création de la release: ${error.message}`, { cause: error });
     }
 }
 
@@ -158,7 +158,7 @@ export function updatePackageVersion(version) {
         console.log(`📦 Package.json mis à jour vers la version ${version}`);
         return true;
     } catch (error) {
-        throw new Error(`Erreur lors de la mise à jour de package.json: ${error.message}`);
+        throw new Error(`Erreur lors de la mise à jour de package.json: ${error.message}`, { cause: error });
     }
 }
 
@@ -233,7 +233,7 @@ export function removePendingFeature(index) {
         console.log(`🗑️  Feature supprimée: ${removed.type} "${removed.name}"`);
         return removed;
     } catch (error) {
-        throw new Error(`Erreur lors de la suppression: ${error.message}`);
+        throw new Error(`Erreur lors de la suppression: ${error.message}`, { cause: error });
     }
 }
 
@@ -276,6 +276,6 @@ export function generateChangelogMarkdown() {
         
         return markdown;
     } catch (error) {
-        throw new Error(`Erreur lors de la génération du markdown: ${error.message}`);
+        throw new Error(`Erreur lors de la génération du markdown: ${error.message}`, { cause: error });
     }
 }

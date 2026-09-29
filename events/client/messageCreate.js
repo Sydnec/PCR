@@ -65,7 +65,7 @@ async function execute(message) {
 
         // Calcul des points en fonction du rang du message dans la journée
         // countToday est le nombre de messages DEJA récompensés aujourd'hui (0 pour le 1er message)
-        let pointsToAdd = 0;
+        let pointsToAdd;
         const rank = countToday + 1; // Le rang de CE message
 
         try {

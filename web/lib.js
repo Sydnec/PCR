@@ -13,7 +13,7 @@ export async function api(path, { method = "GET", body } = {}) {
   // Le corps se lit toujours, même vide (204) : un corps laissé en plan, le
   // navigateur finit par annuler la requête et le signale comme une erreur.
   const text = await response.text().catch(() => "");
-  let data = null;
+  let data;
   try {
     data = text ? JSON.parse(text) : null;
   } catch {

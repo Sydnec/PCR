@@ -140,7 +140,7 @@ async function applyMovementsNow(movements) {
   // Les échecs se journalisent APRÈS la transaction : retrouver un pseudo peut
   // demander à Discord, et rien ne doit la garder ouverte pendant ce temps.
   const failed = [];
-  let commitError = null;
+  let commitError;
   try {
     for (const { userId, amount } of movements) {
       if (!amount) continue;

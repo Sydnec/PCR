@@ -43,7 +43,7 @@ export default {
               // User might have left or is invalid
             }
             
-            let medal = "";
+            let medal;
             if (i === 0) medal = "🥇";
             else if (i === 1) medal = "🥈";
             else if (i === 2) medal = "🥉";
