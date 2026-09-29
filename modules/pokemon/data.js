@@ -339,13 +339,21 @@ export function pickWeightedSpecies(spawnConfig, { generations = null } = {}) {
     .species;
 }
 
+// Le taux réellement appliqué : celui de l'espèce, relevé au plancher
+// `capture.minCatchRate`. Tout ce qui se tire ou s'affiche passe par ici, pour
+// qu'un légendaire à taux 3 ne soit jamais annoncé plus dur qu'il ne l'est.
+export function effectiveCatchRate(catchRate) {
+  const floor = Number(getPokemonConfig().capture.minCatchRate) || 0;
+  return Math.max(Number(catchRate) || 0, floor);
+}
+
 // Formule officielle de la génération 3, à PV pleins et sans altération d'état.
 // a = (3·PVmax − 2·PVmax) / (3·PVmax) × catch_rate × ball = catch_rate × ball / 3
 // P = (b/65536)^4 se simplifie exactement en a/255, d'où le /765.
 // Le multiplicateur global permet de rendre tout le jeu plus ou moins dur sans
 // jamais toucher à la hiérarchie de difficulté entre espèces.
 export function catchProbability(catchRate, ballMultiplier, globalMultiplier) {
-  const probability = (catchRate * ballMultiplier * globalMultiplier) / 765;
+  const probability = (effectiveCatchRate(catchRate) * ballMultiplier * globalMultiplier) / 765;
   return Math.min(1, Math.max(0, probability));
 }
 
@@ -469,7 +477,8 @@ const DIFFICULTIES = [
 ];
 
 export function difficultyOf(catchRate) {
-  const level = DIFFICULTIES.findIndex((difficulty) => catchRate >= difficulty.min);
+  const rate = effectiveCatchRate(catchRate);
+  const level = DIFFICULTIES.findIndex((difficulty) => rate >= difficulty.min);
   return { level, label: DIFFICULTIES[level].label };
 }
 

@@ -296,6 +296,12 @@ export async function render() {
             `moins ${duration(spawn.minDelayMinutes)}), ou s'enfuit seul après ` +
             `**${duration(spawn.fleeMinutes.min)} à ${duration(spawn.fleeMinutes.max)}**.`
         ),
+        rule(
+          `Un **légendaire** reste **${fmt(spawn.legendaryFleeMultiplier)} fois plus longtemps** ` +
+            `(${duration(spawn.fleeMinutes.min * spawn.legendaryFleeMultiplier)} à ` +
+            `${duration(spawn.fleeMinutes.max * spawn.legendaryFleeMultiplier)}) et les messages ` +
+            `ne le font jamais partir : seule son échéance, ou une capture, le retire.`
+        ),
         rule(`**1 sur ${fmt(spawn.shinyOdds)}** est shiny ✨.`),
         rule(
           `**${pct(spawn.heldItemChance)}** tiennent un objet, qui revient au capteur — sauf ` +

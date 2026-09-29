@@ -147,6 +147,9 @@ export function registerMessageForSpawn(client) {
       //    plancher réglable (0 par défaut) ;
       //  - un Pokémon est encore là : le seuil de messages et le délai
       //    minimum décident du moment où il s'enfuit, remplacé par le suivant.
+      //    Sauf un légendaire, que les messages ne chassent jamais : son
+      //    échéance (fleeAfterMinutes × legendaryFleeMultiplier) ou une
+      //    capture sont ses seules sorties.
       const afterEndMs = config.spawn.minDelayAfterEndMinutes * 60 * 1000;
 
       // spawn_paused_until suspend les apparitions pendant un parc safari : le
@@ -162,7 +165,10 @@ export function registerMessageForSpawn(client) {
             AND (
               ( NOT EXISTS (SELECT 1 FROM pokemon_spawns WHERE status = 'ACTIVE')
                 AND COALESCE((SELECT MAX(ended_at) FROM pokemon_spawns), 0) <= ? )
-              OR ( message_count >= ? AND last_spawn_at <= ? )
+              OR ( message_count >= ? AND last_spawn_at <= ?
+                 AND NOT EXISTS (
+                   SELECT 1 FROM pokemon_spawns WHERE status = 'ACTIVE' AND rarity = 'LEGENDAIRE'
+                 ) )
             )`,
         [now, now, now - afterEndMs, config.spawn.messagesPerSpawn, now - minDelayMs],
         function (err) {
@@ -251,17 +257,21 @@ export async function doSpawn(client, options = {}) {
 
 // Durée de vie tirée au sort, figée à la création : elle survit aux
 // redémarrages et n'est jamais recalculée à la lecture.
-export function rollFleeDeadline(spawnedAt, spawnConfig) {
+export function rollFleeDeadline(spawnedAt, spawnConfig, rarity = null) {
   const { min, max } = spawnConfig.fleeAfterMinutes;
-  const low = Math.min(min, max);
-  const span = Math.abs(max - min);
+  // Le facteur d'un légendaire multiplie les deux bornes : la fourchette
+  // s'allonge sans se resserrer.
+  const factor =
+    rarity === "LEGENDAIRE" ? Math.max(1, Number(spawnConfig.legendaryFleeMultiplier) || 1) : 1;
+  const low = Math.min(min, max) * factor;
+  const span = Math.abs(max - min) * factor;
   return spawnedAt + (low + Math.random() * span) * 60 * 1000;
 }
 
 function createSpawn(client, channel, species, { isShiny, charm }, announcement, ping, previous) {
   const now = Date.now();
   const rarity = rarityOf(species);
-  const fleesAt = Math.round(rollFleeDeadline(now, getPokemonConfig().spawn));
+  const fleesAt = Math.round(rollFleeDeadline(now, getPokemonConfig().spawn, rarity));
   // Tiré ici, une fois, et figé dans la ligne : ce que porte ce Pokémon lui
   // appartient. Celui qui s'enfuit part avec — on ne fouille pas les fuyards.
   const heldItem = rollHeldItem();

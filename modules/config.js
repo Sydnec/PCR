@@ -54,6 +54,10 @@ const POKEMON = {
     // Durée de vie d'un Pokémon non capturé : il s'enfuit de lui-même après un
     // délai tiré au hasard dans cet intervalle, sans dépendre de l'activité.
     fleeAfterMinutes: { min: 180, max: 360 },
+    // Un légendaire est un événement rare : il reste ce facteur de fois plus
+    // longtemps (le min ET le max), et le seuil de messages ne le remplace
+    // jamais — seuls son échéance et une capture le font partir.
+    legendaryFleeMultiplier: 2,
     shinyOdds: 500,
     // Le stade 2 pèse 60 % d'un stade 1, le stade 3 un quart : les évolutions
     // restent plus rares que leur forme de base, comme dans les jeux, sans être
@@ -82,6 +86,11 @@ const POKEMON = {
   },
   capture: {
     globalMultiplier: 1,
+    // Plancher du taux de capture. Dans les jeux, on affaiblit un Pokémon avant
+    // de lancer ; ici c'est impossible, et les légendaires à taux 3 devenaient
+    // inatteignables. Un taux plus bas est relevé à cette valeur, partout : les
+    // lancers, les probabilités affichées, le parc safari.
+    minCatchRate: 10,
     throwCooldownSeconds: 5,
     // Les emoji des balls sont ceux du serveur, au format Discord `<:nom:id>`.
     // C'est l'identifiant qui décide de l'image affichée, jamais le nom : le
