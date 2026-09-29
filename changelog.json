@@ -1976,5 +1976,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "chore",
+      "name": "Mise à jour des dépendances",
+      "description": "Mise à jour de dotenv et d'ESLint, sans changement pour les joueurs.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-29T08:44:53.000Z",
+      "branch": "claude/vibrant-brown-s7suxt"
+    }
+  ]
 }
