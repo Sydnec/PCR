@@ -1,5 +1,5 @@
-// Propriétaire unique de config.json : lecture à chaud, valeurs par défaut, et
-// écriture depuis /admin config.
+// Propriétaire unique de la configuration : lecture à chaud, valeurs par défaut,
+// et écriture depuis /admin config.
 //
 // Le fichier était jusqu'ici lu à deux endroits indépendants — ici pour le bloc
 // Pokémon, et dans messageCreate.js en lecture brute sans défauts. Tant que
@@ -12,23 +12,37 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { handleException } from "./utils.js";
+import { handleException, log } from "./utils.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const configPath = path.join(__dirname, "../config.json");
-// C'est ICI qu'écrit /admin config, jamais dans config.json.
+// Deux couches : DEFAULTS, qui porte TOUTES les valeurs de base et se décide en
+// revue de code, puis config.json, l'ajustement à chaud — c'est ICI qu'écrit
+// /admin config. La propriété « clé absente = valeur du dessous » tient à chaque
+// étage : supprimer config.json revient exactement aux valeurs du code.
 //
-// config.json est suivi par git, et le déploiement enchaîne `git checkout main`
-// puis `git pull` sous `set -e` : un fichier suivi modifié sur le serveur fait
-// échouer le déploiement suivant, et `pcr release` refuse de partir d'un arbre
-// sale. Une commande qui écrirait dans config.json casserait donc la chaîne de
-// livraison au premier usage.
-//
-// La surcharge est un troisième étage de la fusion : DEFAULTS, puis config.json
-// (le réglage versionné, décidé en revue), puis ce fichier (l'ajustement fait
-// depuis Discord). La propriété « clé absente = valeur du dessous » tient à
-// chaque étage.
-const overridePath = path.join(__dirname, "../config.local.json");
+// config.json n'est PAS suivi par git. Le déploiement enchaîne `git checkout
+// main` puis `git pull` sous `set -e` : un fichier suivi modifié sur le serveur
+// fait échouer le déploiement suivant, et `pcr release` refuse de partir d'un
+// arbre sale. Un réglage à chaud écrit dans un fichier suivi casserait donc la
+// chaîne de livraison dès le premier usage.
+const overridePath = path.join(__dirname, "../config.json");
+
+// Avant, /admin config écrivait dans config.local.json, et config.json était le
+// réglage versionné — dont toutes les valeurs vivent désormais dans DEFAULTS.
+// Le premier démarrage reprend donc l'ancienne surcharge sous son nouveau nom :
+// sans cela, les réglages posés depuis Discord seraient ignorés en silence. Elle
+// prend la place de l'ancien config.json, qu'elle recouvre sans rien perdre.
+const legacyOverridePath = path.join(__dirname, "../config.local.json");
+function migrateLegacyOverride() {
+  if (!fs.existsSync(legacyOverridePath)) return;
+  try {
+    fs.renameSync(legacyOverridePath, overridePath);
+    log("config.local.json repris comme config.json (réglages à chaud)");
+  } catch (error) {
+    handleException("Reprise de config.local.json comme config.json impossible :", error);
+  }
+}
+migrateLegacyOverride();
 
 const POKEMON = {
   enabled: true,
@@ -546,7 +560,7 @@ export function configOverrideStatus() {
       ok: false,
       exists: true,
       reason:
-        "⚠️ `config.local.json` est illisible : **tous les réglages modifiés depuis Discord sont " +
+        "⚠️ `config.json` est illisible : **tous les réglages modifiés depuis Discord sont " +
         `ignorés** et les valeurs par défaut s'appliquent. Détail : ${error.message}`,
     };
   }
@@ -554,7 +568,7 @@ export function configOverrideStatus() {
 
 // Relu à chaque appel : tous les nombres du bot sont ajustables sans redémarrer.
 export function getConfig() {
-  return merge(merge(DEFAULTS, readLayer(configPath)), readLayer(overridePath, { optional: true }));
+  return merge(DEFAULTS, readLayer(overridePath, { optional: true }));
 }
 
 // ====================== SCHÉMA ======================
@@ -780,11 +794,11 @@ export function writeConfigValue(path, raw) {
     node[segments.at(-1)] = coerced.value;
     saveOverride(next);
   } catch (error) {
-    handleException("Écriture de config.local.json impossible :", error);
+    handleException("Écriture de config.json impossible :", error);
     return {
       ok: false,
       reason:
-        "Impossible d'écrire la surcharge de configuration — `config.local.json` est peut-être illisible.",
+        "Impossible d'écrire la surcharge de configuration — `config.json` est peut-être illisible.",
     };
   }
 

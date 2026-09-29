@@ -55,8 +55,8 @@ safari. Chaque semaine, un pot commun prélève un pourcentage des soldes et le 
 
 - `/autodel`, `/edit`, et `/admin` pour tout le reste : points et objets, configuration à chaud,
   apparitions et parcs à la demande, pot commun, purge, redémarrage. → [Détails](docs/administration.md)
-- Les réglages s'empilent en trois couches (`DEFAULTS`, `config.json`, `config.local.json`) et se
-  modifient sans redémarrage. → [Configuration](docs/configuration.md)
+- Les valeurs de base vivent dans le code (`DEFAULTS`), les ajustements à chaud dans `config.json`
+  (hors git) ; tout se modifie sans redémarrage. → [Configuration](docs/configuration.md)
 
 ## 🚀 Installation & Gestion
 
