@@ -1,7 +1,24 @@
 {
-  "version": "1.16.6",
-  "lastUpdated": "2026-09-30T00:42:21.015Z",
+  "version": "1.16.7",
+  "lastUpdated": "2026-09-30T12:29:55.831Z",
   "releases": [
+    {
+      "version": "1.16.7",
+      "date": "2026-09-30",
+      "title": "Release 1.16.7",
+      "features": [
+        {
+          "type": "enhancement",
+          "name": "Parc safari : la lignée du Pokémon rencontré",
+          "description": "Une rencontre du parc safari montre maintenant la lignée évolutive du Pokémon et ce que tu en possèdes déjà.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-30T12:21:16.000Z",
+          "branch": "claude/vibrant-brown-s7suxt"
+        }
+      ]
+    },
     {
       "version": "1.16.6",
       "date": "2026-09-30",
@@ -2040,16 +2057,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "enhancement",
-      "name": "Parc safari : la lignée du Pokémon rencontré",
-      "description": "Une rencontre du parc safari montre maintenant la lignée évolutive du Pokémon et ce que tu en possèdes déjà.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-30T12:21:16.000Z",
-      "branch": "claude/vibrant-brown-s7suxt"
-    }
-  ]
+  "pending": []
 }
