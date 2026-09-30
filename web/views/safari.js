@@ -39,6 +39,7 @@ export async function render(ctx) {
   let panel = null;
   let acting = false;
   let buying = false;
+  let sharing = false;
 
   const body = h("div", { class: "safari" });
   const draw = () => body.replaceChildren(visit ? visitView() : offerView());
@@ -80,6 +81,25 @@ export async function render(ctx) {
       toast(error.message, "error");
       await reload();
     }
+  }
+
+  // Le bot publie dans le salon Pokémon, comme le bouton du bilan sur Discord :
+  // même verrou en base, donc une seule publication par visite, d'où qu'elle vienne.
+  async function share() {
+    sharing = true;
+    draw();
+    try {
+      await api("/api/safari/share", { method: "POST", body: { sessionId: visit.id } });
+      visit.shared = true;
+      toast("Bilan partagé dans le salon Pokémon.", "success");
+    } catch (error) {
+      // Déjà partagé (depuis Discord, ou un envoi incertain) : le verrou est pris,
+      // le bouton se ferme plutôt que de promettre un nouvel essai.
+      if (error.details?.shared) visit.shared = true;
+      toast(error.message, "error");
+    }
+    sharing = false;
+    draw();
   }
 
   // ---------------------- Sans visite ----------------------
@@ -234,7 +254,14 @@ export async function render(ctx) {
         ),
         count
           ? h("a", { class: "button ghost", href: "/boite", "data-link": true }, "Voir ma boîte")
-          : null
+          : null,
+        visit.shared
+          ? h("button", { class: "button ghost", disabled: true }, "Bilan partagé")
+          : h(
+              "button",
+              { class: "button ghost", disabled: sharing, onclick: share },
+              "Partager dans le salon Pokémon"
+            )
       )
     );
   }

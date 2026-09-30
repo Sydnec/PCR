@@ -30,7 +30,7 @@ import { consumeItem, getItem, getItemCount, grantItem } from "./items.js";
 import { resolveChannel } from "./spawn.js";
 import { getCharms } from "./charms.js";
 import { recordSafariCatch, recordSafariEntry } from "./stats.js";
-import { buildParkEmbed, buildParkRow } from "./embeds.js";
+import { buildParkEmbed, buildParkRow, buildSafariRecapEmbed } from "./embeds.js";
 
 const HOUR = 60 * 60 * 1000;
 
@@ -121,7 +121,7 @@ export function prepareShare(userId, sessionId, cb) {
       return cb(null, { ok: false, reason: "Ta visite n'est pas terminée." });
     }
     if (session.shared_at) {
-      return cb(null, { ok: false, reason: "Ce bilan a déjà été partagé." });
+      return cb(null, { ok: false, shared: true, reason: "Ce bilan a déjà été partagé." });
     }
     getSessionCatches(sessionId, (err, catches) => {
       if (err) return cb(err);
@@ -152,6 +152,90 @@ export function releaseShare(sessionId, cb = () => {}) {
     [sessionId],
     cb
   );
+}
+
+// Codes d'erreur Discord qui PROUVENT que rien n'a été publié. Une coupure
+// réseau, un délai dépassé ou un 5xx n'en font pas partie : la requête a pu
+// aboutir malgré l'exception, et rouvrir le partage republierait le bilan une
+// seconde fois — exactement l'invariant que shared_at existe pour tenir.
+export const ENVOI_IMPOSSIBLE = new Set([
+  50001, // Missing Access
+  50013, // Missing Permissions
+  10003, // Unknown Channel
+  50083, // Thread is archived
+]);
+
+// Partage du bilan depuis le site : le bot publie dans le salon Pokémon, là où
+// le parc s'annonce — il n'y a pas de salon courant comme sur Discord. Mêmes
+// briques que le bouton (prepareShare, claimShare, releaseShare), donc même
+// verrou : une visite partagée d'un côté ne l'est plus de l'autre.
+//
+// `shared` dit que le verrou est pris, y compris quand l'envoi est incertain :
+// l'appelant peut alors fermer son bouton, un nouvel essai serait refusé.
+//
+// Le salon se résout et l'embed se construit AVANT la revendication : un salon
+// introuvable ou un embed qui plante ne doivent pas consommer le droit de
+// partager.
+export async function shareRecap(client, userId, sessionId, author) {
+  const prepared = await new Promise((resolve, reject) =>
+    prepareShare(userId, sessionId, (err, result) => (err ? reject(err) : resolve(result)))
+  );
+  if (!prepared.ok) return prepared;
+
+  let channel = null;
+  try {
+    channel = await resolveChannel(client);
+  } catch (error) {
+    handleException("Salon Pokémon introuvable pour le partage du bilan :", error);
+  }
+  // Un identifiant qui pointe sur une catégorie se résout sans erreur mais n'a
+  // pas de send() : le TypeError viendrait après la revendication, verrou pris
+  // et rien de publié.
+  if (!channel?.isTextBased()) {
+    return { ok: false, reason: "Le salon Pokémon est introuvable." };
+  }
+
+  const embed = buildSafariRecapEmbed(prepared.session, prepared.catches, { author });
+
+  const claimed = await new Promise((resolve, reject) =>
+    claimShare(prepared.session.id, (err, ok) => (err ? reject(err) : resolve(ok)))
+  );
+  if (!claimed) return { ok: false, shared: true, reason: "Ce bilan a déjà été partagé." };
+
+  try {
+    await channel.send({ embeds: [embed] });
+  } catch (error) {
+    handleException("Partage du bilan de safari depuis le site :", error);
+    if (!ENVOI_IMPOSSIBLE.has(error?.code)) {
+      return {
+        ok: false,
+        shared: true,
+        reason:
+          "L'envoi a échoué, mais il a peut-être abouti quand même. Je ne rouvre pas le " +
+          "partage pour ne pas risquer de publier ton bilan deux fois — va voir le salon.",
+      };
+    }
+    const releaseError = await new Promise((resolve) =>
+      releaseShare(prepared.session.id, resolve)
+    );
+    if (releaseError) {
+      handleException("Restitution du droit de partage :", releaseError);
+      return {
+        ok: false,
+        shared: true,
+        reason: "L'envoi a échoué et je n'ai pas pu rouvrir le partage.",
+      };
+    }
+    return {
+      ok: false,
+      reason: "Je n'ai pas pu publier dans le salon Pokémon. Tu peux réessayer.",
+    };
+  }
+
+  pseudo(userId).then((name) =>
+    log(`Partage de bilan safari #${prepared.session.id} par ${name} (site)`)
+  );
+  return { ok: true };
 }
 
 // ====================== RENCONTRES ======================

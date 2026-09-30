@@ -76,6 +76,7 @@ import {
   getSessionCatches,
   playAction,
   refreshParkMessage,
+  shareRecap,
   startPaidSession,
 } from "../pokemon/safari.js";
 import {
@@ -285,11 +286,11 @@ function outcome(result, data) {
 // avatar, comme une mention sur Discord. Le bot les a en cache, donc relire le
 // journal toutes les quelques secondes ne coûte aucun appel à Discord. Un
 // dresseur parti du serveur garde son identifiant, sans nom.
-async function trainerOf(bot, userId) {
+async function trainerOf(bot, userId, size = 64) {
   try {
     const guild = await bot.guilds.fetch(process.env.GUILD_ID);
     const member = await guild.members.fetch(userId);
-    return { id: userId, name: member.displayName, avatar: member.displayAvatarURL({ size: 64 }) };
+    return { id: userId, name: member.displayName, avatar: member.displayAvatarURL({ size }) };
   } catch {
     return { id: userId, name: null, avatar: null };
   }
@@ -447,6 +448,8 @@ async function visitJson(session, owned) {
     actionsTotal: config.actionsPerSession,
     expiresAt: session.expires_at,
     finished,
+    // Le verrou du partage du bilan, partagé avec le bouton Discord.
+    shared: Boolean(session.shared_at),
     catches: catches.map((row) => ({
       speciesId: row.species_id,
       shiny: Boolean(row.is_shiny),
@@ -886,6 +889,29 @@ export const routes = [
         message: safariOutcomeLine(result, getSafariConfig()),
         visit: await visitJson(result.session, result.owned),
       };
+    },
+  },
+
+  // Partager le bilan d'une visite finie dans le salon Pokémon : le bouton
+  // « Partager mon bilan » de Discord, signé du même pseudo et du même avatar.
+  // `shared` dans le refus dit que le verrou est pris : le site ferme son bouton.
+  {
+    method: "POST",
+    path: "/api/safari/share",
+    auth: true,
+    write: true,
+    handler: async (ctx) => {
+      const sessionId = Number(ctx.body.sessionId);
+      if (!Number.isInteger(sessionId) || sessionId <= 0) {
+        throw new HttpError(400, "sessionId invalide.");
+      }
+      const trainer = await trainerOf(ctx.bot, ctx.user.id, 128);
+      const result = await shareRecap(ctx.bot, ctx.user.id, sessionId, {
+        displayName: trainer.name ?? (await pseudo(ctx.user.id)),
+        avatarURL: trainer.avatar,
+      });
+      if (!result.ok) throw new HttpError(409, result.reason, { shared: Boolean(result.shared) });
+      return { shared: true };
     },
   },
 

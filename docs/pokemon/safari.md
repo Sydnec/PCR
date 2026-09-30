@@ -51,7 +51,8 @@ visite. C'est le seul contenu Pokémon où les actions ne coûtent rien.
   Une fois par visite — le verrou est en base, pas dans la disparition du bouton — et à la seule
   condition que **le bot** puisse y publier un embed : c'est lui qui poste, et exiger la même chose
   du dresseur revenait à lui refuser un bouton qu'on lui avait mis sous les yeux. Un envoi qui
-  échoue rend le droit de réessayer.
+  échoue rend le droit de réessayer. Une visite finie **sur le site** se partage aussi, au clic,
+  dans le salon des apparitions (voir [le site](../site.md#parc-safari)) — avec le même verrou.
 - Tout l'état vit en base : les boutons répondent encore après un redémarrage du bot, et un
   double-clic ne peut pas jouer deux fois la même action.
 - **Sur le site** aussi, depuis l'onglet Capture : reprendre sa visite, entrer dans un parc ouvert

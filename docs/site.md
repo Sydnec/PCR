@@ -55,8 +55,12 @@ laissées allumées, et la dernière ne s'éteint pas.
 
 La visite est **la même** que sur Discord : une visite commencée sur le site se reprend avec
 `/pk safari`, et inversement. Chaque action passe par le même chemin que les boutons, avec le même
-jeton : un double clic ne joue qu'une fois, et une action déjà jouée ailleurs est refusée. Le
-partage du bilan dans un salon reste sur Discord.
+jeton : un double clic ne joue qu'une fois, et une action déjà jouée ailleurs est refusée.
+
+À la fin de la visite, le bouton **« Partager dans le salon Pokémon »** publie le bilan : c'est le bot
+qui poste, signé de ton pseudo et de ton avatar, comme avec le bouton Discord. Le verrou est le même :
+un bilan partagé d'un côté ne l'est plus de l'autre. Le bouton n'est là que sur l'écran de fin, un
+rechargement de la page le fait disparaître.
 
 ## Boîte PC
 

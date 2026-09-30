@@ -20,6 +20,7 @@ import { getBallItem, getBallStock, getItem, getItemCount } from "./items.js";
 import { claimDrop } from "./drops.js";
 
 import {
+  ENVOI_IMPOSSIBLE,
   claimShare,
   enterPark,
   findFreeParkFor,
@@ -630,17 +631,6 @@ export async function handlePokemonSelect(interaction) {
     .update({ components: buildSafariGenerationPicker(mode, Number(parkId) || 0, chosen) })
     .catch(() => {});
 }
-
-// Codes d'erreur Discord qui PROUVENT que rien n'a été publié. Une coupure
-// réseau, un délai dépassé ou un 5xx n'en font pas partie : la requête a pu
-// aboutir malgré l'exception, et rouvrir le partage republierait le bilan une
-// seconde fois — exactement l'invariant que shared_at existe pour tenir.
-const ENVOI_IMPOSSIBLE = new Set([
-  50001, // Missing Access
-  50013, // Missing Permissions
-  10003, // Unknown Channel
-  50083, // Thread is archived
-]);
 
 // Partage du bilan dans le salon courant.
 //
