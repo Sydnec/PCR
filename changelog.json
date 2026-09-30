@@ -1,7 +1,24 @@
 {
-  "version": "1.16.7",
-  "lastUpdated": "2026-09-30T12:29:55.831Z",
+  "version": "1.16.8",
+  "lastUpdated": "2026-09-30T13:14:20.511Z",
   "releases": [
+    {
+      "version": "1.16.8",
+      "date": "2026-09-30",
+      "title": "Release 1.16.8",
+      "features": [
+        {
+          "type": "enhancement",
+          "name": "Site : revendre ses objets depuis le sac",
+          "description": "Le sac du site montre le prix de revente des objets qui se revendent, avec un bouton pour en vendre la quantité de ton choix.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-09-30T12:48:09.000Z",
+          "branch": "claude/vibrant-brown-s7suxt"
+        }
+      ]
+    },
     {
       "version": "1.16.7",
       "date": "2026-09-30",
@@ -2057,16 +2074,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "enhancement",
-      "name": "Site : revendre ses objets depuis le sac",
-      "description": "Le sac du site montre le prix de revente des objets qui se revendent, avec un bouton pour en vendre la quantité de ton choix.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-09-30T12:48:09.000Z",
-      "branch": "claude/vibrant-brown-s7suxt"
-    }
-  ]
+  "pending": []
 }
