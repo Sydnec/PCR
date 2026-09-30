@@ -556,7 +556,11 @@ function handleSafariEnter(interaction, parkId) {
       interaction
         .reply({
           ...(ongoing
-            ? buildSafariView(ongoing.session, { owned: ongoing.owned, resumed: true })
+            ? buildSafariView(ongoing.session, {
+                owned: ongoing.owned,
+                lineage: ongoing.lineage,
+                resumed: true,
+              })
             : {
                 content: safariPickerContent("park"),
                 components: buildSafariGenerationPicker("park", Number(parkId)),
@@ -579,6 +583,7 @@ function handleSafariEnter(interaction, parkId) {
       .reply({
         ...buildSafariView(result.session, {
           owned: result.owned,
+          lineage: result.lineage,
           resumed: result.resumed,
         }),
         flags: MessageFlags.Ephemeral,
@@ -617,7 +622,13 @@ function handleSafariGo(interaction, mode, parkId, generations) {
     if (err) return fail(err);
     if (!result.ok) return answer({ content: `❌ ${result.reason}` });
     if (!result.resumed) refreshParkMessage(interaction.client, Number(parkId));
-    answer(buildSafariView(result.session, { owned: result.owned, resumed: result.resumed }));
+    answer(
+      buildSafariView(result.session, {
+        owned: result.owned,
+        lineage: result.lineage,
+        resumed: result.resumed,
+      })
+    );
   });
 }
 
@@ -827,6 +838,7 @@ function handleSafariAction(interaction, action, sessionId, token) {
           result,
           catches: result.catches ?? [],
           owned: result.owned,
+          lineage: result.lineage,
         })
       )
       .catch(() => {});

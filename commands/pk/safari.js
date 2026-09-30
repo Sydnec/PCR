@@ -55,7 +55,11 @@ export default {
         if (ongoing) {
           return interaction
             .editReply(
-              buildSafariView(ongoing.session, { owned: ongoing.owned, resumed: true })
+              buildSafariView(ongoing.session, {
+                owned: ongoing.owned,
+                lineage: ongoing.lineage,
+                resumed: true,
+              })
             )
             .catch(() => {});
         }

@@ -17,6 +17,7 @@ import { handleException, log } from "../utils.js";
 import { pseudo } from "../pseudo.js";
 import { getPokemonConfig, getSafariConfig } from "./config.js";
 import {
+  evolutionChain,
   getSpecies,
   isSafariFinished,
   rollSafariEncounter,
@@ -25,7 +26,7 @@ import {
   safariFleeChance,
   safariGenerations,
 } from "./data.js";
-import { creditSpecies, getOwnedVariants } from "./collection.js";
+import { creditSpecies, getOwnedVariantsFor } from "./collection.js";
 import { consumeItem, getItem, getItemCount, grantItem } from "./items.js";
 import { resolveChannel } from "./spawn.js";
 import { getCharms } from "./charms.js";
@@ -278,19 +279,30 @@ function storeNextEncounter(sessionId, encounter, cb) {
 }
 
 // Joint au résultat l'état de la collection du dresseur pour l'espèce en face de
-// lui. Sur un spawn public, cette question passe par le bouton « Je l'ai déjà ? »
-// parce qu'un message Discord est identique pour tous ses lecteurs ; ici la
-// rencontre est éphémère et n'appartient qu'à un joueur, donc la réponse tient
-// directement dans l'embed.
+// lui, et pour toute sa lignée. Sur un spawn public, cette question passe par le
+// bouton « Je l'ai déjà ? » parce qu'un message Discord est identique pour tous
+// ses lecteurs ; ici la rencontre est éphémère et n'appartient qu'à un joueur,
+// donc la réponse tient directement dans l'embed.
+//
+// `owned` reste les compteurs de l'espèce seule, que l'API du site sert telle
+// quelle ; `lineage` en est la table par maillon, en une seule requête.
 function withOwned(payload, cb) {
   const session = payload.session;
   // Une visite terminée affiche son bilan, pas une rencontre : rien à lire.
   if (!session || isSafariFinished(session)) return cb(null, payload);
-  getOwnedVariants(session.user_id, session.encounter_species_id, (err, owned) => {
+  const species = getSpecies(session.encounter_species_id);
+  const ids = species
+    ? evolutionChain(species).map((link) => link.id)
+    : [session.encounter_species_id];
+  getOwnedVariantsFor(session.user_id, ids, (err, lineage) => {
     // Une collection illisible ne doit jamais faire échouer une action déjà
     // jouée et déjà décomptée : on affiche la rencontre sans la pastille.
     if (err) handleException("Lecture de la collection au parc safari :", err);
-    cb(null, { ...payload, owned: err ? null : owned });
+    cb(null, {
+      ...payload,
+      owned: err ? null : lineage.get(Number(session.encounter_species_id)),
+      lineage: err ? null : lineage,
+    });
   });
 }
 

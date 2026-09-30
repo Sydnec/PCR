@@ -263,6 +263,47 @@ function chainLine(species, counts, { current = false, focusShiny = false } = {}
   );
 }
 
+// Un champ par stade : la rangée se lit de gauche à droite comme la lignée
+// elle-même, et un embranchement (Évoli) empile ses trois cibles dans le champ de
+// son stade, là où une liste à flèches aurait laissé croire à une chaîne unique.
+// Partagé par la fiche d'espèce et la rencontre du parc safari : « où en suis-je
+// dans cette lignée ? » n'a qu'une réponse, et deux mises en forme auraient fini
+// par diverger.
+function lineageFields(species, chain, owned, { isShiny = false } = {}) {
+  const stages = new Map();
+  for (const link of chain) {
+    const lines = stages.get(link.stage) ?? [];
+    lines.push(
+      chainLine(link, owned.get(link.id), {
+        current: link.id === species.id,
+        focusShiny: isShiny,
+      })
+    );
+    stages.set(link.stage, lines);
+  }
+
+  const solo = stages.size <= 1;
+  return [...stages]
+    .sort((a, b) => a[0] - b[0])
+    .map(([stage, lines]) => ({
+      // Sans lignée, « Forme de base » ne veut rien dire : le champ ne répond
+      // plus qu'à une question, celle de la collection.
+      name: solo ? "Ton Pokédex" : STAGE_LABELS[stage - 1] ?? `Stade ${stage - 1}`,
+      value: lines.join("\n"),
+      inline: true,
+    }));
+}
+
+// Ce que signifient les pastilles 🔒 et 🥚 d'une lignée : sans cette légende,
+// elles ne disent rien à qui les découvre.
+function lineageLegend(chain) {
+  return [
+    chain.some(isEvolutionOnly) &&
+      "\u{1F512} Introuvable à l'état sauvage : par évolution, ou par échange.",
+    chain.some(isEggOnly) && "\u{1F95A} Ne sort que d'un œuf : /pk oeuf pondre, avec un couple de parents.",
+  ].filter(Boolean);
+}
+
 // Fiche d'une espèce : ce qu'elle est, ce qu'elle coûte à attraper, et où en est
 // le dresseur dans sa lignée. Elle sert /pk info comme le bouton des
 // apparitions : « je l'ai déjà ? » n'est qu'un cas particulier de « parle-moi de
@@ -296,32 +337,7 @@ export function buildSpeciesInfoEmbed(
       { name: "Sexe", value: genderLine(species), inline: false }
     );
 
-  // Un champ par stade : la rangée se lit de gauche à droite comme la lignée
-  // elle-même, et un embranchement (Évoli) empile ses trois cibles dans le
-  // champ de son stade, là où une liste à flèches aurait laissé croire à une
-  // chaîne unique.
-  const stages = new Map();
-  for (const link of chain) {
-    const lines = stages.get(link.stage) ?? [];
-    lines.push(
-      chainLine(link, owned.get(link.id), {
-        current: link.id === species.id,
-        focusShiny: isShiny,
-      })
-    );
-    stages.set(link.stage, lines);
-  }
-
-  const solo = stages.size <= 1;
-  for (const [stage, lines] of [...stages].sort((a, b) => a[0] - b[0])) {
-    embed.addFields({
-      // Sans lignée, « Forme de base » ne veut rien dire : le champ ne répond
-      // plus qu'à une question, celle de la collection.
-      name: solo ? "Ton Pokédex" : STAGE_LABELS[stage - 1] ?? `Stade ${stage - 1}`,
-      value: lines.join("\n"),
-      inline: true,
-    });
-  }
+  embed.addFields(lineageFields(species, chain, owned, { isShiny }));
 
   // Les formes d'une espèce qui en a — les lettres de Zarbi : celles que le
   // dresseur possède, sur celles que la génération ouverte connaît. Sans
@@ -338,11 +354,7 @@ export function buildSpeciesInfoEmbed(
     });
   }
 
-  const legend = [
-    chain.some(isEvolutionOnly) &&
-      "\u{1F512} Introuvable à l'état sauvage : par évolution, ou par échange.",
-    chain.some(isEggOnly) && "\u{1F95A} Ne sort que d'un œuf : /pk oeuf pondre, avec un couple de parents.",
-  ].filter(Boolean);
+  const legend = lineageLegend(chain);
   if (legend.length) embed.setFooter({ text: legend.join("\n") });
   return embed;
 }
@@ -1188,7 +1200,12 @@ function ownedLine(owned, isShiny) {
     : "\u{1F195} Shiny inédit, et l'espèce te manque !";
 }
 
-function buildEncounterEmbed(session, species, config, { intro = null, owned = null } = {}) {
+function buildEncounterEmbed(
+  session,
+  species,
+  config,
+  { intro = null, owned = null, lineage = null } = {}
+) {
   const isShiny = Boolean(session.encounter_is_shiny);
   const rarity = RARITIES[rarityOf(species)];
   const probability = safariCatchProbability(
@@ -1237,10 +1254,29 @@ function buildEncounterEmbed(session, species, config, { intro = null, owned = n
         value: `**${session.actions_left}** / ${config.actionsPerSession}`,
         inline: true,
       }
-    )
-    .setFooter({
-      text: `Parc safari · Pokédex n°${species.id} · rencontre n°${session.encounter_no}`,
-    });
+    );
+
+  // La lignée, pour savoir si l'on a déjà les autres stades avant de lancer.
+  // Une espèce sans lignée n'a rien à y ajouter : « Ton Pokédex » dit déjà tout.
+  // Une collection illisible (`lineage` null) l'omet plutôt que d'annoncer zéro.
+  const chain = evolutionChain(species);
+  const fields = lineage && chain.length > 1 ? lineageFields(species, chain, lineage, { isShiny }) : [];
+  if (fields.length) {
+    // Les champs en ligne se rangent trois par trois : sans cale, le premier
+    // stade se glisserait dans la rangée de « Actions restantes » et la lignée
+    // ne se lirait plus d'un bloc.
+    const filler = 3 - ((ownership ? 2 : 1) % 3);
+    for (let i = 0; i < filler; i++) embed.addFields({ name: "\u200B", value: "\u200B", inline: true });
+    embed.addFields(fields);
+  }
+
+  const legend = fields.length ? lineageLegend(chain) : [];
+  embed.setFooter({
+    text: [
+      `Parc safari · Pokédex n°${species.id} · rencontre n°${session.encounter_no}`,
+      ...legend,
+    ].join("\n"),
+  });
 
   if (intro) embed.setDescription(intro);
   return embed;
@@ -1303,7 +1339,7 @@ function buildSafariShareRow(session) {
 // étalé la vue.
 export function buildSafariView(
   session,
-  { result = null, catches = [], owned = null, resumed = false } = {}
+  { result = null, catches = [], owned = null, lineage = null, resumed = false } = {}
 ) {
   const config = getSafariConfig();
   const intro = result ? safariOutcomeLine(result, config) : null;
@@ -1325,7 +1361,7 @@ export function buildSafariView(
   }
   return {
     content,
-    embeds: [buildEncounterEmbed(session, species, config, { intro, owned })],
+    embeds: [buildEncounterEmbed(session, species, config, { intro, owned, lineage })],
     components: [buildSafariRow(session, config)],
   };
 }
@@ -1421,7 +1457,11 @@ export function buildPaidEntryReply(result) {
   //
   // Une visite ouverte entre la vérification et le débit est rendue telle
   // quelle : c'est une reprise, pas l'entrée qu'on vient de payer.
-  const view = buildSafariView(result.session, { owned: result.owned, resumed: result.resumed });
+  const view = buildSafariView(result.session, {
+    owned: result.owned,
+    lineage: result.lineage,
+    resumed: result.resumed,
+  });
   const content = result.resumed
     ? view.content + rendu
     : result.ticket
