@@ -55,7 +55,7 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
 | `GET /api/species/:id/evolution?targetId&helper` | coût d'une évolution : `{ targets, target, branching, sacrifices, required, points, helper, helpers }` — `required` compte celui qui évolue et celui qui reste, shiny ou non ; `targets` les formes ouvertes sans objet ; `helpers` les objets utilisables sur l'espèce (`key`, `label`, `image`, `quantity`, `target` : la forme qu'il donne, `choose` : il laisse choisir la forme sans supplément). Une espèce qui n'évolue qu'avec un objet (Onix) répond 409 avec `needs` (les noms des objets) et `helpers` |
 | `GET /api/users/:userId/pokedex` 🔒 | `{ dexSize, entries: [{ speciesId, shiny, count, firstCaughtAt }] }` |
 | `GET /api/users/:userId/box` 🔒 | `{ total, page, pages, pageSize, items }` |
-| `GET /api/users/:userId/inventory` 🔒 | `{ items: [{ key, label, emoji, description, count }] }` |
+| `GET /api/users/:userId/inventory` 🔒 | `{ items: [{ key, label, emoji, description, count, sellValue }] }` — `sellValue` : le prix de revente à l'unité, `null` pour un objet qui ne se revend pas |
 | `GET /api/me/egg` 🔒 | `{ egg }` ou `{ egg: null }` — `egg.shinyParents` et `egg.shinyFactor` : le bonus de shiny des parents ; `egg.charmFactor` : celui du Charme Chroma du dresseur |
 | `GET /api/users/:userId/showcase` 🔒 | `{ trainer, mine, slots, pokemon }` — la vitrine d'un dresseur (`me` pour la sienne), ses Pokémon dans l'ordre |
 | `GET /api/trainers` 🔒 | `{ dexSize, trainers }` — tous les dresseurs ayant au moins un Pokémon, dans l'ordre du classement : `id`, `name`, `avatar`, `species` (espèces distinctes), `shinies`, `total`, `showcase` (Pokémon en vitrine) |
@@ -127,6 +127,7 @@ ou par un groupe `{ "speciesId": 25, "isShiny": false, "sex": "F" }` — les deu
 | Route | Corps | Réponse |
 |---|---|---|
 | `POST /api/me/sell` | Pokémon, `quantity` pour un groupe | `{ sold, unit, points }` |
+| `POST /api/me/sell-item` | `{ key, quantity? }` (1 par défaut) | `{ sold, unit, points }` — comme `/pk revendre objet` : `409` pour un objet qui ne se revend pas ou qu'on n'a pas en assez d'exemplaires |
 | `POST /api/me/evolve` | Pokémon (celui qui évolue, avec `speciesId` son espèce attendue : refus s'il a déjà évolué), `targetId?`, `helper?` (clé d'un objet, ou `metamorph`), `confirmLocked?` (obligatoire pour un verrouillé, sinon 409) | `{ pokemon, sacrificesSpent, dittosSpent, shiniesSacrificed, pointsSpent, helper }` — `pokemon` est le même individu, sous sa nouvelle forme |
 | `POST /api/me/eggs` | `{ parent1, parent2 }` | `{ egg }` |
 | `POST /api/spawn/throw` | `{ spawnId, ball, requireItem? }` | `{ status, message, final, remaining, pokemon }` — `pokemon.shiny` : ce qui a rejoint la boîte, Charme Chroma compris |

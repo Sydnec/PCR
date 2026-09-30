@@ -1583,10 +1583,26 @@ input[type="number"] {
 
 .item {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   padding: 10px 0;
   border-bottom: 1px solid var(--border);
+}
+
+.item-action {
+  display: flex;
+  justify-content: flex-end;
+  min-width: 6.5rem;
+}
+
+/* Le panneau de revente passe sous la ligne de l'objet, sur toute sa largeur. */
+.item-sell {
+  flex-basis: 100%;
+}
+
+.item-sell input[type="number"] {
+  width: 5.5rem;
 }
 
 .item-icon .emoji {

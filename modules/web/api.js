@@ -94,9 +94,10 @@ import {
   getInventory,
   getItem,
   getItems,
+  itemSellValue,
   sortByCatalogue,
 } from "../pokemon/items.js";
-import { pokemonSellValue, sellPokemon } from "../pokemon/sell.js";
+import { pokemonSellValue, sellItem, sellPokemon } from "../pokemon/sell.js";
 import { describeRules } from "../pokemon/rules.js";
 import { getCharms } from "../pokemon/charms.js";
 import {
@@ -678,6 +679,9 @@ export const routes = [
             image: itemImageUrl(item?.sprite),
             description: item?.description ?? null,
             count: row.count,
+            // Le prix à l'unité, ou null : c'est le catalogue qui décide de ce
+            // qui se revend, la même lecture que /pk revendre objet.
+            sellValue: itemSellValue(item) || null,
           };
         }),
       };
@@ -1143,6 +1147,22 @@ export const routes = [
       const selector = await resolveOwn(ctx.user.id, ctx.body, "Pokémon");
       const quantity = selector.pokemonId ? 1 : intParam(ctx.body.quantity, 1, { min: 1 });
       const result = await promise((cb) => sellPokemon(ctx.user.id, selector, quantity, cb));
+      return outcome(result, ({ quantity: sold, unit, points }) => ({ sold, unit, points }));
+    },
+  },
+
+  // Revendre des objets du sac, comme /pk revendre objet : même prix, même
+  // garde sur le stock, même compensation si le crédit échoue.
+  {
+    method: "POST",
+    path: "/api/me/sell-item",
+    auth: true,
+    write: true,
+    handler: async (ctx) => {
+      const key = typeof ctx.body.key === "string" ? ctx.body.key : "";
+      if (!key) throw new HttpError(400, "Objet manquant.");
+      const quantity = intParam(ctx.body.quantity, 1, { min: 1 });
+      const result = await promise((cb) => sellItem(ctx.user.id, key, quantity, cb));
       return outcome(result, ({ quantity: sold, unit, points }) => ({ sold, unit, points }));
     },
   },

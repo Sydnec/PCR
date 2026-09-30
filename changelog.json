@@ -2057,5 +2057,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Site : revendre ses objets depuis le sac",
+      "description": "Le sac du site montre le prix de revente des objets qui se revendent, avec un bouton pour en vendre la quantité de ton choix.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-30T12:48:09.000Z",
+      "branch": "claude/vibrant-brown-s7suxt"
+    }
+  ]
 }
