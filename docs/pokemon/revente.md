@@ -4,7 +4,8 @@
 
 `/pk revendre` convertit en points ce qu'on a en trop — un doublon de Pokémon, ou un objet dont le
 catalogue fixe la valeur (`sellValue`). Rien d'autre ne se revend : une ball offerte se lance, elle
-ne se monnaie pas.
+ne se monnaie pas. Sur le [site](../site.md), un Pokémon se revend depuis sa fiche de la boîte, et un
+objet depuis le Sac, qui affiche son prix à l'unité : les mêmes règles, la même compensation.
 
 - **L'entrée de Pokédex est intouchable.** On ne vend que des doublons : il reste toujours au moins
   un exemplaire de chaque espèce, shiny ou non (voir [Individus](individus.md)), et une seule
