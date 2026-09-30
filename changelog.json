@@ -2040,5 +2040,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Parc safari : la lignée du Pokémon rencontré",
+      "description": "Une rencontre du parc safari montre maintenant la lignée évolutive du Pokémon et ce que tu en possèdes déjà.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-09-30T12:21:16.000Z",
+      "branch": "claude/vibrant-brown-s7suxt"
+    }
+  ]
 }
