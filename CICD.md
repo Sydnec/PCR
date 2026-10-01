@@ -39,7 +39,7 @@ Assurez-vous simplement que :
 ## 📂 Structure des fichiers CI/CD
 
 - `.github/workflows/deploy.yml` : Définition du pipeline GitHub Actions.
-- `.github/workflows/ci.yml` : Pipeline d'intégration continue exécuté à chaque Push/PR sur main : ESLint (`npm run lint`), mise en forme du site (`npm run format:check`, Prettier sur `web/`) et audit des dépendances (`npm audit --audit-level=high`, qui bloque sur une vulnérabilité haute ou critique).
+- `.github/workflows/ci.yml` : Pipeline d'intégration continue exécuté à chaque Push/PR sur main : ESLint (`npm run lint`), mise en forme du site (`npm run format:check`, Prettier sur `web/`), audit des dépendances (`npm audit --audit-level=high`, qui bloque sur une vulnérabilité haute ou critique) et tests automatiques (`npm test`, voir [docs/tests.md](docs/tests.md)).
 - `.github/workflows/codeql.yml` : Analyse de sécurité CodeQL, à chaque PR et chaque semaine (alertes dans l'onglet *Security*).
 - `.github/dependabot.yml` : Dependabot propose chaque semaine les mises à jour des dépendances npm et des actions GitHub.
 - `pcr` : Script bash local qui gère les commandes `deploy` et `release`.
@@ -47,7 +47,7 @@ Assurez-vous simplement que :
 ## ⚠️ Notes importantes
 
 1.  **Fichier .env** : Le fichier `.env` contenant les tokens et clés API **n'est pas versionné**. Vous devez le créer manuellement sur le serveur dans `/home/sydnec/pcr/.env`.
-2.  **Tests** : Le workflow CI exécute ESLint, Prettier et `npm audit`. Les tests unitaires ne sont pas encore implémentés : le comportement se teste sur une copie du dépôt (voir `CLAUDE.md`).
+2.  **Tests** : Le workflow CI exécute ESLint, Prettier, `npm audit` et la suite de tests (`npm test`). Les tests travaillent dans un dossier jetable (`PCR_DATA_DIR`) : ils n'ont besoin ni de `.env` ni des vraies bases. Voir [docs/tests.md](docs/tests.md).
 3.  **Runner auto-hébergé** : le dépôt est public. Seul `deploy.yml` tourne sur la machine du bot, et seulement sur un tag, que seuls les collaborateurs peuvent pousser. Aucun workflow déclenché par une PR ne doit y tourner : une PR venue d'un fork exécuterait son code sur le serveur.
 
 ## 📝 Commandes utiles pour le développeur

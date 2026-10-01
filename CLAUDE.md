@@ -53,7 +53,7 @@ Lors d'un compactage, conserver : les fichiers modifiés, les sorties de tests, 
 
 Le mainteneur ne fait que `git pull && pcr release <fix|minor|major>` sur `main`. Les changements s'accumulent sur la branche de travail, poussés au fil de l'eau ; ils ne partent vers `main` que quand le mainteneur dit **« là, on release »** :
 
-1. Développer sur la branche de travail, (`feat(pokemon): …`, `fix(pokemon): …`).
+1. Développer sur la branche de travail, (`feat(pokemon): …`, `fix(pokemon): …`), avec ses tests (`npm test`).
 2. Ajouter l'entrée du changement dans `changelog.json` → `pending` (c'est ce que `pcr finish` faisait, et `pcr release` la reprend telle quelle) :
    `type` (`feature` / `fix` / `enhancement` / `chore`), `name`, `description` (texte destiné aux
    joueurs), `announce` (annoncé sur Discord ou non), `author: "Sydnec"`, `commit: "pending"`,
@@ -75,6 +75,10 @@ le rôle de `pcr release`.
 - **Commentaires en français qui disent pourquoi** : la décision, le piège évité, la règle de jeu.
   Jamais une paraphrase du code, et la même densité que le code autour.
 - **Réutiliser les chemins uniques** au lieu de les recopier : `creditSpecies` (nouvel individu), `reserveDuplicates` / `restoreDuplicates` (retrait d'individus d'un groupe, et remise à l'identique), `getIndividuals` / `groupIndividuals` (lecture), `grantItem` / `consumeItem` (inventaire), `spendPoints` / `addPoints` (points), `displayName`, `encodeEntry` / `decodeEntry`, `buildBalanceEmbed`, `startThrow` / `resolveThrow` / `throwMessage` (un lancer de ball, depuis Discord comme depuis le site).
+- **Tests** : une règle de jeu nouvelle, un nouveau chemin d'écriture, une commande ou une route
+  arrivent avec leur test dans `test/` (`npm test`, voir `docs/tests.md`), et un bug corrigé ajoute
+  le test qui l'aurait vu. Un refus se teste avec son message *et* l'état en base, le hasard est
+  figé (`withRandom`), la compensation se prouve par une panne provoquée.
 - **Pas d'état de jeu en mémoire** : tout vit en base, pour que les boutons répondent encore après
   un redémarrage.
 - **Opérations en plusieurs étapes** : retirer avant de créditer, et compenser en cascade si une

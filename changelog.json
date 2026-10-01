@@ -2104,6 +2104,16 @@
       "commit": "pending",
       "timestamp": "2026-10-01T06:39:50.000Z",
       "branch": "claude/vibrant-brown-s7suxt"
+    },
+    {
+      "type": "chore",
+      "name": "Tests automatiques",
+      "description": "Ajout d'une suite de tests automatiques du jeu, du site et des commandes, lancée à chaque pull request. Au passage, /admin config borne le taux de capture minimal (0 à 255) et refuse un multiplicateur de fuite des légendaires inférieur à 1.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-01T07:58:23.000Z",
+      "branch": "claude/vibrant-brown-s7suxt"
     }
   ]
 }
