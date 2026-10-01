@@ -12,7 +12,6 @@ process.env.POKEMON_CHANNEL_ID = "123";
 const { points } = await openDatabases();
 const { handlePokemonButton, handlePokemonSelect } = await import("../modules/pokemon/interactions.js");
 const collection = await import("../modules/pokemon/collection.js");
-const safari = await import("../modules/pokemon/safari.js");
 const items = await import("../modules/pokemon/items.js");
 const economy = await import("../modules/economy.js");
 const data = await import("../modules/pokemon/data.js");
