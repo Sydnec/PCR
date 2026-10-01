@@ -19,6 +19,11 @@ export function createSandbox({ config = null } = {}) {
   process.env.PCR_DATA_DIR = dir;
   // dotenv 18 journalise chaque chargement du .env : inutile dans un test.
   process.env.DOTENV_CONFIG_QUIET = "true";
+  // Le journal du bot (console.log) n'apporte rien à un test qui passe, et il
+  // partage la sortie standard avec le lanceur de node:test : en silence, il ne
+  // peut pas brouiller ses messages. PCR_TEST_LOGS=1 le rétablit pour comprendre
+  // un échec ; les erreurs (console.error) restent visibles.
+  if (!process.env.PCR_TEST_LOGS) console.log = () => {};
   const configFile = path.join(dir, "config.json");
   if (config) fs.writeFileSync(configFile, JSON.stringify(config));
   after(() => fs.rmSync(dir, { recursive: true, force: true }));
