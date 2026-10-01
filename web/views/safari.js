@@ -21,6 +21,7 @@ import {
   progressBar,
   toast,
 } from "../lib.js";
+import { lineageView } from "../lineage.js";
 import { safariOffer } from "../safari-offer.js";
 
 // L'icône qui ouvre la réponse d'une action, à la place de l'emoji du message.
@@ -175,7 +176,15 @@ export async function render(ctx) {
         encounter.owned ? [" · ", ownedMark(encounter.owned, encounter.shiny)] : null
       ),
       actions(encounter),
-      panel ? actionPanel() : null
+      panel ? actionPanel() : null,
+      // La lignée et ce qu'on en possède, le même rendu que l'apparition de la
+      // Capture et la fiche Discord. Collection illisible : on l'omet.
+      encounter.lineage
+        ? lineageView(ctx, encounter.lineage, {
+            currentId: encounter.speciesId,
+            shiny: encounter.shiny,
+          })
+        : null
     );
     const glow = ctx.types[species.types[0]];
     if (glow) view.style.setProperty("--glow", glow);
