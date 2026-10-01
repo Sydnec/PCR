@@ -107,7 +107,8 @@ dès qu'il y en a plus d'une ouverte, et reste vide sinon.
 Une visite : `{ id, token, actionsLeft, actionsTotal, expiresAt, finished, catches, ball,
 encounter }`. `encounter` (`null` une fois la visite finie) porte l'espèce, `shiny`, `sex`, la
 rareté, `probability`, `bait` (appâts avalés), `baitFactor`, `baitCapped` (un appât de plus ne
-servirait à rien), `fleeRisk` et `owned`. `token` se renvoie avec chaque action.
+servirait à rien), `fleeRisk`, `owned` et `lineage` (la lignée, `[{ speciesId, stage, owned }]`, comme celle d'une
+apparition ; `null` sur une collection illisible). `token` se renvoie avec chaque action.
 
 Dans la boîte PC, `boxes` liste `{ box, name, custom, defaultName }` et chaque Pokémon est un
 individu avec sa case, `pos` (boîte = `pos / slotsPerBox`). Un Pokémon sans place reçoit la

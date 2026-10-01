@@ -436,7 +436,7 @@ async function spawnJson(ctx, spawn, balance) {
 // Une visite du parc telle que le site l'affiche : la rencontre (chances, appât,
 // risque de fuite, calculés par les mêmes fonctions que l'embed Discord) et ce
 // qui a déjà été capturé. `token` est le jeton anti-double-clic de playAction.
-async function visitJson(session, owned) {
+async function visitJson(session, owned, lineageOwned) {
   const config = getSafariConfig();
   const finished = isSafariFinished(session);
   const species = finished ? null : getSpecies(session.encounter_species_id);
@@ -471,6 +471,16 @@ async function visitJson(session, owned) {
           baitCapped: safariBaitCapped(bait, config),
           fleeRisk: safariFleeChance(bait, config),
           owned: owned ?? null,
+          // La lignée de la rencontre et ce que le dresseur en possède, comme la
+          // fiche Discord et l'apparition de la Capture : null sur une collection
+          // illisible, que la page omet plutôt que d'annoncer zéro.
+          lineage: lineageOwned
+            ? evolutionChain(species).map((link) => ({
+                speciesId: link.id,
+                stage: link.stage,
+                owned: lineageOwned.get(link.id) ?? { normal: 0, shiny: 0 },
+              }))
+            : null,
         }
       : null,
   };
@@ -814,7 +824,7 @@ export const routes = [
       const { json, ongoing } = await safariState(ctx);
       return {
         offer: json,
-        visit: ongoing ? await visitJson(ongoing.session, ongoing.owned) : null,
+        visit: ongoing ? await visitJson(ongoing.session, ongoing.owned, ongoing.lineage) : null,
       };
     },
   },
@@ -846,7 +856,7 @@ export const routes = [
       if (!result.resumed) refreshParkMessage(ctx.bot, parkId);
       return {
         resumed: Boolean(result.resumed),
-        visit: await visitJson(result.session, result.owned),
+        visit: await visitJson(result.session, result.owned, result.lineage),
       };
     },
   },
@@ -865,7 +875,7 @@ export const routes = [
       return {
         resumed: Boolean(result.resumed),
         ticket: result.ticket?.label ?? null,
-        visit: await visitJson(result.session, result.owned),
+        visit: await visitJson(result.session, result.owned, result.lineage),
       };
     },
   },
@@ -891,7 +901,7 @@ export const routes = [
       return {
         outcome: result.outcome,
         message: safariOutcomeLine(result, getSafariConfig()),
-        visit: await visitJson(result.session, result.owned),
+        visit: await visitJson(result.session, result.owned, result.lineage),
       };
     },
   },

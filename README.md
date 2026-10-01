@@ -123,6 +123,15 @@ pcr finish
 Les livraisons de Claude arrivent, elles, par une PR déjà mergée dans `main`, entrée du changelog
 comprise : il ne reste que `git pull && pcr release <fix|minor|major>` (voir [CLAUDE.md](./CLAUDE.md)).
 
+### Tests
+
+```bash
+npm test   # toute la suite, ≈ 45 s : aucun .env, aucune vraie base n'est touchée
+```
+
+Le jeu, l'économie, le site, les commandes `/pk` et `/admin`, les boutons Discord et les minuteurs
+sont couverts, et la CI lance la suite à chaque pull request. → [Tests automatiques](docs/tests.md)
+
 ## 📦 Déploiement & CI/CD
 
 Le projet utilise **GitHub Actions** pour le déploiement continu.

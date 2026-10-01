@@ -25,14 +25,17 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // fait échouer le déploiement suivant, et `pcr release` refuse de partir d'un
 // arbre sale. Un réglage à chaud écrit dans un fichier suivi casserait donc la
 // chaîne de livraison dès le premier usage.
-const overridePath = path.join(__dirname, "../config.json");
+// PCR_DATA_DIR : les tests lisent et écrivent dans un dossier jetable (voir
+// points-db.js), pas dans le config.json du dépôt.
+const dataDir = process.env.PCR_DATA_DIR ?? path.join(__dirname, "..");
+const overridePath = path.join(dataDir, "config.json");
 
 // Avant, /admin config écrivait dans config.local.json, et config.json était le
 // réglage versionné — dont toutes les valeurs vivent désormais dans DEFAULTS.
 // Le premier démarrage reprend donc l'ancienne surcharge sous son nouveau nom :
 // sans cela, les réglages posés depuis Discord seraient ignorés en silence. Elle
 // prend la place de l'ancien config.json, qu'elle recouvre sans rien perdre.
-const legacyOverridePath = path.join(__dirname, "../config.local.json");
+const legacyOverridePath = path.join(dataDir, "config.local.json");
 function migrateLegacyOverride() {
   if (!fs.existsSync(legacyOverridePath)) return;
   try {
@@ -677,6 +680,12 @@ const BOUNDS = {
   "pokemon.safari.shinyOdds": { min: 1 },
   // Sous 1, un parent shiny ferait baisser les chances au lieu de les monter.
   "pokemon.eggs.shinyParentMultiplier": { min: 1 },
+  // Le taux de capture va de 0 à 255 : un plancher au-delà rendrait tout le
+  // monde plus facile à attraper qu'un Roucool, sans qu'on s'en aperçoive.
+  "pokemon.capture.minCatchRate": { min: 0, max: 255 },
+  // Sous 1, un légendaire resterait MOINS longtemps qu'un Pokémon ordinaire :
+  // l'inverse de ce que ce réglage promet.
+  "pokemon.spawn.legendaryFleeMultiplier": { min: 1 },
   // On n'ouvre que ce que le jeu de données contient. Le plafond est lu dans le
   // fichier plutôt qu'écrit ici : préparer la génération suivante, c'est
   // régénérer ce fichier, et rien d'autre ne doit avoir à suivre.

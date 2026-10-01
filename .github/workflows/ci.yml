@@ -41,3 +41,9 @@ jobs:
       # Une dépendance vulnérable (gravité haute ou critique) bloque la PR.
       - name: Audit des dépendances
         run: npm audit --audit-level=high
+
+      # La suite de tests (node:test) : jeu, économie, site, commandes, boutons.
+      # Elle travaille dans un dossier jetable (PCR_DATA_DIR) : aucun .env, aucune
+      # base ni config.json n'est nécessaire.
+      - name: Tests automatiques
+        run: npm test

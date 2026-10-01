@@ -2074,5 +2074,46 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "fix",
+      "name": "Parc safari : lignée sans doublon",
+      "description": "La rencontre du parc safari n'affiche plus « Ton Pokédex » en plus de la lignée : le Pokémon rencontré n'y apparaît qu'une fois.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-01T06:22:42.000Z",
+      "branch": "claude/vibrant-brown-s7suxt"
+    },
+    {
+      "type": "chore",
+      "name": "Mise à jour d'une dépendance de développement",
+      "description": "Mise à jour de l'outil de vérification du code (globals), sans changement pour les joueurs.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-01T06:38:53.000Z",
+      "branch": "claude/vibrant-brown-s7suxt"
+    },
+    {
+      "type": "enhancement",
+      "name": "Site : la lignée sur la page du parc safari",
+      "description": "La page du parc safari du site montre maintenant la lignée évolutive du Pokémon rencontré et ce que tu en possèdes, comme sur Discord.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-01T06:39:50.000Z",
+      "branch": "claude/vibrant-brown-s7suxt"
+    },
+    {
+      "type": "chore",
+      "name": "Tests automatiques",
+      "description": "Ajout d'une suite de tests automatiques du jeu, du site et des commandes, lancée à chaque pull request. Au passage, /admin config borne le taux de capture minimal (0 à 255) et refuse un multiplicateur de fuite des légendaires inférieur à 1.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-01T07:58:23.000Z",
+      "branch": "claude/vibrant-brown-s7suxt"
+    }
+  ]
 }
