@@ -1605,11 +1605,13 @@ export function getTradePartners(userId, { reserve = false } = {}, cb) {
   });
 }
 
-// Qui n'a pas l'espèce que `userId` peut donner, et ce que chacun peut lui
-// offrir en retour (`back` : le nombre d'espèces qui lui manquent). `offer` vaut
-// null quand l'espèce n'est pas un doublon qu'il peut céder, avec la réserve
-// d'évolution demandée. Ceux qui peuvent offrir quelque chose passent d'abord :
-// un échange vaut mieux qu'un cadeau.
+// Qui n'a pas l'espèce demandée — n'importe laquelle, possédée ou non par
+// `userId`. Quand il peut la donner (`offer`, un de ses doublons, avec la réserve
+// d'évolution demandée), chacun porte aussi `back` : ce qu'il pourrait lui offrir
+// en retour, le nombre d'espèces qui manquent à `userId`, et ceux qui peuvent
+// offrir quelque chose passent d'abord — un échange vaut mieux qu'un cadeau. Sans
+// rien à donner, `offer` vaut null, `back` aussi, et la liste suit l'identifiant :
+// « en retour » n'aurait pas de sens.
 export function getSpeciesNeeders(userId, speciesId, { reserve = false } = {}, cb) {
   readEveryCollection((err, byUser) => {
     if (err) return cb(err, { offer: null, list: [] });
@@ -1618,14 +1620,17 @@ export function getSpeciesNeeders(userId, speciesId, { reserve = false } = {}, c
     const mine = profileOf(byUser.get(userId) ?? [], options, context);
     byUser.delete(userId);
     const offer = mine.offers.find((line) => line.speciesId === Number(speciesId)) ?? null;
-    if (!offer) return cb(null, { offer: null, list: [] });
     const list = [];
     for (const [otherId, rows] of byUser) {
-      if (rows.some((row) => row.species_id === offer.speciesId)) continue;
-      const back = lacking(profileOf(rows, options, context).offers, mine.owned).length;
+      if (rows.some((row) => row.species_id === Number(speciesId))) continue;
+      const back = offer
+        ? lacking(profileOf(rows, options, context).offers, mine.owned).length
+        : null;
       list.push({ userId: otherId, back });
     }
-    list.sort((a, b) => b.back - a.back || String(a.userId).localeCompare(String(b.userId)));
+    list.sort(
+      (a, b) => (b.back ?? 0) - (a.back ?? 0) || String(a.userId).localeCompare(String(b.userId))
+    );
     cb(null, { offer, list });
   });
 }

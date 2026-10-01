@@ -405,17 +405,6 @@ function showNeedersPage(interaction, speciesId, reserve, page) {
       handleException("Lecture de ceux qui ont besoin d'une espèce :", err);
       return ephemeral(interaction, "❌ Impossible de lire les collections.");
     }
-    // Le dernier exemplaire a pu partir entre deux clics : on le dit, plutôt que
-    // d'afficher « tout le monde l'a » devant quelqu'un qui n'en a plus à donner.
-    if (!found.offer) {
-      return interaction
-        .update({
-          content: `❌ Tu n'as plus de **${species.name}** à donner : relance /pk comparer.`,
-          embeds: [],
-          components: [],
-        })
-        .catch(() => {});
-    }
     interaction
       .update({
         embeds: [buildNeedersEmbed(species, found.offer, found.list, { page, reserve })],

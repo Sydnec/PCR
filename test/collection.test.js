@@ -747,11 +747,17 @@ describe("qui a besoin d'une espèce (getSpeciesNeeders)", () => {
     assert.deepEqual(list.map((entry) => [entry.userId, entry.back]), [["n-d", 2], ["n-a", 1], ["n-b", 0]], "n-c l'a déjà : il n'en a pas besoin");
   });
 
-  it("une espèce qu'on ne peut pas céder ne donne rien : un seul exemplaire, ou inconnue", async () => {
+  it("une espèce qu'on ne peut pas céder se cherche quand même : à qui elle manque, sans « en retour »", async () => {
     await give("Rattata");
     await giveMany("Chenipan", 2, { user: "n-a" });
-    assert.deepEqual(await needers("Rattata"), { offer: null, list: [] });
-    assert.deepEqual(await call(collection.getSpeciesNeeders, "u1", 99999, {}), { offer: null, list: [] });
+    await give("Rattata", { user: "n-b" });
+    await give("Roucool", { user: "n-c" });
+    const { offer, list } = await needers("Rattata");
+    assert.equal(offer, null, "un seul exemplaire : rien à donner");
+    assert.deepEqual(list, [{ userId: "n-a", back: null }, { userId: "n-c", back: null }], "n-b l'a déjà ; ni ordre ni retour sans doublon à donner");
+    const unowned = await needers("Aspicot");
+    assert.equal(unowned.offer, null, "même une espèce qu'on ne possède pas");
+    assert.deepEqual(unowned.list.map((entry) => entry.userId), ["n-a", "n-b", "n-c"]);
   });
 
   it("une espèce à évolution d'échange se cherche comme les autres", async () => {
