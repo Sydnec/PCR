@@ -12,6 +12,7 @@ import comparer from "./pk/comparer.js";
 import oeuf from "./pk/oeuf.js";
 import revendre from "./pk/revendre.js";
 import verrou from "./pk/verrou.js";
+import renommer from "./pk/renommer.js";
 import inventaire from "./pk/inventaire.js";
 import loterie from "./pk/loterie.js";
 import safari from "./pk/safari.js";
@@ -38,6 +39,7 @@ const SUBCOMMANDS = [
   oeuf,
   revendre,
   verrou,
+  renommer,
   inventaire,
   loterie,
   safari,

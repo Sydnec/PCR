@@ -104,7 +104,7 @@ describe("la déclaration des commandes", () => {
     const files = fs.readdirSync(path.join(ROOT, "commands/pk")).map((file) => file.replace(/\.js$/, "")).sort();
     const declared = pk.data.toJSON().options.map((option) => option.name).sort();
     assert.deepEqual(declared, files);
-    assert.equal(declared.length, 16);
+    assert.equal(declared.length, 17);
   });
 
   it("toutes les commandes d'administration sont câblées au routeur /admin", async () => {
@@ -529,6 +529,74 @@ describe("/pk vitrine", () => {
     await showcase("ajouter", { espece: String(species("Rattata").id), individu: `#${id}` });
     const filled = payloadOf(await runAutocomplete(pk, { group: "vitrine", sub: "retirer", focused: { name: "pokemon", value: String(id) } }), "respond");
     assert.deepEqual(filled.map((choice) => choice.value), [`#${id}`]);
+  });
+});
+
+describe("/pk renommer", () => {
+  const rename = (options, user = "u1") => runCommand(pk, { sub: "renommer", options, user });
+  const nickname = async (id) => (await dbGet(points, "SELECT nickname FROM pokemon_owned WHERE id = ?", [id])).nickname;
+  const pick = (id, surnom, name = "Roucool") => ({ espece: String(species(name).id), individu: `#${id}`, ...(surnom === undefined ? {} : { surnom }) });
+
+  it("donne un surnom : réponse privée, enregistré par le chemin du site", async () => {
+    const id = await own("Roucool");
+    const reply = payloadOf(await rename(pick(id, "  Pipou  ")), "reply");
+    assert.equal(reply.flags, EPHEMERAL);
+    assert.equal(reply.content, `✅ **#${id} Roucool ♂** s'appelle désormais **Pipou**.`);
+    assert.equal(await nickname(id), "Pipou", "les espaces superflus sont retirés comme sur le site");
+  });
+
+  it("le renommage garde l'ancien surnom dans la réponse, pour pouvoir le remettre ; vide, il le retire", async () => {
+    const id = await own("Roucool");
+    await rename(pick(id, "Pipou"));
+    assert.match(payloadOf(await rename(pick(id, "Roupi")), "reply").content, /désormais \*\*Roupi\*\*\. \(avant : \*\*Pipou\*\*\)/);
+    const removed = payloadOf(await rename(pick(id)), "reply").content;
+    assert.equal(removed, `✅ **#${id} Roucool ♂** n'a plus de surnom. (avant : **Roupi**)`);
+    assert.equal(await nickname(id), null);
+  });
+
+  it("la limite de la configuration rogne le surnom, et la réponse le dit", async () => {
+    sandbox.writeConfig({ pokemon: { ...GEN1.pokemon, pc: { nicknameLength: 5 } } });
+    const id = await own("Roucool");
+    const reply = payloadOf(await rename(pick(id, "Superpipou")), "reply").content;
+    assert.match(reply, /désormais \*\*Super\*\*\. ✂️ Rogné à 5 caractères\./);
+    assert.equal(await nickname(id), "Super");
+    assert.doesNotMatch(payloadOf(await rename(pick(id, "Court")), "reply").content, /Rogné/);
+  });
+
+  it("refuse en privé le Pokémon d'un autre, une espèce inconnue ou un individu d'une autre espèce", async () => {
+    const theirs = await own("Roucool", { user: "u2" });
+    const stolen = payloadOf(await rename(pick(theirs, "Voleur")), "reply");
+    assert.match(stolen.content, /^❌ .*n'est pas dans cette boîte/);
+    assert.equal(stolen.flags, EPHEMERAL);
+    assert.equal(await nickname(theirs), null, "rien n'a été écrit");
+    const mine = await own("Rattata");
+    assert.match(payloadOf(await rename(pick(mine, "Ratou")), "reply").content, /n'est pas un Roucool/);
+    assert.match(payloadOf(await rename({ espece: "99999", individu: "#1", surnom: "x" }), "reply").content, /^❌ /);
+  });
+
+  it("l'autocomplétion : les espèces qu'on possède, puis les individus avec leur surnom actuel", async () => {
+    const id = await own("Roucool");
+    await own("Roucool", { obtained: 2 });
+    await dbRun(points, "UPDATE pokemon_owned SET nickname = 'Pipou' WHERE id = ?", [id]);
+    const species_ = payloadOf(await runAutocomplete(pk, { sub: "renommer", focused: { name: "espece", value: "" } }), "respond");
+    assert.deepEqual(species_.map((choice) => choice.value), [String(species("Roucool").id)]);
+    const people = payloadOf(await runAutocomplete(pk, { sub: "renommer", options: { espece: String(species("Roucool").id) }, focused: { name: "individu", value: "" } }), "respond");
+    assert.equal(people.length, 2);
+    assert.ok(people.find((choice) => choice.value === `#${id}`).name.endsWith("· « Pipou »"));
+    assert.ok(people.every((choice) => choice.name.length <= 100));
+    const noSpecies = payloadOf(await runAutocomplete(pk, { sub: "renommer", focused: { name: "individu", value: "" } }), "respond");
+    assert.match(noSpecies[0].name, /Choisis d'abord l'espèce/);
+  });
+
+  it("le surnom s'affiche dans /pk boite, devant l'espèce, sans que son gras ni ses mentions cassent la ligne", async () => {
+    const id = await own("Roucool");
+    await rename(pick(id, "**Pi** <@1>"));
+    const calls = await runCommand(pk, { sub: "boite" });
+    const description = payloadOf(calls, "reply").embeds[0].toJSON().description;
+    assert.ok(description.includes(`\`#${id}\` **\\*\\*Pi\\*\\* <@1>** · Roucool ♂`), description);
+    await rename(pick(id));
+    const plain = payloadOf(await runCommand(pk, { sub: "boite" }), "reply").embeds[0].toJSON().description;
+    assert.ok(plain.includes(`\`#${id}\` **Roucool ♂**`), "sans surnom, la ligne est celle d'avant");
   });
 });
 

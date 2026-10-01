@@ -22,6 +22,11 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
   qui ne sortent que d'un œuf.
 - `/pk boite [pokemon] [membre]` : les Pokémon un par un, page par page — `#numéro`, sexe, ball,
   date, fertilité, et 🛡️ les verrouillés (voir [Individus](individus.md)).
+- `/pk renommer <espece> <individu> [surnom]` : donne un surnom à un de tes Pokémon, ou le retire
+  (`surnom` vide). Le même que sur le [site](../site.md), par la même fonction : limite
+  `pokemon.pc.nicknameLength`, rognage signalé dans la réponse, ancien surnom rappelé pour pouvoir le
+  remettre. Il apparaît devant l'espèce dans `/pk boite` et dans la vitrine, et suit le Pokémon
+  quand il évolue ou change de dresseur. Réponse privée.
 - `/pk doublons [membre] [pokemon] [evolutions]` : les espèces qu'un dresseur a en plusieurs
   exemplaires, dans l'ordre du Pokédex, et combien peuvent s'échanger — tout sauf un par espèce,
   hors verrouillés 🛡️. Avec une espèce, l'inverse : les dresseurs qui l'ont en double, ceux qui

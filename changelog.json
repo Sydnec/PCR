@@ -2144,6 +2144,16 @@
       "commit": "pending",
       "timestamp": "2026-10-01T14:40:29.000Z",
       "branch": "claude/vibrant-brown-s7suxt"
+    },
+    {
+      "type": "feature",
+      "name": "Nouvelle commande /pk renommer",
+      "description": "Donne un surnom à un de tes Pokémon depuis Discord, comme sur le site, ou retire-le. Le surnom s'affiche désormais dans /pk boite.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-01T14:42:52.000Z",
+      "branch": "claude/vibrant-brown-s7suxt"
     }
   ]
 }

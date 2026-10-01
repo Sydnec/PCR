@@ -6,6 +6,7 @@ import {
   ButtonStyle,
   ContainerBuilder,
   EmbedBuilder,
+  escapeMarkdown,
   MediaGalleryBuilder,
   MediaGalleryItemBuilder,
   MessageFlags,
@@ -640,11 +641,17 @@ function provenanceOf(row) {
   return ball ? `${ball.emoji} ${ball.label}` : ORIGINS[row.origin] ?? "—";
 }
 
+// Le surnom devant le nom de l'espèce, comme dans la vitrine : « **Pipou** · Roucool ♂ ».
+// Échappé : il est saisi par le dresseur, et du gras ou une mention n'y ont pas leur place.
+const nicknamed = (nickname, label) =>
+  nickname ? `**${escapeMarkdown(nickname)}** · ${label.replaceAll("**", "")}` : label;
+
 function individualLine(row) {
   const species = getSpecies(row.species_id);
   const provenance = provenanceOf(row);
   return (
-    `\`#${row.id}\` **${species ? displayName(species, row.is_shiny, row.sex, row.form) : "?"}**` +
+    `\`#${row.id}\` ` +
+    nicknamed(row.nickname, `**${species ? displayName(species, row.is_shiny, row.sex, row.form) : "?"}**`) +
     ` · ${provenance}` +
     (row.origin === "echange" ? " · reçu en échange" : "") +
     ` · ${shortDate(row.obtained_at)}` +

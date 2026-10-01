@@ -207,13 +207,14 @@ describe("noms de boîtes et surnoms", () => {
 
   it("un surnom se donne, se nettoie, se coupe et s'efface", async () => {
     const id = await give();
-    assert.deepEqual(await call(pc.renamePokemon, "u1", id, "  Ratou \n "), { ok: true, nickname: "Ratou" });
+    assert.deepEqual(await call(pc.renamePokemon, "u1", id, "  Ratou \n "), { ok: true, nickname: "Ratou", cut: false });
     assert.equal((await dbGet(points, "SELECT nickname FROM pokemon_owned WHERE id = ?", [id])).nickname, "Ratou");
 
     config({ pc: { nicknameLength: 3 } });
-    assert.equal((await call(pc.renamePokemon, "u1", id, "Roudoudou")).nickname, "Rou");
+    const cut = await call(pc.renamePokemon, "u1", id, "Roudoudou");
+    assert.deepEqual([cut.nickname, cut.cut], ["Rou", true], "la limite rogne, et le résultat le dit");
 
-    assert.deepEqual(await call(pc.renamePokemon, "u1", id, ""), { ok: true, nickname: null });
+    assert.deepEqual(await call(pc.renamePokemon, "u1", id, ""), { ok: true, nickname: null, cut: false });
     assert.equal((await dbGet(points, "SELECT nickname FROM pokemon_owned WHERE id = ?", [id])).nickname, null);
   });
 
