@@ -38,15 +38,15 @@ function respondWithSpecies(interaction, userId, query, emptyLabel) {
       .map(([speciesId, { spare }]) => {
         const species = getSpecies(speciesId);
         if (!species || spare < 1) return null;
-        // Les quatre évolutions par échange se déclarent ici plutôt que dans un
-        // message d'aide que personne ne lit : c'est l'instant exact où on
-        // choisit ce qu'on donne. Le filtre portant sur le libellé, taper
-        // « mackogneur » remonte le Machopeur qui y mène.
+        // Les quatre évolutions par échange se disent ici plutôt que dans un
+        // message d'aide que personne ne lit : c'est l'instant exact où on choisit
+        // ce qu'on donne. Le filtre portant sur le libellé, taper « mackogneur »
+        // remonte le Machopeur qui y mène.
         const evolved = tradeEvolutionTarget(species);
         return {
           name:
             `${species.name} ×${spare} en trop` +
-            (evolved ? ` — évolue en ${evolved.name}` : ""),
+            (evolved ? ` — évoluera gratuitement en ${evolved.name} chez l'autre` : ""),
           value: String(speciesId),
         };
       })

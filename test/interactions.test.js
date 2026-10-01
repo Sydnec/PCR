@@ -403,6 +403,16 @@ describe("les boutons d'évolution", () => {
     assert.equal(await balance(user), 3500);
   });
 
+  it("un Machopeur reçu en échange évolue sans rien payer, sans solde, même seul", async () => {
+    const user = newUser();
+    const id = await own("Machopeur", user);
+    await dbRun(points, "UPDATE pokemon_owned SET origin = 'echange' WHERE id = ?", [id]);
+    const calls = await click(evo("Machopeur", `#${id}`), { user });
+    assert.match(only(calls, "update").content, /a évolué en \*\*Mackogneur/);
+    assert.equal((await dbAll(points, "SELECT species_id FROM pokemon_owned WHERE user_id = ?", [user]))[0].species_id, species("Mackogneur").id);
+    assert.equal(await balance(user), 0);
+  });
+
   it("un second clic sur le même bouton est refusé : il ne repaie pas", async () => {
     const user = newUser();
     const ids = await ownMany("Rattata", 4, user);

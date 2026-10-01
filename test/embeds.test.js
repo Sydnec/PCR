@@ -439,14 +439,12 @@ describe("la comparaison de deux dresseurs (/pk comparer)", () => {
     assert.deepEqual(json(embeds.buildCompareView(matchOf([], []), state())).rows, []);
   });
 
-  it("une ligne dit le numéro, le nom, combien peuvent partir, les shiny et l'espèce qui arrivera", () => {
-    const machop = species("Machopeur");
+  it("une ligne dit le numéro, le nom, combien peuvent partir, les shiny", () => {
     const match = matchOf(
       [
         entry(species("Rattata").id),
         entry(species("Roucool").id, { spare: 1, free: 2, freeNormal: 1 }),
         entry(species("Pikachu").id, { spare: 3, free: 3, freeNormal: 1 }),
-        entry(machop.id, { arrivalId: species("Mackogneur").id, spare: 1 }),
       ],
       [entry(species("Chenipan").id)]
     );
@@ -454,7 +452,6 @@ describe("la comparaison de deux dresseurs (/pk comparer)", () => {
     assert.match(embed.description, /`#019` \*\*Rattata\*\* ×2\n/);
     assert.match(embed.description, /\*\*Roucool\*\* ✨\n/, "un shiny peut partir : signalé, sans nombre quand il n'y en a qu'un");
     assert.match(embed.description, /\*\*Pikachu\*\* ×3 ✨2\n/);
-    assert.match(embed.description, /\*\*Machopeur\*\* · arrive en \*\*Mackogneur\*\*/);
     assert.match(embed.footer.text, /✨ : un shiny fait partie de ceux qui peuvent partir/);
   });
 
@@ -486,13 +483,13 @@ describe("la comparaison de deux dresseurs (/pk comparer)", () => {
     assert.match(embeds.buildPartnersEmbed([], { reserve: false, offers: 3 }).toJSON().description, /Personne n'a de quoi échanger/);
   });
 
-  it("qui a besoin d'une espèce : ce que chacun donnerait en retour, et la forme qui arrive quand elle change", () => {
+  it("qui a besoin d'une espèce : ce que chacun donnerait en retour", () => {
     const machop = species("Machopeur");
-    const offer = entry(machop.id, { arrivalId: species("Mackogneur").id, spare: 1, free: 2, freeNormal: 1 });
+    const offer = entry(machop.id, { spare: 1, free: 2, freeNormal: 1 });
     const list = [{ userId: "n-a", back: 2 }, { userId: "n-b", back: 1 }, { userId: "n-c", back: 0 }];
     const json1 = embeds.buildNeedersEmbed(machop, offer, list, { reserve: false }).toJSON();
     assert.equal(json1.title, "📥 Qui a besoin de Machopeur");
-    assert.match(json1.description, /Tu peux donner \*\*1\*\* Machopeur ✨\. Voici ceux à qui \*\*Mackogneur\*\* manque : Machopeur y arrive sous cette forme/);
+    assert.match(json1.description, /Tu peux donner \*\*1\*\* Machopeur ✨\. Voici ceux à qui il manque\./);
     assert.match(json1.description, /<@n-a> · peut te donner \*\*2\*\* espèces en retour/);
     assert.match(json1.description, /<@n-b> · peut te donner \*\*1\*\* espèce en retour/);
     assert.match(json1.description, /<@n-c> · rien à te donner en retour/);

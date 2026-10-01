@@ -435,30 +435,28 @@ describe("échanger (createTrade / acceptTrade)", () => {
     assert.ok((await owned("u1")).some((row) => row.id === give2), "u1 a reçu le Roucool de u2");
     assert.equal((await owned("u1")).length, 2);
     assert.equal((await owned("u2")).length, 2);
-    assert.deepEqual(result.evolutions, []);
   });
 
-  it("Machopeur évolue chez celui qui le reçoit, pas chez celui qui le donne", async () => {
+  it("l'échange ne fait plus évoluer : Machopeur arrive tel quel, avec l'origine « echange »", async () => {
     const [machop] = await giveMany("Machopeur", 2);
     const [roucool] = await giveMany("Roucool", 2, { user: "u2" });
     const id = await open({ offerSpeciesId: species("Machopeur").id, offerPokemonId: machop, requestPokemonId: roucool });
     const result = await accept(id);
     assert.equal(result.ok, true, result.reason);
     const arrived = (await owned("u2")).find((row) => row.id === machop);
-    assert.equal(arrived.species_id, species("Mackogneur").id);
-    assert.deepEqual(result.evolutions, [{ userId: "u2", from: species("Machopeur").id, to: species("Mackogneur").id, isShiny: 0 }]);
+    assert.equal(arrived.species_id, species("Machopeur").id);
+    assert.equal(arrived.origin, "echange");
+    assert.equal(result.evolutions, undefined);
     assert.equal((await ofSpecies("Machopeur", "u1")).length, 1, "celui qui donne garde son autre Machopeur");
   });
 
-  it("deux Machopeur échangés font deux Mackogneur, comme dans le jeu d'origine", async () => {
+  it("deux Machopeur échangés restent deux Machopeur, chacun libre d'évoluer ensuite", async () => {
     const [mine] = await giveMany("Machopeur", 2);
     const [theirs] = await giveMany("Machopeur", 2, { user: "u2" });
     const id = await open({ offerSpeciesId: species("Machopeur").id, requestSpeciesId: species("Machopeur").id, offerPokemonId: mine, requestPokemonId: theirs });
-    const result = await accept(id);
-    assert.equal(result.ok, true, result.reason);
-    assert.equal(result.evolutions.length, 2);
-    assert.equal((await owned("u1")).find((row) => row.id === theirs).species_id, species("Mackogneur").id);
-    assert.equal((await owned("u2")).find((row) => row.id === mine).species_id, species("Mackogneur").id);
+    assert.equal((await accept(id)).ok, true);
+    assert.equal((await owned("u1")).find((row) => row.id === theirs).species_id, species("Machopeur").id);
+    assert.equal((await owned("u2")).find((row) => row.id === mine).species_id, species("Machopeur").id);
   });
 
   it("un shiny qui arrive est verrouillé d'office", async () => {
@@ -572,7 +570,6 @@ describe("les échanges possibles entre deux dresseurs (tradeMatches)", () => {
     assert.deepEqual(names(gets), ["Chenipan"]);
     assert.equal(swaps, 1);
     assert.equal(gifts[0].spare, 1, "les chiffres de listDuplicates suivent chaque ligne");
-    assert.equal(gifts[0].arrivalId, species("Rattata").id);
   });
 
   it("ce que l'autre a déjà ne compte pas, même en un seul exemplaire : le second ne comble rien", async () => {
@@ -606,27 +603,13 @@ describe("les échanges possibles entre deux dresseurs (tradeMatches)", () => {
     assert.deepEqual(names((await matches("u1", "u2", { reserve: true })).give), ["Rattata"], "Rattatac au Pokédex : plus rien à garder");
   });
 
-  it("ce qui compte est l'espèce qui ARRIVE : un Machopeur devient Mackogneur chez celui qui le reçoit", async () => {
+  it("Machopeur se compte comme n'importe quelle espèce : l'échange ne le transforme plus", async () => {
     await giveMany("Machopeur", 2);
     await give("Mackogneur", { user: "u2" });
     await give("Roucool", { user: "u2" });
-    assert.deepEqual((await matches()).give, [], "il a déjà un Mackogneur : son Machopeur ne lui apporterait rien, même s'il n'a jamais eu de Machopeur");
-
-    await dbRun(points, "DELETE FROM pokemon_owned WHERE user_id = 'u2'");
-    await give("Machopeur", { user: "u2" });
     const { give: gifts } = await matches();
-    assert.deepEqual(names(gifts), ["Machopeur"], "il a un Machopeur mais pas de Mackogneur : celui qui arrive lui manque");
-    assert.equal(gifts[0].arrivalId, species("Mackogneur").id);
-  });
-
-  it("deux espèces qui arrivent sous la même forme ne comblent qu'une case : on garde celle qui n'a pas à évoluer", async () => {
-    await giveMany("Machopeur", 2);
-    await giveMany("Mackogneur", 2);
-    await give("Roucool", { user: "u2" });
-    const { give: gifts, swaps } = await matches();
-    assert.deepEqual(names(gifts), ["Mackogneur"]);
-    assert.equal(gifts[0].arrivalId, species("Mackogneur").id);
-    assert.equal(swaps, 0, "l'autre n'a rien en double à donner en retour");
+    assert.deepEqual(names(gifts), ["Machopeur"], "il a un Mackogneur mais pas de Machopeur : celui-ci lui manque");
+    assert.equal(gifts[0].arrivalId, undefined);
   });
 
   it("les chiffres de chaque ligne disent combien de shiny peuvent partir, pour les signaler", async () => {
@@ -771,13 +754,13 @@ describe("qui a besoin d'une espèce (getSpeciesNeeders)", () => {
     assert.deepEqual(await call(collection.getSpeciesNeeders, "u1", 99999, {}), { offer: null, list: [] });
   });
 
-  it("une espèce qui change en arrivant : seuls ceux à qui manque la forme d'arrivée en ont besoin", async () => {
+  it("une espèce à évolution d'échange se cherche comme les autres", async () => {
     await giveMany("Machopeur", 2);
     await give("Mackogneur", { user: "m-a" });
     await give("Machopeur", { user: "m-b" });
     const { offer, list } = await needers("Machopeur");
-    assert.equal(offer.arrivalId, species("Mackogneur").id);
-    assert.deepEqual(list.map((entry) => entry.userId), ["m-b"], "m-a a déjà un Mackogneur : le Machopeur n'y ajouterait rien");
+    assert.equal(offer.speciesId, species("Machopeur").id);
+    assert.deepEqual(list.map((entry) => entry.userId), ["m-a"], "m-b a déjà un Machopeur ; m-a n'en a pas, son Mackogneur n'y change rien");
   });
 });
 

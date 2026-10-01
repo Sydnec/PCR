@@ -606,7 +606,8 @@ describe("évolutions", () => {
       });
       const trade = await new Promise((resolve, reject) => collection.acceptTrade(tradeId, (error, value) => (error ? reject(error) : resolve(value))));
       assert.equal(trade.ok, true, trade.reason);
-      assert.deepEqual(trade.evolutions, [], "un Onix échangé reste un Onix : c'est le Catalyseur qui donne Steelix");
+      const [arrived] = await dbAll(points, "SELECT species_id FROM pokemon_owned WHERE id = ?", [mine[0]]);
+      assert.equal(arrived.species_id, species("Onix").id, "un Onix échangé reste un Onix : c'est le Catalyseur qui donne Steelix");
     });
 
     it("une panne à l'arrivée de la forme rend la Roche Royale, les points et les sacrifices", async () => {

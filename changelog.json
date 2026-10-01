@@ -2134,6 +2134,16 @@
       "commit": "pending",
       "timestamp": "2026-10-01T13:11:08.000Z",
       "branch": "claude/vibrant-brown-s7suxt"
+    },
+    {
+      "type": "enhancement",
+      "name": "Échange : l'évolution devient un choix",
+      "description": "Kadabra, Machopeur, Gravalanch et Spectrum n'évoluent plus d'office quand on les reçoit en échange : ils évoluent ensuite gratuitement avec /pk evolution, quand tu le décides, même s'ils sont seuls de leur espèce.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-01T14:40:29.000Z",
+      "branch": "claude/vibrant-brown-s7suxt"
     }
   ]
 }

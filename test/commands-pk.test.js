@@ -598,14 +598,13 @@ describe("/pk comparer", () => {
     assert.doesNotMatch(textOf(raw), /🧬/);
   });
 
-  it("un shiny déverrouillé est proposé, signalé ✨, et l'évolution par échange est annoncée", async () => {
+  it("un shiny déverrouillé est proposé, signalé ✨", async () => {
     await own("Roucool", { shiny: 1, locked: 0 });
     await own("Roucool", { obtained: 2, shiny: 1, locked: 0 });
     await ownMany("Machopeur", 2);
     await ownMany("Kangourex", 2, { user: "u2" });
     const text = textOf(payloadOf(await compare({ evolutions: false }, partner()), "editReply"));
     assert.match(text, /Roucool\*\* ✨/);
-    assert.match(text, /Machopeur\*\* · arrive en \*\*Mackogneur\*\*/);
   });
 
   it("refuse en privé, avant de différer : soi-même, un bot, les deux options, une espèce illisible", async () => {
@@ -790,11 +789,11 @@ describe("/pk echange", () => {
     assert.match(payloadOf(stolen, "reply").content, /n'est pas dans cette boîte/);
   });
 
-  it("l'autocomplétion : ce qu'on peut donner (avec l'évolution par échange), puis chez le destinataire", async () => {
+  it("l'autocomplétion : ce qu'on peut donner (avec l'évolution gratuite annoncée), puis chez le destinataire", async () => {
     await ownMany("Machopeur", 2);
     await own("Rattata");
     const mine = payloadOf(await runAutocomplete(pk, { sub: "echange", focused: { name: "je_donne", value: "" } }), "respond");
-    assert.deepEqual(mine.map((choice) => choice.name), ["Machopeur ×1 en trop — évolue en Mackogneur"]);
+    assert.deepEqual(mine.map((choice) => choice.name), ["Machopeur ×1 en trop — évoluera gratuitement en Mackogneur chez l'autre"]);
     const none = payloadOf(await runAutocomplete(pk, { sub: "echange", focused: { name: "je_recois", value: "" } }), "respond");
     assert.match(none[0].name, /Choisis d'abord le dresseur/);
     await ownMany("Roucool", 2, { user: "u2" });
@@ -818,6 +817,25 @@ describe("/pk evolution", () => {
     assert.match(textOf(reply), /Coût[\s\S]*1 \*\*?Rattata|\*\*1\*\* Rattata sacrifié/);
     const ids = reply.components.flatMap((row) => row.toJSON().components.map((button) => button.custom_id));
     assert.deepEqual(ids, [`poke_evo|${species("Rattata").id}|*|random`]);
+  });
+
+  it("un Machopeur reçu en échange : évolution gratuite annoncée, même seul, et le bouton le désigne", async () => {
+    const id = await own("Machopeur");
+    await dbRun(points, "UPDATE pokemon_owned SET origin = 'echange' WHERE id = ?", [id]);
+    const reply = payloadOf(await evolution({ ...evo("Machopeur"), individu: `#${id}` }), "editReply");
+    assert.match(textOf(reply), /Reçu en échange : l'évolution est \*\*gratuite\*\*/);
+    const [button] = reply.components.flatMap((row) => row.toJSON().components);
+    assert.equal(button.label, "Faire évoluer (gratuit)");
+    assert.equal(button.custom_id, `poke_evo|${species("Machopeur").id}|#${id}|random`);
+
+    const choices = payloadOf(await runAutocomplete(pk, { sub: "evolution", options: evo("Machopeur"), focused: { name: "individu", value: "" } }), "respond");
+    assert.deepEqual(choices.map((choice) => choice.value), [`#${id}`], "le dernier de l'espèce se propose, puisque cette évolution est gratuite");
+    const species_ = payloadOf(await runAutocomplete(pk, { sub: "evolution", focused: { name: "espece", value: "" } }), "respond");
+    assert.ok(species_.some((choice) => choice.value === String(species("Machopeur").id)));
+
+    await dbRun(points, "UPDATE pokemon_owned SET origin = 'test' WHERE id = ?", [id]);
+    const paid = payloadOf(await evolution({ ...evo("Machopeur"), individu: `#${id}` }), "editReply");
+    assert.doesNotMatch(textOf(paid), /gratuite/, "jamais échangé : rien de gratuit");
   });
 
   it("avec un individu précis, le bouton le désigne ; verrouillé, l'écran le dit", async () => {

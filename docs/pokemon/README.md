@@ -79,13 +79,14 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
   en reste toujours au moins un de chaque espèce, shiny ou non, et l'autocomplétion ne propose que
   ce qu'on a en trop — `/pk doublons membre` le montre avant de proposer, et `/pk comparer`
   cherche les échanges qui servent aux deux.
-  **Kadabra, Machopeur, Gravalanch et Spectrum évoluent en changeant de dresseur**, comme en
-  première génération : c'est celui qui *reçoit* le Pokémon qui reçoit sa forme évoluée. La
-  proposition l'annonce avant le clic, et un shiny reste shiny en évoluant.
+  **Kadabra, Machopeur, Gravalanch et Spectrum** arrivent tels quels : l'échange ne les fait plus
+  évoluer. Reçus en échange, ils évoluent ensuite **gratuitement** avec `/pk evolution` — ni points ni
+  sacrifice, même si c'est le seul de son espèce (elle quitte alors le Pokédex). Le dresseur choisit
+  donc s'il évolue, et quand. Un Pokémon jamais échangé garde l'évolution payante ordinaire. La
+  proposition l'annonce avant le clic.
 - `/pk comparer [membre] [pokemon] [evolutions]` : cherche les échanges **qui servent aux deux** —
   une espèce contre une espèce, chacune absente du Pokédex de celui qui la reçoit. Réponse privée,
-  page par page. Une espèce se compte telle qu'elle *arrive* : Machopeur devient Mackogneur chez
-  celui qui le reçoit, il ne comble donc que le Mackogneur. Trois usages, selon l'option :
+  page par page. Trois usages, selon l'option :
   - `membre` compare les doublons de deux dresseurs : ce que tu peux donner, ce que l'autre peut
     te donner, et combien d'échanges 1 contre 1 en sortent. Un shiny déverrouillé reste proposé,
     signalé ✨. Deux menus choisissent un côté de l'échange chacun, puis **« Proposer cet

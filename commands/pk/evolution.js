@@ -34,6 +34,11 @@ import {
 } from "../../modules/pokemon/embeds.js";
 
 const pts = (value) => value.toLocaleString("fr-FR");
+// Un individu reçu en échange dont l'espèce évolue à l'échange : son évolution ne
+// coûte rien (describeEvolution), et il peut être le dernier de son espèce.
+const isTradedEvolver = (row) =>
+  row.origin === "echange" &&
+  Boolean(describeEvolution(row.species_id, null, null, { traded: true }).traded);
 // Une espèce absente, avec les mêmes champs que countBySpecies.
 const NO_ENTRY = { total: 0, normal: 0, shiny: 0, free: 0, freeNormal: 0 };
 
@@ -144,7 +149,10 @@ function listEvolvable(userId, cb) {
       for (const speciesId of counts.keys()) {
         const stock = stockOf(counts, speciesId);
         const paths = evolutionPaths(speciesId, stock, helpers);
-        if (paths.length) {
+        // Un Pokémon reçu en échange évolue gratuitement vers sa forme d'échange,
+        // même seul de son espèce : c'est un chemin de plus.
+        const free = rows.some((row) => isTradedEvolver(row));
+        if (paths.length || free) {
           evolvable.push({ speciesId, count: stock.total, shiny: stock.shiny });
           continue;
         }
@@ -211,7 +219,7 @@ export default {
       .addStringOption((option) =>
         option
           .setName("individu")
-          .setDescription("Un Pokémon précis — sinon le bot choisit, jamais un verrouillé")
+          .setDescription("Un Pokémon précis (échangé : évolution d'échange gratuite) — sinon le bot choisit")
           .setRequired(false)
           .setAutocomplete(true)
       ),
@@ -234,7 +242,7 @@ export default {
         const choices = individualChoices(
           rows.filter((row) => row.species_id === species.id),
           query,
-          (row) => !row.last
+          (row) => !row.last || isTradedEvolver(row)
         );
         if (!choices.length) {
           return hint(
@@ -305,7 +313,8 @@ export default {
       const { speciesId, pokemonId } = selector;
       // Une espèce qui n'évolue qu'avec un objet (Onix et le Catalyseur) passe :
       // l'écran proposera l'objet, ou dira qu'il manque.
-      const plan = describeEvolution(speciesId);
+      const traded = Boolean(pokemonId && isTradedEvolver(selector.row));
+      const plan = describeEvolution(speciesId, null, null, { traded });
       if (plan.error && !plan.needs) {
         return interaction.reply({
           content: `❌ ${plan.error}`,
@@ -385,7 +394,15 @@ export default {
           // Le coût de l'évolution ordinaire n'a sa place que si elle est
           // proposée : au-dessus d'un unique bouton « Pierre Feu → Pyroli
           // (gratuit) », annoncer « 1 sacrifice et 2000 points » se contredit.
-          if (canPay(plan, stock)) {
+          if (canPay(plan, stock) && plan.traded) {
+            embed.addFields({
+              name: "Coût",
+              value:
+                "🔁 Reçu en échange : l'évolution est **gratuite**, sans sacrifice ni points, " +
+                `même si c'est ton seul ${species.name}.`,
+              inline: false,
+            });
+          } else if (canPay(plan, stock)) {
             const sacrifices = plan.sacrifices;
             embed.addFields({
               name: "Coût",
@@ -423,7 +440,7 @@ export default {
             normale.addComponents(
               new ButtonBuilder()
                 .setCustomId(`poke_evo|${speciesId}|${suffix}|random`)
-                .setLabel(`Faire évoluer (${pts(plan.points)} pts)`)
+                .setLabel(plan.traded ? "Faire évoluer (gratuit)" : `Faire évoluer (${pts(plan.points)} pts)`)
                 .setEmoji("✨")
                 .setStyle(ButtonStyle.Success)
             );

@@ -862,17 +862,14 @@ export function comparePage(match, page) {
 
 // Une ligne de ce qu'un dresseur peut céder : le numéro et le nom, combien
 // peuvent partir, ✨ si un shiny en fait partie — un shiny déverrouillé reste
-// proposé, c'est le seul signal qu'il y en a un — et l'espèce qui arrivera si
-// elle change en changeant de dresseur.
+// proposé, c'est le seul signal qu'il y en a un.
 function tradeOfferLine(entry) {
   const species = getSpecies(entry.speciesId);
-  const arrival = entry.arrivalId === entry.speciesId ? null : getSpecies(entry.arrivalId);
   const shiny = entry.free - entry.freeNormal;
   return (
     `\`${species ? dexNumber(species) : `#${entry.speciesId}`}\` **${species?.name ?? "?"}**` +
     (entry.spare > 1 ? ` ×${fr(entry.spare)}` : "") +
-    (shiny > 0 ? ` ✨${shiny > 1 ? fr(shiny) : ""}` : "") +
-    (arrival ? ` · arrive en **${arrival.name}**` : "")
+    (shiny > 0 ? ` ✨${shiny > 1 ? fr(shiny) : ""}` : "")
   );
 }
 
@@ -947,12 +944,10 @@ function compareMenu(id, placeholder, list, chosen) {
       .addOptions(
         list.map((entry) => {
           const species = getSpecies(entry.speciesId);
-          const arrival = entry.arrivalId === entry.speciesId ? null : getSpecies(entry.arrivalId);
           const shiny = entry.free - entry.freeNormal;
           const details = [
             `${fr(entry.spare)} peu${plural(entry.spare, "t", "vent")} partir`,
             shiny > 0 ? "✨" : null,
-            arrival ? `arrive en ${arrival.name}` : null,
           ].filter(Boolean);
           return new StringSelectMenuOptionBuilder()
             .setLabel(species?.name ?? `#${entry.speciesId}`)
@@ -1066,16 +1061,15 @@ export function buildNeedersEmbed(species, offer, list, { page = 0, reserve = tr
     .setTitle(`\u{1F4E5} Qui a besoin de ${species.name}`)
     .setColor(embedColor(species, false))
     .setThumbnail(spriteUrl(species, false));
-  const arrival = offer.arrivalId === species.id ? null : getSpecies(offer.arrivalId);
   const shiny = offer.free - offer.freeNormal;
   const intro =
     `Tu peux donner **${fr(offer.spare)}** ${species.name}${shiny > 0 ? " ✨" : ""}. Voici ceux à qui ` +
-    (arrival ? `**${arrival.name}** manque : ${species.name} y arrive sous cette forme.` : "il manque.") +
+    "il manque." +
     (shiny > 0 ? "\n✨ : un shiny fait partie de ceux qui peuvent partir." : "");
   const note = reserve ? `\n\n${COMPARE_RESERVE_NOTE}` : "";
   if (!list.length) {
     return embed.setDescription(
-      `${intro}${note}\n\n*Tout le monde a déjà ${arrival ? arrival.name : `un ${species.name}`}.*`
+      `${intro}${note}\n\n*Tout le monde a déjà un ${species.name}.*`
     );
   }
   const lines = list.slice(start, end).map(
@@ -1250,25 +1244,19 @@ const TRADE_STATUS = {
   },
 };
 
-// Ce que l'échange va transformer, ou vient de transformer. La ligne se
-// recalcule à chaque rendu depuis les seules espèces de l'offre : l'embed reste
-// juste après un redémarrage du bot, là où un résultat mémorisé aurait disparu.
-//
-// Elle apparaît aussi AVANT l'acceptation : à la réflexion c'est là qu'elle sert
-// le plus, puisque personne ne devrait découvrir après coup que le Machopeur
-// qu'il vient de céder arrive chez l'autre en Mackogneur.
-function tradeEvolutionLines(trade, done) {
+// L'échange ne fait plus évoluer : celui qui reçoit Kadabra, Machopeur, Gravalanch
+// ou Spectrum le garde tel quel, et peut le faire évoluer ensuite sans payer.
+// La ligne se recalcule à chaque rendu depuis les seules espèces de l'offre :
+// l'embed reste juste après un redémarrage du bot.
+function tradeEvolutionLines(trade) {
   const lines = [];
   const add = (speciesId, isShiny, receiverId) => {
     const source = getSpecies(speciesId);
     const target = tradeEvolutionTarget(source);
     if (!target) return;
-    const from = displayName(source, isShiny);
-    const to = displayName(target, isShiny);
     lines.push(
-      done
-        ? `**${from}** est devenu **${to}** chez <@${receiverId}>.`
-        : `**${from}** deviendra **${to}** chez <@${receiverId}>.`
+      `**${displayName(source, isShiny)}** pourra évoluer gratuitement en ` +
+        `**${displayName(target, isShiny)}** chez <@${receiverId}>, avec /pk evolution.`
     );
   };
   add(trade.offer_species_id, trade.offer_is_shiny, trade.to_user_id);
@@ -1303,14 +1291,13 @@ export function buildTradeEmbed(trade, status = "PENDING") {
 
   if (style.note) embed.addFields({ name: "Raison", value: style.note });
 
-  // Une offre refusée, annulée ou expirée n'a rien fait évoluer du tout : on ne
-  // promet une transformation que tant qu'elle peut encore arriver, et on ne la
-  // raconte au passé que si elle a eu lieu.
+  // Une offre refusée, annulée ou expirée n'a rien donné : on ne promet une
+  // évolution que tant que l'échange peut avoir lieu, ou qu'il a eu lieu.
   if (status === "PENDING" || status === "ACCEPTED") {
-    const lines = tradeEvolutionLines(trade, status === "ACCEPTED");
+    const lines = tradeEvolutionLines(trade);
     if (lines.length) {
       embed.addFields({
-        name: "Évolution par échange",
+        name: "Évolution gratuite",
         value: lines.join("\n"),
       });
     }

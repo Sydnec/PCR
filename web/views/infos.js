@@ -212,7 +212,7 @@ function tradeAndSale(rules) {
     rule(
       `Une offre d'échange expire après **${fmt(rules.trade.expiryHours)} h**.` +
         (rules.trade.evolutions.length
-          ? ` Évoluent en changeant de dresseur : ${rules.trade.evolutions
+          ? ` Reçus en échange, ils évoluent gratuitement (/pk evolution) : ${rules.trade.evolutions
               .map((entry) => `${entry.from} → ${entry.to}`)
               .join(", ")}.`
           : "")
