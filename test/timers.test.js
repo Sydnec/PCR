@@ -187,13 +187,23 @@ describe("le parc safari (minuteur horaire)", () => {
 });
 
 describe("le pot commun et les autres minuteurs ne propagent jamais une erreur", () => {
-  it("un serveur injoignable est journalisé, le minuteur reste vivant", async () => {
+  const nextAt = async () => (await dbGet(points, "SELECT next_redistribution_at AS at FROM economy_state WHERE id = 1")).at;
+
+  it("un serveur injoignable est journalisé, l'échéance n'est pas consommée, le minuteur reste vivant", async () => {
     sandbox.writeConfig({ pokemon: GEN1.pokemon, redistribution: { enabled: true, intervalHours: 1 } });
     const bot = await loadBot();
-    await quiet(async () => {
+    const due = Date.now() - 1000;
+    await dbRun(points, "UPDATE economy_state SET next_redistribution_at = ? WHERE id = 1", [due]);
+    const logged = [];
+    const original = console.error;
+    console.error = (...args) => logged.push(args.join(" "));
+    try {
       await bot.handleRedistributionOnTimer();
-      await bot.handleRedistributionOnTimer();
-    });
+    } finally {
+      console.error = original;
+    }
+    assert.ok(logged.some((line) => line.includes("serveur introuvable")), "l'échec est journalisé");
+    assert.equal(await nextAt(), due, "le pot de la semaine n'est pas brûlé sur un hoquet de Discord");
   });
 
   it("les minuteurs du jeu s'exécutent à vide sans rien casser", async () => {

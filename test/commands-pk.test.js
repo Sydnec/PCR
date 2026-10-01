@@ -408,11 +408,19 @@ describe("/pk revendre", () => {
     assert.equal(await balance(), 0);
   });
 
-  it("un individu précis, shiny compris, se choisit un par un", async () => {
-    await own("Rattata", { obtained: 1 });
-    const shiny = await own("Rattata", { shiny: 1, obtained: 2 });
-    const reply = payloadOf(await sellPokemon({ espece: String(species("Rattata").id), individu: `#${shiny}` }), "editReply").content;
-    assert.match(reply, /^✅|^❌/);
+  it("un individu précis se choisit un par un ; un shiny ne se revend pas, et le refus le dit", async () => {
+    const normal = await own("Rattata", { obtained: 1 });
+    const spare = await own("Rattata", { obtained: 2 });
+    const shiny = await own("Rattata", { shiny: 1, obtained: 3 });
+    const refused = payloadOf(await sellPokemon({ espece: String(species("Rattata").id), individu: `#${shiny}` }), "editReply").content;
+    assert.match(refused, /^❌ /);
+    assert.equal((await dbAll(points, "SELECT id FROM pokemon_owned")).length, 3, "le shiny reste dans la boîte");
+    assert.equal(await balance(), 0);
+
+    const sold = payloadOf(await sellPokemon({ espece: String(species("Rattata").id), individu: `#${spare}` }), "editReply").content;
+    assert.match(sold, /^✅ Tu revends \*\*1× Rattata/);
+    assert.deepEqual((await dbAll(points, "SELECT id FROM pokemon_owned ORDER BY id")).map((row) => row.id), [normal, shiny]);
+    assert.ok((await balance()) > 0);
   });
 
   it("la proposition « rien à revendre » n'est pas une saisie : refus avant de différer", async () => {
