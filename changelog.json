@@ -2094,6 +2094,16 @@
       "commit": "pending",
       "timestamp": "2026-10-01T06:38:53.000Z",
       "branch": "claude/vibrant-brown-s7suxt"
+    },
+    {
+      "type": "enhancement",
+      "name": "Site : la lignée sur la page du parc safari",
+      "description": "La page du parc safari du site montre maintenant la lignée évolutive du Pokémon rencontré et ce que tu en possèdes, comme sur Discord.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-01T06:39:50.000Z",
+      "branch": "claude/vibrant-brown-s7suxt"
     }
   ]
 }
