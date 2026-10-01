@@ -2171,6 +2171,16 @@
       "commit": "pending",
       "timestamp": "2026-10-01T15:26:17.000Z",
       "branch": "claude/vibrant-brown-s7suxt"
+    },
+    {
+      "type": "enhancement",
+      "name": "/pk comparer : n'importe quel Pokémon",
+      "description": "L'option pokemon de /pk comparer accepte toutes les espèces, pas seulement tes doublons : elle dit à qui le Pokémon manque.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-01T16:46:46.000Z",
+      "branch": "claude/vibrant-brown-s7suxt"
     }
   ]
 }

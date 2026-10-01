@@ -626,8 +626,9 @@ describe("la comparaison de /pk comparer", () => {
     assert.match(await description(`poke_cmpt|0|0|next`), new RegExp(`<@${b}>`));
     assert.match(await description(`poke_cmpt|1|0|next`), /Tu n'as aucun doublon à offrir pour l'instant/, "tout est mis de côté : c'est toi qui n'as rien à donner");
     assert.match(await description(`poke_cmpn|${rata()}|0|0|next`), new RegExp(`<@${b}>`));
-    const hidden = only(await click(`poke_cmpn|${rata()}|1|0|next`, { user: a }), "update");
-    assert.match(hidden.content, /Tu n'as plus de \*\*Rattata\*\* à donner/);
+    const hidden = embedOf(only(await click(`poke_cmpn|${rata()}|1|0|next`, { user: a }), "update"));
+    assert.match(hidden.description, /Tu n'en as pas en trop à leur donner/, "mis de côté : rien à donner, mais la liste reste lisible");
+    assert.match(hidden.description, new RegExp(`<@${b}>`));
   });
 
   it("un dresseur parti du serveur se compare quand même : sa collection est toujours là", async () => {
@@ -842,10 +843,9 @@ describe("la comparaison de /pk comparer", () => {
     assert.equal(unknown.flags, EPHEMERAL);
 
     await dbRun(points, "DELETE FROM pokemon_owned WHERE user_id = ?", [a]);
-    await own("Rattata", a);
-    const gone = only(await click(`poke_cmpn|${rata()}|0|0|next`, { user: a }), "update");
-    assert.equal(gone.content, "❌ Tu n'as plus de **Rattata** à donner : relance /pk comparer.");
-    assert.deepEqual(gone.components, []);
+    const unowned = embedOf(only(await click(`poke_cmpn|${rata()}|0|0|next`, { user: a }), "update"));
+    assert.match(unowned.description, new RegExp(`<@${b}>`), "une espèce qu'on ne possède plus se cherche encore");
+    assert.doesNotMatch(unowned.description, /en retour/);
   });
 });
 

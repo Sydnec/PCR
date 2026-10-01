@@ -741,56 +741,27 @@ describe("/pk comparer", () => {
     assert.deepEqual(idsOf(reply)[1], `poke_cmpn_noop|${species("Rattata").id}`);
   });
 
-  it("une espèce qu'on ne peut pas donner : le refus dit pourquoi, avec les chiffres", async () => {
-    const run = async (options = {}) => payloadOf(await compare({ pokemon: String(species("Rattata").id), ...options }), "editReply").content;
-    assert.match(await run(), /^❌ Tu n'as pas de \*\*Rattata\*\* à donner/);
-    await own("Rattata");
-    assert.match(await run(), /Tu n'as qu'un \*\*Rattata\*\* : il t'en faut au moins 2/);
-    await dbRun(points, "DELETE FROM pokemon_owned");
-    await ownMany("Rattata", 3, { locked: 1 });
-    assert.match(await run(), /Tes \*\*3\*\* Rattata sont verrouillés 🛡️ : déverrouille-en un avec \/pk verrou/);
-    await dbRun(points, "DELETE FROM pokemon_owned");
-    await ownMany("Rattata", 3);
-    assert.match(await run(), /Tes \*\*2\*\* Rattata en trop sont mis de côté 🧬.*`evolutions: False`/);
-    const text = textOf(payloadOf(await compare({ pokemon: String(species("Rattata").id), evolutions: false }), "editReply"));
-    assert.match(text, /Qui a besoin de Rattata/, "sans la réserve, il se propose");
+  it("n'importe quelle espèce se cherche, possédée ou non : à qui elle manque, sans ce que chacun donnerait en retour", async () => {
+    await ownMany("Chenipan", 2, { user: "n-a" });
+    await own("Rattata", { user: "n-b" });
+    const calls = await compare({ pokemon: String(species("Rattata").id), evolutions: false });
+    const text = textOf(payloadOf(calls, "editReply"));
+    assert.match(text, /Qui a besoin de Rattata/);
+    assert.match(text, /Tu n'en as pas en trop à leur donner/);
+    assert.match(text, /<@n-a>/);
+    assert.doesNotMatch(text, /<@n-b>/, "il en a déjà un");
+    assert.doesNotMatch(text, /en retour/, "sans doublon à donner, « en retour » n'a pas de sens");
+    assert.doesNotMatch(text, /^❌/);
   });
 
-  it("l'autocomplétion ne propose que ce qu'on peut donner ; vide, elle l'explique", async () => {
-    const empty = payloadOf(await runAutocomplete(pk, { sub: "comparer", focused: { name: "pokemon", value: "" } }), "respond");
-    assert.deepEqual(empty, [{ name: "Aucun doublon à offrir : ils servent peut-être à tes évolutions", value: "—" }]);
-    await ownMany("Ronflex", 3);
-    await ownMany("Rattata", 3);
-    await own("Roucool");
-    const choices = payloadOf(await runAutocomplete(pk, { sub: "comparer", focused: { name: "pokemon", value: "" } }), "respond");
-    assert.deepEqual(choices, [{ name: "Ronflex ×2 en trop", value: String(species("Ronflex").id) }], "les Rattata servent à évoluer, Roucool n'a pas de doublon");
-    const raw = payloadOf(await runAutocomplete(pk, { sub: "comparer", options: { evolutions: false }, focused: { name: "pokemon", value: "ratt" } }), "respond");
-    assert.deepEqual(raw.map((choice) => choice.name), ["Rattata ×2 en trop"], "la saisie filtre, et la réserve se désactive");
-    const none = payloadOf(await runAutocomplete(pk, { sub: "comparer", options: { evolutions: false }, focused: { name: "pokemon", value: "zzz" } }), "respond");
-    assert.deepEqual(none, [{ name: "Aucun de tes doublons ne correspond à « zzz »", value: "—" }], "il y a des doublons : c'est la saisie qui ne retient rien");
-    await dbRun(points, "DELETE FROM pokemon_owned");
-    const nothing = payloadOf(await runAutocomplete(pk, { sub: "comparer", options: { evolutions: false }, focused: { name: "pokemon", value: "zzz" } }), "respond");
-    assert.deepEqual(nothing, [{ name: "Tu n'as aucun doublon à offrir", value: "—" }]);
+  it("l'autocomplétion propose toutes les espèces, sans regarder ses doublons : accents et casse ignorés", async () => {
+    const all = payloadOf(await runAutocomplete(pk, { sub: "comparer", focused: { name: "pokemon", value: "" } }), "respond");
+    assert.equal(all.length, 25, "aucun doublon, aucune collection : la liste est quand même pleine");
+    const typed = async (value) => payloadOf(await runAutocomplete(pk, { sub: "comparer", focused: { name: "pokemon", value } }), "respond");
+    assert.deepEqual(await typed("salameche"), [{ name: `#004 Salamèche`, value: String(species("Salamèche").id) }]);
+    assert.deepEqual(await typed("zzzzzz"), [{ name: "Aucune espèce ne correspond", value: "—" }]);
   });
 
-  it("l'autocomplétion cherche comme les autres : sans accents ni casse", async () => {
-    await ownMany("Salamèche", 2);
-    const typed = async (value) => payloadOf(await runAutocomplete(pk, { sub: "comparer", options: { evolutions: false }, focused: { name: "pokemon", value } }), "respond");
-    assert.deepEqual((await typed("salameche")).map((choice) => choice.name), ["Salamèche ×1 en trop"]);
-    assert.deepEqual((await typed("SALAM")).map((choice) => choice.value), [String(species("Salamèche").id)]);
-  });
-
-  it("les chiffres des refus se lisent à la française", async () => {
-    await dbRun(
-      points,
-      `WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 1200)
-       INSERT INTO pokemon_owned (user_id, species_id, is_shiny, sex, origin, obtained_at, locked)
-       SELECT 'u1', ?, 0, 'M', 'test', i, 1 FROM n`,
-      [species("Rattata").id]
-    );
-    const text = payloadOf(await compare({ pokemon: String(species("Rattata").id), evolutions: false }), "editReply").content;
-    assert.match(text, /Tes \*\*1\u202f200\*\* Rattata sont verrouillés/);
-  });
 });
 
 describe("/pk echange", () => {

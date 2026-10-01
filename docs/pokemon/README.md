@@ -102,8 +102,9 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
     offre identique encore ouverte n'est pas republiée (« tu as déjà proposé cet échange »), et une
     offre que le salon n'a pas pu publier est annulée plutôt que laissée sans message.
   - sans option : **avec qui échanger**, le dresseur qui permet le plus d'échanges d'abord.
-  - `pokemon` (un de tes doublons) : **à qui il manque**, avec ce que chacun peut te donner en
-    retour — un échange passe avant un cadeau.
+  - `pokemon` (n'importe quelle espèce, possédée ou non) : **à qui elle manque**. Si tu en as un
+    en trop, chacun est accompagné de ce qu'il peut te donner en retour — un échange passe avant un
+    cadeau ; sinon, la liste dit seulement qui n'en a pas.
   - Dans les trois cas, `evolutions` (actif par défaut) met de côté, de chaque côté, ce qu'il faut
     pour les évolutions qui manquent au Pokédex (voir `/pk doublons`). Ces Pokémon restent
     échangeables avec `/pk echange`.

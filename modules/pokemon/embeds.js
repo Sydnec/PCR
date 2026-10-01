@@ -1068,11 +1068,15 @@ export function buildNeedersEmbed(species, offer, list, { page = 0, reserve = tr
     .setTitle(`\u{1F4E5} Qui a besoin de ${species.name}`)
     .setColor(embedColor(species, false))
     .setThumbnail(spriteUrl(species, false));
-  const shiny = offer.free - offer.freeNormal;
-  const intro =
-    `Tu peux donner **${fr(offer.spare)}** ${species.name}${shiny > 0 ? " ✨" : ""}. Voici ceux à qui ` +
-    "il manque." +
-    (shiny > 0 ? "\n✨ : un shiny fait partie de ceux qui peuvent partir." : "");
+  // Sans doublon à donner (`offer` null), la liste dit seulement à qui l'espèce
+  // manque : « en retour » n'aurait pas de sens.
+  const shiny = offer ? offer.free - offer.freeNormal : 0;
+  const intro = offer
+    ? `Tu peux donner **${fr(offer.spare)}** ${species.name}${shiny > 0 ? " ✨" : ""}. Voici ceux à qui ` +
+      "il manque." +
+      (shiny > 0 ? "\n✨ : un shiny fait partie de ceux qui peuvent partir." : "")
+    : `Voici ceux à qui il manque un ${species.name}. Tu n'en as pas en trop à leur donner : ` +
+      "un échange suppose d'avoir un doublon.";
   const note = reserve ? `\n\n${COMPARE_RESERVE_NOTE}` : "";
   if (!list.length) {
     return embed.setDescription(
@@ -1081,10 +1085,12 @@ export function buildNeedersEmbed(species, offer, list, { page = 0, reserve = tr
   }
   const lines = list.slice(start, end).map(
     (entry) =>
-      `<@${entry.userId}> · ` +
-      (entry.back
-        ? `peut te donner **${fr(entry.back)}** espèce${plural(entry.back, "", "s")} en retour`
-        : "rien à te donner en retour")
+      `<@${entry.userId}> ` +
+      (entry.back === null
+        ? ""
+        : entry.back
+          ? `· peut te donner **${fr(entry.back)}** espèce${plural(entry.back, "", "s")} en retour`
+          : "· rien à te donner en retour")
   );
   return embed
     .setDescription(`${intro}${note}\n\n${lines.join("\n")}`)

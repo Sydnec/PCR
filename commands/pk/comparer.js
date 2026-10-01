@@ -1,29 +1,25 @@
 import { MessageFlags } from "discord.js";
 import { handleException } from "../../modules/utils.js";
 import {
-  countBySpecies,
-  getIndividuals,
   getSpeciesNeeders,
   getTradeMatches,
   getTradePartners,
-  listDuplicates,
 } from "../../modules/pokemon/collection.js";
-import { getAvailableSpecies, getSpecies, searchByName } from "../../modules/pokemon/data.js";
+import { getAvailableSpecies, searchByName } from "../../modules/pokemon/data.js";
 import {
   buildCompareView,
   buildNeedersEmbed,
   buildNeedersRow,
   buildPartnersEmbed,
   buildPartnersRow,
+  dexNumber,
   respondHint as hint,
 } from "../../modules/pokemon/embeds.js";
-
-const fr = (value) => value.toLocaleString("fr-FR");
 
 // Les échanges qui servent aux deux : une espèce contre une espèce, chacune
 // absente du Pokédex de celui qui la reçoit. Trois questions, selon l'option :
 // ce que deux dresseurs peuvent s'échanger (membre), avec qui échanger
-// (rien), à qui manque ce qu'on peut donner (pokemon). La première propose
+// (rien), à qui manque une espèce, possédée ou non (pokemon). La première propose
 // l'échange d'un bouton, par le même chemin que /pk echange. Réponse privée,
 // comme les doublons : elle ne concerne que celui qui la consulte.
 export default {
@@ -40,7 +36,7 @@ export default {
       .addStringOption((option) =>
         option
           .setName("pokemon")
-          .setDescription("Un de tes doublons : les dresseurs à qui il manque")
+          .setDescription("Une espèce : les dresseurs à qui elle manque")
           .setRequired(false)
           .setAutocomplete(true)
       )
@@ -51,42 +47,15 @@ export default {
           .setRequired(false)
       ),
 
-  // Ce qu'on peut donner, avec la réserve d'évolution demandée : une espèce
-  // qu'on ne proposerait pas ne sert à rien d'autocompléter. Le choix de l'option
-  // `evolutions` se lit tel que Discord l'envoie, valeur brute.
+  // L'option `pokemon` s'autocomplète sur toutes les espèces ouvertes, comme
+  // /pk doublons : on cherche à qui manque n'importe quel Pokémon, qu'on le possède
+  // ou non. Une seule définition du « contient », celle de la recherche par nom.
   async autocomplete(interaction) {
-    const reserve = interaction.options.get("evolutions")?.value ?? true;
-    getIndividuals(interaction.user.id, (err, rows) => {
-      if (err) {
-        handleException("Autocomplétion de /pk comparer :", err);
-        return interaction.respond([]).catch(() => {});
-      }
-      const duplicates = listDuplicates(rows, { reserve });
-      // Le « contient » de la recherche par nom, accents et casse compris : une
-      // seule définition, celle de toutes les autres autocomplétions d'espèces.
-      const query = String(interaction.options.getFocused() ?? "");
-      const matching = new Set(searchByName(query, Infinity).map((species) => species.id));
-      const choices = duplicates
-        .filter((entry) => matching.has(entry.speciesId))
-        .map((entry) => {
-          const species = getSpecies(entry.speciesId);
-          return species && { name: `${species.name} ×${fr(entry.spare)} en trop`, value: String(species.id) };
-        })
-        .filter(Boolean)
-        .slice(0, 25);
-      if (choices.length) return interaction.respond(choices).catch(() => {});
-      // Une liste vide est indiscernable d'une commande cassée : on dit pourquoi, et
-      // on ne prétend pas qu'il n'y a aucun doublon quand c'est la saisie qui ne
-      // retient rien.
-      hint(
-        interaction,
-        duplicates.length
-          ? `Aucun de tes doublons ne correspond à « ${query} »`.slice(0, 100)
-          : reserve
-            ? "Aucun doublon à offrir : ils servent peut-être à tes évolutions"
-            : "Tu n'as aucun doublon à offrir"
-      );
-    });
+    const matches = searchByName(interaction.options.getFocused(), 25);
+    if (!matches.length) return hint(interaction, "Aucune espèce ne correspond");
+    await interaction
+      .respond(matches.map((species) => ({ name: `${dexNumber(species)} ${species.name}`, value: String(species.id) })))
+      .catch(() => {});
   },
 
   async execute(interaction) {
@@ -133,7 +102,6 @@ export default {
       if (species) {
         return getSpeciesNeeders(interaction.user.id, species.id, { reserve }, (err, found) => {
           if (err) return fail("Lecture de ceux qui ont besoin d'une espèce :", err);
-          if (!found.offer) return explainNoOffer(interaction, species, reserve);
           interaction
             .editReply({
               embeds: [buildNeedersEmbed(species, found.offer, found.list, { reserve })],
@@ -157,39 +125,3 @@ export default {
     }
   },
 };
-
-// L'espèce choisie ne peut pas être proposée : le refus dit pourquoi, avec les
-// chiffres, plutôt que de répondre par une liste vide qu'on prendrait pour « tout
-// le monde l'a déjà ».
-function explainNoOffer(interaction, species, reserve) {
-  getIndividuals(interaction.user.id, (err, rows) => {
-    if (err) {
-      handleException("Lecture des doublons d'une espèce :", err);
-      return interaction
-        .editReply({ content: "❌ Impossible de lire tes doublons." })
-        .catch(() => {});
-    }
-    const counts = countBySpecies(rows).get(species.id);
-    const inDuplicates = (options) =>
-      listDuplicates(rows, options).some((entry) => entry.speciesId === species.id);
-    let content;
-    if (!counts) {
-      content = `❌ Tu n'as pas de **${species.name}** à donner.`;
-    } else if (counts.total === 1) {
-      content =
-        `❌ Tu n'as qu'un **${species.name}** : il t'en faut au moins 2 pour en donner un, ` +
-        "il reste toujours un Pokémon de chaque espèce.";
-    } else if (counts.free === 0) {
-      content =
-        `❌ Tes **${fr(counts.total)}** ${species.name} sont verrouillés 🛡️ : déverrouille-en un avec ` +
-        "/pk verrou pour le proposer.";
-    } else if (reserve && inDuplicates({ reserve: false })) {
-      content =
-        `❌ Tes **${fr(counts.spare)}** ${species.name} en trop sont mis de côté 🧬 pour les évolutions ` +
-        "qui manquent à ton Pokédex : ajoute `evolutions: False` pour les proposer quand même.";
-    } else {
-      content = `❌ **${species.name}** ne peut pas être proposé pour l'instant.`;
-    }
-    interaction.editReply({ content }).catch(() => {});
-  });
-}
