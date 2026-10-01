@@ -9,7 +9,9 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const year = new Date().getFullYear();
-const dbPath = path.join(__dirname, `../botdata-${year}.db`);
+// PCR_DATA_DIR : les tests travaillent dans un dossier jetable (voir points-db.js).
+const dataDir = process.env.PCR_DATA_DIR ?? path.join(__dirname, "..");
+const dbPath = path.join(dataDir, `botdata-${year}.db`);
 
 // Initialisation de la base de données SQLite
 const db = new sqlite3.Database(dbPath, (err) => {

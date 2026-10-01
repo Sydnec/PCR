@@ -6,7 +6,10 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 // Persistent DB for points (does not reset yearly)
-const dbPath = path.join(__dirname, "../points.db");
+// PCR_DATA_DIR déplace les bases (et config.json) hors du dépôt : les tests y
+// posent des fichiers jetables, jamais les vraies données.
+const dataDir = process.env.PCR_DATA_DIR ?? path.join(__dirname, "..");
+const dbPath = path.join(dataDir, "points.db");
 
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
