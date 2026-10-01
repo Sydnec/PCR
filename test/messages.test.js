@@ -450,7 +450,7 @@ describe("le bouton « Traduire »", () => {
     const description = (await click("tweet_translate|42"))[1].payload.embeds[0].toJSON().description;
     assert.ok(description.length <= 4096);
     assert.ok(description.endsWith("…"));
-    assert.ok(!description.includes("https://exemple.fr/un-long"), "le lien entamé est retiré en entier");
+    assert.doesNotMatch(description, /https?:\/\//, "le lien entamé est retiré en entier, pas laissé à moitié");
   });
 
   it("dit pourquoi il n'y a rien : tweet illisible, déjà en français, rien à traduire, API muette", async () => {
