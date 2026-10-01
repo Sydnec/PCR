@@ -10,6 +10,12 @@
   suivant. Un délai plancher après capture est disponible (`minDelayAfterEndMinutes`, à 0 par défaut)
   si l'enchaînement devient trop rapide. **Un légendaire fait exception** : les messages ne le
   chassent jamais, seuls sa durée de vie ou une capture le retirent.
+- **Les générations récentes sortent plus souvent.** Le poids d'une espèce est multiplié par
+  `spawn.generationBoost` (2 par défaut) pour chaque génération qu'elle compte après la 1ʳᵉ : ×1 en
+  1ʳᵉ, ×2 en 2ᵉ, ×4 en 3ᵉ. À l'ouverture de la 2ᵉ, chacune de ses espèces apparaît donc deux fois
+  plus qu'une de la 1ʳᵉ au même stade, et la 2ᵉ pèse environ 53 % des apparitions au lieu de 36 %.
+  `/admin poids` donne le détail par génération. Le parc safari n'a pas ce facteur : on y choisit sa
+  génération.
 - **Fuite autonome** : chaque apparition reçoit une durée de vie tirée au hasard entre 45 minutes et 1 h 30
   (`fleeAfterMinutes`). Passé ce délai, un Pokémon que personne n'a capturé s'enfuit de lui-même,
   sans dépendre de l'activité du serveur — un salon silencieux ne reste donc jamais figé sur le même

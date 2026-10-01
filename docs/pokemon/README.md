@@ -142,6 +142,9 @@ prennent en compte immédiatement. Ce qu'elle change :
   lequel ils n'évoluent pas). Ces trois objets entrent dans les mains des Pokémon et dans la loterie
   à l'ouverture (voir [Objets](objets.md#objets-dévolution)). Ces formes n'apparaissent jamais à
   l'état sauvage (🔒).
+- **Les nouvelles espèces sortent plus souvent** : deux fois plus qu'une espèce de la 1ʳᵉ génération
+  au même stade (`spawn.generationBoost`, voir [Capture & Pokédex](capture.md)), aux apparitions du
+  salon seulement.
 - **Le parc safari demande quelles générations on vise** (voir [Parc Safari](safari.md)).
 - **Six légendaires** de plus : Raikou, Entei, Suicune, Lugia, Ho-Oh et Celebi.
 - **Zarbi et ses 26 lettres** : une seule entrée de Pokédex, mais chaque Zarbi porte la sienne,
