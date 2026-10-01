@@ -445,6 +445,96 @@ describe("évolutions", () => {
     assert.equal(left.filter((row) => row.species_id === species("Pikachu").id).length, 1);
     assert.ok(left.some((row) => row.species_id === species("Pichu").id), "il reste toujours un Pichu");
   });
+
+  describe("les formes qu'un objet est seul à donner, de bout en bout", () => {
+    const give = (name, count = 3) =>
+      Promise.all(
+        Array.from({ length: count }, (_, index) =>
+          dbRun(points, "INSERT INTO pokemon_owned (user_id, species_id, is_shiny, sex, origin, obtained_at) VALUES ('u1', ?, 0, 'M', 'test', ?)", [species(name).id, index + 1])
+        )
+      ).then((results) => results.map((result) => result.lastID));
+    const stock = (key) => call(items.getItemCount, "u1", key);
+    const grant = (key, quantity) => call(items.grantItem, "u1", key, quantity, { source: "test" });
+    const run = (name, id, helper = null, chosen = null) =>
+      new Promise((resolve, reject) =>
+        collection.evolve("u1", { speciesId: species(name).id, isShiny: null, pokemonId: id }, chosen, helper, (error, value) => (error ? reject(error) : resolve(value)))
+      );
+
+    beforeEach(async () => {
+      for (const table of ["pokemon_owned", "points", "pokemon_inventory", "pokemon_item_log"]) await dbRun(points, `DELETE FROM ${table}`);
+      await dbRun(points, "INSERT INTO points (user_id, balance) VALUES ('u1', 10000)");
+    });
+
+    it("la Pierre Soleil fait d'un Ortide un Joliflor, et elle est consommée", async () => {
+      const ids = await give("Ortide", 2);
+      await grant("pierre_soleil", 2);
+      const result = await run("Ortide", ids[1], "pierre_soleil");
+      assert.equal(result.ok, true, result.reason);
+      assert.equal(result.target.name, "Joliflor");
+      assert.equal(await stock("pierre_soleil"), 1);
+    });
+
+    it("sans elle, Ortide devient Rafflesia : la forme à objet n'est jamais tirée", async () => {
+      const outcomes = new Set();
+      for (const value of [0, 0.5, 0.99]) {
+        await dbRun(points, "DELETE FROM pokemon_owned");
+        const ids = await give("Ortide", 3);
+        const result = await withRandom(value, async () => run("Ortide", ids[2]));
+        assert.equal(result.ok, true, result.reason);
+        outcomes.add(result.target.name);
+      }
+      assert.deepEqual([...outcomes], ["Rafflesia"]);
+    });
+
+    it("Onix sans Catalyseur n'évolue pas, et rien ne lui est retiré", async () => {
+      const ids = await give("Onix", 3);
+      const result = await run("Onix", ids[2]);
+      assert.equal(result.ok, false);
+      assert.match(result.reason, /n'évolue qu'avec \*\*Catalyseur\*\*/);
+      assert.equal((await dbAll(points, "SELECT id FROM pokemon_owned")).length, 3);
+    });
+
+    it("le Catalyseur donne Steelix, et l'échange ne le donne pas", async () => {
+      const ids = await give("Onix", 2);
+      await grant("catalyseur", 1);
+      const result = await run("Onix", ids[1], "catalyseur");
+      assert.equal(result.ok, true, result.reason);
+      assert.equal(result.target.name, "Steelix");
+
+      await dbRun(points, "DELETE FROM pokemon_owned");
+      const mine = await give("Onix", 2);
+      const theirs = await dbRun(points, "INSERT INTO pokemon_owned (user_id, species_id, is_shiny, sex, origin, obtained_at) VALUES ('u2', ?, 0, 'M', 'test', 1)", [species("Roucool").id]);
+      await dbRun(points, "INSERT INTO pokemon_owned (user_id, species_id, is_shiny, sex, origin, obtained_at) VALUES ('u2', ?, 0, 'M', 'test', 2)", [species("Roucool").id]);
+      const tradeId = await call(collection.createTrade, {
+        fromUserId: "u1", toUserId: "u2", offerSpeciesId: species("Onix").id, requestSpeciesId: species("Roucool").id, offerPokemonId: mine[0], requestPokemonId: theirs.lastID, channelId: "x",
+      });
+      const trade = await new Promise((resolve, reject) => collection.acceptTrade(tradeId, (error, value) => (error ? reject(error) : resolve(value))));
+      assert.equal(trade.ok, true, trade.reason);
+      assert.deepEqual(trade.evolutions, [], "un Onix échangé reste un Onix : c'est le Catalyseur qui donne Steelix");
+    });
+
+    it("une panne à l'arrivée de la forme rend la Roche Royale, les points et les sacrifices", async () => {
+      const ids = await give("Têtarte", 3);
+      await grant("roche_royale", 1);
+      const before = await dbAll(points, "SELECT id, species_id FROM pokemon_owned ORDER BY id");
+      await dbRun(points, `CREATE TRIGGER panne BEFORE INSERT ON pokemon_owned WHEN NEW.species_id = ${species("Tarpaud").id} BEGIN SELECT RAISE(ABORT, 'panne'); END`);
+      await assert.rejects(() => run("Têtarte", ids[2], "roche_royale"), /panne/);
+      await dbRun(points, "DROP TRIGGER panne");
+      assert.deepEqual(await dbAll(points, "SELECT id, species_id FROM pokemon_owned ORDER BY id"), before);
+      assert.equal(await stock("roche_royale"), 1);
+      assert.equal(await call(economy.getBalance, "u1"), 10000);
+    });
+
+    it("la fiche de Zarbi montre les lettres qu'on a, celle d'une espèce sans formes n'en dit rien", async () => {
+      const unown = species("Zarbi");
+      for (const key of ["A", "B"]) {
+        await dbRun(points, "INSERT INTO pokemon_owned (user_id, species_id, is_shiny, sex, origin, obtained_at, form) VALUES ('u1', ?, 0, NULL, 'test', 1, ?)", [unown.id, key]);
+      }
+      const sheet = await call(collection.getSpeciesOwnership, "u1", unown);
+      assert.deepEqual([...sheet.forms].sort(), ["A", "B"]);
+      assert.equal((await call(collection.getSpeciesOwnership, "u1", species("Rattata"))).forms, null);
+    });
+  });
 });
 
 describe("œufs", () => {
