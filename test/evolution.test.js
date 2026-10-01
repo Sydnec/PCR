@@ -369,8 +369,8 @@ describe("l'évolution d'échange d'un Pokémon reçu en échange", () => {
     return id;
   };
 
-  it("est gratuite : ni points ni sacrifice, même pour le seul Machopeur — l'espèce quitte alors le Pokédex", async () => {
-    const id = await traded("Machopeur");
+  it("est gratuite : ni points ni sacrifice, et un exemplaire reste derrière lui", async () => {
+    const [kept, id] = [await give("Machopeur"), await traded("Machopeur", { obtained: 2 })];
     await setBalance(0);
     const result = await evolve(byId("Machopeur", id));
     assert.equal(result.ok, true, result.reason);
@@ -378,13 +378,22 @@ describe("l'évolution d'échange d'un Pokémon reçu en échange", () => {
     assert.deepEqual(result.spent, { sacrifices: 0, dittos: 0, shinies: 0 });
     assert.equal(await balance(), 0);
     assert.deepEqual((await ofSpecies("Mackogneur")).map((row) => row.id), [id]);
-    assert.deepEqual(await ofSpecies("Machopeur"), []);
+    assert.deepEqual((await ofSpecies("Machopeur")).map((row) => row.id), [kept], "l'entrée du Pokédex reste");
     assert.equal((await fusions())[0].points_spent, 0);
+  });
+
+  it("refuse le seul Machopeur : il faut un exemplaire restant, comme pour toute évolution", async () => {
+    const id = await traded("Machopeur");
+    const result = await evolve(byId("Machopeur", id));
+    assert.equal(result.ok, false);
+    assert.match(result.reason, /dernier|2/);
+    assert.deepEqual((await ofSpecies("Machopeur")).map((row) => row.id), [id], "rien n'a bougé");
   });
 
   it("s'applique aux quatre espèces qui évoluent à l'échange", async () => {
     for (const [from, to] of [["Kadabra", "Alakazam"], ["Gravalanch", "Grolem"], ["Spectrum", "Ectoplasma"]]) {
-      const id = await traded(from);
+      await give(from);
+      const id = await traded(from, { obtained: 2 });
       const result = await evolve(byId(from, id));
       assert.equal(result.ok, true, `${from} : ${result.reason}`);
       assert.equal(result.target.name, to);
@@ -411,19 +420,12 @@ describe("l'évolution d'échange d'un Pokémon reçu en échange", () => {
     assert.ok(first);
   });
 
-  it("le plan le dit : gratuit, un seul exemplaire requis, `traded` pour l'écran", () => {
+  it("le plan le dit : gratuit, deux exemplaires requis, `traded` pour l'écran", () => {
     const plan = collection.describeEvolution(species("Machopeur").id, null, null, { traded: true });
-    assert.deepEqual([plan.points, plan.sacrifices, plan.required, plan.traded], [0, 0, 1, true]);
+    assert.deepEqual([plan.points, plan.sacrifices, plan.required, plan.traded], [0, 0, 2, true]);
     const normal = collection.describeEvolution(species("Machopeur").id);
     assert.equal(normal.traded, undefined);
     assert.ok(normal.points > 0);
-  });
-
-  it("le dernier de l'espèce ne part que pour cette évolution : reserveDuplicates le refuse sinon", async () => {
-    const id = await give("Roucool");
-    assert.deepEqual(await call(collection.reserveDuplicates, "u1", { speciesId: species("Roucool").id }, 1), []);
-    const taken = await call(collection.reserveDuplicates, "u1", { speciesId: species("Roucool").id, allowLast: true }, 1);
-    assert.deepEqual(taken.map((row) => row.id), [id]);
   });
 });
 

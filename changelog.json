@@ -2161,5 +2161,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "fix",
+      "name": "Évolution d'échange : un exemplaire doit rester",
+      "description": "L'évolution gratuite d'un Kadabra, Machopeur, Gravalanch ou Spectrum reçu en échange demande, comme toute évolution, d'en garder un exemplaire : le seul de son espèce ne peut pas évoluer.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-01T15:26:17.000Z",
+      "branch": "claude/vibrant-brown-s7suxt"
+    }
+  ]
 }
