@@ -2114,6 +2114,16 @@
       "commit": "pending",
       "timestamp": "2026-10-01T07:58:23.000Z",
       "branch": "claude/vibrant-brown-s7suxt"
+    },
+    {
+      "type": "enhancement",
+      "name": "Les générations récentes apparaissent plus souvent",
+      "description": "Une espèce de la 2ᵉ génération apparaît deux fois plus souvent qu'une espèce de la 1ʳᵉ au même stade, et ainsi de suite pour les suivantes. Le parc safari n'est pas concerné : on y choisit sa génération.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-01T12:33:30.000Z",
+      "branch": "claude/vibrant-brown-s7suxt"
     }
   ]
 }

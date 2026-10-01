@@ -82,6 +82,13 @@ const POKEMON = {
     // des curiosités — un stade 3 sur 75 apparitions.
     weightsByStage: { 1: 70, 2: 60, 3: 25 },
     legendaryWeight: 8,
+    // Les générations récentes sortent plus que les anciennes : le poids d'une
+    // espèce est multiplié par ce facteur autant de fois qu'elle compte de
+    // générations de plus que la 1re (×1 en 1re, ×2 en 2e, ×4 en 3e). Sans lui, la
+    // nouveauté ne tient qu'au nombre d'espèces ajoutées : un Héricendre n'aurait pas
+    // plus de chances d'apparaître qu'un Roucool. Propre aux apparitions du salon :
+    // le parc safari ne l'a pas, puisqu'on y choisit sa génération.
+    generationBoost: 2,
     pingRarities: ["RARE", "LEGENDAIRE"],
     throwLogSize: 8,
     // Un Pokémon sur sept environ tient quelque chose. C'est tiré à l'apparition et
@@ -686,6 +693,9 @@ const BOUNDS = {
   // Sous 1, un légendaire resterait MOINS longtemps qu'un Pokémon ordinaire :
   // l'inverse de ce que ce réglage promet.
   "pokemon.spawn.legendaryFleeMultiplier": { min: 1 },
+  // Sous 1, les générations récentes sortiraient MOINS que les anciennes :
+  // l'inverse de ce que ce réglage promet.
+  "pokemon.spawn.generationBoost": { min: 1 },
   // On n'ouvre que ce que le jeu de données contient. Le plafond est lu dans le
   // fichier plutôt qu'écrit ici : préparer la génération suivante, c'est
   // régénérer ce fichier, et rien d'autre ne doit avoir à suivre.
