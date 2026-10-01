@@ -105,16 +105,25 @@ export async function openDatabases() {
 
 // Fige Math.random le temps de `run` : une valeur, ou une suite (la dernière se
 // répète). Le jeu tire au sort partout : un test qui ne le fige pas est une
-// loterie.
-export async function withRandom(values, run) {
+// loterie. Marche pour une fonction synchrone comme pour une asynchrone : le
+// hasard est rendu quand elle a fini, pas avant.
+export function withRandom(values, run) {
   const sequence = Array.isArray(values) ? [...values] : [values];
   const real = Math.random;
   Math.random = () => (sequence.length > 1 ? sequence.shift() : sequence[0]);
-  try {
-    return await run();
-  } finally {
+  const restore = () => {
     Math.random = real;
+  };
+  let result;
+  try {
+    result = run();
+  } catch (error) {
+    restore();
+    throw error;
   }
+  if (result && typeof result.then === "function") return result.finally(restore);
+  restore();
+  return result;
 }
 
 // ---------------------- Données de jeu ----------------------
