@@ -2074,5 +2074,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "fix",
+      "name": "Parc safari : lignée sans doublon",
+      "description": "La rencontre du parc safari n'affiche plus « Ton Pokédex » en plus de la lignée : le Pokémon rencontré n'y apparaît qu'une fois.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-01T06:22:42.000Z",
+      "branch": "claude/vibrant-brown-s7suxt"
+    }
+  ]
 }

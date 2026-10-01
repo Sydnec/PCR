@@ -26,9 +26,10 @@ visite. C'est le seul contenu Pokémon où les actions ne coûtent rien.
 - **« Il te manque ? »** : chaque rencontre affiche si le dresseur possède déjà l'espèce, shiny ou
   non — et signale un premier shiny. Le message étant privé, l'information tient dans l'embed, là où les
   apparitions publiques ont besoin d'un bouton pour répondre à chacun séparément.
-  Pour une espèce qui a une lignée évolutive, la rencontre la
-  montre aussi, stade par stade, avec ce que le dresseur en possède (la même présentation que
-  `/pk info`), pour décider d'un lancer en connaissant la suite.
+  Pour une espèce qui a une lignée évolutive, c'est la lignée qui
+  le dit : elle se montre stade par stade, avec ce que le dresseur en possède (la même présentation
+  que `/pk info`, le Pokémon rencontré y est marqué ▸), pour décider d'un lancer en connaissant la
+  suite. Une espèce sans lignée garde son champ « Ton Pokédex ».
 - **Raretés compensées** : poids 50/60/40 par stade et 24 pour un légendaire — les stades 1 y pèsent
   moins qu'à l'état sauvage, les stades 3 (les *rares*) ×1,6, les légendaires ×3 —, shiny 1/250 au
   lieu de 1/500. En 1ʳᵉ génération, les rares passent de 3,4 % à 6,3 % du pool et les légendaires de
