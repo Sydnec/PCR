@@ -642,10 +642,17 @@ describe("/pk comparer", () => {
     assert.deepEqual(idsOf(reply), ["poke_cmpt|0|0|prev", "poke_cmpt_noop|0", "poke_cmpt|0|0|next"]);
   });
 
-  it("sans option et sans personne : le dit, au lieu d'une liste vide", async () => {
+  it("sans option et sans personne : le dit, au lieu d'une liste vide — sans accuser les autres quand c'est soi qui n'a rien à donner", async () => {
     await own("Rattata");
-    const text = textOf(payloadOf(await compare({ evolutions: false }), "editReply"));
-    assert.match(text, /Personne n'a de quoi échanger avec toi pour l'instant/);
+    await ownMany("Chenipan", 2, { user: "u2" });
+    const noOffer = textOf(payloadOf(await compare({ evolutions: false }), "editReply"));
+    assert.match(noOffer, /Tu n'as aucun doublon à offrir pour l'instant/);
+    assert.doesNotMatch(noOffer, /Personne n'a de quoi/);
+
+    await own("Rattata", { obtained: 2 });
+    await own("Rattata", { user: "u2" });
+    const nobodyWants = textOf(payloadOf(await compare({ evolutions: false }), "editReply"));
+    assert.match(nobodyWants, /Personne n'a de quoi échanger avec toi pour l'instant/, "u2 a déjà un Rattata : tu as de quoi offrir, mais personne n'en veut");
   });
 
   it("avec une espèce : à qui elle manque, et ce que chacun donnerait en retour", async () => {
@@ -693,7 +700,23 @@ describe("/pk comparer", () => {
     const raw = payloadOf(await runAutocomplete(pk, { sub: "comparer", options: { evolutions: false }, focused: { name: "pokemon", value: "ratt" } }), "respond");
     assert.deepEqual(raw.map((choice) => choice.name), ["Rattata ×2 en trop"], "la saisie filtre, et la réserve se désactive");
     const none = payloadOf(await runAutocomplete(pk, { sub: "comparer", options: { evolutions: false }, focused: { name: "pokemon", value: "zzz" } }), "respond");
-    assert.deepEqual(none, [{ name: "Tu n'as aucun doublon à offrir", value: "—" }]);
+    assert.deepEqual(none, [{ name: "Aucun de tes doublons ne correspond à « zzz »", value: "—" }], "il y a des doublons : c'est la saisie qui ne retient rien");
+    await dbRun(points, "DELETE FROM pokemon_owned");
+    const nothing = payloadOf(await runAutocomplete(pk, { sub: "comparer", options: { evolutions: false }, focused: { name: "pokemon", value: "zzz" } }), "respond");
+    assert.deepEqual(nothing, [{ name: "Tu n'as aucun doublon à offrir", value: "—" }]);
+  });
+
+  it("l'autocomplétion cherche comme les autres : sans accents ni casse", async () => {
+    await ownMany("Salamèche", 2);
+    const typed = async (value) => payloadOf(await runAutocomplete(pk, { sub: "comparer", options: { evolutions: false }, focused: { name: "pokemon", value } }), "respond");
+    assert.deepEqual((await typed("salameche")).map((choice) => choice.name), ["Salamèche ×1 en trop"]);
+    assert.deepEqual((await typed("SALAM")).map((choice) => choice.value), [String(species("Salamèche").id)]);
+  });
+
+  it("les chiffres des refus se lisent à la française", async () => {
+    await ownMany("Rattata", 1200, { locked: 1 });
+    const text = payloadOf(await compare({ pokemon: String(species("Rattata").id), evolutions: false }), "editReply").content;
+    assert.match(text, /Tes \*\*1\u202f200\*\* Rattata sont verrouillés/);
   });
 });
 

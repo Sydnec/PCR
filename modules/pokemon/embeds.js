@@ -1020,7 +1020,9 @@ export function buildCompareView(match, state) {
 
 // Avec qui échanger : un dresseur par ligne, celui qui permet le plus d'échanges
 // d'abord (getTradePartners).
-export function buildPartnersEmbed(list, { page = 0, reserve = true } = {}) {
+// `offers` : combien d'espèces le dresseur peut offrir (getTradePartners). À zéro,
+// la liste vide ne tient pas aux autres : c'est lui qui n'a rien à donner.
+export function buildPartnersEmbed(list, { page = 0, reserve = true, offers = null } = {}) {
   const { pages, current, start, end } = pageOf(list.length, page);
   const embed = new EmbedBuilder().setTitle("\u{1F91D} Avec qui échanger").setColor(COMPARE_COLOR);
   const intro =
@@ -1029,9 +1031,11 @@ export function buildPartnersEmbed(list, { page = 0, reserve = true } = {}) {
     "`/pk comparer membre`.";
   const note = reserve ? `\n\n${COMPARE_RESERVE_NOTE}` : "";
   if (!list.length) {
-    return embed.setDescription(
-      `${intro}${note}\n\n*Personne n'a de quoi échanger avec toi pour l'instant.*`
-    );
+    const empty =
+      offers === 0
+        ? "*Tu n'as aucun doublon à offrir pour l'instant : un échange suppose d'avoir de quoi donner.*"
+        : "*Personne n'a de quoi échanger avec toi pour l'instant.*";
+    return embed.setDescription(`${intro}${note}\n\n${empty}`);
   }
   const lines = list
     .slice(start, end)

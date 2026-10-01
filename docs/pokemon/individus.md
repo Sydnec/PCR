@@ -75,4 +75,5 @@ verrouillé.
   libre du PC, et verrouillé s'il est shiny ou légendaire.
   Quand l'offre naît du bouton de `/pk comparer`, c'est le bot qui choisit l'individu de chaque
   côté, selon la règle ci-dessus : le moins précieux d'abord, jamais un verrouillé ni le dernier de
-  l'espèce. Un shiny déverrouillé ne part que s'il n'y a pas de normal libre, et l'offre le montre.
+  l'espèce. Un shiny déverrouillé ne part qu'à défaut d'un normal libre qui ne soit pas en vitrine,
+  et l'offre le montre.

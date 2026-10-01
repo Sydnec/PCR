@@ -47,6 +47,7 @@ import {
   getTrade,
   getTradeMatches,
   getTradePartners,
+  isOldestOpenOffer,
   listDuplicates,
   proposeTrade,
   resolveTradeAs,
@@ -383,14 +384,14 @@ function showComparison(interaction, state) {
 // « Avec qui échanger » et « qui a besoin d'une espèce » se relisent à chaque
 // page, comme les doublons : ce qui a été donné entre-temps apparaît tel quel.
 function showPartnersPage(interaction, reserve, page) {
-  getTradePartners(interaction.user.id, { reserve }, (err, list) => {
+  getTradePartners(interaction.user.id, { reserve }, (err, list, summary) => {
     if (err) {
       handleException("Lecture des partenaires d'échange :", err);
       return ephemeral(interaction, "❌ Impossible de lire les collections.");
     }
     interaction
       .update({
-        embeds: [buildPartnersEmbed(list, { page, reserve })],
+        embeds: [buildPartnersEmbed(list, { page, reserve, offers: summary.offers })],
         components: [buildPartnersRow(list.length, page, { reserve })],
       })
       .catch(() => {});
@@ -507,23 +508,48 @@ async function proposeFromComparison(interaction, state) {
     handleException("Création d'une offre depuis /pk comparer :", trade.err);
     return refuse("❌ Impossible de créer l'échange.");
   }
+  const offerId = trade.created.id;
+  const cancelOffer = () =>
+    resolveTradeAs(offerId, userId, "CANCELLED", (err) => {
+      if (err) handleException("Annulation d'une offre non publiée :", err);
+    });
+
+  // Deux clics rapprochés ont créé deux offres identiques : seule la plus ancienne
+  // est publiée, l'autre se retire sans bruit et dit pourquoi.
+  const oldest = await new Promise((resolve) =>
+    isOldestOpenOffer(trade.created, (err, first) => resolve(err ? { err } : { first }))
+  );
+  if (oldest.err) {
+    handleException("Vérification d'une offre en double :", oldest.err);
+    cancelOffer();
+    return refuse("❌ Erreur base de données.");
+  }
+  if (!oldest.first) {
+    cancelOffer();
+    return refuse(`⏳ Tu as déjà proposé cet échange à <@${state.partnerId}> : il attend sa réponse.`);
+  }
 
   let message;
   try {
     message = await channel.send({
       content: `<@${state.partnerId}>`,
       embeds: [buildTradeEmbed(trade.created, "PENDING")],
-      components: [buildTradeRow(trade.created.id)],
+      components: [buildTradeRow(offerId)],
       allowedMentions: { users: [state.partnerId] },
     });
   } catch (error) {
     handleException("Publication d'une offre d'échange :", error);
-    resolveTradeAs(trade.created.id, userId, "CANCELLED", (err) => {
-      if (err) handleException("Annulation d'une offre non publiée :", err);
-    });
+    // Seuls ces codes prouvent que rien n'a été publié (ENVOI_IMPOSSIBLE). Sur une
+    // coupure ou un délai, le message est peut-être parti : annuler l'offre lui
+    // laisserait des boutons morts, et un nouvel essai en publierait une seconde.
+    // Elle expire seule.
+    if (!ENVOI_IMPOSSIBLE.has(error?.code)) {
+      return refuse("⚠️ L'envoi a échoué, mais il a peut-être abouti : va voir le salon.");
+    }
+    cancelOffer();
     return refuse(`❌ Je n'ai pas pu publier l'offre dans ${channel}. Tu peux réessayer.`);
   }
-  setTradeMessage(trade.created.id, message.id);
+  setTradeMessage(offerId, message.id);
   await interaction
     .editReply({
       content: `✅ Offre envoyée à <@${state.partnerId}> dans ${channel}.`,
@@ -1147,8 +1173,6 @@ export async function handlePokemonButton(interaction) {
         reserve: action === "poke_dupspr",
       });
 
-    // Le cinquième segment, facultatif, est l'objet qui aide l'évolution : une
-    // pierre impose alors sa cible, un bonbon remplace un sacrifice manquant.
     // La comparaison de /pk comparer : ses pages, puis « avec qui échanger », « qui a
     // besoin d'une espèce », et le bouton qui propose l'échange choisi.
     case "poke_cmp":
@@ -1165,6 +1189,8 @@ export async function handlePokemonButton(interaction) {
         handleException("Proposition d'un échange :", error)
       );
 
+    // Le cinquième segment, facultatif, est l'objet qui aide l'évolution : une
+    // pierre impose alors sa cible, un bonbon remplace un sacrifice manquant.
     case "poke_evo": {
       const [speciesId, variant, mode, helper, confirm] = args;
       if (mode === "choose") {

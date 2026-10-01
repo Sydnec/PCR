@@ -9,6 +9,7 @@ import { addPoints, spendPoints } from "../economy.js";
 import { handleException } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
 import {
+  activeGeneration,
   dittoSpecies,
   evolutionChain,
   evolutionTargets,
@@ -1280,10 +1281,39 @@ export function proposeTrade({ fromUserId, toUserId, offer, request, channelId }
     },
     (err, tradeId) => {
       if (err || !tradeId) return cb(err || new Error("Création d'échange impossible"));
-      getTrade(tradeId, (readError, trade) =>
-        cb(readError || (trade ? null : new Error(`Échange #${tradeId} introuvable`)), trade)
-      );
+      getTrade(tradeId, (readError, trade) => {
+        if (!readError && trade) return cb(null, trade);
+        // L'offre existe, mais l'appelant va répondre à un échec et personne ne la
+        // verra : on la ferme plutôt que de la laisser ouverte jusqu'à son expiration.
+        resolveTradeAs(tradeId, fromUserId, "CANCELLED", (closeError) => {
+          if (closeError) handleException("Fermeture d'une offre illisible :", closeError);
+          cb(readError || new Error(`Échange #${tradeId} introuvable`));
+        });
+      });
     }
+  );
+}
+
+// L'offre est-elle la plus ancienne de ses semblables — même auteur, même
+// destinataire, mêmes Pokémon, encore ouvertes ? Deux clics rapprochés sur
+// « Proposer cet échange » créent deux offres identiques : chacune vérifie
+// après avoir écrit, la plus ancienne reste, les autres se retirent. Comme les
+// identifiants montent, une seule peut se croire la première, même quand les
+// deux s'exécutent en même temps.
+export function isOldestOpenOffer(trade, cb) {
+  db.get(
+    `SELECT MIN(id) AS first FROM pokemon_trades
+      WHERE from_user_id = ? AND to_user_id = ?
+        AND offer_pokemon_id IS ? AND request_pokemon_id IS ?
+        AND status = 'PENDING' AND expires_at > ?`,
+    [
+      trade.from_user_id,
+      trade.to_user_id,
+      trade.offer_pokemon_id,
+      trade.request_pokemon_id,
+      Date.now(),
+    ],
+    (err, row) => cb(err, !err && row?.first === trade.id)
   );
 }
 
@@ -1443,40 +1473,66 @@ export function acceptTrade(tradeId, cb) {
 // ne se décide ici : proposer, accepter et refuser restent les gestes de
 // /pk echange, et acceptTrade revérifie tout au moment de l'échange.
 
-// Ce qu'un dresseur peut céder à un autre sans que celui-ci l'ait déjà : ses
-// doublons dont l'autre n'a pas l'espèce qui lui ARRIVERAIT, pas celle qu'on
-// cède. Un Machopeur devient Mackogneur chez celui qui le reçoit (tradedForm) :
-// il ne comble que la case du Mackogneur, et le donner à qui en a déjà un ne
-// lui apporte rien, même s'il n'a jamais eu de Machopeur. Seules les espèces de
-// la génération ouverte comptent : on ne propose pas ce que le Pokédex ne montre
-// pas encore.
-function offersTo(duplicates, receiverOwned) {
-  const byArrival = new Map();
-  for (const entry of duplicates) {
-    const arrivalId = tradedForm(entry.speciesId);
-    if (!isAvailable(getSpecies(entry.speciesId)) || !isAvailable(getSpecies(arrivalId))) continue;
-    if (receiverOwned.has(arrivalId)) continue;
-    // Deux espèces qui arrivent sous la même forme (un Machopeur et un Mackogneur
-    // en trop) ne comblent qu'une case : on garde celle qui n'a pas à évoluer.
-    const kept = byArrival.get(arrivalId);
-    if (!kept || (arrivalId === entry.speciesId && kept.speciesId !== arrivalId)) {
-      byArrival.set(arrivalId, { ...entry, arrivalId });
-    }
+// Ce qu'une comparaison relit une fois pour toutes ses dresseurs : la génération
+// ouverte, et l'espèce qui arrive pour chaque espèce cédée. La configuration est
+// relue sur le disque à chaque accès (isAvailable, tradedForm) : sans ce
+// contexte, comparer un dresseur à trois cents autres la relirait des dizaines
+// de milliers de fois.
+const tradeContext = () => ({ generation: activeGeneration(), arrivals: new Map() });
+
+// L'offre d'un doublon : l'espèce qui ARRIVERAIT chez celui qui le reçoit, pas
+// celle qu'on cède. Un Machopeur devient Mackogneur chez celui qui le reçoit
+// (tradedForm) : il ne comble que la case du Mackogneur, et le donner à qui en a
+// déjà un ne lui apporte rien, même s'il n'a jamais eu de Machopeur. Seules les
+// espèces de la génération ouverte comptent : on ne propose pas ce que le Pokédex
+// ne montre pas encore. null sinon.
+function offerOf(entry, context) {
+  let arrivalId = context.arrivals.get(entry.speciesId);
+  if (arrivalId === undefined) {
+    arrivalId = tradedForm(entry.speciesId);
+    context.arrivals.set(entry.speciesId, arrivalId);
   }
-  return [...byArrival.values()].sort((a, b) => a.speciesId - b.speciesId);
+  const { generation } = context;
+  if (!isAvailable(getSpecies(entry.speciesId), generation)) return null;
+  if (!isAvailable(getSpecies(arrivalId), generation)) return null;
+  return { ...entry, arrivalId };
 }
 
-// Ce que la comparaison lit d'un dresseur : les espèces de son Pokédex et ses
-// doublons. Les lignes peuvent être des individus entiers ou seulement leur
-// espèce, leur variante et leur verrou (countBySpecies ne lit pas autre chose).
-const profileOf = (rows, options) => ({
-  owned: new Set(rows.map((row) => row.species_id)),
-  duplicates: listDuplicates(rows, options),
-});
+// Ce que la comparaison lit d'un dresseur : les espèces de son Pokédex, ses
+// doublons (`duplicates`, listDuplicates) et ce qu'il peut offrir (`offers`),
+// dans l'ordre du Pokédex. Les lignes peuvent être des individus entiers ou
+// seulement leur espèce, leur variante et leur verrou (countBySpecies ne lit pas
+// autre chose).
+//
+// Deux espèces qui arrivent sous la même forme (un Machopeur et un Mackogneur en
+// trop) ne comblent qu'une case : on garde celle qui n'a pas à évoluer. Le choix
+// ne dépend pas de celui qui reçoit, qui a la même forme d'arrivée dans les deux
+// cas : il se fait une fois, ici.
+function profileOf(rows, options, context) {
+  const duplicates = listDuplicates(rows, options);
+  const byArrival = new Map();
+  for (const entry of duplicates) {
+    const offer = offerOf(entry, context);
+    if (!offer) continue;
+    const kept = byArrival.get(offer.arrivalId);
+    if (!kept || (offer.arrivalId === offer.speciesId && kept.speciesId !== offer.arrivalId)) {
+      byArrival.set(offer.arrivalId, offer);
+    }
+  }
+  return {
+    owned: new Set(rows.map((row) => row.species_id)),
+    duplicates,
+    offers: [...byArrival.values()].sort((a, b) => a.speciesId - b.speciesId),
+  };
+}
+
+// Ce qu'on peut offrir à qui n'a pas encore l'espèce qui lui arriverait.
+const lacking = (offers, receiverOwned) =>
+  offers.filter((offer) => !receiverOwned.has(offer.arrivalId));
 
 function compareProfiles(mine, theirs) {
-  const give = offersTo(mine.duplicates, theirs.owned);
-  const get = offersTo(theirs.duplicates, mine.owned);
+  const give = lacking(mine.offers, theirs.owned);
+  const get = lacking(theirs.offers, mine.owned);
   // Une espèce contre une espèce : le plus petit des deux côtés. Un second
   // exemplaire donné à qui n'en avait pas ne comble rien de plus.
   return { give, get, swaps: Math.min(give.length, get.length) };
@@ -1488,7 +1544,8 @@ function compareProfiles(mine, theirs) {
 // quoi faire les évolutions qui manquent (voir listDuplicates).
 export function tradeMatches(rowsA, rowsB, { reserve = false, edges = new Map() } = {}) {
   const options = { reserve, edges };
-  return compareProfiles(profileOf(rowsA, options), profileOf(rowsB, options));
+  const context = tradeContext();
+  return compareProfiles(profileOf(rowsA, options, context), profileOf(rowsB, options, context));
 }
 
 // Les deux collections lues en base, puis comparées.
@@ -1522,17 +1579,22 @@ function readEveryCollection(cb) {
 // des deux. Les égalités se départagent par le volume, puis par l'identifiant :
 // la liste est relue à chaque page, et un ordre qui bougerait entre deux clics
 // montrerait un dresseur deux fois et en cacherait un autre.
+//
+// `offers`, en troisième argument, dit combien d'espèces `userId` peut offrir :
+// à zéro, personne n'est en cause, c'est lui qui n'a rien à donner — une liste
+// vide ne se lit pas pareil.
 export function getTradePartners(userId, { reserve = false } = {}, cb) {
   readEveryCollection((err, byUser) => {
-    if (err) return cb(err, []);
+    if (err) return cb(err, [], { offers: 0 });
     const options = { reserve, edges: new Map() };
-    const mine = profileOf(byUser.get(userId) ?? [], options);
+    const context = tradeContext();
+    const mine = profileOf(byUser.get(userId) ?? [], options, context);
     byUser.delete(userId);
-    // Sans doublon à offrir, aucun échange n'est possible, avec personne.
-    if (!mine.duplicates.length) return cb(null, []);
+    // Sans rien à offrir, aucun échange n'est possible, avec personne.
+    if (!mine.offers.length) return cb(null, [], { offers: 0 });
     const list = [];
     for (const [otherId, rows] of byUser) {
-      const { give, get, swaps } = compareProfiles(mine, profileOf(rows, options));
+      const { give, get, swaps } = compareProfiles(mine, profileOf(rows, options, context));
       if (swaps > 0) list.push({ userId: otherId, give: give.length, get: get.length, swaps });
     }
     list.sort(
@@ -1541,7 +1603,7 @@ export function getTradePartners(userId, { reserve = false } = {}, cb) {
         b.give + b.get - (a.give + a.get) ||
         String(a.userId).localeCompare(String(b.userId))
     );
-    cb(null, list);
+    cb(null, list, { offers: mine.offers.length });
   });
 }
 
@@ -1554,15 +1616,16 @@ export function getSpeciesNeeders(userId, speciesId, { reserve = false } = {}, c
   readEveryCollection((err, byUser) => {
     if (err) return cb(err, { offer: null, list: [] });
     const options = { reserve, edges: new Map() };
-    const mine = profileOf(byUser.get(userId) ?? [], options);
+    const context = tradeContext();
+    const mine = profileOf(byUser.get(userId) ?? [], options, context);
     byUser.delete(userId);
     const entry = mine.duplicates.find((line) => line.speciesId === Number(speciesId));
-    const [offer = null] = entry ? offersTo([entry], new Set()) : [];
+    const offer = entry ? offerOf(entry, context) : null;
     if (!offer) return cb(null, { offer: null, list: [] });
     const list = [];
     for (const [otherId, rows] of byUser) {
       if (rows.some((row) => row.species_id === offer.arrivalId)) continue;
-      const back = offersTo(profileOf(rows, options).duplicates, mine.owned).length;
+      const back = lacking(profileOf(rows, options, context).offers, mine.owned).length;
       list.push({ userId: otherId, back });
     }
     list.sort((a, b) => b.back - a.back || String(a.userId).localeCompare(String(b.userId)));

@@ -8,7 +8,7 @@ import {
   getTradePartners,
   listDuplicates,
 } from "../../modules/pokemon/collection.js";
-import { getAvailableSpecies, getSpecies } from "../../modules/pokemon/data.js";
+import { getAvailableSpecies, getSpecies, searchByName } from "../../modules/pokemon/data.js";
 import {
   buildCompareView,
   buildNeedersEmbed,
@@ -17,6 +17,8 @@ import {
   buildPartnersRow,
   respondHint as hint,
 } from "../../modules/pokemon/embeds.js";
+
+const fr = (value) => value.toLocaleString("fr-FR");
 
 // Les échanges qui servent aux deux : une espèce contre une espèce, chacune
 // absente du Pokédex de celui qui la reçoit. Trois questions, selon l'option :
@@ -59,24 +61,31 @@ export default {
         handleException("Autocomplétion de /pk comparer :", err);
         return interaction.respond([]).catch(() => {});
       }
-      const needle = String(interaction.options.getFocused() ?? "").toLowerCase();
-      const choices = listDuplicates(rows, { reserve })
+      const duplicates = listDuplicates(rows, { reserve });
+      // Le « contient » de la recherche par nom, accents et casse compris : une
+      // seule définition, celle de toutes les autres autocomplétions d'espèces.
+      const query = String(interaction.options.getFocused() ?? "");
+      const matching = new Set(searchByName(query, Infinity).map((species) => species.id));
+      const choices = duplicates
+        .filter((entry) => matching.has(entry.speciesId))
         .map((entry) => {
           const species = getSpecies(entry.speciesId);
-          return species && { name: `${species.name} ×${entry.spare} en trop`, value: String(species.id) };
+          return species && { name: `${species.name} ×${fr(entry.spare)} en trop`, value: String(species.id) };
         })
-        .filter((choice) => choice && choice.name.toLowerCase().includes(needle))
+        .filter(Boolean)
         .slice(0, 25);
-      // Une liste vide est indiscernable d'une commande cassée : on dit pourquoi.
-      if (!choices.length) {
-        return hint(
-          interaction,
-          reserve
+      if (choices.length) return interaction.respond(choices).catch(() => {});
+      // Une liste vide est indiscernable d'une commande cassée : on dit pourquoi, et
+      // on ne prétend pas qu'il n'y a aucun doublon quand c'est la saisie qui ne
+      // retient rien.
+      hint(
+        interaction,
+        duplicates.length
+          ? `Aucun de tes doublons ne correspond à « ${query} »`.slice(0, 100)
+          : reserve
             ? "Aucun doublon à offrir : ils servent peut-être à tes évolutions"
             : "Tu n'as aucun doublon à offrir"
-        );
-      }
-      interaction.respond(choices).catch(() => {});
+      );
     });
   },
 
@@ -134,11 +143,11 @@ export default {
         });
       }
 
-      getTradePartners(interaction.user.id, { reserve }, (err, list) => {
+      getTradePartners(interaction.user.id, { reserve }, (err, list, summary) => {
         if (err) return fail("Lecture des partenaires d'échange :", err);
         interaction
           .editReply({
-            embeds: [buildPartnersEmbed(list, { reserve })],
+            embeds: [buildPartnersEmbed(list, { reserve, offers: summary.offers })],
             components: [buildPartnersRow(list.length, 0, { reserve })],
           })
           .catch(() => {});
@@ -172,11 +181,11 @@ function explainNoOffer(interaction, species, reserve) {
         "il reste toujours un Pokémon de chaque espèce.";
     } else if (counts.free === 0) {
       content =
-        `❌ Tes **${counts.total}** ${species.name} sont verrouillés 🛡️ : déverrouille-en un avec ` +
+        `❌ Tes **${fr(counts.total)}** ${species.name} sont verrouillés 🛡️ : déverrouille-en un avec ` +
         "/pk verrou pour le proposer.";
     } else if (reserve && inDuplicates({ reserve: false })) {
       content =
-        `❌ Tes **${counts.spare}** ${species.name} en trop sont mis de côté 🧬 pour les évolutions ` +
+        `❌ Tes **${fr(counts.spare)}** ${species.name} en trop sont mis de côté 🧬 pour les évolutions ` +
         "qui manquent à ton Pokédex : ajoute `evolutions: False` pour les proposer quand même.";
     } else {
       content = `❌ **${species.name}** ne peut pas être proposé pour l'instant.`;

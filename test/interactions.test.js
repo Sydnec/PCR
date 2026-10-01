@@ -609,7 +609,7 @@ describe("la comparaison de /pk comparer", () => {
     assert.match(await description(`poke_cmp|${b}|0|0|0|0|next`), /Rattata/);
     assert.doesNotMatch(await description(`poke_cmp|${b}|0|0|1|0|next`), /Rattata/, "il manque Rattatac : les Rattata servent à évoluer");
     assert.match(await description(`poke_cmpt|0|0|next`), new RegExp(`<@${b}>`));
-    assert.match(await description(`poke_cmpt|1|0|next`), /Personne n'a de quoi échanger avec toi/);
+    assert.match(await description(`poke_cmpt|1|0|next`), /Tu n'as aucun doublon à offrir pour l'instant/, "tout est mis de côté : c'est toi qui n'as rien à donner");
     assert.match(await description(`poke_cmpn|${rata()}|0|0|next`), new RegExp(`<@${b}>`));
     const hidden = only(await click(`poke_cmpn|${rata()}|1|0|next`, { user: a }), "update");
     assert.match(hidden.content, /Tu n'as plus de \*\*Rattata\*\* à donner/);
@@ -730,11 +730,51 @@ describe("la comparaison de /pk comparer", () => {
     assert.equal((await trades()).length, 0, "le refus vient avant la création de l'offre");
   });
 
-  it("un salon qui refuse l'envoi : l'offre est annulée plutôt qu'oubliée dans la base", async () => {
+  it("un salon qui refuse l'envoi, code Discord à l'appui : l'offre est annulée plutôt qu'oubliée dans la base", async () => {
     const { a, b } = await pair();
-    const calls = await propose(a, b, { channel: fakeChannel({ sendFails: new Error("Missing Access") }) });
+    const refused = Object.assign(new Error("Missing Permissions"), { code: 50013 });
+    const calls = await propose(a, b, { channel: fakeChannel({ sendFails: refused }) });
     assert.equal(last(calls, "followUp").content, "❌ Je n'ai pas pu publier l'offre dans <#c1>. Tu peux réessayer.");
     assert.equal((await trades())[0].status, "CANCELLED");
+  });
+
+  it("une coupure pendant l'envoi ne prouve pas qu'il a échoué : l'offre reste ouverte, le message l'a peut-être publiée", async () => {
+    const { a, b } = await pair();
+    const calls = await propose(a, b, { channel: fakeChannel({ sendFails: new Error("fetch failed") }) });
+    assert.equal(last(calls, "followUp").content, "⚠️ L'envoi a échoué, mais il a peut-être abouti : va voir le salon.");
+    assert.equal((await trades())[0].status, "PENDING", "annuler laisserait des boutons morts sous un message déjà publié");
+  });
+
+  it("deux clics rapprochés ne publient qu'une offre : la plus ancienne reste, l'autre se retire et le dit", async () => {
+    const { a, b } = await pair();
+    const channel = fakeChannel();
+    const [first, second] = await Promise.all([propose(a, b, { channel }), propose(a, b, { channel })]);
+    const open = (await trades()).filter((trade) => trade.status === "PENDING");
+    assert.equal(open.length, 1);
+    assert.equal((await trades()).filter((trade) => trade.status === "CANCELLED").length, 1);
+    assert.equal(channel.sent.length, 1, "un seul message, une seule mention");
+    const refusals = [first, second].flatMap((calls) => calls.filter((entry) => entry.method === "followUp"));
+    assert.equal(refusals.length, 1);
+    assert.equal(refusals[0].payload.content, `⏳ Tu as déjà proposé cet échange à <@${b}> : il attend sa réponse.`);
+
+    const later = await propose(a, b, { channel });
+    assert.match(last(later, "followUp").content, /Tu as déjà proposé cet échange/);
+    assert.equal(channel.sent.length, 1, "un troisième clic n'ajoute rien");
+    assert.equal((await trades()).filter((trade) => trade.status === "PENDING").length, 1);
+  });
+
+  it("une offre refusée ou expirée ne bloque pas une nouvelle proposition des mêmes Pokémon", async () => {
+    const { a, b } = await pair();
+    await propose(a, b);
+    const [{ id }] = await trades();
+    await click(`poke_trade_decline|${id}`, { user: b });
+    const channel = fakeChannel();
+    await propose(a, b, { channel });
+    assert.equal(channel.sent.length, 1);
+    assert.deepEqual((await trades()).map((trade) => trade.status), ["DECLINED", "PENDING"]);
+    await dbRun(points, "UPDATE pokemon_trades SET expires_at = ? WHERE status = 'PENDING'", [Date.now() - 1]);
+    await propose(a, b, { channel });
+    assert.equal(channel.sent.length, 2, "une offre expirée ne compte plus");
   });
 
   it("une panne d'écriture : rien n'est envoyé, le refus le dit", async () => {

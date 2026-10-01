@@ -480,6 +480,10 @@ describe("la comparaison de deux dresseurs (/pk comparer)", () => {
     const none = embeds.buildPartnersEmbed([], { reserve: true }).toJSON();
     assert.match(none.description, /Personne n'a de quoi échanger avec toi pour l'instant/);
     assert.match(none.description, /🧬/);
+    const nothingToGive = embeds.buildPartnersEmbed([], { reserve: false, offers: 0 }).toJSON();
+    assert.match(nothingToGive.description, /Tu n'as aucun doublon à offrir pour l'instant/, "quand c'est le dresseur qui n'a rien à donner, on n'accuse pas les autres");
+    assert.doesNotMatch(nothingToGive.description, /Personne n'a de quoi/);
+    assert.match(embeds.buildPartnersEmbed([], { reserve: false, offers: 3 }).toJSON().description, /Personne n'a de quoi échanger/);
   });
 
   it("qui a besoin d'une espèce : ce que chacun donnerait en retour, et la forme qui arrive quand elle change", () => {
