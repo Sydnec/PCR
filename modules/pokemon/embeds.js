@@ -1221,10 +1221,17 @@ function buildEncounterEmbed(
   // joueur ne pourrait pas arbitrer entre lancer et appâter.
   const fleeRisk = safariFleeChance(session.encounter_bait, config);
 
-  // Collection illisible : on préfère une rencontre sans pastille à un champ
-  // vide, que l'API refuserait. Trois champs par rangée, d'où la grille
-  // « Rareté | Type | Chances » puis « Ton Pokédex | Actions restantes ».
-  const ownership = ownedLine(owned, isShiny);
+  // La lignée, pour savoir si l'on a déjà les autres stades avant de lancer.
+  // Une collection illisible (`lineage` null) l'omet plutôt que d'annoncer zéro.
+  const chain = evolutionChain(species);
+  const lineageRows =
+    lineage && chain.length > 1 ? lineageFields(species, chain, lineage, { isShiny }) : [];
+
+  // « Ton Pokédex » ne sert que sans lignée : avec elle, le Pokémon rencontré y
+  // figure déjà (▸, avec ses compteurs), et le dire deux fois ne ferait que
+  // doubler l'information. Collection illisible : on préfère une rencontre sans
+  // pastille à un champ vide, que l'API refuserait.
+  const ownership = lineageRows.length ? null : ownedLine(owned, isShiny);
 
   const name = displayName(species, false, session.encounter_sex, session.encounter_form);
   const embed = new EmbedBuilder()
@@ -1248,6 +1255,9 @@ function buildEncounterEmbed(
           `\u{1F4A8} ${Math.round(fleeRisk * 100)} % qu'il détale`,
         inline: true,
       },
+      // Trois champs par rangée : « Rareté | Type | Chances », puis la lignée (un
+      // champ par stade, dans sa propre rangée), et les actions en dernier.
+      ...lineageRows,
       ...(ownership ? [{ name: "Ton Pokédex", value: ownership, inline: true }] : []),
       {
         name: "Actions restantes",
@@ -1256,21 +1266,7 @@ function buildEncounterEmbed(
       }
     );
 
-  // La lignée, pour savoir si l'on a déjà les autres stades avant de lancer.
-  // Une espèce sans lignée n'a rien à y ajouter : « Ton Pokédex » dit déjà tout.
-  // Une collection illisible (`lineage` null) l'omet plutôt que d'annoncer zéro.
-  const chain = evolutionChain(species);
-  const fields = lineage && chain.length > 1 ? lineageFields(species, chain, lineage, { isShiny }) : [];
-  if (fields.length) {
-    // Les champs en ligne se rangent trois par trois : sans cale, le premier
-    // stade se glisserait dans la rangée de « Actions restantes » et la lignée
-    // ne se lirait plus d'un bloc.
-    const filler = 3 - ((ownership ? 2 : 1) % 3);
-    for (let i = 0; i < filler; i++) embed.addFields({ name: "\u200B", value: "\u200B", inline: true });
-    embed.addFields(fields);
-  }
-
-  const legend = fields.length ? lineageLegend(chain) : [];
+  const legend = lineageRows.length ? lineageLegend(chain) : [];
   embed.setFooter({
     text: [
       `Parc safari · Pokédex n°${species.id} · rencontre n°${session.encounter_no}`,
