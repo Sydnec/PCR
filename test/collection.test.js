@@ -204,11 +204,11 @@ describe("lire la collection", () => {
 
   it("les formes possédées d'une espèce à formes, lues sans filtre de génération", async () => {
     const unown = data.allSpeciesData().find((entry) => entry.name === "Zarbi");
-    for (const key of ["A", "B", "A"]) {
+    for (const key of ["a", "b", "a"]) {
       await dbRun(points, "INSERT INTO pokemon_owned (user_id, species_id, is_shiny, sex, origin, obtained_at, form) VALUES ('u1', ?, 0, NULL, 'test', 1, ?)", [unown.id, key]);
     }
     await dbRun(points, "INSERT INTO pokemon_owned (user_id, species_id, is_shiny, sex, origin, obtained_at) VALUES ('u1', ?, 0, 'M', 'test', 1)", [species("Rattata").id]);
-    assert.deepEqual([...(await call(collection.getOwnedForms, "u1", unown.id))].sort(), ["A", "B"]);
+    assert.deepEqual([...(await call(collection.getOwnedForms, "u1", unown.id))].sort(), ["a", "b"]);
     assert.equal((await call(collection.getOwnedForms, "u1", species("Rattata").id)).size, 0, "pas de forme : un ensemble vide");
   });
 

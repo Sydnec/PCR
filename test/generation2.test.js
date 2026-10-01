@@ -527,11 +527,11 @@ describe("évolutions", () => {
 
     it("la fiche de Zarbi montre les lettres qu'on a, celle d'une espèce sans formes n'en dit rien", async () => {
       const unown = species("Zarbi");
-      for (const key of ["A", "B"]) {
+      for (const key of ["a", "b"]) {
         await dbRun(points, "INSERT INTO pokemon_owned (user_id, species_id, is_shiny, sex, origin, obtained_at, form) VALUES ('u1', ?, 0, NULL, 'test', 1, ?)", [unown.id, key]);
       }
       const sheet = await call(collection.getSpeciesOwnership, "u1", unown);
-      assert.deepEqual([...sheet.forms].sort(), ["A", "B"]);
+      assert.deepEqual([...sheet.forms].sort(), ["a", "b"]);
       assert.equal((await call(collection.getSpeciesOwnership, "u1", species("Rattata"))).forms, null);
     });
   });
