@@ -599,7 +599,7 @@ describe("la comparaison de /pk comparer", () => {
   const rows = (payload) => payload.components.map((row) => row.toJSON());
   const trades = () => dbAll(points, "SELECT * FROM pokemon_trades");
   const choose = (customId, user, value) => click(customId, { user, values: [String(value)], run: handlePokemonSelect });
-  const propose = (a, b, { give = rata(), get = chen(), ...options } = {}) => click(`poke_cmpgo|${b}|${give}|${get}|0`, { user: a, ...options });
+  const propose = (a, b, { give: given = rata(), get: taken = chen(), ...options } = {}) => click(`poke_cmpgo|${b}|${given}|${taken}|0`, { user: a, ...options });
 
   it("une page : la comparaison relue, au nom du dresseur comparé, sans texte résiduel", async () => {
     const { a, b } = await pair();
