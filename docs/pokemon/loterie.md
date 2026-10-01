@@ -39,7 +39,7 @@ ceux d'une génération suivante s'y ajoutent.
 
 **La loterie a ses propres poids** (`lotteryWeight`, qui retombe sur `dropWeight` quand le
 catalogue n'en dit rien). Les deux tables ont été la même jusqu'à ce que la loterie doive donner
-quelque chose sept fois sur dix : ouvrir sa porte rendait du même coup les lots rares 1,4× plus
+quelque chose trois fois sur quatre : ouvrir sa porte rendait du même coup les lots rares 1,5× plus
 fréquents, sans rien changer à ce que tiennent les Pokémon. Les balls y pèsent donc plus lourd —
 640 et 330 contre 400 et 200 —, ce qui garde la Pépite et la Master Ball rares à la loterie **sans
 toucher à ce que tiennent les Pokémon**. `/admin poids` affiche les deux tables côte à côte : c'est là, et nulle part ailleurs,

@@ -6,11 +6,11 @@
   [Générations](README.md#générations)) apparaît dans un salon dédié, un seul à la fois. Dès que le
   salon est vide — le précédent ayant été capturé ou s'étant enfui — le **message suivant** en fait
   apparaître un nouveau. Tant qu'un Pokémon est là, ce sont le seuil de messages et
-  le délai minimum (~40 messages et 1 h) qui décident du moment où il s'enfuit, remplacé par le
+  le délai minimum (~20 messages et 1 minute) qui décident du moment où il s'enfuit, remplacé par le
   suivant. Un délai plancher après capture est disponible (`minDelayAfterEndMinutes`, à 0 par défaut)
   si l'enchaînement devient trop rapide. **Un légendaire fait exception** : les messages ne le
   chassent jamais, seuls sa durée de vie ou une capture le retirent.
-- **Fuite autonome** : chaque apparition reçoit une durée de vie tirée au hasard entre 3 et 6 heures
+- **Fuite autonome** : chaque apparition reçoit une durée de vie tirée au hasard entre 45 minutes et 1 h 30
   (`fleeAfterMinutes`). Passé ce délai, un Pokémon que personne n'a capturé s'enfuit de lui-même,
   sans dépendre de l'activité du serveur — un salon silencieux ne reste donc jamais figé sur le même
   Pokémon. La durée de vie n'est jamais affichée. Celle d'un légendaire est multipliée par
