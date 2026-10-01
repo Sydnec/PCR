@@ -557,3 +557,297 @@ describe("échanger (createTrade / acceptTrade)", () => {
     assert.equal(result.ok, false);
   });
 });
+
+describe("les échanges possibles entre deux dresseurs (tradeMatches)", () => {
+  const matches = async (a = "u1", b = "u2", options) => collection.tradeMatches(await owned(a), await owned(b), options);
+  const names = (list) => list.map((entry) => data.getSpecies(entry.speciesId).name);
+
+  it("chacun donne ce que l'autre n'a pas : une espèce contre une espèce", async () => {
+    await giveMany("Rattata", 2);
+    await give("Roucool");
+    await giveMany("Chenipan", 2, { user: "u2" });
+    await give("Roucool", { user: "u2" });
+    const { give: gifts, get: gets, swaps } = await matches();
+    assert.deepEqual(names(gifts), ["Rattata"]);
+    assert.deepEqual(names(gets), ["Chenipan"]);
+    assert.equal(swaps, 1);
+    assert.equal(gifts[0].spare, 1, "les chiffres de listDuplicates suivent chaque ligne");
+    assert.equal(gifts[0].arrivalId, species("Rattata").id);
+  });
+
+  it("ce que l'autre a déjà ne compte pas, même en un seul exemplaire : le second ne comble rien", async () => {
+    await giveMany("Rattata", 3);
+    await give("Rattata", { user: "u2" });
+    await giveMany("Chenipan", 2, { user: "u2" });
+    const { give: gifts, swaps } = await matches();
+    assert.deepEqual(gifts, []);
+    assert.equal(swaps, 0, "rien à donner : pas d'échange, même si l'autre a de quoi donner");
+  });
+
+  it("jamais le dernier exemplaire, jamais un verrouillé : le verrouillé reste, c'est l'autre qui part", async () => {
+    await give("Rattata");
+    await giveMany("Chenipan", 2);
+    await dbRun(points, "UPDATE pokemon_owned SET locked = 1 WHERE id = (SELECT MIN(id) FROM pokemon_owned WHERE species_id = ?)", [species("Chenipan").id]);
+    await giveMany("Aspicot", 2, { locked: 1 });
+    await giveMany("Piafabec", 3);
+    await dbRun(points, "UPDATE pokemon_owned SET locked = 1 WHERE species_id = ? AND id != (SELECT MAX(id) FROM pokemon_owned WHERE species_id = ?)", [species("Piafabec").id, species("Piafabec").id]);
+    await give("Roucool", { user: "u2" });
+    const { give: gifts } = await matches();
+    assert.deepEqual(names(gifts), ["Chenipan", "Piafabec"], "un seul exemplaire, ou que des verrouillés : rien à céder");
+    assert.deepEqual(gifts.map((entry) => entry.spare), [1, 1], "le libre part, les verrouillés gardent l'entrée");
+  });
+
+  it("la réserve d'évolution met de côté, de chaque côté, ce qu'il faut pour compléter le Pokédex", async () => {
+    await giveMany("Rattata", 3);
+    await giveMany("Chenipan", 2, { user: "u2" });
+    assert.deepEqual(names((await matches("u1", "u2")).give), ["Rattata"]);
+    assert.deepEqual((await matches("u1", "u2", { reserve: true })).give, [], "il manque Rattatac : un Rattata évolue, un se sacrifie, un reste");
+    await give("Rattatac", { obtained: 9 });
+    assert.deepEqual(names((await matches("u1", "u2", { reserve: true })).give), ["Rattata"], "Rattatac au Pokédex : plus rien à garder");
+  });
+
+  it("ce qui compte est l'espèce qui ARRIVE : un Machopeur devient Mackogneur chez celui qui le reçoit", async () => {
+    await giveMany("Machopeur", 2);
+    await give("Mackogneur", { user: "u2" });
+    await give("Roucool", { user: "u2" });
+    assert.deepEqual((await matches()).give, [], "il a déjà un Mackogneur : son Machopeur ne lui apporterait rien, même s'il n'a jamais eu de Machopeur");
+
+    await dbRun(points, "DELETE FROM pokemon_owned WHERE user_id = 'u2'");
+    await give("Machopeur", { user: "u2" });
+    const { give: gifts } = await matches();
+    assert.deepEqual(names(gifts), ["Machopeur"], "il a un Machopeur mais pas de Mackogneur : celui qui arrive lui manque");
+    assert.equal(gifts[0].arrivalId, species("Mackogneur").id);
+  });
+
+  it("deux espèces qui arrivent sous la même forme ne comblent qu'une case : on garde celle qui n'a pas à évoluer", async () => {
+    await giveMany("Machopeur", 2);
+    await giveMany("Mackogneur", 2);
+    await give("Roucool", { user: "u2" });
+    const { give: gifts, swaps } = await matches();
+    assert.deepEqual(names(gifts), ["Mackogneur"]);
+    assert.equal(gifts[0].arrivalId, species("Mackogneur").id);
+    assert.equal(swaps, 0, "l'autre n'a rien en double à donner en retour");
+  });
+
+  it("les chiffres de chaque ligne disent combien de shiny peuvent partir, pour les signaler", async () => {
+    await give("Rattata", { obtained: 1 });
+    await give("Rattata", { obtained: 2, shiny: 1, locked: 0 });
+    await give("Roucool", { obtained: 1 });
+    await give("Roucool", { obtained: 2, shiny: 1, locked: 1 });
+    const { give: gifts } = await matches("u1", "u2");
+    const free = (name) => gifts.find((entry) => entry.speciesId === species(name).id);
+    assert.equal(free("Rattata").free - free("Rattata").freeNormal, 1, "un shiny déverrouillé peut partir");
+    assert.equal(free("Roucool").free - free("Roucool").freeNormal, 0, "un shiny verrouillé ne part pas");
+  });
+
+  it("la comparaison est symétrique : ce que l'un donne est ce que l'autre reçoit", async () => {
+    await giveMany("Rattata", 3);
+    await giveMany("Roucool", 2);
+    await give("Chenipan");
+    await giveMany("Chenipan", 3, { user: "u2" });
+    await giveMany("Aspicot", 2, { user: "u2" });
+    await give("Roucool", { user: "u2" });
+    const forward = await matches("u1", "u2");
+    const backward = await matches("u2", "u1");
+    assert.deepEqual(forward.give, backward.get);
+    assert.deepEqual(forward.get, backward.give);
+    assert.equal(forward.swaps, backward.swaps);
+    assert.equal(forward.swaps, Math.min(forward.give.length, forward.get.length));
+  });
+
+  it("deux dresseurs sans rien : une comparaison vide, sans planter", async () => {
+    const result = await matches("rien-1", "rien-2");
+    assert.deepEqual(result, { give: [], get: [], swaps: 0 });
+  });
+
+  it("lue en base, la comparaison est la même que sur les lignes", async () => {
+    await giveMany("Rattata", 2);
+    await giveMany("Chenipan", 2, { user: "u2" });
+    const fromDb = await call(collection.getTradeMatches, "u1", "u2", { reserve: false });
+    assert.deepEqual(fromDb, await matches());
+  });
+});
+
+describe("avec qui échanger (getTradePartners)", () => {
+  const partners = (user = "u1", options = {}) => call(collection.getTradePartners, user, options);
+  const shape = (list) => list.map((entry) => [entry.userId, entry.swaps, entry.give, entry.get]);
+
+  async function world() {
+    await giveMany("Rattata", 3);
+    await giveMany("Roucool", 2);
+    // p-a et p-e : une espèce contre une espèce.
+    for (const id of ["p-a", "p-e"]) {
+      await giveMany("Chenipan", 2, { user: id });
+      await give("Roucool", { user: id });
+    }
+    // p-b : peut donner trois espèces, n'en reçoit qu'une.
+    for (const name of ["Chenipan", "Aspicot", "Piafabec"]) await giveMany(name, 2, { user: "p-b" });
+    await give("Roucool", { user: "p-b" });
+    // p-c a déjà un Rattata : rien à lui donner. p-d n'a rien en double : rien à recevoir.
+    await give("Rattata", { user: "p-c" });
+    await give("Roucool", { user: "p-c" });
+    await giveMany("Chenipan", 2, { user: "p-c" });
+    await give("Roucool", { user: "p-d" });
+    // p-f : deux espèces contre deux.
+    await giveMany("Chenipan", 2, { user: "p-f" });
+    await giveMany("Aspicot", 2, { user: "p-f" });
+  }
+
+  it("ceux qui permettent le plus d'échanges d'abord, puis le volume, puis l'identifiant", async () => {
+    await world();
+    assert.deepEqual(shape(await partners()), [
+      ["p-f", 2, 2, 2],
+      ["p-b", 1, 1, 3],
+      ["p-a", 1, 1, 1],
+      ["p-e", 1, 1, 1],
+    ]);
+  });
+
+  it("celui qui demande n'est jamais dans sa propre liste, et rien à offrir veut dire personne", async () => {
+    await world();
+    assert.ok(!(await partners()).some((entry) => entry.userId === "u1"));
+    await giveMany("Salamèche", 1, { user: "seul" });
+    assert.deepEqual(await partners("seul"), [], "sans doublon à offrir, aucun échange n'est possible");
+    assert.deepEqual(await partners("inconnu"), [], "un dresseur sans Pokémon non plus");
+  });
+
+  it("la réserve d'évolution retire ceux dont l'échange ne tient qu'à ce qu'on garde pour évoluer", async () => {
+    await giveMany("Rattata", 3);
+    await giveMany("Chenipan", 2, { user: "p-a" });
+    assert.equal((await partners("u1")).length, 1);
+    assert.deepEqual(await partners("u1", { reserve: true }), [], "les trois Rattata servent à évoluer : rien à donner");
+  });
+});
+
+describe("qui a besoin d'une espèce (getSpeciesNeeders)", () => {
+  const needers = (speciesName, user = "u1", options = {}) => call(collection.getSpeciesNeeders, user, species(speciesName).id, options);
+
+  it("ceux à qui elle manque, avec ce qu'ils offriraient en retour : l'échange avant le cadeau", async () => {
+    await giveMany("Rattata", 3);
+    await give("Roucool");
+    await giveMany("Chenipan", 2, { user: "n-a" });
+    await give("Roucool", { user: "n-b" });
+    await give("Rattata", { user: "n-c" });
+    await giveMany("Chenipan", 2, { user: "n-d" });
+    await giveMany("Aspicot", 2, { user: "n-d" });
+    const { offer, list } = await needers("Rattata");
+    assert.equal(offer.speciesId, species("Rattata").id);
+    assert.equal(offer.spare, 2);
+    assert.deepEqual(list.map((entry) => [entry.userId, entry.back]), [["n-d", 2], ["n-a", 1], ["n-b", 0]], "n-c l'a déjà : il n'en a pas besoin");
+  });
+
+  it("une espèce qu'on ne peut pas céder ne donne rien : un seul exemplaire, ou inconnue", async () => {
+    await give("Rattata");
+    await giveMany("Chenipan", 2, { user: "n-a" });
+    assert.deepEqual(await needers("Rattata"), { offer: null, list: [] });
+    assert.deepEqual(await call(collection.getSpeciesNeeders, "u1", 99999, {}), { offer: null, list: [] });
+  });
+
+  it("une espèce qui change en arrivant : seuls ceux à qui manque la forme d'arrivée en ont besoin", async () => {
+    await giveMany("Machopeur", 2);
+    await give("Mackogneur", { user: "m-a" });
+    await give("Machopeur", { user: "m-b" });
+    const { offer, list } = await needers("Machopeur");
+    assert.equal(offer.arrivalId, species("Mackogneur").id);
+    assert.deepEqual(list.map((entry) => entry.userId), ["m-b"], "m-a a déjà un Mackogneur : le Machopeur n'y ajouterait rien");
+  });
+});
+
+describe("l'individu que cède une offre qui n'en désigne pas (tradeCandidate)", () => {
+  const rattata = species("Rattata").id;
+  // Chaque situation est jouée deux fois, sur les mêmes lignes : l'individu choisi doit être
+  // celui que reserveDuplicates retirerait en premier. Une règle écrite à deux endroits
+  // finit par ne plus l'être qu'à un seul, et le test dit lequel a bougé.
+  const situations = {
+    "le plus récent d'abord": async () => giveMany("Rattata", 3),
+    "un stérile avant un capable de pondre, même plus récent": async () => {
+      await give("Rattata", { obtained: 5 });
+      await give("Rattata", { obtained: 1, sterile: 1 });
+      await give("Rattata", { obtained: 9 });
+    },
+    "un normal avant un shiny, même plus récent": async () => {
+      await give("Rattata", { obtained: 1 });
+      await give("Rattata", { obtained: 2 });
+      await give("Rattata", { obtained: 9, shiny: 1 });
+    },
+    "un individu hors vitrine avant un exposé, même plus récent": async () => {
+      await give("Rattata", { obtained: 9, showcase: 0 });
+      await give("Rattata", { obtained: 1 });
+      await give("Rattata", { obtained: 2 });
+    },
+    "un verrouillé n'est jamais cédé": async () => {
+      await give("Rattata", { obtained: 9, locked: 1 });
+      await give("Rattata", { obtained: 1 });
+      await give("Rattata", { obtained: 2 });
+    },
+    "le dernier de l'espèce ne part pas": async () => give("Rattata"),
+    "ni un groupe dont tout est verrouillé": async () => giveMany("Rattata", 2, { locked: 1 }),
+    "ni une espèce qu'on n'a pas": async () => give("Roucool"),
+  };
+
+  for (const [name, setup] of Object.entries(situations)) {
+    it(name, async () => {
+      await setup();
+      const chosen = await call(collection.tradeCandidate, "u1", rattata);
+      const removed = await call(collection.reserveDuplicates, "u1", { speciesId: rattata }, 1);
+      assert.equal(chosen?.id ?? null, removed[0]?.id ?? null);
+      if (chosen) assert.equal(chosen.locked, 0);
+    });
+  }
+
+  it("rend la ligne entière, prête à servir de sélecteur", async () => {
+    const [id] = await giveMany("Rattata", 2, { sex: "F", sterile: 1 });
+    const row = await call(collection.tradeCandidate, "u1", rattata);
+    const selector = collection.selectorOf(row);
+    assert.equal(selector.pokemonId, row.id);
+    assert.equal(selector.speciesId, rattata);
+    assert.equal(selector.sex, "F");
+    assert.equal(selector.isShiny, false);
+    assert.equal(selector.fertile, null);
+    assert.equal(selector.row, row);
+    assert.ok(id > 0);
+  });
+});
+
+describe("proposer une offre (proposeTrade)", () => {
+  async function sides() {
+    await dbRun(points, "DELETE FROM pokemon_trades");
+    const mine = await give("Rattata", { sterile: 1, sex: "F", form: null });
+    await give("Rattata", { obtained: 2 });
+    const theirs = await give("Roucool", { user: "u2", sex: "F" });
+    await give("Roucool", { user: "u2", obtained: 2 });
+    const row = async (user, id) => (await owned(user)).find((entry) => entry.id === id);
+    return {
+      mine,
+      theirs,
+      offer: collection.selectorOf(await row("u1", mine)),
+      request: collection.selectorOf(await row("u2", theirs)),
+    };
+  }
+
+  it("enregistre l'offre avec l'individu et la fertilité de chaque côté, et rend la ligne", async () => {
+    const { mine, theirs, offer, request } = await sides();
+    const trade = await call(collection.proposeTrade, { fromUserId: "u1", toUserId: "u2", offer, request, channelId: "salon" });
+    assert.equal(trade.status, "PENDING");
+    assert.equal(trade.from_user_id, "u1");
+    assert.equal(trade.to_user_id, "u2");
+    assert.equal(trade.offer_pokemon_id, mine);
+    assert.equal(trade.request_pokemon_id, theirs);
+    assert.equal(trade.offer_species_id, species("Rattata").id);
+    assert.equal(trade.request_species_id, species("Roucool").id);
+    assert.equal(trade.offer_fertile, 0, "le Rattata proposé est stérile : qui le reçoit le sait");
+    assert.equal(trade.request_fertile, 1);
+    assert.equal(trade.offer_sex, "F");
+    assert.equal(trade.channel_id, "salon");
+    assert.equal(trade.expires_at - trade.created_at, getPokemonConfig().trade.expiryHours * 3600 * 1000);
+    assert.deepEqual(await call(collection.getTrade, trade.id), trade, "ce qui est rendu est la ligne enregistrée");
+  });
+
+  it("une panne d'écriture est rendue à l'appelant, sans offre à moitié créée", async () => {
+    const { offer, request } = await sides();
+    await dbRun(points, "CREATE TRIGGER panne BEFORE INSERT ON pokemon_trades BEGIN SELECT RAISE(ABORT, 'panne'); END");
+    await assert.rejects(() => call(collection.proposeTrade, { fromUserId: "u1", toUserId: "u2", offer, request, channelId: "salon" }), /panne/);
+    await dbRun(points, "DROP TRIGGER panne");
+    assert.equal((await dbAll(points, "SELECT id FROM pokemon_trades")).length, 0);
+  });
+});
