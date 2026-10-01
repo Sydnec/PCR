@@ -403,13 +403,18 @@ describe("les boutons d'évolution", () => {
     assert.equal(await balance(user), 3500);
   });
 
-  it("un Machopeur reçu en échange évolue sans rien payer, sans solde, même seul", async () => {
+  it("un Machopeur reçu en échange évolue sans rien payer, sans solde, avec un exemplaire restant", async () => {
     const user = newUser();
-    const id = await own("Machopeur", user);
+    await own("Machopeur", user);
+    const id = await own("Machopeur", user, { obtained: 2 });
     await dbRun(points, "UPDATE pokemon_owned SET origin = 'echange' WHERE id = ?", [id]);
     const calls = await click(evo("Machopeur", `#${id}`), { user });
     assert.match(only(calls, "update").content, /a évolué en \*\*Mackogneur/);
-    assert.equal((await dbAll(points, "SELECT species_id FROM pokemon_owned WHERE user_id = ?", [user]))[0].species_id, species("Mackogneur").id);
+    assert.equal((await dbAll(points, "SELECT species_id FROM pokemon_owned WHERE id = ?", [id]))[0].species_id, species("Mackogneur").id);
+    const left = await own("Machopeur", "u-seul");
+    await dbRun(points, "UPDATE pokemon_owned SET origin = 'echange' WHERE id = ?", [left]);
+    const alone = await click(evo("Machopeur", `#${left}`), { user: "u-seul" });
+    assert.match(only(alone, "update").content, /^❌/, "seul de son espèce, il ne peut pas évoluer");
     assert.equal(await balance(user), 0);
   });
 

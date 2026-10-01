@@ -887,8 +887,9 @@ describe("/pk evolution", () => {
     assert.deepEqual(ids, [`poke_evo|${species("Rattata").id}|*|random`]);
   });
 
-  it("un Machopeur reçu en échange : évolution gratuite annoncée, même seul, et le bouton le désigne", async () => {
-    const id = await own("Machopeur");
+  it("un Machopeur reçu en échange : évolution gratuite annoncée avec un exemplaire restant, et le bouton le désigne", async () => {
+    await own("Machopeur");
+    const id = await own("Machopeur", { obtained: 2 });
     await dbRun(points, "UPDATE pokemon_owned SET origin = 'echange' WHERE id = ?", [id]);
     const reply = payloadOf(await evolution({ ...evo("Machopeur"), individu: `#${id}` }), "editReply");
     assert.match(textOf(reply), /Reçu en échange : l'évolution est \*\*gratuite\*\*/);
@@ -897,10 +898,14 @@ describe("/pk evolution", () => {
     assert.equal(button.custom_id, `poke_evo|${species("Machopeur").id}|#${id}|random`);
 
     const choices = payloadOf(await runAutocomplete(pk, { sub: "evolution", options: evo("Machopeur"), focused: { name: "individu", value: "" } }), "respond");
-    assert.deepEqual(choices.map((choice) => choice.value), [`#${id}`], "le dernier de l'espèce se propose, puisque cette évolution est gratuite");
+    assert.ok(choices.some((choice) => choice.value === `#${id}`));
     const species_ = payloadOf(await runAutocomplete(pk, { sub: "evolution", focused: { name: "espece", value: "" } }), "respond");
     assert.ok(species_.some((choice) => choice.value === String(species("Machopeur").id)));
 
+    await dbRun(points, "DELETE FROM pokemon_owned WHERE id != ?", [id]);
+    const lone = payloadOf(await evolution({ ...evo("Machopeur"), individu: `#${id}` }), "editReply");
+    assert.doesNotMatch(textOf(lone), /Faire évoluer/, "le seul Machopeur ne peut pas évoluer : il en faut un qui reste");
+    await own("Machopeur");
     await dbRun(points, "UPDATE pokemon_owned SET origin = 'test' WHERE id = ?", [id]);
     const paid = payloadOf(await evolution({ ...evo("Machopeur"), individu: `#${id}` }), "editReply");
     assert.doesNotMatch(textOf(paid), /gratuite/, "jamais échangé : rien de gratuit");

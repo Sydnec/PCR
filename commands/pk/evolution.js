@@ -35,7 +35,7 @@ import {
 
 const pts = (value) => value.toLocaleString("fr-FR");
 // Un individu reçu en échange dont l'espèce évolue à l'échange : son évolution ne
-// coûte rien (describeEvolution), et il peut être le dernier de son espèce.
+// coûte rien (describeEvolution), pourvu qu'il en reste un derrière lui.
 const isTradedEvolver = (row) =>
   row.origin === "echange" &&
   Boolean(describeEvolution(row.species_id, null, null, { traded: true }).traded);
@@ -150,8 +150,9 @@ function listEvolvable(userId, cb) {
         const stock = stockOf(counts, speciesId);
         const paths = evolutionPaths(speciesId, stock, helpers);
         // Un Pokémon reçu en échange évolue gratuitement vers sa forme d'échange,
-        // même seul de son espèce : c'est un chemin de plus.
-        const free = rows.some((row) => isTradedEvolver(row));
+        // s'il en reste un derrière lui : c'est un chemin de plus.
+        const free =
+          stock.total >= 2 && rows.some((row) => !row.locked && isTradedEvolver(row));
         if (paths.length || free) {
           evolvable.push({ speciesId, count: stock.total, shiny: stock.shiny });
           continue;
@@ -242,7 +243,7 @@ export default {
         const choices = individualChoices(
           rows.filter((row) => row.species_id === species.id),
           query,
-          (row) => !row.last || isTradedEvolver(row)
+          (row) => !row.last
         );
         if (!choices.length) {
           return hint(
@@ -398,8 +399,8 @@ export default {
             embed.addFields({
               name: "Coût",
               value:
-                "🔁 Reçu en échange : l'évolution est **gratuite**, sans sacrifice ni points, " +
-                `même si c'est ton seul ${species.name}.`,
+                "🔁 Reçu en échange : l'évolution est **gratuite**, sans sacrifice ni points. " +
+                `Il t'en faut **${plan.required}** en tout : celui qui évolue et un ${species.name} qui reste.`,
               inline: false,
             });
           } else if (canPay(plan, stock)) {

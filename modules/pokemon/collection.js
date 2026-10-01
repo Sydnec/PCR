@@ -572,10 +572,7 @@ const LEAST_PRECIOUS_FIRST =
 // dernier, et un exposé après tous les autres. Une variante absente du
 // groupe veut dire « shiny ou non ». Un verrouillé n'est jamais candidat, sauf
 // avec `withLocked` : l'individu qui évolue ne quitte pas la boîte, il revient
-// sous sa nouvelle forme — et même alors, un ouvert passe avant lui. Avec
-// `allowLast`, le dernier de l'espèce peut partir : réservé à l'évolution gratuite
-// d'un Pokémon reçu en échange, dont l'espèce d'origine quitte alors le Pokédex,
-// comme avant, quand l'échange le faisait évoluer d'office.
+// sous sa nouvelle forme — et même alors, un ouvert passe avant lui.
 //
 // Une seule instruction, qui compte et retire d'un même geste : deux retraits
 // simultanés ne peuvent pas passer à deux sur le même individu, et c'est tout
@@ -593,7 +590,6 @@ export function reserveDuplicates(userId, group, quantity, cb) {
     fertile = null,
     pokemonId = null,
     withLocked = false,
-    allowLast = false,
   } = group;
   const filter = `o.user_id = $user AND o.species_id = $species
     AND ($withLocked OR o.locked = 0)
@@ -609,7 +605,7 @@ export function reserveDuplicates(userId, group, quantity, cb) {
          LIMIT $quantity)
         AND (SELECT COUNT(*) FROM pokemon_owned o WHERE ${filter}) >= $quantity
         AND (SELECT COUNT(*) FROM pokemon_owned WHERE user_id = $user AND species_id = $species)
-            >= $quantity + $keep
+            >= $quantity + 1
       RETURNING *`,
     {
       $user: userId,
@@ -620,7 +616,6 @@ export function reserveDuplicates(userId, group, quantity, cb) {
       $sterile: fertile === null || fertile === undefined ? null : fertile ? 0 : 1,
       $withLocked: withLocked ? 1 : 0,
       $quantity: quantity,
-      $keep: allowLast ? 0 : 1,
     },
     (err, rows) => cb(err, rows || [])
   );
@@ -886,8 +881,8 @@ export function describeEvolution(
   const sacrifices = Math.max(0, stageCost.duplicates - 1 - (helper?.copies ?? 0));
 
   // Un Pokémon reçu en échange évolue gratuitement vers sa forme d'échange : ni
-  // points ni sacrifice, et un seul exemplaire suffit, puisque l'échange le
-  // faisait évoluer d'office et qu'aucun autre ne restait derrière lui. Sans
+  // points ni sacrifice. Il reste exigé un exemplaire derrière celui qui évolue,
+  // comme pour toute évolution : l'entrée du Pokédex n'est jamais perdue. Sans
   // objet : une aide n'a rien à payer ici.
   if (traded && !helper && target && target.id === tradeEvolutionTarget(species)?.id) {
     return {
@@ -898,7 +893,7 @@ export function describeEvolution(
       helper: null,
       sacrifices: 0,
       points: 0,
-      required: 1,
+      required: 2,
       traded: true,
     };
   }
@@ -1186,7 +1181,6 @@ export function evolve(userId, group, chosenTargetId, helperKey, cb) {
     sex,
     pokemonId,
     withLocked: Boolean(group.confirmLocked),
-    allowLast: Boolean(plan.traded),
   };
   reserveDuplicates(userId, evolverGroup, 1, (err, evolvers) => {
     if (err) return cb(err);

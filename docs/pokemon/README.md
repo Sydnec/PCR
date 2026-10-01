@@ -86,7 +86,8 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
   cherche les échanges qui servent aux deux.
   **Kadabra, Machopeur, Gravalanch et Spectrum** arrivent tels quels : l'échange ne les fait plus
   évoluer. Reçus en échange, ils évoluent ensuite **gratuitement** avec `/pk evolution` — ni points ni
-  sacrifice, même si c'est le seul de son espèce (elle quitte alors le Pokédex). Le dresseur choisit
+  sacrifice, à condition qu'il en reste un derrière lui, comme pour toute évolution : l'entrée du
+  Pokédex n'est jamais perdue. Le dresseur choisit
   donc s'il évolue, et quand. Un Pokémon jamais échangé garde l'évolution payante ordinaire. La
   proposition l'annonce avant le clic.
 - `/pk comparer [membre] [pokemon] [evolutions]` : cherche les échanges **qui servent aux deux** —
