@@ -1260,7 +1260,18 @@ export function setTradeMessage(tradeId, messageId) {
 // que de livrer autre chose que ce qui était promis. /pk echange et le bouton de
 // /pk comparer passent tous deux par ici : une offre ne se fabrique qu'à un
 // endroit, et ce qui s'affiche vient de la ligne, pas d'une copie.
-export function proposeTrade({ fromUserId, toUserId, offer, request, channelId }, cb) {
+//
+// Avec `unique`, une offre identique encore ouverte — même auteur, même
+// destinataire, mêmes Pokémon — empêche d'en créer une seconde : la nouvelle se
+// retire et l'appelant reçoit `{ duplicate: true }` à la place de la ligne. Le
+// bouton de /pk comparer le demande : deux clics rapprochés publieraient deux
+// offres, avec deux mentions. Une offre qu'on n'a pu ni relire ni vérifier est
+// fermée aussi : l'appelant répond à un échec, personne ne la verra, et ouverte
+// elle bloquerait les essais suivants jusqu'à son expiration.
+export function proposeTrade(
+  { fromUserId, toUserId, offer, request, channelId, unique = false },
+  cb
+) {
   createTrade(
     {
       fromUserId,
@@ -1281,13 +1292,20 @@ export function proposeTrade({ fromUserId, toUserId, offer, request, channelId }
     },
     (err, tradeId) => {
       if (err || !tradeId) return cb(err || new Error("Création d'échange impossible"));
-      getTrade(tradeId, (readError, trade) => {
-        if (!readError && trade) return cb(null, trade);
-        // L'offre existe, mais l'appelant va répondre à un échec et personne ne la
-        // verra : on la ferme plutôt que de la laisser ouverte jusqu'à son expiration.
+      const abandon = (error, ...rest) =>
         resolveTradeAs(tradeId, fromUserId, "CANCELLED", (closeError) => {
-          if (closeError) handleException("Fermeture d'une offre illisible :", closeError);
-          cb(readError || new Error(`Échange #${tradeId} introuvable`));
+          if (closeError) handleException("Fermeture d'une offre abandonnée :", closeError);
+          cb(error, ...rest);
+        });
+      getTrade(tradeId, (readError, trade) => {
+        if (readError || !trade) {
+          return abandon(readError || new Error(`Échange #${tradeId} introuvable`));
+        }
+        if (!unique) return cb(null, trade);
+        isOldestOpenOffer(trade, (checkError, first) => {
+          if (checkError) return abandon(checkError);
+          if (!first) return abandon(null, null, { duplicate: true });
+          cb(null, trade);
         });
       });
     }
@@ -1295,22 +1313,29 @@ export function proposeTrade({ fromUserId, toUserId, offer, request, channelId }
 }
 
 // L'offre est-elle la plus ancienne de ses semblables — même auteur, même
-// destinataire, mêmes Pokémon, encore ouvertes ? Deux clics rapprochés sur
-// « Proposer cet échange » créent deux offres identiques : chacune vérifie
-// après avoir écrit, la plus ancienne reste, les autres se retirent. Comme les
-// identifiants montent, une seule peut se croire la première, même quand les
-// deux s'exécutent en même temps.
+// destinataire, mêmes Pokémon, encore ouvertes ? Chacune vérifie après avoir
+// écrit : la plus ancienne reste, les autres se retirent. Comme les identifiants
+// montent, une seule peut se croire la première, même quand deux demandes
+// s'exécutent en même temps. Les espèces et les variantes se comparent aussi :
+// une offre qui ne désigne pas d'individu (celles d'avant ce choix) a deux
+// identifiants NULL, et NULL vaut NULL.
 export function isOldestOpenOffer(trade, cb) {
   db.get(
     `SELECT MIN(id) AS first FROM pokemon_trades
       WHERE from_user_id = ? AND to_user_id = ?
         AND offer_pokemon_id IS ? AND request_pokemon_id IS ?
+        AND offer_species_id = ? AND request_species_id = ?
+        AND offer_is_shiny = ? AND request_is_shiny = ?
         AND status = 'PENDING' AND expires_at > ?`,
     [
       trade.from_user_id,
       trade.to_user_id,
       trade.offer_pokemon_id,
       trade.request_pokemon_id,
+      trade.offer_species_id,
+      trade.request_species_id,
+      trade.offer_is_shiny,
+      trade.request_is_shiny,
       Date.now(),
     ],
     (err, row) => cb(err, !err && row?.first === trade.id)
@@ -1585,7 +1610,7 @@ function readEveryCollection(cb) {
 // vide ne se lit pas pareil.
 export function getTradePartners(userId, { reserve = false } = {}, cb) {
   readEveryCollection((err, byUser) => {
-    if (err) return cb(err, [], { offers: 0 });
+    if (err) return cb(err, []);
     const options = { reserve, edges: new Map() };
     const context = tradeContext();
     const mine = profileOf(byUser.get(userId) ?? [], options, context);

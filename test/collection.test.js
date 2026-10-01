@@ -713,6 +713,22 @@ describe("avec qui échanger (getTradePartners)", () => {
     assert.deepEqual(await both("inconnu"), [[], { offers: 0 }], "un dresseur sans Pokémon non plus");
   });
 
+  it("une lecture ratée est rendue telle quelle, sans résumé qui ferait dire « rien à offrir » à tort", async () => {
+    await world();
+    const original = points.all;
+    points.all = function (sql, ...rest) {
+      if (/FROM pokemon_owned/.test(sql) && !/WHERE/.test(sql)) return rest.at(-1)(new Error("panne de lecture"));
+      return original.call(this, sql, ...rest);
+    };
+    try {
+      const result = await new Promise((resolve) => collection.getTradePartners("u1", {}, (...args) => resolve(args)));
+      assert.equal(result[0].message, "panne de lecture");
+      assert.deepEqual(result.slice(1), [[]], "la liste est vide, et aucun résumé n'accompagne l'erreur");
+    } finally {
+      points.all = original;
+    }
+  });
+
   it("dit combien d'espèces le dresseur peut offrir, pour distinguer « rien à offrir » de « personne n'en veut »", async () => {
     await world();
     assert.deepEqual((await both())[1], { offers: 2 }, "Rattata et Roucool");
@@ -871,6 +887,38 @@ describe("proposer une offre (proposeTrade)", () => {
     assert.deepEqual(rows.map((row) => row.status), ["CANCELLED"], "l'appelant répond à un échec : personne ne verra cette offre");
   });
 
+  it("avec `unique`, une offre identique encore ouverte empêche d'en créer une seconde, qui se retire", async () => {
+    const { offer, request } = await sides();
+    const args = { fromUserId: "u1", toUserId: "u2", offer, request, channelId: "salon", unique: true };
+    const propose = (overrides = {}) => call(collection.proposeTrade, { ...args, ...overrides });
+    const [first] = [await propose()];
+    assert.equal(first.status, "PENDING");
+    const second = await new Promise((resolve) => collection.proposeTrade(args, (err, trade, info) => resolve({ err, trade, info })));
+    assert.deepEqual([second.err, second.trade, second.info], [null, null, { duplicate: true }]);
+    assert.deepEqual((await dbAll(points, "SELECT status FROM pokemon_trades ORDER BY id")).map((row) => row.status), ["PENDING", "CANCELLED"]);
+
+    const without = await call(collection.proposeTrade, { ...args, unique: false });
+    assert.equal(without.status, "PENDING", "sans `unique`, /pk echange garde son comportement : une offre de plus");
+    await call(collection.resolveTradeAs, first.id, "u2", "DECLINED");
+    await call(collection.resolveTradeAs, without.id, "u2", "DECLINED");
+    assert.equal((await propose()).status, "PENDING", "une offre refusée ne bloque plus");
+  });
+
+  it("avec `unique`, une panne en vérifiant ferme l'offre plutôt que de la laisser ouverte sans personne pour la voir", async () => {
+    const { offer, request } = await sides();
+    const original = points.get;
+    points.get = function (sql, ...rest) {
+      if (/MIN\(id\) AS first/.test(sql)) return rest.at(-1)(new Error("panne de lecture"));
+      return original.call(this, sql, ...rest);
+    };
+    try {
+      await assert.rejects(() => call(collection.proposeTrade, { fromUserId: "u1", toUserId: "u2", offer, request, channelId: "salon", unique: true }), /panne de lecture/);
+    } finally {
+      points.get = original;
+    }
+    assert.deepEqual((await dbAll(points, "SELECT status FROM pokemon_trades")).map((row) => row.status), ["CANCELLED"]);
+  });
+
   it("une panne d'écriture est rendue à l'appelant, sans offre à moitié créée", async () => {
     const { offer, request } = await sides();
     await dbRun(points, "CREATE TRIGGER panne BEFORE INSERT ON pokemon_trades BEGIN SELECT RAISE(ABORT, 'panne'); END");
@@ -914,10 +962,17 @@ describe("l'offre la plus ancienne de ses semblables (isOldestOpenOffer)", () =>
     assert.equal(await oldest(third), true);
   });
 
-  it("des offres anciennes, sans Pokémon désignés, se comparent aussi : NULL vaut NULL", async () => {
-    const first = await open({ offerPokemonId: null, requestPokemonId: null });
-    const second = await open({ offerPokemonId: null, requestPokemonId: null });
+  it("des offres anciennes, sans Pokémon désignés, se comparent par espèce : NULL vaut NULL, mais Rattata n'est pas Roucool", async () => {
+    const group = { offerPokemonId: null, requestPokemonId: null };
+    const first = await open(group);
+    const second = await open(group);
     assert.equal(await oldest(first), true);
-    assert.equal(await oldest(second), false);
+    assert.equal(await oldest(second), false, "mêmes espèces, mêmes variantes : un doublon");
+    const other = await open({ ...group, offerSpeciesId: species("Aspicot").id });
+    assert.equal(await oldest(other), true, "une autre espèce proposée n'est pas un doublon");
+    const another = await open({ ...group, requestSpeciesId: species("Piafabec").id });
+    assert.equal(await oldest(another), true, "ni une autre espèce demandée");
+    const shiny = await open({ ...group, offerIsShiny: true });
+    assert.equal(await oldest(shiny), true, "ni une autre variante");
   });
 });

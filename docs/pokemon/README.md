@@ -91,7 +91,9 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
     signalé ✨. Deux menus choisissent un côté de l'échange chacun, puis **« Proposer cet
     échange »** publie l'offre dans le salon, avec le destinataire mentionné : même offre, mêmes
     boutons et même acceptation que `/pk echange`. Le bot choisit lui-même l'individu de chaque
-    côté, le moins précieux d'abord (voir [Individus](individus.md#qui-part-quand-on-cède)).
+    côté, le moins précieux d'abord (voir [Individus](individus.md#qui-part-quand-on-cède)). Une
+    offre identique encore ouverte n'est pas republiée (« tu as déjà proposé cet échange »), et une
+    offre que le salon n'a pas pu publier est annulée plutôt que laissée sans message.
   - sans option : **avec qui échanger**, le dresseur qui permet le plus d'échanges d'abord.
   - `pokemon` (un de tes doublons) : **à qui il manque**, avec ce que chacun peut te donner en
     retour — un échange passe avant un cadeau.

@@ -47,7 +47,6 @@ import {
   getTrade,
   getTradeMatches,
   getTradePartners,
-  isOldestOpenOffer,
   listDuplicates,
   proposeTrade,
   resolveTradeAs,
@@ -432,8 +431,8 @@ function showNeedersPage(interaction, speciesId, reserve, page) {
 // verrouillé ni le dernier de l'espèce. Tout se relit au clic : le choix a pu
 // cesser d'être proposé depuis la comparaison. Comme le partage d'un bilan, c'est
 // le bot qui publie dans le salon : ses permissions se vérifient avant de créer
-// quoi que ce soit, et une offre que le salon refuse est annulée plutôt que
-// laissée dans la base sans que personne ne la voie.
+// quoi que ce soit, et une offre que le salon n'a pas publiée est annulée plutôt
+// que laissée dans la base sans que personne ne la voie.
 //
 // Le clic est acquitté d'abord : la lecture, la création et la publication peuvent
 // dépasser les trois secondes que Discord laisse pour répondre.
@@ -492,7 +491,7 @@ async function proposeFromComparison(interaction, state) {
   const problem = postingProblem(interaction, channel);
   if (problem) return refuse(problem);
 
-  const trade = await new Promise((resolve) =>
+  const created = await new Promise((resolve) =>
     proposeTrade(
       {
         fromUserId: userId,
@@ -500,54 +499,45 @@ async function proposeFromComparison(interaction, state) {
         offer: selectorOf(giving.row),
         request: selectorOf(receiving.row),
         channelId: channel.id,
+        unique: true,
       },
-      (err, created) => resolve(err ? { err } : { created })
+      (err, trade, info) => resolve({ err, trade, duplicate: Boolean(info?.duplicate) })
     )
   );
-  if (trade.err) {
-    handleException("Création d'une offre depuis /pk comparer :", trade.err);
+  if (created.err) {
+    handleException("Création d'une offre depuis /pk comparer :", created.err);
     return refuse("❌ Impossible de créer l'échange.");
   }
-  const offerId = trade.created.id;
-  const cancelOffer = () =>
-    resolveTradeAs(offerId, userId, "CANCELLED", (err) => {
-      if (err) handleException("Annulation d'une offre non publiée :", err);
-    });
-
-  // Deux clics rapprochés ont créé deux offres identiques : seule la plus ancienne
-  // est publiée, l'autre se retire sans bruit et dit pourquoi.
-  const oldest = await new Promise((resolve) =>
-    isOldestOpenOffer(trade.created, (err, first) => resolve(err ? { err } : { first }))
-  );
-  if (oldest.err) {
-    handleException("Vérification d'une offre en double :", oldest.err);
-    cancelOffer();
-    return refuse("❌ Erreur base de données.");
-  }
-  if (!oldest.first) {
-    cancelOffer();
+  // Deux clics rapprochés, ou une offre identique encore ouverte : proposeTrade a
+  // retiré la nouvelle, la plus ancienne reste.
+  if (created.duplicate) {
     return refuse(`⏳ Tu as déjà proposé cet échange à <@${state.partnerId}> : il attend sa réponse.`);
   }
+  const offerId = created.trade.id;
 
   let message;
   try {
     message = await channel.send({
       content: `<@${state.partnerId}>`,
-      embeds: [buildTradeEmbed(trade.created, "PENDING")],
+      embeds: [buildTradeEmbed(created.trade, "PENDING")],
       components: [buildTradeRow(offerId)],
       allowedMentions: { users: [state.partnerId] },
     });
   } catch (error) {
     handleException("Publication d'une offre d'échange :", error);
-    // Seuls ces codes prouvent que rien n'a été publié (ENVOI_IMPOSSIBLE). Sur une
-    // coupure ou un délai, le message est peut-être parti : annuler l'offre lui
-    // laisserait des boutons morts, et un nouvel essai en publierait une seconde.
-    // Elle expire seule.
-    if (!ENVOI_IMPOSSIBLE.has(error?.code)) {
-      return refuse("⚠️ L'envoi a échoué, mais il a peut-être abouti : va voir le salon.");
-    }
-    cancelOffer();
-    return refuse(`❌ Je n'ai pas pu publier l'offre dans ${channel}. Tu peux réessayer.`);
+    // Une offre sans message n'a plus de raison d'exister, et ouverte elle
+    // bloquerait tout nouvel essai : on l'annule dans tous les cas. Seul l'avis
+    // change. Un code d'ENVOI_IMPOSSIBLE prouve que rien n'a été publié ; sur une
+    // coupure ou un délai, le message est peut-être parti, et ses boutons
+    // répondront alors que l'offre a déjà été traitée.
+    resolveTradeAs(offerId, userId, "CANCELLED", (err) => {
+      if (err) handleException("Annulation d'une offre non publiée :", err);
+    });
+    return refuse(
+      ENVOI_IMPOSSIBLE.has(error?.code)
+        ? `❌ Je n'ai pas pu publier l'offre dans ${channel}. Tu peux réessayer.`
+        : "⚠️ L'envoi a échoué, mais il a peut-être abouti : va voir le salon avant de réessayer."
+    );
   }
   setTradeMessage(offerId, message.id);
   await interaction

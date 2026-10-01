@@ -738,11 +738,34 @@ describe("la comparaison de /pk comparer", () => {
     assert.equal((await trades())[0].status, "CANCELLED");
   });
 
-  it("une coupure pendant l'envoi ne prouve pas qu'il a échoué : l'offre reste ouverte, le message l'a peut-être publiée", async () => {
+  it("une coupure pendant l'envoi : l'offre est annulée aussi, avec un avis prudent, et un nouvel essai aboutit", async () => {
     const { a, b } = await pair();
     const calls = await propose(a, b, { channel: fakeChannel({ sendFails: new Error("fetch failed") }) });
-    assert.equal(last(calls, "followUp").content, "⚠️ L'envoi a échoué, mais il a peut-être abouti : va voir le salon.");
-    assert.equal((await trades())[0].status, "PENDING", "annuler laisserait des boutons morts sous un message déjà publié");
+    assert.equal(last(calls, "followUp").content, "⚠️ L'envoi a échoué, mais il a peut-être abouti : va voir le salon avant de réessayer.");
+    assert.equal((await trades())[0].status, "CANCELLED", "ouverte, une offre sans message bloquerait tout nouvel essai");
+
+    const channel = fakeChannel();
+    await propose(a, b, { channel });
+    assert.equal(channel.sent.length, 1, "le nouvel essai publie l'offre : l'échec précédent ne l'a pas bloqué");
+    assert.deepEqual((await trades()).map((trade) => trade.status), ["CANCELLED", "PENDING"]);
+  });
+
+  it("une panne en vérifiant les doublons : l'offre est fermée, rien n'est envoyé, le refus le dit", async () => {
+    const { a, b } = await pair();
+    const original = points.get;
+    points.get = function (sql, ...rest) {
+      if (/MIN\(id\) AS first/.test(sql)) return rest.at(-1)(new Error("panne de lecture"));
+      return original.call(this, sql, ...rest);
+    };
+    const channel = fakeChannel();
+    try {
+      const calls = await propose(a, b, { channel });
+      assert.equal(last(calls, "followUp").content, "❌ Impossible de créer l'échange.");
+    } finally {
+      points.get = original;
+    }
+    assert.equal(channel.sent.length, 0);
+    assert.deepEqual((await trades()).map((trade) => trade.status), ["CANCELLED"], "aucune offre ouverte que personne ne verra");
   });
 
   it("deux clics rapprochés ne publient qu'une offre : la plus ancienne reste, l'autre se retire et le dit", async () => {

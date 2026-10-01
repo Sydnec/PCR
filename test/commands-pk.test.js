@@ -714,7 +714,13 @@ describe("/pk comparer", () => {
   });
 
   it("les chiffres des refus se lisent à la française", async () => {
-    await ownMany("Rattata", 1200, { locked: 1 });
+    await dbRun(
+      points,
+      `WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 1200)
+       INSERT INTO pokemon_owned (user_id, species_id, is_shiny, sex, origin, obtained_at, locked)
+       SELECT 'u1', ?, 0, 'M', 'test', i, 1 FROM n`,
+      [species("Rattata").id]
+    );
     const text = payloadOf(await compare({ pokemon: String(species("Rattata").id), evolutions: false }), "editReply").content;
     assert.match(text, /Tes \*\*1\u202f200\*\* Rattata sont verrouillés/);
   });
