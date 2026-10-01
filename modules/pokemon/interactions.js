@@ -42,22 +42,34 @@ import {
   getCollection,
   getIndividuals,
   getSpeciesDuplicates,
+  getSpeciesNeeders,
   getSpeciesOwnership,
   getTrade,
+  getTradeMatches,
+  getTradePartners,
   listDuplicates,
+  proposeTrade,
   resolveTradeAs,
+  selectorOf,
+  setTradeMessage,
+  tradeCandidate,
 } from "./collection.js";
 import {
   buildDexEmbed,
   buildDexRow,
   buildBoxEmbed,
   buildBoxRow,
+  buildCompareView,
   buildDropEmbed,
   buildDuplicatesEmbed,
   buildDuplicatesRow,
   buildSpeciesDuplicatesEmbed,
   buildSpeciesDuplicatesRow,
+  buildNeedersEmbed,
+  buildNeedersRow,
   buildPaidEntryReply,
+  buildPartnersEmbed,
+  buildPartnersRow,
   buildSafariGenerationPicker,
   buildSafariRecapEmbed,
   buildSafariView,
@@ -323,6 +335,220 @@ function showSpeciesDuplicatesPage(interaction, speciesId, page, { reserve = fal
   });
 }
 
+// ---------------------- Comparer ----------------------
+
+// L'état d'une comparaison, tel que les customId le portent : le dresseur
+// comparé, ce que chaque côté a choisi (0 : rien), la réserve d'évolution et la
+// page. Rien n'est gardé en mémoire : le clic suivant relit tout en base.
+const compareState = ([partnerId, give, get, reserve, page]) => ({
+  partnerId: String(partnerId),
+  give: Number(give) || 0,
+  get: Number(get) || 0,
+  reserve: reserve === "1",
+  page: Number(page) || 0,
+});
+
+// Le dresseur comparé, avec son nom. Parti du serveur, il reste comparable : sa
+// collection est toujours là.
+async function fetchPartner(interaction, partnerId) {
+  try {
+    return await interaction.client.users.fetch(partnerId);
+  } catch (error) {
+    return { id: partnerId, username: "Dresseur inconnu" };
+  }
+}
+
+// Réécrit le message avec la comparaison, relue en base. `notice` dit pourquoi un
+// choix a disparu, quand c'est le cas ; sans lui le texte est effacé. `write`
+// vaut `update` pour un clic direct, `editReply` une fois le clic acquitté.
+async function renderComparison(interaction, state, match, { notice = null, write = "update" } = {}) {
+  const partner = await fetchPartner(interaction, state.partnerId);
+  await interaction[write]({ content: notice, ...buildCompareView(match, { ...state, partner }) }).catch(
+    () => {}
+  );
+}
+
+function showComparison(interaction, state) {
+  getTradeMatches(interaction.user.id, state.partnerId, { reserve: state.reserve }, (err, match) => {
+    if (err) {
+      handleException("Lecture de la comparaison :", err);
+      return ephemeral(interaction, "❌ Impossible de lire les collections.");
+    }
+    renderComparison(interaction, state, match).catch((error) =>
+      handleException("Affichage de la comparaison :", error)
+    );
+  });
+}
+
+// « Avec qui échanger » et « qui a besoin d'une espèce » se relisent à chaque
+// page, comme les doublons : ce qui a été donné entre-temps apparaît tel quel.
+function showPartnersPage(interaction, reserve, page) {
+  getTradePartners(interaction.user.id, { reserve }, (err, list, summary) => {
+    if (err) {
+      handleException("Lecture des partenaires d'échange :", err);
+      return ephemeral(interaction, "❌ Impossible de lire les collections.");
+    }
+    interaction
+      .update({
+        embeds: [buildPartnersEmbed(list, { page, reserve, offers: summary.offers })],
+        components: [buildPartnersRow(list.length, page, { reserve })],
+      })
+      .catch(() => {});
+  });
+}
+
+function showNeedersPage(interaction, speciesId, reserve, page) {
+  const species = getSpecies(speciesId);
+  if (!species) return ephemeral(interaction, "❌ Espèce inconnue.");
+  getSpeciesNeeders(interaction.user.id, species.id, { reserve }, (err, found) => {
+    if (err) {
+      handleException("Lecture de ceux qui ont besoin d'une espèce :", err);
+      return ephemeral(interaction, "❌ Impossible de lire les collections.");
+    }
+    // Le dernier exemplaire a pu partir entre deux clics : on le dit, plutôt que
+    // d'afficher « tout le monde l'a » devant quelqu'un qui n'en a plus à donner.
+    if (!found.offer) {
+      return interaction
+        .update({
+          content: `❌ Tu n'as plus de **${species.name}** à donner : relance /pk comparer.`,
+          embeds: [],
+          components: [],
+        })
+        .catch(() => {});
+    }
+    interaction
+      .update({
+        embeds: [buildNeedersEmbed(species, found.offer, found.list, { page, reserve })],
+        components: [buildNeedersRow(species.id, found.list.length, page, { reserve })],
+      })
+      .catch(() => {});
+  });
+}
+
+// Le bouton « Proposer cet échange » : l'offre naît par le même chemin que
+// /pk echange (proposeTrade), avec pour chaque côté l'individu que
+// reserveDuplicates retirerait en premier — le moins précieux, jamais un
+// verrouillé ni le dernier de l'espèce. Tout se relit au clic : le choix a pu
+// cesser d'être proposé depuis la comparaison. Comme le partage d'un bilan, c'est
+// le bot qui publie dans le salon : ses permissions se vérifient avant de créer
+// quoi que ce soit, et une offre que le salon n'a pas publiée est annulée plutôt
+// que laissée dans la base sans que personne ne la voie.
+//
+// Le clic est acquitté d'abord : la lecture, la création et la publication peuvent
+// dépasser les trois secondes que Discord laisse pour répondre.
+async function proposeFromComparison(interaction, state) {
+  const userId = interaction.user.id;
+  const channel = interaction.channel;
+  if (!channel) return ephemeral(interaction, "❌ Salon introuvable.");
+  await interaction.deferUpdate().catch(() => {});
+  const refuse = (content) =>
+    interaction.followUp({ content, flags: MessageFlags.Ephemeral }).catch(() => {});
+
+  const match = await new Promise((resolve) =>
+    getTradeMatches(userId, state.partnerId, { reserve: state.reserve }, (err, found) =>
+      resolve(err ? { err } : { found })
+    )
+  );
+  if (match.err) {
+    handleException("Lecture de la comparaison :", match.err);
+    return refuse("❌ Impossible de lire les collections.");
+  }
+  const mine = match.found.give.find((entry) => entry.speciesId === state.give);
+  const theirs = match.found.get.find((entry) => entry.speciesId === state.get);
+  const stale = (what) =>
+    renderComparison(
+      interaction,
+      { ...state, give: mine ? state.give : 0, get: theirs ? state.get : 0 },
+      match.found,
+      { notice: `⚠️ ${what}. Choisis ton échange à nouveau.`, write: "editReply" }
+    );
+  if (!mine || !theirs) {
+    return stale(
+      !mine && !theirs
+        ? "Ces deux Pokémon ne sont plus proposés"
+        : mine
+          ? `<@${state.partnerId}> n'a plus ce Pokémon à donner`
+          : "Tu n'as plus ce Pokémon à donner"
+    );
+  }
+
+  const candidate = (owner, speciesId) =>
+    new Promise((resolve) =>
+      tradeCandidate(owner, speciesId, (err, row) => resolve(err ? { err } : { row }))
+    );
+  const [giving, receiving] = await Promise.all([
+    candidate(userId, mine.speciesId),
+    candidate(state.partnerId, theirs.speciesId),
+  ]);
+  const failed = giving.err ?? receiving.err;
+  if (failed) {
+    handleException("Choix des Pokémon de l'offre :", failed);
+    return refuse("❌ Erreur base de données.");
+  }
+  // Entre la comparaison et ici, le dernier exemplaire a pu partir.
+  if (!giving.row || !receiving.row) return stale("Un des deux Pokémon n'est plus disponible");
+
+  const problem = postingProblem(interaction, channel);
+  if (problem) return refuse(problem);
+
+  const created = await new Promise((resolve) =>
+    proposeTrade(
+      {
+        fromUserId: userId,
+        toUserId: state.partnerId,
+        offer: selectorOf(giving.row),
+        request: selectorOf(receiving.row),
+        channelId: channel.id,
+        unique: true,
+      },
+      (err, trade, info) => resolve({ err, trade, duplicate: Boolean(info?.duplicate) })
+    )
+  );
+  if (created.err) {
+    handleException("Création d'une offre depuis /pk comparer :", created.err);
+    return refuse("❌ Impossible de créer l'échange.");
+  }
+  // Deux clics rapprochés, ou une offre identique encore ouverte : proposeTrade a
+  // retiré la nouvelle, la plus ancienne reste.
+  if (created.duplicate) {
+    return refuse(`⏳ Tu as déjà proposé cet échange à <@${state.partnerId}> : il attend sa réponse.`);
+  }
+  const offerId = created.trade.id;
+
+  let message;
+  try {
+    message = await channel.send({
+      content: `<@${state.partnerId}>`,
+      embeds: [buildTradeEmbed(created.trade, "PENDING")],
+      components: [buildTradeRow(offerId)],
+      allowedMentions: { users: [state.partnerId] },
+    });
+  } catch (error) {
+    handleException("Publication d'une offre d'échange :", error);
+    // Une offre sans message n'a plus de raison d'exister, et ouverte elle
+    // bloquerait tout nouvel essai : on l'annule dans tous les cas. Seul l'avis
+    // change. Un code d'ENVOI_IMPOSSIBLE prouve que rien n'a été publié ; sur une
+    // coupure ou un délai, le message est peut-être parti, et ses boutons
+    // répondront alors que l'offre a déjà été traitée.
+    resolveTradeAs(offerId, userId, "CANCELLED", (err) => {
+      if (err) handleException("Annulation d'une offre non publiée :", err);
+    });
+    return refuse(
+      ENVOI_IMPOSSIBLE.has(error?.code)
+        ? `❌ Je n'ai pas pu publier l'offre dans ${channel}. Tu peux réessayer.`
+        : "⚠️ L'envoi a échoué, mais il a peut-être abouti : va voir le salon avant de réessayer."
+    );
+  }
+  setTradeMessage(offerId, message.id);
+  await interaction
+    .editReply({
+      content: `✅ Offre envoyée à <@${state.partnerId}> dans ${channel}.`,
+      embeds: [],
+      components: [],
+    })
+    .catch(() => {});
+}
+
 // ---------------------- Évolution ----------------------
 
 // Le deuxième segment des boutons d'évolution désigne l'individu qui évolue :
@@ -522,11 +748,8 @@ function handleTradeButton(interaction, action, tradeId) {
       if (!result.ok) {
         return finishTrade(interaction, trade, "FAILED", `❌ ${result.reason}`);
       }
-      const evolutions = (result.evolutions ?? [])
-        .map((e) => `${getSpecies(e.from)?.name} → ${getSpecies(e.to)?.name}`)
-        .join(", ");
       pseudos(trade.from_user_id, trade.to_user_id).then(([from, to]) =>
-        log(`Échange #${tradeId} accepté entre ${from} et ${to}` + (evolutions ? ` (${evolutions})` : ""))
+        log(`Échange #${tradeId} accepté entre ${from} et ${to}`)
       );
       finishTrade(interaction, trade, "ACCEPTED");
     });
@@ -635,12 +858,36 @@ function handleSafariGo(interaction, mode, parkId, generations) {
 // Les menus du jeu. Un seul pour l'instant : le choix des générations du parc,
 // qui réécrit son message avec le choix porté par le bouton d'entrée.
 export async function handlePokemonSelect(interaction) {
-  const [action, mode, parkId] = interaction.customId.split("|");
-  if (action !== "poke_safari_gens") return;
-  const chosen = interaction.values.map(Number).filter((value) => value >= 1);
-  await interaction
-    .update({ components: buildSafariGenerationPicker(mode, Number(parkId) || 0, chosen) })
-    .catch(() => {});
+  const [action, ...args] = interaction.customId.split("|");
+  switch (action) {
+    case "poke_safari_gens": {
+      const [mode, parkId] = args;
+      const chosen = interaction.values.map(Number).filter((value) => value >= 1);
+      return interaction
+        .update({ components: buildSafariGenerationPicker(mode, Number(parkId) || 0, chosen) })
+        .catch(() => {});
+    }
+
+    // Un côté de l'échange choisi : le message se réécrit avec ce choix, l'autre
+    // côté tel que le customId le portait. Une espèce qui n'est plus proposée est
+    // écartée par la comparaison elle-même.
+    case "poke_cmpg": {
+      const [partnerId, get, reserve, page] = args;
+      return showComparison(
+        interaction,
+        compareState([partnerId, interaction.values?.[0], get, reserve, page])
+      );
+    }
+    case "poke_cmpr": {
+      const [partnerId, give, reserve, page] = args;
+      return showComparison(
+        interaction,
+        compareState([partnerId, give, interaction.values?.[0], reserve, page])
+      );
+    }
+
+    default:
+  }
 }
 
 // Partage du bilan dans le salon courant.
@@ -912,6 +1159,22 @@ export async function handlePokemonButton(interaction) {
       return showSpeciesDuplicatesPage(interaction, Number(args[0]), Number(args[1]) || 0, {
         reserve: action === "poke_dupspr",
       });
+
+    // La comparaison de /pk comparer : ses pages, puis « avec qui échanger », « qui a
+    // besoin d'une espèce », et le bouton qui propose l'échange choisi.
+    case "poke_cmp":
+      return showComparison(interaction, compareState(args));
+
+    case "poke_cmpt":
+      return showPartnersPage(interaction, args[0] === "1", Number(args[1]) || 0);
+
+    case "poke_cmpn":
+      return showNeedersPage(interaction, Number(args[0]), args[1] === "1", Number(args[2]) || 0);
+
+    case "poke_cmpgo":
+      return proposeFromComparison(interaction, compareState(args)).catch((error) =>
+        handleException("Proposition d'un échange :", error)
+      );
 
     // Le cinquième segment, facultatif, est l'objet qui aide l'évolution : une
     // pierre impose alors sa cible, un bonbon remplace un sacrifice manquant.

@@ -41,6 +41,8 @@ visite. C'est le seul contenu Pokémon où les actions ne coûtent rien.
   une, et les rencontres de la visite ne viennent que d'elles, raretés compensées comprises. Le
   choix est gardé sur la visite : une reprise, de Discord comme du site, le conserve. Tant qu'une
   seule génération est ouverte, l'entrée reste directe.
+  Le facteur qui favorise les générations récentes aux apparitions du salon ne s'applique pas ici :
+  on choisit déjà la sienne.
 - **Une visite dure autant que le parc** : elle expire à la fermeture des grilles, avec un
   plancher d'une heure pour qui entre juste avant — 25 actions ne se jouent pas en dix minutes.
 - **La visite se reprend** : l'éphémère se ferme d'un geste et personne ne peut le rouvrir à la

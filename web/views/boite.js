@@ -3,8 +3,8 @@
 // ouvre la fiche, d'où le Pokémon se renomme, se déplace, se revend ou évolue —
 // ces deux derniers comme /pk revendre et /pk evolution avec un `#id`.
 //
-// Le rangement (places, noms des boîtes, surnoms) n'existe que sur le site et
-// ne change rien au jeu. On déplace en glissant un Pokémon sur une case, ou, au
+// Le rangement (places, noms des boîtes) n'existe que sur le site et ne change
+// rien au jeu ; le surnom se donne aussi sur Discord, avec /pk renommer. On déplace en glissant un Pokémon sur une case, ou, au
 // doigt, avec « Déplacer » dans sa fiche puis un clic sur la case voulue. C'est
 // l'API qui range : la page redessine la boîte qu'elle lui renvoie.
 import { icon } from "../icons.js";
@@ -552,8 +552,7 @@ function relabel(button, label) {
 
 // La barre d'actions d'une fiche, et ce qu'elle ouvre. Verrou, revente et
 // évolution passent par les mêmes routes que /pk verrou, /pk revendre et
-// /pk evolution avec un `#id` ; le surnom, lui, n'existe que sur le site, comme
-// tout le rangement du PC.
+// /pk evolution avec un `#id`, et le surnom comme /pk renommer.
 function pokemonActions(ctx, item, species, targets, { renamed, relocked, move, done, pc, value }) {
   // Le surnom s'enregistre en sortant du champ, ou sur Entrée ; Échap rend la
   // valeur d'avant, et une seconde fois ferme la fiche. Vide, le Pokémon

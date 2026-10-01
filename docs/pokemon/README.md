@@ -22,6 +22,11 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
   qui ne sortent que d'un œuf.
 - `/pk boite [pokemon] [membre]` : les Pokémon un par un, page par page — `#numéro`, sexe, ball,
   date, fertilité, et 🛡️ les verrouillés (voir [Individus](individus.md)).
+- `/pk renommer <espece> <individu> [surnom]` : donne un surnom à un de tes Pokémon, ou le retire
+  (`surnom` vide). Le même que sur le [site](../site.md), par la même fonction : limite
+  `pokemon.pc.nicknameLength`, rognage signalé dans la réponse, ancien surnom rappelé pour pouvoir le
+  remettre. Il apparaît devant l'espèce dans `/pk boite` et dans la vitrine, et suit le Pokémon
+  quand il évolue ou change de dresseur. Réponse privée.
 - `/pk doublons [membre] [pokemon] [evolutions]` : les espèces qu'un dresseur a en plusieurs
   exemplaires, dans l'ordre du Pokédex, et combien peuvent s'échanger — tout sauf un par espèce,
   hors verrouillés 🛡️. Avec une espèce, l'inverse : les dresseurs qui l'ont en double, ceux qui
@@ -77,10 +82,30 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
   exactement ce qu'il aura, fertilité comprise. **Seuls les doublons s'échangent** : contrairement
   aux jeux, avoir capturé un Pokémon ne suffit pas à le garder au Pokédex, il faut le posséder. Il
   en reste toujours au moins un de chaque espèce, shiny ou non, et l'autocomplétion ne propose que
-  ce qu'on a en trop — `/pk doublons membre` le montre avant de proposer.
-  **Kadabra, Machopeur, Gravalanch et Spectrum évoluent en changeant de dresseur**, comme en
-  première génération : c'est celui qui *reçoit* le Pokémon qui reçoit sa forme évoluée. La
-  proposition l'annonce avant le clic, et un shiny reste shiny en évoluant.
+  ce qu'on a en trop — `/pk doublons membre` le montre avant de proposer, et `/pk comparer`
+  cherche les échanges qui servent aux deux.
+  **Kadabra, Machopeur, Gravalanch et Spectrum** arrivent tels quels : l'échange ne les fait plus
+  évoluer. Reçus en échange, ils évoluent ensuite **gratuitement** avec `/pk evolution` — ni points ni
+  sacrifice, même si c'est le seul de son espèce (elle quitte alors le Pokédex). Le dresseur choisit
+  donc s'il évolue, et quand. Un Pokémon jamais échangé garde l'évolution payante ordinaire. La
+  proposition l'annonce avant le clic.
+- `/pk comparer [membre] [pokemon] [evolutions]` : cherche les échanges **qui servent aux deux** —
+  une espèce contre une espèce, chacune absente du Pokédex de celui qui la reçoit. Réponse privée,
+  page par page. Trois usages, selon l'option :
+  - `membre` compare les doublons de deux dresseurs : ce que tu peux donner, ce que l'autre peut
+    te donner, et combien d'échanges 1 contre 1 en sortent. Un shiny déverrouillé reste proposé,
+    signalé ✨. Deux menus choisissent un côté de l'échange chacun, puis **« Proposer cet
+    échange »** publie l'offre dans le salon, avec le destinataire mentionné : même offre, mêmes
+    boutons et même acceptation que `/pk echange`. Le bot choisit lui-même l'individu de chaque
+    côté, le moins précieux d'abord (voir [Individus](individus.md#qui-part-quand-on-cède)). Une
+    offre identique encore ouverte n'est pas republiée (« tu as déjà proposé cet échange »), et une
+    offre que le salon n'a pas pu publier est annulée plutôt que laissée sans message.
+  - sans option : **avec qui échanger**, le dresseur qui permet le plus d'échanges d'abord.
+  - `pokemon` (un de tes doublons) : **à qui il manque**, avec ce que chacun peut te donner en
+    retour — un échange passe avant un cadeau.
+  - Dans les trois cas, `evolutions` (actif par défaut) met de côté, de chaque côté, ce qu'il faut
+    pour les évolutions qui manquent au Pokédex (voir `/pk doublons`). Ces Pokémon restent
+    échangeables avec `/pk echange`.
 - `/pk safari` : paie l'entrée du parc safari (voir [Parc Safari](safari.md)). Réponse privée.
 - `/pk inventaire [membre]` : les objets qu'un dresseur a en poche (voir [Objets](objets.md)).
 - `/pk loterie` : un tirage par jour et par dresseur (voir [Loterie](loterie.md)). Réponse privée.
@@ -142,6 +167,9 @@ prennent en compte immédiatement. Ce qu'elle change :
   lequel ils n'évoluent pas). Ces trois objets entrent dans les mains des Pokémon et dans la loterie
   à l'ouverture (voir [Objets](objets.md#objets-dévolution)). Ces formes n'apparaissent jamais à
   l'état sauvage (🔒).
+- **Les nouvelles espèces sortent plus souvent** : deux fois plus qu'une espèce de la 1ʳᵉ génération
+  au même stade (`spawn.generationBoost`, voir [Capture & Pokédex](capture.md)), aux apparitions du
+  salon seulement.
 - **Le parc safari demande quelles générations on vise** (voir [Parc Safari](safari.md)).
 - **Six légendaires** de plus : Raikou, Entei, Suicune, Lugia, Ho-Oh et Celebi.
 - **Zarbi et ses 26 lettres** : une seule entrée de Pokédex, mais chaque Zarbi porte la sienne,

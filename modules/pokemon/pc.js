@@ -1,7 +1,9 @@
 // La boîte PC du site : des boîtes nommées où chacun range ses Pokémon comme il
 // l'entend, et des surnoms. Rien de tout ça ne change le jeu — ni ce qu'on
-// possède, ni ce qui peut partir — : c'est du rangement, réservé au site, où
-// glisser un Pokémon d'une case à l'autre a un sens.
+// possède, ni ce qui peut partir. Les places et les noms de boîtes sont du
+// rangement réservé au site, où glisser un Pokémon d'une case à l'autre a un
+// sens ; le surnom se donne aussi sur Discord (/pk renommer), par la même
+// fonction (renamePokemon).
 //
 // Une place (`pc_pos`) est un numéro de case sur l'ensemble des boîtes : boîte =
 // pc_pos / slotsPerBox. Elle se retient dans la ligne de l'individu et le suit
@@ -196,7 +198,12 @@ export function renamePokemon(userId, pokemonId, nickname, cb) {
       if (this.changes !== 1) {
         return cb(null, { ok: false, reason: `Le Pokémon #${pokemonId} n'est pas à toi.` });
       }
-      cb(null, { ok: true, nickname: clean });
+      // `cut` : la limite a rogné la saisie, et l'appelant peut le dire.
+      cb(null, {
+        ok: true,
+        nickname: clean,
+        cut: [...(cleanName(nickname, Infinity) ?? "")].length > pcConfig().nicknameLength,
+      });
     }
   );
 }

@@ -3,8 +3,8 @@ import { handleException } from "../../modules/utils.js";
 import {
   countBySpecies,
   countGroup,
-  createTrade,
   getIndividuals,
+  proposeTrade,
   resolveIndividual,
   setTradeMessage,
 } from "../../modules/pokemon/collection.js";
@@ -38,15 +38,15 @@ function respondWithSpecies(interaction, userId, query, emptyLabel) {
       .map(([speciesId, { spare }]) => {
         const species = getSpecies(speciesId);
         if (!species || spare < 1) return null;
-        // Les quatre évolutions par échange se déclarent ici plutôt que dans un
-        // message d'aide que personne ne lit : c'est l'instant exact où on
-        // choisit ce qu'on donne. Le filtre portant sur le libellé, taper
-        // « mackogneur » remonte le Machopeur qui y mène.
+        // Les quatre évolutions par échange se disent ici plutôt que dans un
+        // message d'aide que personne ne lit : c'est l'instant exact où on choisit
+        // ce qu'on donne. Le filtre portant sur le libellé, taper « mackogneur »
+        // remonte le Machopeur qui y mène.
         const evolved = tradeEvolutionTarget(species);
         return {
           name:
             `${species.name} ×${spare} en trop` +
-            (evolved ? ` — évolue en ${evolved.name}` : ""),
+            (evolved ? ` — évoluera gratuitement en ${evolved.name} chez l'autre` : ""),
           value: String(speciesId),
         };
       })
@@ -268,61 +268,32 @@ export default {
 
       await interaction.deferReply();
 
-      // La fertilité de chaque individu fait partie de l'offre : qui reçoit une
-      // femelle fertile doit pouvoir compter dessus. Si elle pond entre-temps,
-      // acceptTrade ne la trouve plus, et l'échange échoue plutôt que de livrer
-      // autre chose que ce qui était promis.
-      const fertility = (side) => !side.row.sterile;
-
-      createTrade(
+      // La fertilité de chaque individu fait partie de l'offre (proposeTrade) : qui
+      // reçoit une femelle fertile doit pouvoir compter dessus. Si elle pond
+      // entre-temps, acceptTrade ne la trouve plus, et l'échange échoue plutôt que
+      // de livrer autre chose que ce qui était promis.
+      proposeTrade(
         {
           fromUserId: interaction.user.id,
           toUserId: target.id,
-          offerSpeciesId: offer.speciesId,
-          offerIsShiny: offer.isShiny,
-          offerSex: offer.sex,
-          offerFertile: fertility(offer),
-          requestSpeciesId: request.speciesId,
-          requestIsShiny: request.isShiny,
-          requestSex: request.sex,
-          requestFertile: fertility(request),
-          offerPokemonId: offer.pokemonId,
-          requestPokemonId: request.pokemonId,
-          offerForm: offer.form,
-          requestForm: request.form,
+          offer,
+          request,
           channelId: interaction.channelId,
         },
-        async (err, tradeId) => {
-          if (err || !tradeId) {
+        async (err, trade) => {
+          if (err || !trade) {
             handleException(err || new Error("Création d'échange impossible"));
             return interaction
               .editReply({ content: "❌ Impossible de créer l'échange." })
               .catch(() => {});
           }
 
-          const trade = {
-            from_user_id: interaction.user.id,
-            to_user_id: target.id,
-            offer_species_id: offer.speciesId,
-            offer_is_shiny: offer.isShiny ? 1 : 0,
-            offer_sex: offer.sex,
-            offer_fertile: fertility(offer) ? 1 : 0,
-            request_species_id: request.speciesId,
-            request_is_shiny: request.isShiny ? 1 : 0,
-            request_sex: request.sex,
-            request_fertile: fertility(request) ? 1 : 0,
-            offer_pokemon_id: offer.pokemonId,
-            request_pokemon_id: request.pokemonId,
-            offer_form: offer.form,
-            request_form: request.form,
-          };
-
           const message = await interaction.editReply({
             content: `<@${target.id}>`,
             embeds: [buildTradeEmbed(trade, "PENDING")],
-            components: [buildTradeRow(tradeId)],
+            components: [buildTradeRow(trade.id)],
           });
-          setTradeMessage(tradeId, message.id);
+          setTradeMessage(trade.id, message.id);
         }
       );
     } catch (error) {

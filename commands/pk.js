@@ -8,9 +8,11 @@ import info from "./pk/info.js";
 import classement from "./pk/classement.js";
 import evolution from "./pk/evolution.js";
 import echange from "./pk/echange.js";
+import comparer from "./pk/comparer.js";
 import oeuf from "./pk/oeuf.js";
 import revendre from "./pk/revendre.js";
 import verrou from "./pk/verrou.js";
+import renommer from "./pk/renommer.js";
 import inventaire from "./pk/inventaire.js";
 import loterie from "./pk/loterie.js";
 import safari from "./pk/safari.js";
@@ -33,9 +35,11 @@ const SUBCOMMANDS = [
   classement,
   evolution,
   echange,
+  comparer,
   oeuf,
   revendre,
   verrou,
+  renommer,
   inventaire,
   loterie,
   safari,

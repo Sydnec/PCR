@@ -169,6 +169,17 @@ describe("écriture (/admin config)", () => {
     assert.equal(writeConfigValue("pokemon.spawn.legendaryFleeMultiplier", "3").ok, true);
   });
 
+  it("refuse une majoration des générations récentes sous 1 : elle favoriserait les anciennes", () => {
+    const refused = writeConfigValue("pokemon.spawn.generationBoost", "0,5");
+    assert.equal(refused.ok, false);
+    assert.match(refused.reason, /en dessous du minimum autorisé \(1\)/);
+    assert.equal(writeConfigValue("pokemon.spawn.generationBoost", "0").ok, false);
+    assert.equal(fs.existsSync(sandbox.configFile), false, "rien n'est écrit après un refus");
+    assert.equal(writeConfigValue("pokemon.spawn.generationBoost", "1").ok, true);
+    assert.equal(writeConfigValue("pokemon.spawn.generationBoost", "2,5").ok, true);
+    assert.equal(getConfig().pokemon.spawn.generationBoost, 2.5);
+  });
+
   it("exige une date ISO complète, fuseau compris, pour ouvrir une génération", () => {
     for (const bad of ["2", "demain", "2026-10-30", "2026-10-30T18:00:00"]) {
       assert.equal(

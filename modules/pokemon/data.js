@@ -285,10 +285,21 @@ export function itemOnlySpecies() {
 // détour.
 //
 // Les bébés non plus : comme dans les jeux, ils ne sortent que d'un œuf.
+//
+// Le poids de base est ensuite majoré selon la génération (generationBoost). Le
+// facteur se lit dans le bloc qu'on reçoit : celui des apparitions le porte, celui
+// du parc safari non, qui garde donc des poids sans majoration — on y choisit sa
+// génération. Un seul endroit décide, les tirages comme les tables de /admin poids
+// y passent.
 export function spawnWeight(species, spawnConfig, itemOnly = itemOnlySpecies()) {
   if (species.tradeEvolution || species.isBaby || itemOnly.has(species.id)) return 0;
-  if (isLegendary(species)) return spawnConfig.legendaryWeight;
-  return spawnConfig.weightsByStage[species.stage] ?? 0;
+  const base = isLegendary(species)
+    ? spawnConfig.legendaryWeight
+    : (spawnConfig.weightsByStage[species.stage] ?? 0);
+  // Plancher à 1 : un réglage écrit à la main dans config.json échappe aux bornes de
+  // /admin config, et un facteur sous 1 inverserait l'effet attendu.
+  const boost = Math.max(1, Number(spawnConfig.generationBoost) || 1);
+  return base * boost ** Math.max(0, (species.generation || 1) - 1);
 }
 
 // Un bébé ne sort que d'un œuf : aucune apparition ne le donne, et aucune
@@ -416,7 +427,8 @@ export const safariBaitCapped = (baitStacks, safariConfig) =>
 // Une rencontre du parc. pickWeightedSpecies lit exactement weightsByStage et
 // legendaryWeight : le bloc safari lui est passé tel quel, il n'y a pas de
 // second tirage à maintenir. Les évolutions par échange restent hors pool,
-// spawnWeight leur donne déjà un poids nul.
+// spawnWeight leur donne déjà un poids nul. Sans generationBoost dans ce bloc,
+// aucune génération n'y est favorisée : le visiteur a déjà choisi la sienne.
 // Une visite est terminée quand son statut a changé ou qu'il ne reste plus une
 // action. Le prédicat vivait recopié dans trois fonctions de deux modules, dont
 // deux qui devaient s'accorder au mot près — le bouton de partage et la garde

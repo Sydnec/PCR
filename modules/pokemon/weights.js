@@ -10,7 +10,13 @@
 // sur les mêmes données. Une table qui diverge de la réalité qu'elle décrit
 // serait pire que pas de table du tout : elle ferait régler le jeu à côté.
 import { getPokemonConfig, getSafariConfig } from "./config.js";
-import { allSpecies, isLegendary, itemOnlySpecies, spawnWeight } from "./data.js";
+import {
+  allSpecies,
+  generationOrdinal,
+  isLegendary,
+  itemOnlySpecies,
+  spawnWeight,
+} from "./data.js";
 import {
   getItems,
   heldItemChance,
@@ -60,12 +66,19 @@ function table({ key, name, note, subject, gate = null, lots = false, rows }) {
 // obtient pas de la même façon —, puis les légendaires, le reste par stade. Un
 // bébé rangé avec son stade prendrait le poids du groupe et gonflerait le
 // total d'espèces qui ne sortent jamais.
+//
+// Un groupe ne réunit que des espèces de même poids : avec la majoration par
+// génération (generationBoost), les stades 1 de la 1re et de la 2e génération ne
+// pèsent plus pareil, et une ligne « Stade 1 » unique afficherait un poids faux
+// pour l'un des deux. Le poids fait donc partie de la clé, et c'est lui — jamais
+// un calcul refait ici — qui sépare les générations. Sans majoration, rien ne
+// change : une seule ligne par catégorie.
 function speciesRows(poolConfig) {
   const groups = new Map();
   const itemOnly = itemOnlySpecies();
   for (const species of allSpecies()) {
     const weight = spawnWeight(species, poolConfig, itemOnly);
-    const key =
+    const category =
       species.tradeEvolution || itemOnly.has(species.id)
         ? "Hors pool (échange, objet)"
         : species.isBaby
@@ -73,11 +86,10 @@ function speciesRows(poolConfig) {
           : isLegendary(species)
             ? "Légendaires"
             : `Stade ${species.stage}`;
-    const group = groups.get(key) ?? { label: key, count: 0, weight };
+    const key = `${category}|${weight}`;
+    const group = groups.get(key) ?? { category, count: 0, weight, generations: new Set() };
     group.count += 1;
-    // Un groupe dont les membres n'auraient pas le même poids serait un bug de
-    // regroupement, pas une moyenne à faire : on garde le premier et le reste
-    // se verrait au total.
+    group.generations.add(species.generation);
     groups.set(key, group);
   }
 
@@ -89,12 +101,28 @@ function speciesRows(poolConfig) {
     "Hors pool (échange, objet)",
     "Hors pool (œuf)",
   ];
+  const parCategorie = new Map();
+  for (const group of groups.values()) {
+    parCategorie.set(group.category, (parCategorie.get(group.category) ?? 0) + 1);
+  }
+  const first = (group) => Math.min(...group.generations);
   return (
     [...groups.values()]
-      .sort((a, b) => ordre.indexOf(a.label) - ordre.indexOf(b.label))
+      .sort(
+        (a, b) => ordre.indexOf(a.category) - ordre.indexOf(b.category) || first(a) - first(b)
+      )
       // Les groupes se comptent au fil des espèces, mais c'est `row` qui fabrique
       // une ligne : une seule définition de ce qu'est un total.
-      .map((group) => row(group.label, group.count, group.weight))
+      .map((group) => {
+        const split = parCategorie.get(group.category) > 1;
+        const label = split
+          ? `${group.category} (${[...group.generations]
+              .sort((a, b) => a - b)
+              .map(generationOrdinal)
+              .join(", ")} gén.)`
+          : group.category;
+        return row(label, group.count, group.weight);
+      })
   );
 }
 

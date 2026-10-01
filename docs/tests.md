@@ -47,7 +47,7 @@ génération ouverte en cours de route.
 | `throws`                          | lancers : paiement, remboursement, courses entre dresseurs, ball offerte, shiny du Charme                          |
 | `safari`, `safari-entry`          | tirage des rencontres, appâts et fuite, actions, entrée payante ou offerte, reprise d'une visite                   |
 | `economy`, `redistribution`       | points, objets, revente, compensation en cascade, pot commun (plan, bail, rattrapage, simultanéité)                |
-| `evolution`, `collection`         | coût d'une évolution, sacrifices, objets, Métamorph, compensation ; individus, verrous, doublons, échanges         |
+| `evolution`, `collection`         | coût d'une évolution, sacrifices, objets, Métamorph, compensation ; individus, verrous, doublons, échanges, échanges possibles |
 | `eggs`, `lottery-charms`          | ponte, éclosion, compteur de messages ; loterie quotidienne, Charme Chroma et ses rôles                            |
 | `pc-showcase`                     | boîtes PC, surnoms, vitrine, envoi de la vitrine                                                                   |
 | `embeds`                          | embeds Discord, lignée, formats                                                                                    |

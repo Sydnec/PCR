@@ -87,7 +87,7 @@ en poche, et le site une image à cliquer dans la bande d'évolution.
   devient Tartard et Ramoloss Flagadoss — l'objet change la forme, il ne débloque pas l'évolution.
   Sans Catalyseur, Onix, Insécateur, Hypocéan et Porygon n'évoluent pas du tout. Dans les jeux, ces
   quatre-là évoluent en changeant de dresseur avec un objet tenu : ici, l'objet suffit, et
-  l'échange ne les fait plus évoluer. Kadabra, Machopeur, Gravalanch et Spectrum évoluent toujours
-  par échange, sans objet.
+  l'échange ne les fait plus évoluer. Kadabra, Machopeur, Gravalanch et Spectrum, eux, évoluent
+  gratuitement une fois reçus en échange, sans objet (voir [Commandes](README.md#commandes)).
 - **Les trois objets de la 2ᵉ génération** (`generation: 2`) n'entrent dans les mains des Pokémon
   et dans la loterie qu'à son ouverture (voir [Générations](README.md#générations)).

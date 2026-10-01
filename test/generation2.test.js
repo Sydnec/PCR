@@ -23,6 +23,7 @@ const eggs = await import("../modules/pokemon/eggs.js");
 const collection = await import("../modules/pokemon/collection.js");
 const generations = await import("../modules/pokemon/generations.js");
 const embeds = await import("../modules/pokemon/embeds.js");
+const weights = await import("../modules/pokemon/weights.js");
 const lottery = await import("../modules/pokemon/lottery.js");
 const economy = await import("../modules/economy.js");
 const { routes } = await import("../modules/web/api.js");
@@ -171,6 +172,101 @@ describe("apparitions", () => {
     const withGen2 = weights();
     const onlyGen1 = asGen1(() => weights());
     assert.deepEqual(withGen2.slice(0, 151), onlyGen1, "le poids d'une espèce de la 1ʳᵉ génération ne dépend pas de la 2ᵉ");
+  });
+});
+
+describe("la majoration des générations récentes", () => {
+  const spawn = () => getPokemonConfig().spawn;
+  // Le réglage se relit à chaque usage : on l'écrit dans le fichier, et l'état d'avant revient après.
+  const withBoost = (value, run) => {
+    sandbox.writeConfig({ pokemon: { generation: 2, spawn: { generationBoost: value } } });
+    try {
+      return run();
+    } finally {
+      sandbox.writeConfig(GEN2);
+    }
+  };
+  const drawable = (generation, stage) =>
+    all().find((entry) => entry.generation === generation && entry.stage === stage && data.spawnWeight(entry, spawn()) > 0);
+
+  it("par défaut ×2 : une espèce de la 2ᵉ génération pèse le double d'une de la 1ʳᵉ du même stade", () => {
+    assert.equal(spawn().generationBoost, 2);
+    for (const stage of [1, 2, 3]) {
+      const base = spawn().weightsByStage[stage];
+      assert.equal(data.spawnWeight(drawable(1, stage), spawn()), base, `stade ${stage}, 1ʳᵉ génération`);
+      assert.equal(data.spawnWeight(drawable(2, stage), spawn()), 2 * base, `stade ${stage}, 2ᵉ génération`);
+    }
+    assert.equal(data.spawnWeight(species("Mewtwo"), spawn()), spawn().legendaryWeight);
+    assert.equal(data.spawnWeight(species("Lugia"), spawn()), 2 * spawn().legendaryWeight);
+  });
+
+  it("ce qui n'apparaît jamais reste à zéro, quelle que soit la majoration", () => {
+    assert.equal(data.spawnWeight(species("Pichu"), spawn()), 0, "un bébé ne sort que d'un œuf");
+    for (const id of data.itemOnlySpecies()) {
+      assert.equal(data.spawnWeight(data.getSpecies(id), spawn()), 0, data.getSpecies(id).name);
+    }
+  });
+
+  it("le facteur se cumule : une 3ᵉ génération pèserait quatre fois la 1ʳᵉ", () => {
+    const hypothetical = { ...species("Salamèche"), generation: 3 };
+    assert.equal(data.spawnWeight(hypothetical, spawn()), 4 * spawn().weightsByStage[1]);
+  });
+
+  it("à ×1 les générations pèsent pareil, et un facteur sous 1 est relevé à 1 plutôt que d'inverser l'effet", () => {
+    for (const value of [1, 0.5, 0, "n'importe quoi"]) {
+      withBoost(value, () => {
+        assert.equal(data.spawnWeight(drawable(2, 1), spawn()), spawn().weightsByStage[1], `facteur ${value}`);
+        assert.equal(data.spawnWeight(drawable(1, 1), spawn()), spawn().weightsByStage[1], `facteur ${value}`);
+      });
+    }
+  });
+
+  it("le parc safari n'est pas majoré, même quand les apparitions le sont : on y choisit sa génération", () => {
+    assert.equal(getSafariConfig().generationBoost, undefined);
+    withBoost(5, () => {
+      const safari = getSafariConfig();
+      assert.equal(data.spawnWeight(drawable(2, 1), safari), safari.weightsByStage[1]);
+      assert.equal(data.spawnWeight(drawable(1, 1), safari), safari.weightsByStage[1]);
+      assert.equal(data.spawnWeight(drawable(2, 1), spawn()), 5 * spawn().weightsByStage[1], "les apparitions, elles, le sont");
+    });
+  });
+
+  it("le tirage suit les poids majorés : la frontière entre les deux générations se déplace", () => {
+    // Un pool réduit aux stades 1, dans l'ordre du Pokédex : n1 espèces de la 1ʳᵉ génération, puis n2 de la 2ᵉ.
+    const only = (boost) => ({ ...spawn(), generationBoost: boost, weightsByStage: { 1: 1 }, legendaryWeight: 0 });
+    const pool = all().filter((entry) => data.spawnWeight(entry, only(1)) > 0);
+    const n1 = pool.filter((entry) => entry.generation === 1).length;
+    const n2 = pool.length - n1;
+    assert.ok(n1 > 0 && n2 > 0);
+    // Juste au-delà de la part de la 1ʳᵉ génération quand la 2ᵉ compte double : c'est une espèce de la 2ᵉ.
+    // Sans majoration, la même valeur tombe encore parmi celles de la 1ʳᵉ.
+    const roll = n1 / (n1 + 2 * n2) + 1e-6;
+    assert.equal(withRandom(roll, () => data.pickWeightedSpecies(only(2))).generation, 2);
+    assert.equal(withRandom(roll, () => data.pickWeightedSpecies(only(1))).generation, 1);
+  });
+
+  it("la table /admin poids sépare les générations d'un même stade, avec les poids réellement tirés", () => {
+    const table = weights.describeSpawnPool();
+    const stage1 = table.rows.filter((row) => row.label.startsWith("Stade 1"));
+    assert.deepEqual(
+      stage1.map((row) => [row.label, row.weight]),
+      [
+        ["Stade 1 (1re gén.)", spawn().weightsByStage[1]],
+        ["Stade 1 (2e gén.)", 2 * spawn().weightsByStage[1]],
+      ]
+    );
+    assert.equal(table.rows.reduce((sum, row) => sum + row.count, 0), all().length, "chaque espèce est dans une ligne");
+    const itemOnly = data.itemOnlySpecies();
+    assert.equal(table.total, all().reduce((sum, entry) => sum + data.spawnWeight(entry, spawn(), itemOnly), 0));
+    near(table.rows.reduce((sum, row) => sum + row.share, 0), 1, "les parts font un tout");
+  });
+
+  it("sans majoration, ou au parc safari, la table garde une seule ligne par catégorie", () => {
+    withBoost(1, () => {
+      assert.ok(weights.describeSpawnPool().rows.every((row) => !row.label.includes("gén.")));
+    });
+    const safari = weights.describeSafariPool().rows.map((row) => row.label);
+    assert.deepEqual(safari, ["Stade 1", "Stade 2", "Stade 3", "Légendaires", "Hors pool (échange, objet)", "Hors pool (œuf)"]);
   });
 });
 
@@ -510,7 +606,8 @@ describe("évolutions", () => {
       });
       const trade = await new Promise((resolve, reject) => collection.acceptTrade(tradeId, (error, value) => (error ? reject(error) : resolve(value))));
       assert.equal(trade.ok, true, trade.reason);
-      assert.deepEqual(trade.evolutions, [], "un Onix échangé reste un Onix : c'est le Catalyseur qui donne Steelix");
+      const [arrived] = await dbAll(points, "SELECT species_id FROM pokemon_owned WHERE id = ?", [mine[0]]);
+      assert.equal(arrived.species_id, species("Onix").id, "un Onix échangé reste un Onix : c'est le Catalyseur qui donne Steelix");
     });
 
     it("une panne à l'arrivée de la forme rend la Roche Royale, les points et les sacrifices", async () => {

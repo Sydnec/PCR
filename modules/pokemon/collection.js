@@ -9,12 +9,14 @@ import { addPoints, spendPoints } from "../economy.js";
 import { handleException } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
 import {
+  activeGeneration,
   dittoSpecies,
   evolutionChain,
   evolutionTargets,
   formAfterEvolution,
   formOf,
   getSpecies,
+  isAvailable,
   itemOnlyTargets,
   lockedByDefault,
   rollForm,
@@ -120,17 +122,21 @@ export function resolveSelector(ownerId, value, cb) {
     if (!row || row.user_id !== ownerId) {
       return cb(null, { error: `Le Pokémon #${entry.pokemonId} n'est pas dans cette boîte.` });
     }
-    cb(null, {
-      speciesId: row.species_id,
-      isShiny: Boolean(row.is_shiny),
-      sex: row.sex,
-      form: row.form ?? null,
-      fertile: null,
-      pokemonId: row.id,
-      row,
-    });
+    cb(null, selectorOf(row));
   });
 }
+
+// Le sélecteur d'un individu précis, tel que resolveSelector le rend : ce que
+// proposeTrade et les commandes attendent de chaque côté d'une offre.
+export const selectorOf = (row) => ({
+  speciesId: row.species_id,
+  isShiny: Boolean(row.is_shiny),
+  sex: row.sex,
+  form: row.form ?? null,
+  fertile: null,
+  pokemonId: row.id,
+  row,
+});
 
 // L'espèce que désigne la première option d'une commande, revalidée : tapée à
 // la main ou périmée, elle peut ne rien désigner.
@@ -542,6 +548,15 @@ export function toggleLock(userId, pokemonId, cb) {
 
 // ====================== DOUBLONS ======================
 
+// L'ordre dans lequel un dresseur se sépare de ses individus : ce qui vaut le
+// moins d'abord. Une seule définition, pour qu'une offre qui choisit elle-même
+// l'individu (tradeCandidate) cède exactement celui que reserveDuplicates aurait
+// retiré. Les critères se lisent dans cet ordre : un individu non verrouillé,
+// hors vitrine, normal, stérile — puis, à égalité, le plus récent.
+const LEAST_PRECIOUS_FIRST =
+  "o.locked ASC, o.showcase_pos IS NOT NULL, o.is_shiny ASC, o.sterile DESC, " +
+  "o.obtained_at DESC, o.id DESC";
+
 // Retire des individus d'un groupe en garantissant qu'il reste TOUJOURS un
 // individu de l'espèce, shiny ou non. C'est l'invariant du Pokédex : une
 // évolution, une revente, un échange, rien ne doit pouvoir effacer une entrée
@@ -557,7 +572,10 @@ export function toggleLock(userId, pokemonId, cb) {
 // dernier, et un exposé après tous les autres. Une variante absente du
 // groupe veut dire « shiny ou non ». Un verrouillé n'est jamais candidat, sauf
 // avec `withLocked` : l'individu qui évolue ne quitte pas la boîte, il revient
-// sous sa nouvelle forme — et même alors, un ouvert passe avant lui.
+// sous sa nouvelle forme — et même alors, un ouvert passe avant lui. Avec
+// `allowLast`, le dernier de l'espèce peut partir : réservé à l'évolution gratuite
+// d'un Pokémon reçu en échange, dont l'espèce d'origine quitte alors le Pokédex,
+// comme avant, quand l'échange le faisait évoluer d'office.
 //
 // Une seule instruction, qui compte et retire d'un même geste : deux retraits
 // simultanés ne peuvent pas passer à deux sur le même individu, et c'est tout
@@ -575,6 +593,7 @@ export function reserveDuplicates(userId, group, quantity, cb) {
     fertile = null,
     pokemonId = null,
     withLocked = false,
+    allowLast = false,
   } = group;
   const filter = `o.user_id = $user AND o.species_id = $species
     AND ($withLocked OR o.locked = 0)
@@ -586,12 +605,11 @@ export function reserveDuplicates(userId, group, quantity, cb) {
     `DELETE FROM pokemon_owned
       WHERE id IN (
         SELECT o.id FROM pokemon_owned o WHERE ${filter}
-         ORDER BY o.locked ASC, o.showcase_pos IS NOT NULL, o.is_shiny ASC, o.sterile DESC,
-                  o.obtained_at DESC, o.id DESC
+         ORDER BY ${LEAST_PRECIOUS_FIRST}
          LIMIT $quantity)
         AND (SELECT COUNT(*) FROM pokemon_owned o WHERE ${filter}) >= $quantity
         AND (SELECT COUNT(*) FROM pokemon_owned WHERE user_id = $user AND species_id = $species)
-            >= $quantity + 1
+            >= $quantity + $keep
       RETURNING *`,
     {
       $user: userId,
@@ -602,6 +620,7 @@ export function reserveDuplicates(userId, group, quantity, cb) {
       $sterile: fertile === null || fertile === undefined ? null : fertile ? 0 : 1,
       $withLocked: withLocked ? 1 : 0,
       $quantity: quantity,
+      $keep: allowLast ? 0 : 1,
     },
     (err, rows) => cb(err, rows || [])
   );
@@ -790,7 +809,12 @@ export function evolutionShortage(plan, owned = null) {
 // Catalyseur n'évolue pas. `targets` ne garde donc que les formes ouvertes sans
 // objet — celles entre lesquelles le hasard et le choix tranchent — et
 // `needs` nomme les objets qui manquent quand il n'en reste aucune.
-export function describeEvolution(speciesId, chosenTargetId = null, helperKey = null) {
+export function describeEvolution(
+  speciesId,
+  chosenTargetId = null,
+  helperKey = null,
+  { traded = false } = {}
+) {
   const config = getPokemonConfig().evolution;
   const species = getSpecies(speciesId);
   if (!species) return { error: "Espèce inconnue." };
@@ -861,6 +885,24 @@ export function describeEvolution(speciesId, chosenTargetId = null, helperKey = 
   // pas rendre une évolution négative.
   const sacrifices = Math.max(0, stageCost.duplicates - 1 - (helper?.copies ?? 0));
 
+  // Un Pokémon reçu en échange évolue gratuitement vers sa forme d'échange : ni
+  // points ni sacrifice, et un seul exemplaire suffit, puisque l'échange le
+  // faisait évoluer d'office et qu'aucun autre ne restait derrière lui. Sans
+  // objet : une aide n'a rien à payer ici.
+  if (traded && !helper && target && target.id === tradeEvolutionTarget(species)?.id) {
+    return {
+      species,
+      targets,
+      target,
+      branching,
+      helper: null,
+      sacrifices: 0,
+      points: 0,
+      required: 1,
+      traded: true,
+    };
+  }
+
   return {
     species,
     targets,
@@ -897,18 +939,29 @@ export function describeEvolution(speciesId, chosenTargetId = null, helperKey = 
 // variante — les boutons d'avant le choix de l'individu — en fait évoluer un
 // du sexe et de la variante demandés.
 export function evolve(userId, group, chosenTargetId, helperKey, cb) {
-  if (group.pokemonId && !group.speciesId) {
+  // L'individu se lit une fois : son espèce, quand on ne la donne pas, et son
+  // origine, qui décide de la gratuité d'une évolution d'échange.
+  if (group.pokemonId && group.row === undefined) {
     return resolveSelector(userId, encodeIndividual(group.pokemonId), (err, selector) => {
       if (err) return cb(err);
-      if (selector.error) return cb(null, { ok: false, reason: selector.error });
-      const resolved = { ...selector, confirmLocked: group.confirmLocked };
+      if (selector.error) {
+        // Avec l'espèce attendue, la réservation dira pourquoi il ne part pas.
+        if (group.speciesId) return evolve(userId, { ...group, row: null }, chosenTargetId, helperKey, cb);
+        return cb(null, { ok: false, reason: selector.error });
+      }
+      const resolved = group.speciesId
+        ? { ...group, row: selector.row }
+        : { ...selector, confirmLocked: group.confirmLocked };
       evolve(userId, resolved, chosenTargetId, helperKey, cb);
     });
   }
   const { speciesId, isShiny, sex = null, pokemonId = null } = group;
   // Métamorph n'est pas un objet : il passe par sa propre réservation, plus bas.
   const ditto = helperKey === DITTO_HELPER;
-  const plan = describeEvolution(speciesId, chosenTargetId, ditto ? null : helperKey);
+  // Reçu en échange : l'évolution d'échange ne coûte rien (describeEvolution). Seul un
+  // individu désigné le dit — sans lui, le bot ne sait pas encore lequel évoluera.
+  const traded = Boolean(pokemonId && group.row?.origin === "echange");
+  const plan = describeEvolution(speciesId, chosenTargetId, ditto ? null : helperKey, { traded });
   if (plan.error) return cb(null, { ok: false, reason: plan.error });
 
   const target =
@@ -1133,6 +1186,7 @@ export function evolve(userId, group, chosenTargetId, helperKey, cb) {
     sex,
     pokemonId,
     withLocked: Boolean(group.confirmLocked),
+    allowLast: Boolean(plan.traded),
   };
   reserveDuplicates(userId, evolverGroup, 1, (err, evolvers) => {
     if (err) return cb(err);
@@ -1174,18 +1228,6 @@ export function evolve(userId, group, chosenTargetId, helperKey, cb) {
 }
 
 // ====================== ÉCHANGES ======================
-
-// Ce qu'un Pokémon devient en changeant de dresseur. Quatre espèces de la
-// première génération évoluent à l'échange, et c'est le dresseur qui REÇOIT qui
-// reçoit la forme évoluée — celui qui donne son Machopeur ne voit jamais le
-// Mackogneur. L'échange devient donc la seconde porte vers ces quatre-là, à
-// côté de l'évolution : la moins chère, mais celle qui coûte un partenaire.
-//
-// Le calcul vit ici et pas dans acceptTrade parce qu'il sert deux fois, une
-// par Pokémon traversé, et qu'une règle de jeu écrite deux fois finit toujours
-// par ne plus l'être qu'une.
-const tradedForm = (speciesId) =>
-  tradeEvolutionTarget(getSpecies(speciesId))?.id ?? Number(speciesId);
 
 // Chaque côté désigne un individu précis, choisi sur /pk echange : qui reçoit
 // sait exactement quel Pokémon il aura. Les offres d'avant ce choix désignent
@@ -1238,6 +1280,94 @@ export function setTradeMessage(tradeId, messageId) {
   db.run("UPDATE pokemon_trades SET message_id = ? WHERE id = ?", [messageId, tradeId], (err) => {
     if (err) handleException("Enregistrement du message d'échange :", err);
   });
+}
+
+// Crée l'offre d'un dresseur à un autre et rend la ligne enregistrée. `offer` et
+// `request` désignent chacun un individu précis (resolveSelector, selectorOf) :
+// sa fertilité fait partie de l'offre, et l'offre échoue à l'acceptation plutôt
+// que de livrer autre chose que ce qui était promis. /pk echange et le bouton de
+// /pk comparer passent tous deux par ici : une offre ne se fabrique qu'à un
+// endroit, et ce qui s'affiche vient de la ligne, pas d'une copie.
+//
+// Avec `unique`, une offre identique encore ouverte — même auteur, même
+// destinataire, mêmes Pokémon — empêche d'en créer une seconde : la nouvelle se
+// retire et l'appelant reçoit `{ duplicate: true }` à la place de la ligne. Le
+// bouton de /pk comparer le demande : deux clics rapprochés publieraient deux
+// offres, avec deux mentions. Une offre qu'on n'a pu ni relire ni vérifier est
+// fermée aussi : l'appelant répond à un échec, personne ne la verra, et ouverte
+// elle bloquerait les essais suivants jusqu'à son expiration.
+export function proposeTrade(
+  { fromUserId, toUserId, offer, request, channelId, unique = false },
+  cb
+) {
+  createTrade(
+    {
+      fromUserId,
+      toUserId,
+      offerSpeciesId: offer.speciesId,
+      offerIsShiny: offer.isShiny,
+      offerSex: offer.sex,
+      offerFertile: !offer.row.sterile,
+      requestSpeciesId: request.speciesId,
+      requestIsShiny: request.isShiny,
+      requestSex: request.sex,
+      requestFertile: !request.row.sterile,
+      offerPokemonId: offer.pokemonId,
+      requestPokemonId: request.pokemonId,
+      offerForm: offer.form,
+      requestForm: request.form,
+      channelId,
+    },
+    (err, tradeId) => {
+      if (err || !tradeId) return cb(err || new Error("Création d'échange impossible"));
+      const abandon = (error, ...rest) =>
+        resolveTradeAs(tradeId, fromUserId, "CANCELLED", (closeError) => {
+          if (closeError) handleException("Fermeture d'une offre abandonnée :", closeError);
+          cb(error, ...rest);
+        });
+      getTrade(tradeId, (readError, trade) => {
+        if (readError || !trade) {
+          return abandon(readError || new Error(`Échange #${tradeId} introuvable`));
+        }
+        if (!unique) return cb(null, trade);
+        isOldestOpenOffer(trade, (checkError, first) => {
+          if (checkError) return abandon(checkError);
+          if (!first) return abandon(null, null, { duplicate: true });
+          cb(null, trade);
+        });
+      });
+    }
+  );
+}
+
+// L'offre est-elle la plus ancienne de ses semblables — même auteur, même
+// destinataire, mêmes Pokémon, encore ouvertes ? Chacune vérifie après avoir
+// écrit : la plus ancienne reste, les autres se retirent. Comme les identifiants
+// montent, une seule peut se croire la première, même quand deux demandes
+// s'exécutent en même temps. Les espèces et les variantes se comparent aussi :
+// une offre qui ne désigne pas d'individu (celles d'avant ce choix) a deux
+// identifiants NULL, et NULL vaut NULL.
+export function isOldestOpenOffer(trade, cb) {
+  db.get(
+    `SELECT MIN(id) AS first FROM pokemon_trades
+      WHERE from_user_id = ? AND to_user_id = ?
+        AND offer_pokemon_id IS ? AND request_pokemon_id IS ?
+        AND offer_species_id = ? AND request_species_id = ?
+        AND offer_is_shiny = ? AND request_is_shiny = ?
+        AND status = 'PENDING' AND expires_at > ?`,
+    [
+      trade.from_user_id,
+      trade.to_user_id,
+      trade.offer_pokemon_id,
+      trade.request_pokemon_id,
+      trade.offer_species_id,
+      trade.request_species_id,
+      trade.offer_is_shiny,
+      trade.request_is_shiny,
+      Date.now(),
+    ],
+    (err, row) => cb(err, !err && row?.first === trade.id)
+  );
 }
 
 function releaseTrade(tradeId, status, cb = () => {}) {
@@ -1323,33 +1453,28 @@ export function acceptTrade(tradeId, cb) {
             }
 
             // Chaque individu change de dresseur sans cesser d'être lui-même :
-            // même identifiant, même sexe, même ball. Il passe par tradedForm,
-            // qui le fait évoluer s'il est de ceux qui évoluent à l'échange — un
-            // échange de Machopeur contre Machopeur fait deux Mackogneur, comme
-            // dans le jeu d'origine.
+            // même identifiant, même espèce, même sexe, même ball. L'échange ne
+            // fait plus évoluer : Kadabra, Machopeur, Gravalanch et Spectrum
+            // arrivent tels quels, et leur évolution se fait ensuite, gratuite
+            // (describeEvolution), parce qu'ils arrivent avec l'origine « echange ».
+            // Le dresseur choisit s'il évolue et quand.
             const now = Date.now();
             const [mine] = offered;
             const [theirs] = requested;
-            const arrive = (row, userId) => {
-              const species = getSpecies(tradedForm(row.species_id));
-              return {
-                ...row,
-                user_id: userId,
-                species_id: species.id,
-                sex: sexAfterEvolution(species, row.sex),
-                form: formAfterEvolution(species, row.form),
-                origin: "echange",
-                obtained_at: now,
-                // Il arrive comme une capture : verrouillé d'office s'il est
-                // shiny ou légendaire, au nouveau dresseur de décider ensuite.
-                locked: lockedByDefault(species.id, row.is_shiny) ? 1 : 0,
-                // Sa place était celle du PC de l'autre : chez son nouveau
-                // dresseur, il prend la première libre. Son surnom le suit,
-                // comme dans les jeux ; la vitrine de l'autre, non.
-                pc_pos: null,
-                showcase_pos: null,
-              };
-            };
+            const arrive = (row, userId) => ({
+              ...row,
+              user_id: userId,
+              origin: "echange",
+              obtained_at: now,
+              // Il arrive comme une capture : verrouillé d'office s'il est
+              // shiny ou légendaire, au nouveau dresseur de décider ensuite.
+              locked: lockedByDefault(row.species_id, row.is_shiny) ? 1 : 0,
+              // Sa place était celle du PC de l'autre : chez son nouveau
+              // dresseur, il prend la première libre. Son surnom le suit,
+              // comme dans les jeux ; la vitrine de l'autre, non.
+              pc_pos: null,
+              showcase_pos: null,
+            });
             const arrivals = [arrive(mine, trade.to_user_id), arrive(theirs, trade.from_user_id)];
 
             restoreDuplicates(arrivals, (err) => {
@@ -1363,28 +1488,165 @@ export function acceptTrade(tradeId, cb) {
                 );
               }
               recordTrade({ fromUserId: trade.from_user_id, toUserId: trade.to_user_id });
-              // La fonction qui a appliqué les évolutions est la seule à pouvoir
-              // dire lesquelles ont eu lieu — et quels individus ont traversé.
               cb(null, {
                 ok: true,
                 trade,
                 received: { byTarget: arrivals[0], byInitiator: arrivals[1] },
-                evolutions: [
-                  { userId: trade.to_user_id, from: mine, to: arrivals[0] },
-                  { userId: trade.from_user_id, from: theirs, to: arrivals[1] },
-                ]
-                  .filter(({ from, to }) => from.species_id !== to.species_id)
-                  .map(({ userId, from, to }) => ({
-                    userId,
-                    from: from.species_id,
-                    to: to.species_id,
-                    isShiny: from.is_shiny,
-                  })),
               });
             });
           });
         });
       });
     }
+  );
+}
+
+// ====================== ÉCHANGES POSSIBLES ======================
+
+// Un échange qui sert aux deux : chacun donne une espèce que l'autre n'a pas, et
+// les deux Pokédex gagnent une entrée. C'est ce que cherche /pk comparer. Rien
+// ne se décide ici : proposer, accepter et refuser restent les gestes de
+// /pk echange, et acceptTrade revérifie tout au moment de l'échange.
+
+// Ce qu'une comparaison relit une fois pour toutes ses dresseurs : la génération
+// ouverte. La configuration est relue sur le disque à chaque accès (isAvailable) :
+// sans ce contexte, comparer un dresseur à trois cents autres la relirait des
+// dizaines de milliers de fois.
+const tradeContext = () => ({ generation: activeGeneration() });
+
+// Ce que la comparaison lit d'un dresseur : les espèces de son Pokédex, ses
+// doublons (`duplicates`, listDuplicates) et ce qu'il peut offrir (`offers`),
+// dans l'ordre du Pokédex. Seules les espèces de la génération ouverte comptent :
+// on ne propose pas ce que le Pokédex ne montre pas encore. Les lignes peuvent
+// être des individus entiers ou seulement leur espèce, leur variante et leur
+// verrou (countBySpecies ne lit pas autre chose).
+function profileOf(rows, options, context) {
+  const duplicates = listDuplicates(rows, options);
+  return {
+    owned: new Set(rows.map((row) => row.species_id)),
+    duplicates,
+    offers: duplicates.filter((entry) =>
+      isAvailable(getSpecies(entry.speciesId), context.generation)
+    ),
+  };
+}
+
+// Ce qu'on peut offrir à qui n'a pas encore l'espèce qui lui arriverait.
+const lacking = (offers, receiverOwned) =>
+  offers.filter((offer) => !receiverOwned.has(offer.speciesId));
+
+function compareProfiles(mine, theirs) {
+  const give = lacking(mine.offers, theirs.owned);
+  const get = lacking(theirs.offers, mine.owned);
+  // Une espèce contre une espèce : le plus petit des deux côtés. Un second
+  // exemplaire donné à qui n'en avait pas ne comble rien de plus.
+  return { give, get, swaps: Math.min(give.length, get.length) };
+}
+
+// `give` : ce que A peut donner à B, `get` : ce que B peut donner à A, chacun dans
+// l'ordre du Pokédex, avec les chiffres de listDuplicates. `reserve` met de côté, de chaque côté, de
+// quoi faire les évolutions qui manquent (voir listDuplicates).
+export function tradeMatches(rowsA, rowsB, { reserve = false, edges = new Map() } = {}) {
+  const options = { reserve, edges };
+  const context = tradeContext();
+  return compareProfiles(profileOf(rowsA, options, context), profileOf(rowsB, options, context));
+}
+
+// Les deux collections lues en base, puis comparées.
+export function getTradeMatches(userId, partnerId, options, cb) {
+  getIndividuals(userId, (err, mine) => {
+    if (err) return cb(err);
+    getIndividuals(partnerId, (err, theirs) => {
+      if (err) return cb(err);
+      cb(null, tradeMatches(mine, theirs, options));
+    });
+  });
+}
+
+// Toutes les collections, lues d'un coup et rangées par dresseur : de quoi
+// comparer l'un d'eux à tous les autres sans une lecture par dresseur.
+function readEveryCollection(cb) {
+  db.all("SELECT user_id, species_id, is_shiny, locked FROM pokemon_owned", [], (err, rows) => {
+    if (err) return cb(err);
+    const byUser = new Map();
+    for (const row of rows || []) {
+      if (!byUser.has(row.user_id)) byUser.set(row.user_id, []);
+      byUser.get(row.user_id).push(row);
+    }
+    cb(null, byUser);
+  });
+}
+
+// Avec qui échanger : les dresseurs qui ont de quoi faire au moins un échange
+// d'une espèce contre une espèce avec `userId`, celui qui en permet le plus
+// d'abord. `give` et `get` sont les tailles des deux listes, `swaps` le plus petit
+// des deux. Les égalités se départagent par le volume, puis par l'identifiant :
+// la liste est relue à chaque page, et un ordre qui bougerait entre deux clics
+// montrerait un dresseur deux fois et en cacherait un autre.
+//
+// `offers`, en troisième argument, dit combien d'espèces `userId` peut offrir :
+// à zéro, personne n'est en cause, c'est lui qui n'a rien à donner — une liste
+// vide ne se lit pas pareil.
+export function getTradePartners(userId, { reserve = false } = {}, cb) {
+  readEveryCollection((err, byUser) => {
+    if (err) return cb(err, []);
+    const options = { reserve, edges: new Map() };
+    const context = tradeContext();
+    const mine = profileOf(byUser.get(userId) ?? [], options, context);
+    byUser.delete(userId);
+    // Sans rien à offrir, aucun échange n'est possible, avec personne.
+    if (!mine.offers.length) return cb(null, [], { offers: 0 });
+    const list = [];
+    for (const [otherId, rows] of byUser) {
+      const { give, get, swaps } = compareProfiles(mine, profileOf(rows, options, context));
+      if (swaps > 0) list.push({ userId: otherId, give: give.length, get: get.length, swaps });
+    }
+    list.sort(
+      (a, b) =>
+        b.swaps - a.swaps ||
+        b.give + b.get - (a.give + a.get) ||
+        String(a.userId).localeCompare(String(b.userId))
+    );
+    cb(null, list, { offers: mine.offers.length });
+  });
+}
+
+// Qui n'a pas l'espèce que `userId` peut donner, et ce que chacun peut lui
+// offrir en retour (`back` : le nombre d'espèces qui lui manquent). `offer` vaut
+// null quand l'espèce n'est pas un doublon qu'il peut céder, avec la réserve
+// d'évolution demandée. Ceux qui peuvent offrir quelque chose passent d'abord :
+// un échange vaut mieux qu'un cadeau.
+export function getSpeciesNeeders(userId, speciesId, { reserve = false } = {}, cb) {
+  readEveryCollection((err, byUser) => {
+    if (err) return cb(err, { offer: null, list: [] });
+    const options = { reserve, edges: new Map() };
+    const context = tradeContext();
+    const mine = profileOf(byUser.get(userId) ?? [], options, context);
+    byUser.delete(userId);
+    const offer = mine.offers.find((line) => line.speciesId === Number(speciesId)) ?? null;
+    if (!offer) return cb(null, { offer: null, list: [] });
+    const list = [];
+    for (const [otherId, rows] of byUser) {
+      if (rows.some((row) => row.species_id === offer.speciesId)) continue;
+      const back = lacking(profileOf(rows, options, context).offers, mine.owned).length;
+      list.push({ userId: otherId, back });
+    }
+    list.sort((a, b) => b.back - a.back || String(a.userId).localeCompare(String(b.userId)));
+    cb(null, { offer, list });
+  });
+}
+
+// L'individu qu'un dresseur cède quand il propose une espèce sans en désigner un :
+// celui que reserveDuplicates retirerait en premier, jamais un verrouillé, et
+// jamais le dernier de l'espèce — null s'il n'y en a pas. Rend la ligne entière,
+// pour qu'elle serve de sélecteur à proposeTrade (selectorOf).
+export function tradeCandidate(userId, speciesId, cb) {
+  db.get(
+    `SELECT o.* FROM pokemon_owned o
+      WHERE o.user_id = ? AND o.species_id = ? AND o.locked = 0 AND ${ENTRY_COUNT} > 1
+      ORDER BY ${LEAST_PRECIOUS_FIRST}
+      LIMIT 1`,
+    [userId, Number(speciesId)],
+    (err, row) => cb(err, row ?? null)
   );
 }

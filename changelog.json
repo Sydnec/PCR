@@ -2114,6 +2114,46 @@
       "commit": "pending",
       "timestamp": "2026-10-01T07:58:23.000Z",
       "branch": "claude/vibrant-brown-s7suxt"
+    },
+    {
+      "type": "enhancement",
+      "name": "Les générations récentes apparaissent plus souvent",
+      "description": "Une espèce de la 2ᵉ génération apparaît deux fois plus souvent qu'une espèce de la 1ʳᵉ au même stade, et ainsi de suite pour les suivantes. Le parc safari n'est pas concerné : on y choisit sa génération.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-01T12:33:30.000Z",
+      "branch": "claude/vibrant-brown-s7suxt"
+    },
+    {
+      "type": "feature",
+      "name": "Nouvelle commande /pk comparer",
+      "description": "Compare les doublons de deux dresseurs pour trouver les échanges qui complètent le Pokédex des deux, avec un bouton pour proposer l'échange. Sans option, elle dit avec qui échanger ; avec un de tes doublons, à qui il manque.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-01T13:11:08.000Z",
+      "branch": "claude/vibrant-brown-s7suxt"
+    },
+    {
+      "type": "enhancement",
+      "name": "Échange : l'évolution devient un choix",
+      "description": "Kadabra, Machopeur, Gravalanch et Spectrum n'évoluent plus d'office quand on les reçoit en échange : ils évoluent ensuite gratuitement avec /pk evolution, quand tu le décides, même s'ils sont seuls de leur espèce.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-01T14:40:29.000Z",
+      "branch": "claude/vibrant-brown-s7suxt"
+    },
+    {
+      "type": "feature",
+      "name": "Nouvelle commande /pk renommer",
+      "description": "Donne un surnom à un de tes Pokémon depuis Discord, comme sur le site, ou retire-le. Le surnom s'affiche désormais dans /pk boite.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-01T14:42:52.000Z",
+      "branch": "claude/vibrant-brown-s7suxt"
     }
   ]
 }
