@@ -8,7 +8,7 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
-import { createSandbox, openDatabases, dbRun, dbAll, dbGet, sleep, withRandom, speciesByName } from "./helpers.js";
+import { createSandbox, openDatabases, dbRun, dbAll, dbGet, eventuallyStable, withRandom, speciesByName } from "./helpers.js";
 
 const GEN1 = { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } };
 const sandbox = createSandbox({ config: GEN1 });
@@ -143,11 +143,12 @@ describe("l'éclosion des œufs (minuteur d'une minute)", () => {
     await egg("u2", Date.now() + 3_600_000);
     const bot = await loadBot();
     bot.handleEggHatchOnTimer();
-    await sleep(300);
-    assert.equal((await dbGet(points, "SELECT status FROM pokemon_eggs WHERE user_id = 'u1'")).status, "HATCHED");
+    await eventuallyStable(async () => {
+      assert.equal((await dbGet(points, "SELECT status FROM pokemon_eggs WHERE user_id = 'u1'")).status, "HATCHED");
+      assert.equal((await dbAll(points, "SELECT id FROM pokemon_owned WHERE user_id = 'u1' AND origin = 'oeuf'")).length, 1);
+      assert.equal(bot.sent.length, 1);
+    });
     assert.equal((await dbGet(points, "SELECT status FROM pokemon_eggs WHERE user_id = 'u2'")).status, "INCUBATING");
-    assert.equal((await dbAll(points, "SELECT id FROM pokemon_owned WHERE user_id = 'u1' AND origin = 'oeuf'")).length, 1);
-    assert.equal(bot.sent.length, 1);
   });
 });
 

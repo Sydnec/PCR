@@ -5,7 +5,7 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { MessageFlags } from "discord.js";
-import { createSandbox, openDatabases, dbRun, dbAll, dbGet, speciesByName } from "./helpers.js";
+import { createSandbox, openDatabases, dbRun, dbAll, dbGet, speciesByName, eventually } from "./helpers.js";
 import { fakeUser, fakeChannel, fakeGuild, runCommand, runAutocomplete, payloadOf, textOf } from "./fake-discord.js";
 
 const GEN1 = { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } };
@@ -305,8 +305,10 @@ describe("/admin pokespawn", () => {
     const channel = fakeChannel();
     const reply = payloadOf(await run("pokespawn", { options: { espece: String(species("Roucool").id), annonce: "🎃 Halloween !" } }, botWith(channel)), "editReply");
     assert.equal(reply.content, "✅ Spawn déclenché : **Roucool**.");
-    assert.equal((await spawnRows()).at(0).species_id, species("Roucool").id);
-    assert.equal(channel.sent.length, 1);
+    await eventually(async () => {
+      assert.equal((await spawnRows()).at(0)?.species_id, species("Roucool").id);
+      assert.equal(channel.sent.length, 1);
+    });
     assert.match(textOf(channel.sent[0]), /Halloween/);
   });
 
@@ -314,14 +316,17 @@ describe("/admin pokespawn", () => {
     const channel = fakeChannel();
     const reply = payloadOf(await run("pokespawn", { options: { espece: String(species("Roucool").id), shiny: true, ping: true } }, botWith(channel)), "editReply");
     assert.match(reply.content, /\(shiny\)/);
-    assert.equal((await spawnRows()).at(0).is_shiny, 1);
+    await eventually(async () => {
+      assert.equal((await spawnRows()).at(0)?.is_shiny, 1);
+      assert.equal(channel.sent.length, 1);
+    });
     assert.match(channel.sent[0].content, /<@&role-pokemon>/);
   });
 
   it("sans espèce : une apparition aléatoire", async () => {
     const reply = payloadOf(await run("pokespawn", {}, botWith(fakeChannel())), "editReply");
     assert.equal(reply.content, "✅ Spawn déclenché : **espèce aléatoire**.");
-    assert.equal((await spawnRows()).length, 1);
+    await eventually(async () => assert.equal((await spawnRows()).length, 1));
   });
 
   it("une génération fermée ne s'ouvre pas en douce par un événement", async () => {

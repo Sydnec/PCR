@@ -4,7 +4,7 @@
 // sont gardées, et deux onglets ouverts ne s'écrasent pas.
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { createSandbox, openDatabases, dbRun, dbAll, dbGet, sleep } from "./helpers.js";
+import { createSandbox, openDatabases, dbRun, dbAll, dbGet, eventually } from "./helpers.js";
 
 const sandbox = createSandbox({ config: { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } } });
 const { points } = await openDatabases();
@@ -92,8 +92,7 @@ describe("lire le PC (getPc)", () => {
     const ids = await giveMany(3);
     const result = await call(pc.getPc, "u1");
     assert.deepEqual(result.layout.map(({ pos }) => pos).sort(), [0, 1, 2]);
-    await sleep(80);
-    assert.deepEqual((await Promise.all(ids.map(posOf))).sort(), [0, 1, 2]);
+    await eventually(async () => assert.deepEqual((await Promise.all(ids.map(posOf))).sort(), [0, 1, 2]));
   });
 
   it("il y a toujours une boîte vide après la dernière occupée, jusqu'au maximum", async () => {
@@ -339,8 +338,7 @@ describe("la vitrine : l'ordre et la lecture", () => {
   it("une vitrine plus garnie que ses places (une compensation) n'en montre que les premières", async () => {
     config({ showcase: { slots: 2 } });
     const ids = await giveMany(4);
-    ids.forEach((id, index) => dbRun(points, "UPDATE pokemon_owned SET showcase_pos = ? WHERE id = ?", [index + 1, id]));
-    await sleep(60);
+    await Promise.all(ids.map((id, index) => dbRun(points, "UPDATE pokemon_owned SET showcase_pos = ? WHERE id = ?", [index + 1, id])));
     assert.deepEqual(await shownIds(), ids.slice(0, 2));
   });
 

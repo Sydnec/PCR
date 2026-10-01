@@ -745,8 +745,7 @@ describe("le partage de la vitrine", () => {
 
   async function showcaseOf(user, quantity = 2) {
     const ids = await ownMany("Rattata", quantity, user);
-    ids.forEach(async (id, index) => dbRun(points, "UPDATE pokemon_owned SET showcase_pos = ? WHERE id = ?", [index + 1, id]));
-    await sleep(40);
+    await Promise.all(ids.map((id, index) => dbRun(points, "UPDATE pokemon_owned SET showcase_pos = ? WHERE id = ?", [index + 1, id])));
     return ids;
   }
   const noNetwork = async (run) => {

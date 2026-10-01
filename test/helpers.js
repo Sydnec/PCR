@@ -58,6 +58,30 @@ export const dbAll = (db, sql, params = []) =>
 
 export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Attend qu'un travail détaché (un rappel de base, une annonce, une éclosion) ait
+// abouti, sans durée magique : `check` est rejouée jusqu'à ce qu'elle passe, ou
+// que le délai soit écoulé — sa dernière erreur remonte alors. Un `sleep(100)`
+// suffit sur un poste rapide et échoue sur un lanceur de CI trois fois plus lent.
+export async function eventually(check, { timeout = 10000, interval = 15 } = {}) {
+  const deadline = Date.now() + timeout;
+  for (;;) {
+    try {
+      return await check();
+    } catch (error) {
+      if (Date.now() >= deadline) throw error;
+      await sleep(interval);
+    }
+  }
+}
+
+// Pour « exactement N » : le compte est attendu, puis revérifié après un court
+// répit, pour qu'un doublon tardif se voie au lieu de passer inaperçu.
+export async function eventuallyStable(check, { settle = 100, ...options } = {}) {
+  await eventually(check, options);
+  await sleep(settle);
+  return check();
+}
+
 // Les bases se créent en cascade de rappels, sans signal de fin. Plutôt que
 // d'attendre « assez longtemps », on lit le code qui les crée : chaque table,
 // index et déclencheur `IF NOT EXISTS`, et chaque `addColumn(...)`, doit exister
