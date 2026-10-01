@@ -206,7 +206,8 @@ function tradeAndSale(rules) {
   return list(
     rule(
       "Seuls les doublons partent : il te reste toujours un exemplaire de chaque espèce, shiny " +
-        "ou non. /pk doublons les montre, chez toi ou chez un autre."
+        "ou non. /pk doublons les montre, chez toi ou chez un autre, et /pk comparer cherche les " +
+        "échanges qui complètent le Pokédex des deux."
     ),
     rule(
       `Une offre d'échange expire après **${fmt(rules.trade.expiryHours)} h**.` +
