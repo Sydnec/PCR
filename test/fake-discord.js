@@ -39,7 +39,7 @@ export function fakeChannel({ id = "chan-1", messages = [] } = {}) {
         fetched.push(arg);
         if (typeof arg === "string") return messages.find((message) => message.id === arg) ?? Promise.reject(new Error("Unknown Message"));
         const list = new Map(messages.slice(0, arg?.limit ?? 50).map((message) => [message.id, message]));
-        return Object.assign(list, { size: list.size });
+        return list;
       },
     },
     bulkDelete: async (collection) => {
