@@ -3,7 +3,7 @@
 // Pokémon — sur des clics simultanés. Ici, de vraies bases et le hasard figé.
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { createSandbox, openDatabases, dbRun, dbGet, dbAll, sleep, withRandom, speciesByName } from "./helpers.js";
+import { createSandbox, openDatabases, dbRun, dbGet, dbAll, eventually, withRandom, speciesByName } from "./helpers.js";
 
 createSandbox({
   config: {
@@ -331,10 +331,11 @@ describe("l'objet tenu", () => {
     const outcome = await throwBall("u1", "hyper", 0.1);
     assert.equal(outcome.status, "catch");
     assert.equal(outcome.held.dropped, true);
-    await sleep(100);
-    assert.equal(await count("pepite"), 1, "rien ne se perd");
-    const drops = await dbAll(points, "SELECT status FROM pokemon_drops");
-    assert.ok(drops.every((drop) => drop.status === "LOST"), "l'objet qu'aucun message n'annonce est refermé");
+    await eventually(async () => {
+      assert.equal(await count("pepite"), 1, "rien ne se perd");
+      const drops = await dbAll(points, "SELECT status FROM pokemon_drops");
+      assert.ok(drops.length > 0 && drops.every((drop) => drop.status === "LOST"), "l'objet qu'aucun message n'annonce est refermé");
+    });
   });
 
   it("sans objet tenu, rien n'est ajouté au sac", async () => {
@@ -392,10 +393,11 @@ describe("statistiques de l'année", () => {
     await setBalance(1000);
     await throwBall("u1", "poke", 0.999);
     await throwBall("u1", "hyper", 0.5);
-    await sleep(150);
-    const rows = await dbAll(stats, "SELECT * FROM pokemon_stats");
-    assert.ok(rows.length > 0, "des statistiques sont écrites");
-    const total = rows.find((row) => row.user_id === "__global__");
-    assert.ok(total, "la ligne globale du serveur existe");
+    await eventually(async () => {
+      const rows = await dbAll(stats, "SELECT * FROM pokemon_stats");
+      assert.ok(rows.length > 0, "des statistiques sont écrites");
+      const total = rows.find((row) => row.user_id === "__global__");
+      assert.ok(total, "la ligne globale du serveur existe");
+    });
   });
 });

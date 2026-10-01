@@ -6,7 +6,7 @@
 // Pokémon des autres (404) — et rend exactement ce que le jeu a décidé.
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { createSandbox, openDatabases, dbRun, dbGet, dbAll, sleep, withRandom, speciesByName } from "./helpers.js";
+import { createSandbox, openDatabases, dbRun, dbGet, dbAll, eventually, withRandom, speciesByName } from "./helpers.js";
 
 const sandbox = createSandbox({ config: { pokemon: { generation: 2 } } });
 process.env.GUILD_ID = "guild-1";
@@ -513,7 +513,6 @@ describe("un lancer (/api/spawn/throw)", () => {
     const id = await spawnRow("Roucool");
     await setBalance(1000, user.id);
     const result = await withRandom(0, () => throwBall({ spawnId: id, ball: "poke" }, user));
-    await sleep(100);
     assert.equal(result.status, "catch");
     assert.equal(result.final, true);
     assert.equal(result.pokemon.shiny, false);
@@ -573,8 +572,7 @@ describe("ramasser un objet au sol (/api/drops/:id/claim)", () => {
     assert.equal(result.item.key, "pepite");
     assert.ok(result.item.label);
     assert.equal(await callback(items.getItemCount, USER, "pepite"), 1);
-    await sleep(100);
-    assert.ok(channelEdits.some((edit) => edit.id === "m9"), "le bouton du salon est retiré");
+    await eventually(() => assert.ok(channelEdits.some((edit) => edit.id === "m9"), "le bouton du salon est retiré"));
   });
 
   it("le second arrive trop tard : 409, rien n'est créé en plus", async () => {

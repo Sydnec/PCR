@@ -6,7 +6,7 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { MessageFlags } from "discord.js";
-import { createSandbox, openDatabases, dbRun, dbGet, dbAll, sleep, speciesByName } from "./helpers.js";
+import { createSandbox, openDatabases, dbRun, dbGet, dbAll, sleep, eventually, eventuallyStable, speciesByName } from "./helpers.js";
 
 const sandbox = createSandbox({ config: { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } } });
 process.env.POKEMON_CHANNEL_ID = "123";
@@ -52,6 +52,8 @@ const send = async (...args) => {
 };
 const row = (user = "u1") => dbGet(points, "SELECT * FROM points WHERE user_id = ?", [user]);
 const balance = async (user = "u1") => (await row(user))?.balance ?? 0;
+// La récompense s'écrit dans un rappel détaché : on attend qu'elle soit là.
+const rewarded = (expected, user = "u1", message) => eventually(async () => assert.equal(await balance(user), expected, message));
 const back = (user, ms) => dbRun(points, "UPDATE points SET last_message_at = last_message_at - ? WHERE user_id = ?", [ms, user]);
 
 beforeEach(async () => {
@@ -65,8 +67,8 @@ describe("les points des messages", () => {
   it("le premier message du jour rapporte le plus ; la ligne retient l'heure, le rang et le jour", async () => {
     const before = Date.now();
     await send("bonjour");
+    await rewarded(distribution()[1]);
     const state = await row();
-    assert.equal(state.balance, distribution()[1]);
     assert.equal(state.messages_today_count, 1);
     assert.equal(state.last_reset_date, today());
     assert.ok(state.last_message_at >= before);
@@ -74,9 +76,11 @@ describe("les points des messages", () => {
 
   it("un message de plus dans l'heure ne rapporte rien et ne change aucun compteur", async () => {
     await send("un");
+    await rewarded(distribution()[1]);
     const first = await row();
     await send("deux");
     await send("trois");
+    await sleep(100);
     assert.deepEqual(await row(), first);
   });
 
@@ -85,7 +89,7 @@ describe("les points des messages", () => {
     for (let rank = 1; rank <= 8; rank++) {
       if (rank > 1) await back("u1", HOUR + 1000);
       await send(`message ${rank}`);
-      assert.equal(await balance(), expected.slice(0, rank).reduce((sum, value) => sum + value, 0), `après le rang ${rank}`);
+      await rewarded(expected.slice(0, rank).reduce((sum, value) => sum + value, 0), "u1", `après le rang ${rank}`);
       assert.equal((await row()).messages_today_count, rank);
     }
     assert.ok(distribution()[1] > distribution()[2] && distribution()[2] > distribution()[3], "la récompense baisse avec le rang");
@@ -93,37 +97,41 @@ describe("les points des messages", () => {
 
   it("une heure pile après la dernière récompense, la suivante est accordée ; une minute avant, non", async () => {
     await send("un");
+    await rewarded(distribution()[1]);
     await back("u1", HOUR - 60_000);
     await send("trop tôt");
+    await sleep(100);
     assert.equal(await balance(), distribution()[1]);
     await back("u1", 120_000);
     await send("assez tard");
-    assert.equal(await balance(), distribution()[1] + distribution()[2]);
+    await rewarded(distribution()[1] + distribution()[2]);
   });
 
   it("un nouveau jour repart du rang 1, même moins d'une heure après un message de la veille", async () => {
     await send("hier soir");
+    await rewarded(distribution()[1]);
     await dbRun(points, "UPDATE points SET last_reset_date = '2000-01-01', messages_today_count = 5 WHERE user_id = 'u1'");
     await send("ce matin");
+    await rewarded(distribution()[1] * 2);
     const state = await row();
     assert.equal(state.messages_today_count, 1, "le compteur est remis à zéro");
-    assert.equal(state.balance, distribution()[1] * 2);
     assert.equal(state.last_reset_date, today());
   });
 
   it("chacun a son compteur", async () => {
     await send("a", { user: "u1" });
     await send("b", { user: "u2" });
-    assert.equal(await balance("u1"), distribution()[1]);
-    assert.equal(await balance("u2"), distribution()[1]);
+    await rewarded(distribution()[1], "u1");
+    await rewarded(distribution()[1], "u2");
   });
 
   it("dix messages simultanés du même dresseur : une seule récompense", async () => {
     await Promise.all(Array.from({ length: 10 }, (_, index) => execute(message(`message ${index}`))));
-    await sleep(200);
-    const state = await row();
-    assert.equal(state.balance, distribution()[1]);
-    assert.equal(state.messages_today_count, 1);
+    await eventuallyStable(async () => {
+      const state = await row();
+      assert.equal(state?.balance, distribution()[1]);
+      assert.equal(state?.messages_today_count, 1);
+    });
   });
 
   it("un bot ne gagne rien, ne compte nulle part", async () => {
@@ -135,9 +143,10 @@ describe("les points des messages", () => {
   it("le barème se règle à chaud : un rang à zéro retombe sur le tarif par défaut, et un tarif nul ne paie rien", async () => {
     sandbox.writeConfig({ ...GEN1, messagePointsDistribution: { 1: 10, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, default: 0 } });
     await send("un");
-    assert.equal(await balance(), 10);
+    await rewarded(10);
     await back("u1", HOUR + 1000);
     await send("deux");
+    await sleep(100);
     assert.equal(await balance(), 10, "le rang 2 vaut zéro, donc le tarif par défaut, ici nul");
     assert.equal((await row()).messages_today_count, 1, "rien n'est consigné quand il n'y a rien à payer");
   });
@@ -145,7 +154,7 @@ describe("les points des messages", () => {
   it("un config.json illisible n'arrête pas les points : le barème par défaut s'applique", async () => {
     sandbox.writeRaw("{illisible");
     await send("un");
-    assert.equal(await balance(), 750);
+    await rewarded(750);
   });
 });
 
@@ -153,16 +162,20 @@ describe("les statistiques de messages", () => {
   it("compte le message par dresseur, salon et jour, et pour le serveur entier", async () => {
     await send("un");
     await send("deux");
-    const rows = await dbAll(stats, "SELECT user_id, channel_id, date, count FROM message_stats ORDER BY user_id");
-    assert.deepEqual(rows, [
-      { user_id: "__global__", channel_id: "__global__", date: today(), count: 2 },
-      { user_id: "u1", channel_id: "chan-1", date: today(), count: 2 },
-    ]);
+    await eventuallyStable(async () => {
+      const rows = await dbAll(stats, "SELECT user_id, channel_id, date, count FROM message_stats ORDER BY user_id");
+      assert.deepEqual(rows, [
+        { user_id: "__global__", channel_id: "__global__", date: today(), count: 2 },
+        { user_id: "u1", channel_id: "chan-1", date: today(), count: 2 },
+      ]);
+    });
   });
 
   it("compte les mots de plus de deux lettres, en minuscules et sans ponctuation", async () => {
     await send("Salut, SALUT ! Un petit mot de l'été... et 420 chats-noirs.");
-    const words = Object.fromEntries((await dbAll(stats, "SELECT word, count FROM word_stats")).map((entry) => [entry.word, entry.count]));
+    const wordsNow = async () => Object.fromEntries((await dbAll(stats, "SELECT word, count FROM word_stats")).map((entry) => [entry.word, entry.count]));
+    await eventually(async () => assert.equal((await wordsNow())["chats-noirs"], 1));
+    const words = await wordsNow();
     assert.equal(words.salut, 2);
     assert.equal(words.petit, 1);
     assert.equal(words["l'été"], 1, "l'apostrophe et les accents font partie du mot");
@@ -174,11 +187,13 @@ describe("les statistiques de messages", () => {
 
   it("compte les emojis du dresseur et ceux du serveur", async () => {
     await send("super 🎉🎉 et 😀");
-    const all = await dbAll(stats, "SELECT user_id, emoji, count FROM emoji_stats ORDER BY user_id, emoji");
-    const of = (user, emoji) => all.find((entry) => entry.user_id === user && entry.emoji === emoji)?.count;
-    assert.equal(of("u1", "🎉"), 2);
-    assert.equal(of("__global__", "🎉"), 2);
-    assert.equal(of("u1", "😀"), 1);
+    await eventually(async () => {
+      const all = await dbAll(stats, "SELECT user_id, emoji, count FROM emoji_stats ORDER BY user_id, emoji");
+      const of = (user, emoji) => all.find((entry) => entry.user_id === user && entry.emoji === emoji)?.count;
+      assert.equal(of("u1", "🎉"), 2);
+      assert.equal(of("__global__", "🎉"), 2);
+      assert.equal(of("u1", "😀"), 1);
+    });
   });
 });
 
@@ -186,14 +201,14 @@ describe("le compteur du jeu", () => {
   it("un message du serveur compte pour les apparitions, un message privé non", async () => {
     await send("salon", { guild: true });
     await send("privé", { guild: false });
-    assert.equal((await dbGet(points, "SELECT message_count FROM pokemon_state WHERE id = 1")).message_count, 1);
+    await eventuallyStable(async () => assert.equal((await dbGet(points, "SELECT message_count FROM pokemon_state WHERE id = 1")).message_count, 1));
   });
 
   it("un message du serveur rapproche aussi l'œuf de son auteur de l'éclosion", async () => {
     await dbRun(points, "INSERT INTO pokemon_eggs (user_id, species_id, father_species_id, mother_species_id, shiny_parents, status, messages, hatch_messages, laid_at, hatch_at) VALUES ('u1', ?, ?, ?, 0, 'INCUBATING', 0, 200, ?, ?)", [species("Rattata").id, species("Rattata").id, species("Rattata").id, Date.now(), Date.now() + 10 * HOUR]);
     await send("un message");
     await send("un autre");
-    assert.equal((await dbGet(points, "SELECT messages FROM pokemon_eggs WHERE user_id = 'u1'")).messages, 2);
+    await eventuallyStable(async () => assert.equal((await dbGet(points, "SELECT messages FROM pokemon_eggs WHERE user_id = 'u1'")).messages, 2));
   });
 });
 
@@ -209,10 +224,10 @@ describe("la réécriture des liens dans un message", () => {
 
   it("republie le message avec le miroir, sous la mention de son auteur, sans la notifier ; l'original est supprimé", async () => {
     const msg = await send("regardez https://x.com/sacha/status/123456 c'est drôle");
+    await eventually(() => assert.equal(msg.deleted.length, 1));
     assert.equal(msg.sent.length, 1);
     assert.equal(msg.sent[0].content, "<@u1> a envoyé :\nregardez https://vxtwitter.com/sacha/status/123456 c'est drôle");
     assert.deepEqual(msg.sent[0].allowedMentions, { parse: [] });
-    assert.equal(msg.deleted.length, 1);
   });
 
   it("un message sans lien à réécrire reste tel quel", async () => {
@@ -236,7 +251,7 @@ describe("la réécriture des liens dans un message", () => {
     console.error = () => {};
     try {
       await execute(msg);
-      await sleep(60);
+      await sleep(150);
     } finally {
       console.error = original;
     }

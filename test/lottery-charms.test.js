@@ -3,7 +3,7 @@
 // génération — et qui se rendent si la suite échoue.
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { createSandbox, openDatabases, dbRun, dbAll, sleep, withRandom } from "./helpers.js";
+import { createSandbox, openDatabases, dbRun, dbAll, sleep, eventually, eventuallyStable, withRandom } from "./helpers.js";
 
 const GEN1 = { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } };
 const GEN2 = { pokemon: { generation: 2 } };
@@ -104,8 +104,7 @@ describe("jouer (play)", () => {
     assert.equal(await stock(result.prize.item.key), result.prize.quantity);
     const row = await ticket();
     assert.equal(row.draws, 1);
-    await sleep(50);
-    assert.equal((await ticket()).wins, 1);
+    await eventually(async () => assert.equal((await ticket()).wins, 1));
     assert.equal(row.last_day, lottery.lotteryDay());
     assert.equal(result.nextAt, lottery.nextDrawAt());
   });
@@ -256,8 +255,7 @@ describe("compléter un Pokédex (checkCharms)", () => {
     assert.equal((await call(charms.checkCharms, "u1")).length, 1);
     assert.equal((await call(charms.checkCharms, "u1")).length, 0);
     assert.equal(await stock("charme_chroma_1"), 1);
-    await sleep(50);
-    assert.equal(discord.sent.length, 1, "annoncé une seule fois");
+    await eventuallyStable(() => assert.equal(discord.sent.length, 1, "annoncé une seule fois"));
     assert.match(discord.sent[0].content, /<@u1> complète le Pokédex de la 1re génération/);
     assert.match(discord.sent[0].content, new RegExp(`${charms.charmSpecies(1).length} espèces`));
     assert.match(discord.sent[0].content, /×2/);
@@ -270,8 +268,7 @@ describe("compléter un Pokédex (checkCharms)", () => {
     await ownEverySpecies("u1", 1);
     const results = await Promise.all([call(charms.checkCharms, "u1"), call(charms.checkCharms, "u1")]);
     assert.equal(results.flat().length, 1);
-    await sleep(50);
-    assert.equal(discord.sent.length, 1);
+    await eventuallyStable(() => assert.equal(discord.sent.length, 1));
     assert.equal(await stock("charme_chroma_1"), 1);
   });
 
@@ -311,14 +308,14 @@ describe("compléter un Pokédex (checkCharms)", () => {
 
 describe("les rôles du charme (syncCharmRoles)", () => {
   const holder = () => call(items.grantItem, "u1", "charme_chroma_1", 1, { source: "test" });
-  const settle = () => sleep(80);
+  // Pour les cas où RIEN ne doit se passer : un répit assez long pour que le travail détaché ait eu le temps d'agir.
+  const settle = () => sleep(250);
 
   it("un porteur qui a le rôle Pokémon reçoit le rôle de son charme", async () => {
     await holder();
     const member = fakeMember({ roles: ["role-pokemon"] });
     charms.syncCharmRoles("u1", { member });
-    await settle();
-    assert.deepEqual(member.log, [["add", "role-charm-1", "Charme Chroma"]]);
+    await eventually(() => assert.deepEqual(member.log, [["add", "role-charm-1", "Charme Chroma"]]));
   });
 
   it("sans le rôle Pokémon, il ne reçoit pas le ping du charme : qui ne veut pas du jeu n'a pas ceux-là", async () => {
@@ -332,16 +329,14 @@ describe("les rôles du charme (syncCharmRoles)", () => {
   it("sans le charme, jamais son rôle", async () => {
     const member = fakeMember({ roles: ["role-pokemon", "role-charm-1"] });
     charms.syncCharmRoles("u1", { member });
-    await settle();
-    assert.deepEqual(member.log, [["remove", "role-charm-1", "Pas de Charme Chroma de cette génération"]]);
+    await eventually(() => assert.deepEqual(member.log, [["remove", "role-charm-1", "Pas de Charme Chroma de cette génération"]]));
   });
 
   it("un porteur qui quitte le rôle Pokémon perd aussi celui du charme", async () => {
     await holder();
     const member = fakeMember({ roles: ["role-charm-1"] });
     charms.syncCharmRoles("u1", { member, leftPokemonRole: true });
-    await settle();
-    assert.deepEqual(member.log, [["remove", "role-charm-1", "Rôle Pokémon retiré"]]);
+    await eventually(() => assert.deepEqual(member.log, [["remove", "role-charm-1", "Rôle Pokémon retiré"]]));
   });
 
   it("un porteur sans rôle Pokémon garde le rôle qu'un modérateur lui a donné", async () => {
@@ -358,8 +353,7 @@ describe("les rôles du charme (syncCharmRoles)", () => {
     const member = fakeMember({ roles: ["role-pokemon"] });
     charms.setCharmClient(fakeDiscord({ members: new Map([["u1", member]]) }).client);
     charms.syncCharmRoles("u1");
-    await settle();
-    assert.deepEqual(member.log.map(([action]) => action), ["add"]);
+    await eventually(() => assert.deepEqual(member.log.map(([action]) => action), ["add"]));
   });
 
   it("un membre parti du serveur n'est pas une erreur", async () => {
@@ -398,10 +392,10 @@ describe("le rattrapage au démarrage (repairCharms)", () => {
     });
 
     charms.repairCharms(discord.client);
-    await sleep(600);
-
-    assert.equal(await stock("charme_chroma_1"), 1, "le charme est donné");
-    assert.ok(complete.cache.has("role-charm-1"), "son porteur reçoit le rôle");
-    assert.equal(usurper.cache.has("role-charm-1"), false, "qui a le rôle sans le charme le perd");
+    await eventually(async () => {
+      assert.equal(await stock("charme_chroma_1"), 1, "le charme est donné");
+      assert.ok(complete.cache.has("role-charm-1"), "son porteur reçoit le rôle");
+      assert.equal(usurper.cache.has("role-charm-1"), false, "qui a le rôle sans le charme le perd");
+    });
   });
 });

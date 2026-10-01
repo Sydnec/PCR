@@ -4,7 +4,7 @@
 // (les heures ou les messages) — et chacune doit tenir sous des clics simultanés.
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { createSandbox, openDatabases, dbRun, dbAll, dbGet, sleep, withRandom, speciesByName } from "./helpers.js";
+import { createSandbox, openDatabases, dbRun, dbAll, dbGet, sleep, eventually, eventuallyStable, withRandom, speciesByName } from "./helpers.js";
 
 const GEN2 = { pokemon: { generation: 2 } };
 const sandbox = createSandbox({ config: GEN2 });
@@ -248,11 +248,12 @@ describe("l'éclosion (hatchEgg)", () => {
     const [born] = await babies();
     assert.ok(born, "un Pichu est dans la boîte");
     assert.equal(born.user_id, "u1");
-    await sleep(40);
-    const row = (await eggsOf())[0];
-    assert.equal(row.status, "HATCHED");
-    assert.equal(row.pokemon_id, born.id);
-    assert.ok(row.hatched_at > 0);
+    await eventually(async () => {
+      const row = (await eggsOf())[0];
+      assert.equal(row.status, "HATCHED");
+      assert.equal(row.pokemon_id, born.id);
+      assert.ok(row.hatched_at > 0);
+    });
   });
 
   it("la revendication est gardée : deux éclosions simultanées font un seul bébé", async () => {
@@ -319,14 +320,14 @@ describe("le compteur de messages et le balayage", () => {
     const client = fakeClient();
     eggs.countEggMessage(client, "u1");
     eggs.countEggMessage(client, "u1");
-    await sleep(80);
-    assert.equal((await eggsOf())[0].messages, 2);
+    await eventually(async () => assert.equal((await eggsOf())[0].messages, 2));
     assert.equal((await eggsOf())[0].status, "INCUBATING");
     eggs.countEggMessage(client, "u1");
-    await sleep(200);
-    assert.equal((await eggsOf())[0].status, "HATCHED");
-    assert.equal((await babies()).length, 1);
-    assert.equal(client.sent.length, 1);
+    await eventuallyStable(async () => {
+      assert.equal((await eggsOf())[0].status, "HATCHED");
+      assert.equal((await babies()).length, 1);
+      assert.equal(client.sent.length, 1);
+    });
     assert.equal(client.sent[0].content, "<@u1>");
     assert.match(JSON.stringify(client.sent[0].embeds[0].toJSON()), new RegExp(`<@u1> accueille \\*\\*Pichu`));
     assert.equal(egg.status, "INCUBATING");
@@ -335,7 +336,7 @@ describe("le compteur de messages et le balayage", () => {
   it("les messages de quelqu'un qui ne couve pas ne touchent rien", async () => {
     await incubating();
     eggs.countEggMessage(fakeClient(), "u2");
-    await sleep(60);
+    await sleep(150);
     assert.equal((await eggsOf())[0].messages, 0);
   });
 
@@ -344,8 +345,13 @@ describe("le compteur de messages et le balayage", () => {
     await dbRun(points, "UPDATE pokemon_eggs SET hatch_at = ? WHERE id = ?", [Date.now() - 1, egg.id]);
     const client = fakeClient();
     eggs.countEggMessage(client, "u1");
-    await sleep(200);
-    assert.equal((await eggsOf())[0].status, "HATCHED");
+    // L'éclosion se conclut après le statut (bébé crédité, annonce) : s'arrêter à
+    // HATCHED laisserait le bébé tomber dans la base du test suivant.
+    await eventually(async () => {
+      assert.equal((await eggsOf())[0].status, "HATCHED");
+      assert.equal((await babies()).length, 1);
+      assert.equal(client.sent.length, 1);
+    });
   });
 
   it("des messages simultanés au seuil : un seul bébé", async () => {
@@ -353,9 +359,10 @@ describe("le compteur de messages et le balayage", () => {
     await incubating();
     const client = fakeClient();
     for (let index = 0; index < 5; index++) eggs.countEggMessage(client, "u1");
-    await sleep(300);
-    assert.equal((await babies()).length, 1);
-    assert.equal(client.sent.length, 1);
+    await eventuallyStable(async () => {
+      assert.equal((await babies()).length, 1);
+      assert.equal(client.sent.length, 1);
+    });
   });
 
   it("le balayage fait éclore les œufs dont l'échéance est passée, et seulement eux", async () => {
@@ -364,10 +371,11 @@ describe("le compteur de messages et le balayage", () => {
     await dbRun(points, "UPDATE pokemon_eggs SET hatch_at = ? WHERE id = ?", [Date.now() - 1000, due.id]);
     const client = fakeClient();
     eggs.hatchDueEggs(client);
-    await sleep(300);
-    assert.equal((await eggsOf("u1"))[0].status, "HATCHED");
+    await eventuallyStable(async () => {
+      assert.equal((await eggsOf("u1"))[0].status, "HATCHED");
+      assert.equal(client.sent.length, 1);
+    });
     assert.equal((await eggsOf("u2"))[0].status, "INCUBATING");
-    assert.equal(client.sent.length, 1);
   });
 
   it("un salon qui refuse l'annonce n'empêche pas le bébé de naître", async () => {
@@ -377,7 +385,8 @@ describe("le compteur de messages et le balayage", () => {
     console.error = () => {};
     try {
       eggs.hatchDueEggs(fakeClient({ sendFails: true }));
-      await sleep(300);
+      await eventually(async () => assert.equal((await babies()).length, 1));
+      await sleep(150);
     } finally {
       console.error = original;
     }

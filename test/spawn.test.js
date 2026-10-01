@@ -3,7 +3,7 @@
 // gardée, dont dépend l'absence de double apparition.
 import { describe, it, beforeEach, before } from "node:test";
 import assert from "node:assert/strict";
-import { createSandbox, openDatabases, dbRun, dbGet, sleep, withRandom } from "./helpers.js";
+import { createSandbox, openDatabases, dbRun, dbGet, sleep, eventually, eventuallyStable, withRandom } from "./helpers.js";
 
 const sandbox = createSandbox({
   config: { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } },
@@ -102,12 +102,28 @@ describe("revendication d'une apparition (registerMessageForSpawn)", () => {
     fetches = 0;
   }
 
+  const readState = () => dbGet(points, "SELECT message_count, last_spawn_at, spawning FROM pokemon_state WHERE id = 1");
+
   // Un message, puis le temps que la cascade de rappels se termine : le verrou
-  // revient à 0 quand doSpawn a fini, et c'est l'état stable qu'on observe.
+  // revient à 0 quand doSpawn a fini, et c'est l'état stable qu'on observe. Pas de
+  // durée fixe : on attend que le message ait eu un effet (le compteur bouge, ou un
+  // salon est sollicité), puis que l'état ne bouge plus pendant un court répit.
   async function message() {
+    const before = (await readState()).message_count;
     registerMessageForSpawn(client);
-    await sleep(150);
-    return dbGet(points, "SELECT message_count, last_spawn_at, spawning FROM pokemon_state WHERE id = 1");
+    await eventually(async () => {
+      assert.ok((await readState()).message_count !== before || fetches > 0, "le message n'a encore eu aucun effet");
+    });
+    let last = JSON.stringify(await readState());
+    for (let since = Date.now(); Date.now() - since < 100; ) {
+      await sleep(20);
+      const now = JSON.stringify(await readState());
+      if (now !== last) {
+        last = now;
+        since = Date.now();
+      }
+    }
+    return JSON.parse(last);
   }
   const claimed = (state) => state.message_count === 0;
 
@@ -182,15 +198,14 @@ describe("revendication d'une apparition (registerMessageForSpawn)", () => {
   it("un verrou déjà pris interdit une seconde revendication", async () => {
     await arrange({ count: 1000, locked: 1 });
     registerMessageForSpawn(client);
-    await sleep(150);
+    await sleep(300);
     assert.equal(fetches, 0);
   });
 
   it("dix messages simultanés ne font apparaître qu'un seul Pokémon", async () => {
     await arrange({ active: "COMMUN" });
     for (let i = 0; i < 10; i++) registerMessageForSpawn(client);
-    await sleep(300);
-    assert.equal(fetches, 1);
+    await eventuallyStable(() => assert.equal(fetches, 1));
   });
 
   it("une apparition désactivée ne compte même pas les messages", async () => {
@@ -198,7 +213,7 @@ describe("revendication d'une apparition (registerMessageForSpawn)", () => {
     sandbox.writeConfig({ pokemon: { enabled: false } });
     try {
       registerMessageForSpawn(client);
-      await sleep(100);
+      await sleep(300);
     } finally {
       sandbox.writeConfig({ pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } });
     }

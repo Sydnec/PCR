@@ -22,10 +22,13 @@ async function trainer(userId, moves) {
   await dbRun(points, "DELETE FROM points WHERE user_id = ?", [userId]);
   await dbRun(points, "INSERT INTO points (user_id, balance) VALUES (?, ?)", [userId, balance]);
   await dbRun(points, "DELETE FROM points_log WHERE user_id = ?", [userId]);
+  // Un seul « maintenant » pour tout le jeu de données : deux mouvements « à J-5 » doivent
+  // porter la même date, même si la base met du temps entre deux insertions.
+  const now = Date.now();
   let running = 0;
   for (const [daysAgo, delta] of moves) {
     running += delta;
-    await dbRun(points, "INSERT INTO points_log (user_id, delta, balance, created_at) VALUES (?, ?, ?, ?)", [userId, delta, running, Date.now() - daysAgo * DAY]);
+    await dbRun(points, "INSERT INTO points_log (user_id, delta, balance, created_at) VALUES (?, ?, ?, ?)", [userId, delta, running, now - daysAgo * DAY]);
   }
 }
 

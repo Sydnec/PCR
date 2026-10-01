@@ -3,7 +3,7 @@
 // rend quand l'entrée n'a pas lieu.
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { createSandbox, openDatabases, dbRun, dbGet, dbAll, sleep } from "./helpers.js";
+import { createSandbox, openDatabases, dbRun, dbGet, dbAll, eventually, eventuallyStable } from "./helpers.js";
 
 const sandbox = createSandbox({
   config: { pokemon: { generation: 2 } },
@@ -125,8 +125,7 @@ describe("entrée payante", () => {
     const results = await Promise.all(Array.from({ length: 5 }, () => call(safari.startPaidSession, "u1", {})));
     assert.equal((await sessions()).length, 1);
     assert.equal(results.filter((result) => result.ok).length, 5, "tous reçoivent la visite");
-    await sleep(100);
-    assert.equal(await balance(), price() * 4, "un seul débit net, les autres remboursés");
+    await eventuallyStable(async () => assert.equal(await balance(), price() * 4, "un seul débit net, les autres remboursés"));
   });
 
   it("garde les générations visées pour toute la visite, et les encounters en viennent", async () => {
@@ -169,8 +168,7 @@ describe("entrée gratuite par un parc ouvert", () => {
     const [session] = await sessions();
     assert.equal(session.park_id, parkId);
     assert.equal(session.entry_cost, 0);
-    await sleep(50);
-    assert.equal((await dbGet(points, "SELECT entries FROM pokemon_safari_parks WHERE id = ?", [parkId])).entries, 1);
+    await eventually(async () => assert.equal((await dbGet(points, "SELECT entries FROM pokemon_safari_parks WHERE id = ?", [parkId])).entries, 1));
   });
 
   it("la visite dure jusqu'à la fermeture du parc, au plancher près", async () => {
@@ -228,8 +226,7 @@ describe("entrée gratuite par un parc ouvert", () => {
     const parkId = await openPark();
     await Promise.all(Array.from({ length: 4 }, () => call(safari.enterPark, "u1", parkId, {})));
     assert.equal((await sessions()).length, 1);
-    await sleep(80);
-    assert.equal((await dbGet(points, "SELECT entries FROM pokemon_safari_parks WHERE id = ?", [parkId])).entries, 1);
+    await eventuallyStable(async () => assert.equal((await dbGet(points, "SELECT entries FROM pokemon_safari_parks WHERE id = ?", [parkId])).entries, 1));
   });
 
   it("une visite déjà ouverte se rouvre même si le parc a fermé depuis", async () => {

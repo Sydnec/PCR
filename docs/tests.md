@@ -30,7 +30,7 @@ génération ouverte en cours de route.
 - `test/helpers.js` — `createSandbox`, `openDatabases` (attend la fin de la création des tables, lue
   dans le code qui les crée, et ferme les bases à la fin), `withRandom` (fige `Math.random`, une
   valeur ou une suite, y compris pendant une opération asynchrone), `dbRun` / `dbGet` / `dbAll`,
-  `speciesByName`.
+  `speciesByName`, et `eventually` / `eventuallyStable` pour attendre un travail détaché (voir plus bas).
 - `test/fake-discord.js` — de fausses interactions « slash » (options, sous-commande, membre,
   salon), un faux serveur et un faux salon, qui notent ce qu'on leur répond.
 - Génération : un test qui n'a pas besoin de la 2ᵉ génération la **ferme** (`generationOpenings` à
@@ -86,3 +86,10 @@ génération ouverte en cours de route.
    code ne protège rien.
 7. Une règle de jeu nouvelle, un nouveau chemin d'écriture ou un bug corrigé arrivent avec leur
    test — le test du bug est celui qui l'aurait vu.
+8. **Jamais d'attente fixe avant une assertion positive.** Le bot lance beaucoup de travail détaché
+   (récompense d'un message, objet lâché, fuite d'une apparition) dont la fin dépend de SQLite : un
+   `sleep(100)` passe sur un poste rapide et échoue sur le lanceur de la CI, plus lent. On
+   attend l'effet avec `eventually(() => assert…)` (il réessaie jusqu'à 10 s), et `eventuallyStable`
+   quand le compte exact compte (« un seul gagne » : l'effet, puis 100 ms pour voir qu'il ne
+   se répète pas). Seule une assertion **négative** (« rien ne s'est passé ») garde une attente fixe,
+   assez longue pour que l'effet fautif aurait eu le temps d'arriver.

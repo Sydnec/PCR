@@ -3,7 +3,7 @@
 // laisse tomber en partant. Discord est simulé : on regarde ce qu'il aurait reçu.
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { createSandbox, openDatabases, dbRun, dbGet, dbAll, sleep, withRandom, speciesByName } from "./helpers.js";
+import { createSandbox, openDatabases, dbRun, dbGet, dbAll, sleep, eventually, eventuallyStable, withRandom, speciesByName } from "./helpers.js";
 
 createSandbox({
   config: { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" }, spawn: { embedRefreshMs: 20 } } },
@@ -58,6 +58,15 @@ function fakeDiscord({ sendFails = false, messageGone = false } = {}) {
 
 const active = () => dbGet(points, "SELECT * FROM pokemon_spawns WHERE status = 'ACTIVE'");
 const all = () => dbAll(points, "SELECT * FROM pokemon_spawns ORDER BY id");
+const lockReleased = async () => assert.equal((await dbGet(points, "SELECT spawning FROM pokemon_state WHERE id = 1")).spawning, 0, "le verrou n'est pas encore rendu");
+// Une apparition est née quand son annonce est partie, que sa ligne porte son
+// message et que le verrou est rendu : on attend cet état, pas une durée.
+const born = (discord, count = 1) =>
+  eventually(async () => {
+    assert.ok(discord.sent.length >= count, "l'annonce n'est pas encore partie");
+    await lockReleased();
+    assert.ok((await active())?.message_id, "la ligne n'est pas encore complète");
+  });
 
 beforeEach(async () => {
   for (const table of ["pokemon_spawns", "pokemon_throws", "pokemon_drops", "pokemon_inventory"]) await dbRun(points, `DELETE FROM ${table}`);
@@ -68,7 +77,7 @@ describe("naissance d'une apparition (doSpawn)", () => {
   it("poste l'annonce, enregistre la ligne avec le taux de l'espèce et le message, et rend le verrou", async () => {
     const discord = fakeDiscord();
     await withRandom(0.5, () => spawn.doSpawn(discord.client, { speciesId: species("Roucool").id, forceShiny: false }));
-    await sleep(80);
+    await born(discord);
     const row = await active();
     assert.equal(row.species_id, species("Roucool").id);
     assert.equal(row.catch_rate, species("Roucool").catchRate, "le taux figé est celui de l'espèce, le plancher joue à la lecture");
@@ -88,7 +97,7 @@ describe("naissance d'une apparition (doSpawn)", () => {
     // rester figé jusque-là, pas seulement le temps de l'appel.
     await withRandom(0, async () => {
       await spawn.doSpawn(discord.client, { speciesId: species("Mewtwo").id, forceShiny: false });
-      await sleep(80);
+      await born(discord);
     });
     const legendary = await active();
     assert.equal(legendary.rarity, "LEGENDAIRE");
@@ -99,7 +108,7 @@ describe("naissance d'une apparition (doSpawn)", () => {
     await dbRun(points, "UPDATE pokemon_state SET spawning = 1");
     await withRandom(0, async () => {
       await spawn.doSpawn(discord.client, { speciesId: species("Roucool").id, forceShiny: false });
-      await sleep(80);
+      await born(discord, 2);
     });
     const common = await active();
     assert.ok(Math.abs(common.flees_at - common.spawned_at - min * MINUTE) < 50);
@@ -112,7 +121,7 @@ describe("naissance d'une apparition (doSpawn)", () => {
       await dbRun(points, "UPDATE pokemon_state SET spawning = 1");
       const discord = fakeDiscord();
       await spawn.doSpawn(discord.client, { speciesId: species(name).id, forceShiny });
-      await sleep(80);
+      await born(discord);
       return discord.sent.at(-1)?.content;
     };
     assert.equal(await mentions("Roucool", false), undefined);
@@ -124,7 +133,7 @@ describe("naissance d'une apparition (doSpawn)", () => {
   it("un shiny forcé l'est pour tout le salon, l'annonce l'écrit dans son titre", async () => {
     const discord = fakeDiscord();
     await spawn.doSpawn(discord.client, { speciesId: species("Roucool").id, forceShiny: true });
-    await sleep(80);
+    await born(discord);
     assert.equal((await active()).is_shiny, 1);
     assert.match(discord.sent[0].embeds[0].toJSON().title, /SHINY/);
   });
@@ -132,21 +141,22 @@ describe("naissance d'une apparition (doSpawn)", () => {
   it("l'annonce de l'organisateur figure dans l'embed", async () => {
     const discord = fakeDiscord();
     await spawn.doSpawn(discord.client, { speciesId: species("Roucool").id, announcement: "Un événement !" });
-    await sleep(80);
+    await born(discord);
     assert.match(discord.sent[0].embeds[0].toJSON().description, /Un événement !/);
   });
 
   it("le suivant remplace le précédent : le premier est marqué enfui et son message édité", async () => {
     const discord = fakeDiscord();
     await spawn.doSpawn(discord.client, { speciesId: species("Roucool").id });
-    await sleep(80);
+    await born(discord);
     await dbRun(points, "UPDATE pokemon_state SET spawning = 1");
     await spawn.doSpawn(discord.client, { speciesId: species("Rattata").id });
-    await sleep(120);
-    const rows = await all();
-    assert.deepEqual(rows.map((row) => row.status), ["FLED", "ACTIVE"]);
-    assert.ok(rows[0].ended_at > 0);
-    assert.ok(discord.edits.some((edit) => edit.id === "m1" && edit.components?.length === 0), "le premier message perd ses boutons");
+    await eventually(async () => {
+      const rows = await all();
+      assert.deepEqual(rows.map((row) => row.status), ["FLED", "ACTIVE"]);
+      assert.ok(rows[0].ended_at > 0);
+      assert.ok(discord.edits.some((edit) => edit.id === "m1" && edit.components?.length === 0), "le premier message perd ses boutons");
+    });
   });
 
   it("un seul Pokémon actif à la fois, garanti par la base", async () => {
@@ -157,17 +167,15 @@ describe("naissance d'une apparition (doSpawn)", () => {
   it("un salon qui refuse l'envoi n'enferme pas le jeu : l'apparition est annulée et le verrou rendu", async () => {
     const discord = fakeDiscord({ sendFails: true });
     await spawn.doSpawn(discord.client, { speciesId: species("Roucool").id });
-    await sleep(120);
+    await eventually(lockReleased);
     assert.equal(await active(), undefined);
-    assert.equal((await dbGet(points, "SELECT spawning FROM pokemon_state WHERE id = 1")).spawning, 0);
   });
 
   it("une espèce inconnue ne fait rien d'autre que rendre le verrou", async () => {
     const discord = fakeDiscord();
     await spawn.doSpawn(discord.client, { speciesId: 99999 });
-    await sleep(60);
+    await eventually(lockReleased);
     assert.equal(discord.sent.length, 0);
-    assert.equal((await dbGet(points, "SELECT spawning FROM pokemon_state WHERE id = 1")).spawning, 0);
   });
 
   it("une apparition forcée remet les compteurs à zéro et ignore la pause du parc", async () => {
@@ -222,7 +230,8 @@ describe("fuite par expiration (balayage)", () => {
   attachFleeHandler(bot.client);
   const sweep = async () => {
     await bot.client.handlePokemonFleeOnTimer();
-    await sleep(120);
+    // Pour les cas où RIEN ne doit se passer ; ce qui doit arriver s'attend par sondage.
+    await sleep(250);
   };
 
   it("fait fuir un Pokémon dont la durée de vie est écoulée, et pas avant", async () => {
@@ -231,10 +240,12 @@ describe("fuite par expiration (balayage)", () => {
     assert.equal((await active()).species_id, 1, "pas encore");
     await dbRun(points, "UPDATE pokemon_spawns SET flees_at = ?", [Date.now() - 1000]);
     await sweep();
-    assert.equal(await active(), undefined);
-    const [row] = await all();
-    assert.equal(row.status, "FLED");
-    assert.ok(row.ended_at > 0);
+    await eventually(async () => {
+      assert.equal(await active(), undefined);
+      const [row] = await all();
+      assert.equal(row.status, "FLED");
+      assert.ok(row.ended_at > 0);
+    });
   });
 
   it("un Pokémon sans échéance n'est jamais balayé", async () => {
@@ -253,8 +264,11 @@ describe("fuite par expiration (balayage)", () => {
     await dbRun(points, "INSERT INTO pokemon_spawns (species_id, catch_rate, rarity, status, spawned_at, flees_at, message_id, channel_id) VALUES (?, 45, 'COMMUN', 'ACTIVE', 1, ?, 'm9', '123')", [species("Roucool").id, Date.now() - 1000]);
     bot.edits.length = 0;
     await sweep();
-    const edit = bot.edits.find((entry) => entry.id === "m9");
-    assert.ok(edit, "le message est édité");
+    const edit = await eventually(() => {
+      const found = bot.edits.find((entry) => entry.id === "m9");
+      assert.ok(found, "le message est édité");
+      return found;
+    });
     assert.deepEqual(edit.components, []);
     assert.match(JSON.stringify(edit.embeds[0].toJSON()), /enfui|s'est|Roucool/i);
   });
@@ -266,22 +280,24 @@ describe("l'objet qu'un Pokémon emporte", () => {
     const row = { id: 7, species_id: species("Roucool").id, held_item: "pepite", channel_id: "123", message_id: "m5", rarity: "COMMUN", is_shiny: 0, throw_count: 0, sex: "M", form: null };
     await dbRun(points, "INSERT INTO pokemon_spawns (id, species_id, catch_rate, status, spawned_at, held_item, channel_id, message_id) VALUES (7, ?, 45, 'FLED', 1, 'pepite', '123', 'm5')", [row.species_id]);
     await withRandom(0.1, () => spawn.endSpawnAsFled(discord.client, row));
-    await sleep(120);
-    const [drop] = await dbAll(points, "SELECT * FROM pokemon_drops");
+    const drop = await eventually(async () => {
+      const [found] = await dbAll(points, "SELECT * FROM pokemon_drops");
+      assert.ok(found?.message_id, "l'objet n'est pas encore annoncé dans le salon");
+      return found;
+    });
     assert.equal(drop.item_key, "pepite");
     assert.equal(drop.status, "OPEN");
     assert.equal(drop.spawn_id, 7);
-    assert.ok(drop.message_id, "l'objet est annoncé dans le salon");
     await dbRun(points, "DELETE FROM pokemon_drops");
     await withRandom(0.9, () => spawn.endSpawnAsFled(discord.client, row));
-    await sleep(80);
+    await sleep(250);
     assert.deepEqual(await dbAll(points, "SELECT * FROM pokemon_drops"), [], "il emporte son objet");
   });
 
   it("un Pokémon sans objet n'en laisse pas", async () => {
     const discord = fakeDiscord();
     await withRandom(0.1, () => spawn.endSpawnAsFled(discord.client, { id: 8, species_id: 1, held_item: null }));
-    await sleep(60);
+    await sleep(250);
     assert.deepEqual(await dbAll(points, "SELECT * FROM pokemon_drops"), []);
   });
 });
@@ -371,36 +387,31 @@ describe("réparation au démarrage (rehydratePokemon)", () => {
   it("libère le verrou resté pris après un arrêt brutal", async () => {
     await dbRun(points, "UPDATE pokemon_state SET spawning = 1");
     spawn.rehydratePokemon(fakeDiscord().client);
-    await sleep(100);
-    assert.equal((await dbGet(points, "SELECT spawning FROM pokemon_state")).spawning, 0);
+    await eventually(lockReleased);
   });
 
   it("clôt une apparition sans message : sans cela, plus aucune ne pourrait naître", async () => {
     await dbRun(points, "INSERT INTO pokemon_spawns (species_id, catch_rate, status, spawned_at) VALUES (1, 45, 'ACTIVE', 1)");
     spawn.rehydratePokemon(fakeDiscord().client);
-    await sleep(120);
-    assert.equal(await active(), undefined);
+    await eventually(async () => assert.equal(await active(), undefined));
   });
 
   it("donne une échéance à une apparition d'avant l'ajout de la colonne, sans la tuer au premier tick", async () => {
     await dbRun(points, "INSERT INTO pokemon_spawns (species_id, catch_rate, status, spawned_at, message_id, channel_id, flees_at) VALUES (1, 45, 'ACTIVE', 1, 'm1', '123', NULL)");
     spawn.rehydratePokemon(fakeDiscord().client);
-    await sleep(120);
-    const row = await active();
-    assert.ok(row.flees_at > Date.now(), "une échéance dans le futur");
+    await eventually(async () => assert.ok((await active()).flees_at > Date.now(), "une échéance dans le futur"));
   });
 
   it("clôt l'apparition dont le message a été supprimé", async () => {
     await dbRun(points, "INSERT INTO pokemon_spawns (species_id, catch_rate, status, spawned_at, message_id, channel_id, flees_at) VALUES (1, 45, 'ACTIVE', 1, 'm1', '123', ?)", [Date.now() + 10 * MINUTE]);
     spawn.rehydratePokemon(fakeDiscord({ messageGone: true }).client);
-    await sleep(150);
-    assert.equal(await active(), undefined);
+    await eventually(async () => assert.equal(await active(), undefined));
   });
 
   it("laisse intacte une apparition saine", async () => {
     await dbRun(points, "INSERT INTO pokemon_spawns (species_id, catch_rate, status, spawned_at, message_id, channel_id, flees_at) VALUES (1, 45, 'ACTIVE', 1, 'm1', '123', ?)", [Date.now() + 10 * MINUTE]);
     spawn.rehydratePokemon(fakeDiscord().client);
-    await sleep(150);
+    await sleep(300);
     assert.ok(await active());
   });
 });
@@ -410,15 +421,13 @@ describe("rafraîchissement de l'annonce", () => {
     const discord = fakeDiscord();
     await dbRun(points, "INSERT INTO pokemon_spawns (id, species_id, catch_rate, rarity, status, spawned_at, message_id, channel_id) VALUES (1, ?, 45, 'COMMUN', 'ACTIVE', 1, 'm1', '123')", [species("Roucool").id]);
     for (let i = 0; i < 8; i++) spawn.refreshSpawnEmbed(discord.client, 1);
-    await sleep(250);
-    assert.equal(discord.edits.length, 1, "Discord limite les éditions d'un même message");
+    await eventuallyStable(() => assert.equal(discord.edits.length, 1, "Discord limite les éditions d'un même message"));
   });
 
   it("l'édition immédiate part sans attendre", async () => {
     const discord = fakeDiscord();
     await dbRun(points, "INSERT INTO pokemon_spawns (id, species_id, catch_rate, rarity, status, spawned_at, message_id, channel_id) VALUES (1, ?, 45, 'COMMUN', 'ACTIVE', 1, 'm1', '123')", [species("Roucool").id]);
     spawn.refreshSpawnEmbed(discord.client, 1, { immediate: true });
-    await sleep(60);
-    assert.equal(discord.edits.length, 1);
+    await eventuallyStable(() => assert.equal(discord.edits.length, 1));
   });
 });
