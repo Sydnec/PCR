@@ -836,6 +836,269 @@ export function buildSpeciesDuplicatesRow(speciesId, page, total, { reserve = fa
   return pageRow(`${action}|${speciesId}`, `${action}_noop|${speciesId}`, current, pages);
 }
 
+// ====================== COMPARER ======================
+
+// /pk comparer : les échanges d'une espèce contre une espèce qui complètent le
+// Pokédex des deux dresseurs (tradeMatches). Rien n'est gardé en mémoire : ce que
+// chaque côté a choisi, la page et la réserve d'évolution voyagent dans les
+// customId, et la comparaison se relit en base à chaque clic.
+const COMPARE_COLOR = 0x3b88c3;
+const COMPARE_RESERVE_NOTE =
+  "🧬 De chaque côté, ce qu'il faut garder pour les évolutions qui manquent au Pokédex est " +
+  "mis de côté (option `evolutions`). Ces Pokémon restent échangeables avec /pk echange.";
+const flagOf = (reserve) => (reserve ? "1" : "0");
+const plural = (count, one, many) => (count > 1 ? many : one);
+
+// Les deux listes d'une comparaison partagent la même page : c'est une
+// comparaison, pas deux listes, et un menu par côté ne propose que les lignes
+// affichées. Une page hors limites retombe sur la dernière : la comparaison a pu
+// raccourcir entre deux clics. La liste la plus courte s'arrête, l'autre continue.
+export function comparePage(match, page) {
+  const size = boxPageSize();
+  const pages = Math.max(boxPageCount(match.give.length), boxPageCount(match.get.length));
+  const current = Math.min(Math.max(0, Number(page) || 0), pages - 1);
+  return { pages, current, start: current * size, end: (current + 1) * size };
+}
+
+// Une ligne de ce qu'un dresseur peut céder : le numéro et le nom, combien
+// peuvent partir, ✨ si un shiny en fait partie — un shiny déverrouillé reste
+// proposé, c'est le seul signal qu'il y en a un — et l'espèce qui arrivera si
+// elle change en changeant de dresseur.
+function tradeOfferLine(entry) {
+  const species = getSpecies(entry.speciesId);
+  const arrival = entry.arrivalId === entry.speciesId ? null : getSpecies(entry.arrivalId);
+  const shiny = entry.free - entry.freeNormal;
+  return (
+    `\`${species ? dexNumber(species) : `#${entry.speciesId}`}\` **${species?.name ?? "?"}**` +
+    (entry.spare > 1 ? ` ×${fr(entry.spare)}` : "") +
+    (shiny > 0 ? ` ✨${shiny > 1 ? fr(shiny) : ""}` : "") +
+    (arrival ? ` · arrive en **${arrival.name}**` : "")
+  );
+}
+
+// Pourquoi il n'y a pas d'échange à proposer, dit sans désigner personne par un
+// pronom : les deux dresseurs peuvent être n'importe qui.
+function noSwapReason(match, partnerId) {
+  if (!match.give.length && !match.get.length) {
+    return `*Aucun échange possible : ni toi ni <@${partnerId}> n'avez de doublon qui manque à l'autre.*`;
+  }
+  return match.give.length
+    ? `*Pas d'échange d'une espèce contre une espèce : tu as de quoi compléter le Pokédex de <@${partnerId}>, qui n'a aucun doublon qui te manque.*`
+    : `*Pas d'échange d'une espèce contre une espèce : <@${partnerId}> a de quoi compléter ton Pokédex, mais tu n'as aucun doublon qui lui manque.*`;
+}
+
+// La comparaison de deux dresseurs : ce que chacun peut donner à l'autre, page
+// par page, et l'échange en cours de choix (`give`, `get` : les espèces
+// choisies, 0 quand rien n'est choisi). Un choix qui n'est plus proposé — la
+// liste a changé entre deux clics — ne s'affiche pas. La mention n'a sa place que
+// dans la description : Discord ne la rend pas dans un titre.
+export function buildCompareEmbed(match, { partner, page = 0, give = 0, get = 0, reserve = true } = {}) {
+  const { pages, current, start, end } = comparePage(match, page);
+  const embed = new EmbedBuilder()
+    .setTitle(`\u{1F501} Échanges avec ${partner.displayName ?? partner.username}`)
+    .setColor(COMPARE_COLOR);
+
+  const section = (title, list, empty) => {
+    const shown = list.slice(start, end);
+    const lines = shown.length
+      ? shown.map(tradeOfferLine).join("\n")
+      : list.length
+        ? "*Rien de plus sur cette page.*"
+        : empty;
+    return `**${title}** (${fr(list.length)})\n${lines}`;
+  };
+
+  const intro = match.swaps
+    ? `**${fr(match.swaps)} échange${plural(match.swaps, "", "s")} possible${plural(match.swaps, "", "s")}** : ` +
+      "une espèce contre une espèce, et les deux Pokédex y gagnent."
+    : noSwapReason(match, partner.id);
+  const parts = [
+    intro,
+    section("🎁 Tu peux donner", match.give, `*Aucun de tes doublons ne manque à <@${partner.id}>.*`),
+    section("📥 Tu peux recevoir", match.get, `*<@${partner.id}> n'a aucun doublon qui te manque.*`),
+  ];
+  if (reserve) parts.push(COMPARE_RESERVE_NOTE);
+  embed.setDescription(parts.join("\n\n"));
+
+  const chosen = (list, id) => list.find((entry) => entry.speciesId === Number(id));
+  const mine = chosen(match.give, give);
+  const theirs = chosen(match.get, get);
+  if (match.swaps && (mine || theirs)) {
+    const name = (entry) => (entry ? `**${getSpecies(entry.speciesId)?.name ?? "?"}**` : "*à choisir*");
+    embed.addFields({ name: "🤝 Échange choisi", value: `${name(mine)} ⇄ ${name(theirs)}` });
+  }
+  return embed.setFooter({
+    text:
+      `Page ${current + 1}/${pages} · ×n : combien peuvent partir · ` +
+      "✨ : un shiny fait partie de ceux qui peuvent partir",
+  });
+}
+
+// Le menu d'un côté de l'échange : les lignes de la page, l'espèce déjà choisie
+// cochée. `id` porte le choix de l'autre côté, pour que le message se réécrive
+// sans rien garder en mémoire.
+function compareMenu(id, placeholder, list, chosen) {
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId(id)
+      .setPlaceholder(placeholder)
+      .setMinValues(1)
+      .setMaxValues(1)
+      .addOptions(
+        list.map((entry) => {
+          const species = getSpecies(entry.speciesId);
+          const arrival = entry.arrivalId === entry.speciesId ? null : getSpecies(entry.arrivalId);
+          const shiny = entry.free - entry.freeNormal;
+          const details = [
+            `${fr(entry.spare)} peu${plural(entry.spare, "t", "vent")} partir`,
+            shiny > 0 ? "✨" : null,
+            arrival ? `arrive en ${arrival.name}` : null,
+          ].filter(Boolean);
+          return new StringSelectMenuOptionBuilder()
+            .setLabel(species?.name ?? `#${entry.speciesId}`)
+            .setDescription(details.join(" · "))
+            .setValue(String(entry.speciesId))
+            .setDefault(entry.speciesId === chosen);
+        })
+      )
+  );
+}
+
+// Les menus et les boutons de la comparaison. Sans échange possible il n'y a rien
+// à choisir : seule la pagination reste, et seulement s'il y a plusieurs pages.
+// Les customId : poke_cmp (pages), poke_cmpg et poke_cmpr (le côté choisi), puis
+// poke_cmpgo (proposer). Chacun porte ce que les autres décidaient déjà.
+export function buildCompareComponents(match, { partnerId, page = 0, give = 0, get = 0, reserve = true } = {}) {
+  const { pages, current, start, end } = comparePage(match, page);
+  const flag = flagOf(reserve);
+  const chosen = (list, id) => list.find((entry) => entry.speciesId === Number(id))?.speciesId ?? 0;
+  const mine = chosen(match.give, give);
+  const theirs = chosen(match.get, get);
+  const paging = pageRow(
+    `poke_cmp|${partnerId}|${mine}|${theirs}|${flag}`,
+    `poke_cmp_noop|${partnerId}`,
+    current,
+    pages
+  );
+  if (!match.swaps) return pages > 1 ? [paging] : [];
+
+  const rows = [];
+  // Un menu de Discord s'arrête à 25 options, comme la borne de la page : un
+  // config.json écrit à la main au-delà ne doit pas faire planter la commande.
+  const giveShown = match.give.slice(start, end).slice(0, 25);
+  const getShown = match.get.slice(start, end).slice(0, 25);
+  if (giveShown.length) {
+    rows.push(
+      compareMenu(`poke_cmpg|${partnerId}|${theirs}|${flag}|${current}`, "Ce que tu donnes", giveShown, mine)
+    );
+  }
+  if (getShown.length) {
+    rows.push(
+      compareMenu(`poke_cmpr|${partnerId}|${mine}|${flag}|${current}`, "Ce que tu reçois", getShown, theirs)
+    );
+  }
+  paging.addComponents(
+    new ButtonBuilder()
+      .setCustomId(`poke_cmpgo|${partnerId}|${mine}|${theirs}|${flag}`)
+      .setLabel("Proposer cet échange")
+      .setEmoji("🤝")
+      .setStyle(ButtonStyle.Success)
+      .setDisabled(!mine || !theirs)
+  );
+  return [...rows, paging];
+}
+
+// Le message de la comparaison : l'embed et ses composants, pour la commande
+// comme pour les clics.
+export function buildCompareView(match, state) {
+  const { current } = comparePage(match, state.page);
+  return {
+    embeds: [buildCompareEmbed(match, { ...state, page: current })],
+    components: buildCompareComponents(match, { ...state, partnerId: state.partner.id, page: current }),
+  };
+}
+
+// Avec qui échanger : un dresseur par ligne, celui qui permet le plus d'échanges
+// d'abord (getTradePartners).
+export function buildPartnersEmbed(list, { page = 0, reserve = true } = {}) {
+  const { pages, current, start, end } = pageOf(list.length, page);
+  const embed = new EmbedBuilder().setTitle("\u{1F91D} Avec qui échanger").setColor(COMPARE_COLOR);
+  const intro =
+    "Les dresseurs avec qui un échange **d'une espèce contre une espèce** complète le Pokédex " +
+    "des deux. 🎁 : ce que tu peux leur donner, 📥 : ce qu'ils peuvent te donner. Le détail : " +
+    "`/pk comparer membre`.";
+  const note = reserve ? `\n\n${COMPARE_RESERVE_NOTE}` : "";
+  if (!list.length) {
+    return embed.setDescription(
+      `${intro}${note}\n\n*Personne n'a de quoi échanger avec toi pour l'instant.*`
+    );
+  }
+  const lines = list
+    .slice(start, end)
+    .map(
+      (entry) =>
+        `<@${entry.userId}> · **${fr(entry.swaps)}** échange${plural(entry.swaps, "", "s")} · ` +
+        `🎁 ${fr(entry.give)} · 📥 ${fr(entry.get)}`
+    );
+  return embed
+    .setDescription(`${intro}${note}\n\n${lines.join("\n")}`)
+    .setFooter({
+      text: `Page ${current + 1}/${pages} · ${fr(list.length)} dresseur${plural(list.length, "", "s")}`,
+    });
+}
+
+// Les boutons de page de « avec qui échanger » : la réserve d'évolution suffit.
+export function buildPartnersRow(total, page, { reserve = true } = {}) {
+  const { pages, current } = pageOf(total, page);
+  const flag = flagOf(reserve);
+  return pageRow(`poke_cmpt|${flag}`, `poke_cmpt_noop|${flag}`, current, pages);
+}
+
+// Qui a besoin d'une espèce que le dresseur peut donner (getSpeciesNeeders), et ce
+// que chacun peut lui offrir en retour : un échange avant un cadeau.
+export function buildNeedersEmbed(species, offer, list, { page = 0, reserve = true } = {}) {
+  const { pages, current, start, end } = pageOf(list.length, page);
+  const embed = new EmbedBuilder()
+    .setTitle(`\u{1F4E5} Qui a besoin de ${species.name}`)
+    .setColor(embedColor(species, false))
+    .setThumbnail(spriteUrl(species, false));
+  const arrival = offer.arrivalId === species.id ? null : getSpecies(offer.arrivalId);
+  const shiny = offer.free - offer.freeNormal;
+  const intro =
+    `Tu peux donner **${fr(offer.spare)}** ${species.name}${shiny > 0 ? " ✨" : ""}. Voici ceux à qui ` +
+    (arrival ? `**${arrival.name}** manque : ${species.name} y arrive sous cette forme.` : "il manque.") +
+    (shiny > 0 ? "\n✨ : un shiny fait partie de ceux qui peuvent partir." : "");
+  const note = reserve ? `\n\n${COMPARE_RESERVE_NOTE}` : "";
+  if (!list.length) {
+    return embed.setDescription(
+      `${intro}${note}\n\n*Tout le monde a déjà ${arrival ? arrival.name : `un ${species.name}`}.*`
+    );
+  }
+  const lines = list.slice(start, end).map(
+    (entry) =>
+      `<@${entry.userId}> · ` +
+      (entry.back
+        ? `peut te donner **${fr(entry.back)}** espèce${plural(entry.back, "", "s")} en retour`
+        : "rien à te donner en retour")
+  );
+  return embed
+    .setDescription(`${intro}${note}\n\n${lines.join("\n")}`)
+    .setFooter({
+      text: `Page ${current + 1}/${pages} · ${fr(list.length)} dresseur${plural(list.length, "", "s")}`,
+    });
+}
+
+// Les boutons de page de « qui a besoin » : l'espèce et la réserve.
+export function buildNeedersRow(speciesId, total, page, { reserve = true } = {}) {
+  const { pages, current } = pageOf(total, page);
+  return pageRow(
+    `poke_cmpn|${speciesId}|${flagOf(reserve)}`,
+    `poke_cmpn_noop|${speciesId}`,
+    current,
+    pages
+  );
+}
+
 export function buildInventoryEmbed(rows, { user = null } = {}) {
   const embed = new EmbedBuilder()
     .setTitle(

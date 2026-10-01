@@ -104,7 +104,7 @@ describe("la déclaration des commandes", () => {
     const files = fs.readdirSync(path.join(ROOT, "commands/pk")).map((file) => file.replace(/\.js$/, "")).sort();
     const declared = pk.data.toJSON().options.map((option) => option.name).sort();
     assert.deepEqual(declared, files);
-    assert.equal(declared.length, 15);
+    assert.equal(declared.length, 16);
   });
 
   it("toutes les commandes d'administration sont câblées au routeur /admin", async () => {
@@ -529,6 +529,171 @@ describe("/pk vitrine", () => {
     await showcase("ajouter", { espece: String(species("Rattata").id), individu: `#${id}` });
     const filled = payloadOf(await runAutocomplete(pk, { group: "vitrine", sub: "retirer", focused: { name: "pokemon", value: String(id) } }), "respond");
     assert.deepEqual(filled.map((choice) => choice.value), [`#${id}`]);
+  });
+});
+
+describe("/pk comparer", () => {
+  const compare = (options = {}, users = {}, extra = {}) => runCommand(pk, { sub: "comparer", options, users, ...extra });
+  const partner = (id = "u2") => ({ membre: fakeUser(id) });
+  const rowsOf = (payload) => payload.components.map((row) => row.toJSON());
+  const idsOf = (payload) => rowsOf(payload).flatMap((row) => row.components.map((component) => component.custom_id));
+
+  it("deux dresseurs : privé, ce que chacun peut donner, et un bouton pour proposer", async () => {
+    await ownMany("Rattata", 2);
+    await ownMany("Chenipan", 2, { user: "u2" });
+    const calls = await compare({ evolutions: false }, partner());
+    assert.deepEqual(payloadOf(calls, "deferReply"), { flags: EPHEMERAL });
+    const reply = payloadOf(calls, "editReply");
+    const text = textOf(reply);
+    assert.match(text, /Échanges avec Dresseur u2/);
+    assert.match(text, /1 échange possible/);
+    assert.match(text, /Tu peux donner.*Rattata/);
+    assert.match(text, /Tu peux recevoir.*Chenipan/);
+
+    const [giveRow, getRow, buttons] = rowsOf(reply);
+    assert.equal(giveRow.components[0].custom_id, "poke_cmpg|u2|0|0|0");
+    assert.equal(getRow.components[0].custom_id, "poke_cmpr|u2|0|0|0");
+    assert.deepEqual(giveRow.components[0].options.map((option) => [option.label, option.value, option.description]), [["Rattata", String(species("Rattata").id), "1 peut partir"]]);
+    const go = buttons.components.at(-1);
+    assert.equal(go.custom_id, "poke_cmpgo|u2|0|0|0");
+    assert.equal(go.label, "Proposer cet échange");
+    assert.equal(go.disabled, true, "rien n'est encore choisi");
+    assert.equal(rowsOf(reply).length, 3);
+  });
+
+  it("sans échange possible, seule la liste s'affiche : rien à choisir, et le refus dit pourquoi", async () => {
+    await ownMany("Rattata", 2);
+    await own("Roucool", { user: "u2" });
+    const oneSided = payloadOf(await compare({ evolutions: false }, partner()), "editReply");
+    assert.match(textOf(oneSided), /tu as de quoi compléter le Pokédex de <@u2>, qui n'a aucun doublon qui te manque/);
+    assert.deepEqual(oneSided.components, [], "ni menu ni bouton");
+
+    await dbRun(points, "DELETE FROM pokemon_owned");
+    await own("Rattata");
+    await ownMany("Chenipan", 2, { user: "u2" });
+    const otherWay = payloadOf(await compare({ evolutions: false }, partner()), "editReply");
+    assert.match(textOf(otherWay), /<@u2> a de quoi compléter ton Pokédex, mais tu n'as aucun doublon qui lui manque/);
+    assert.deepEqual(otherWay.components, []);
+
+    await dbRun(points, "DELETE FROM pokemon_owned");
+    await own("Rattata");
+    await own("Chenipan", { user: "u2" });
+    const neither = payloadOf(await compare({ evolutions: false }, partner()), "editReply");
+    assert.match(textOf(neither), /Aucun échange possible : ni toi ni <@u2> n'avez de doublon qui manque à l'autre/);
+    assert.deepEqual(neither.components, []);
+  });
+
+  it("l'option « évolutions » est active par défaut, et la désactiver rend ce qui était mis de côté", async () => {
+    await ownMany("Rattata", 3);
+    await ownMany("Ronflex", 2);
+    await ownMany("Kangourex", 2, { user: "u2" });
+    const byDefault = payloadOf(await compare({}, partner()), "editReply");
+    assert.match(textOf(byDefault), /Ronflex/);
+    assert.doesNotMatch(textOf(byDefault), /Rattata/, "il manque Rattatac : ses Rattata sont mis de côté");
+    assert.match(textOf(byDefault), /🧬/, "la note dit ce qui est mis de côté");
+    assert.ok(idsOf(byDefault).includes("poke_cmpg|u2|0|1|0"), "la réserve (1) voyage dans les menus");
+    const raw = payloadOf(await compare({ evolutions: false }, partner()), "editReply");
+    assert.ok(idsOf(raw).includes("poke_cmpg|u2|0|0|0"), "et son absence (0) aussi");
+    assert.match(textOf(raw), /Rattata/);
+    assert.doesNotMatch(textOf(raw), /🧬/);
+  });
+
+  it("un shiny déverrouillé est proposé, signalé ✨, et l'évolution par échange est annoncée", async () => {
+    await own("Roucool", { shiny: 1, locked: 0 });
+    await own("Roucool", { obtained: 2, shiny: 1, locked: 0 });
+    await ownMany("Machopeur", 2);
+    await ownMany("Kangourex", 2, { user: "u2" });
+    const text = textOf(payloadOf(await compare({ evolutions: false }, partner()), "editReply"));
+    assert.match(text, /Roucool\*\* ✨/);
+    assert.match(text, /Machopeur\*\* · arrive en \*\*Mackogneur\*\*/);
+  });
+
+  it("refuse en privé, avant de différer : soi-même, un bot, les deux options, une espèce illisible", async () => {
+    const self = await compare({}, { membre: fakeUser("u1") });
+    assert.match(payloadOf(self, "reply").content, /Tu ne peux pas te comparer à toi-même/);
+    const bot = await compare({}, { membre: fakeUser("b1", { bot: true }) });
+    assert.match(payloadOf(bot, "reply").content, /Les bots ne collectionnent pas/);
+    const both = await compare({ pokemon: String(species("Rattata").id) }, partner());
+    assert.match(payloadOf(both, "reply").content, /un dresseur \*\*ou\*\* une espèce, pas les deux/);
+    const unknown = await compare({ pokemon: "99999" });
+    assert.match(payloadOf(unknown, "reply").content, /Choisis une espèce dans la liste d'autocomplétion/);
+    for (const calls of [self, bot, both, unknown]) {
+      assert.equal(payloadOf(calls, "reply").flags, EPHEMERAL);
+      assert.ok(!calls.some((entry) => entry.method === "deferReply"), "le refus vient avant la réponse différée");
+    }
+  });
+
+  it("sans option : avec qui échanger, celui qui permet le plus d'échanges d'abord", async () => {
+    await ownMany("Rattata", 3);
+    await ownMany("Roucool", 2);
+    for (const name of ["Chenipan", "Aspicot"]) await ownMany(name, 2, { user: "p-f" });
+    await ownMany("Chenipan", 2, { user: "p-a" });
+    await own("Roucool", { user: "p-a" });
+    await own("Rattata", { user: "p-c" });
+    const calls = await compare({ evolutions: false });
+    assert.deepEqual(payloadOf(calls, "deferReply"), { flags: EPHEMERAL });
+    const reply = payloadOf(calls, "editReply");
+    const text = textOf(reply);
+    assert.ok(text.indexOf("<@p-f>") < text.indexOf("<@p-a>"), "p-f permet deux échanges, p-a un seul");
+    assert.match(text, /<@p-f> · \*\*2\*\* échanges · 🎁 2 · 📥 2/);
+    assert.match(text, /<@p-a> · \*\*1\*\* échange · 🎁 1 · 📥 1/);
+    assert.doesNotMatch(text, /<@p-c>/, "il a déjà un Rattata : rien à lui donner");
+    assert.doesNotMatch(text, /<@u1>/);
+    assert.deepEqual(idsOf(reply), ["poke_cmpt|0|0|prev", "poke_cmpt_noop|0", "poke_cmpt|0|0|next"]);
+  });
+
+  it("sans option et sans personne : le dit, au lieu d'une liste vide", async () => {
+    await own("Rattata");
+    const text = textOf(payloadOf(await compare({ evolutions: false }), "editReply"));
+    assert.match(text, /Personne n'a de quoi échanger avec toi pour l'instant/);
+  });
+
+  it("avec une espèce : à qui elle manque, et ce que chacun donnerait en retour", async () => {
+    await ownMany("Rattata", 3);
+    await own("Roucool");
+    await ownMany("Chenipan", 2, { user: "n-a" });
+    await own("Roucool", { user: "n-b" });
+    await own("Rattata", { user: "n-c" });
+    const calls = await compare({ pokemon: String(species("Rattata").id), evolutions: false });
+    assert.deepEqual(payloadOf(calls, "deferReply"), { flags: EPHEMERAL });
+    const reply = payloadOf(calls, "editReply");
+    const text = textOf(reply);
+    assert.match(text, /Qui a besoin de Rattata/);
+    assert.match(text, /Tu peux donner \*\*2\*\* Rattata/);
+    assert.match(text, /<@n-a> · peut te donner \*\*1\*\* espèce en retour/);
+    assert.match(text, /<@n-b> · rien à te donner en retour/);
+    assert.doesNotMatch(text, /<@n-c>/, "il en a déjà un");
+    assert.ok(text.indexOf("<@n-a>") < text.indexOf("<@n-b>"), "l'échange avant le cadeau");
+    assert.deepEqual(idsOf(reply)[1], `poke_cmpn_noop|${species("Rattata").id}`);
+  });
+
+  it("une espèce qu'on ne peut pas donner : le refus dit pourquoi, avec les chiffres", async () => {
+    const run = async (options = {}) => payloadOf(await compare({ pokemon: String(species("Rattata").id), ...options }), "editReply").content;
+    assert.match(await run(), /^❌ Tu n'as pas de \*\*Rattata\*\* à donner/);
+    await own("Rattata");
+    assert.match(await run(), /Tu n'as qu'un \*\*Rattata\*\* : il t'en faut au moins 2/);
+    await dbRun(points, "DELETE FROM pokemon_owned");
+    await ownMany("Rattata", 3, { locked: 1 });
+    assert.match(await run(), /Tes \*\*3\*\* Rattata sont verrouillés 🛡️ : déverrouille-en un avec \/pk verrou/);
+    await dbRun(points, "DELETE FROM pokemon_owned");
+    await ownMany("Rattata", 3);
+    assert.match(await run(), /Tes \*\*2\*\* Rattata en trop sont mis de côté 🧬.*`evolutions: False`/);
+    const text = textOf(payloadOf(await compare({ pokemon: String(species("Rattata").id), evolutions: false }), "editReply"));
+    assert.match(text, /Qui a besoin de Rattata/, "sans la réserve, il se propose");
+  });
+
+  it("l'autocomplétion ne propose que ce qu'on peut donner ; vide, elle l'explique", async () => {
+    const empty = payloadOf(await runAutocomplete(pk, { sub: "comparer", focused: { name: "pokemon", value: "" } }), "respond");
+    assert.deepEqual(empty, [{ name: "Aucun doublon à offrir : ils servent peut-être à tes évolutions", value: "—" }]);
+    await ownMany("Ronflex", 3);
+    await ownMany("Rattata", 3);
+    await own("Roucool");
+    const choices = payloadOf(await runAutocomplete(pk, { sub: "comparer", focused: { name: "pokemon", value: "" } }), "respond");
+    assert.deepEqual(choices, [{ name: "Ronflex ×2 en trop", value: String(species("Ronflex").id) }], "les Rattata servent à évoluer, Roucool n'a pas de doublon");
+    const raw = payloadOf(await runAutocomplete(pk, { sub: "comparer", options: { evolutions: false }, focused: { name: "pokemon", value: "ratt" } }), "respond");
+    assert.deepEqual(raw.map((choice) => choice.name), ["Rattata ×2 en trop"], "la saisie filtre, et la réserve se désactive");
+    const none = payloadOf(await runAutocomplete(pk, { sub: "comparer", options: { evolutions: false }, focused: { name: "pokemon", value: "zzz" } }), "respond");
+    assert.deepEqual(none, [{ name: "Tu n'as aucun doublon à offrir", value: "—" }]);
   });
 });
 

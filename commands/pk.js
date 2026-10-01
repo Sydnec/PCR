@@ -8,6 +8,7 @@ import info from "./pk/info.js";
 import classement from "./pk/classement.js";
 import evolution from "./pk/evolution.js";
 import echange from "./pk/echange.js";
+import comparer from "./pk/comparer.js";
 import oeuf from "./pk/oeuf.js";
 import revendre from "./pk/revendre.js";
 import verrou from "./pk/verrou.js";
@@ -33,6 +34,7 @@ const SUBCOMMANDS = [
   classement,
   evolution,
   echange,
+  comparer,
   oeuf,
   revendre,
   verrou,

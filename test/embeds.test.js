@@ -5,13 +5,13 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { createSandbox, openDatabases, speciesByName } from "./helpers.js";
 
-createSandbox({ config: { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } } });
+const sandbox = createSandbox({ config: { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } } });
 // Les embeds importent des modules qui ouvrent les bases : on les attend et on les
 // ferme, sinon le dossier jetable disparaît sous leurs pieds.
 await openDatabases();
 const embeds = await import("../modules/pokemon/embeds.js");
 const data = await import("../modules/pokemon/data.js");
-const { getSafariConfig } = await import("../modules/pokemon/config.js");
+const { getPokemonConfig, getSafariConfig } = await import("../modules/pokemon/config.js");
 
 const species = (name) => speciesByName(data.allSpecies, name);
 const safari = () => getSafariConfig();
@@ -335,5 +335,167 @@ describe("noms et numéros", () => {
   it("numérote sur trois chiffres", () => {
     assert.equal(embeds.dexNumber(species("Pikachu")), "#025");
     assert.equal(embeds.dexNumber(species("Mewtwo")), "#150");
+  });
+});
+
+describe("la comparaison de deux dresseurs (/pk comparer)", () => {
+  const GEN1 = { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } };
+  const entry = (speciesId, overrides = {}) => ({
+    speciesId, arrivalId: speciesId, total: 3, normal: 3, shiny: 0, free: 3, freeNormal: 3, spare: 2, reserved: 0, ...overrides,
+  });
+  const matchOf = (give, get) => ({ give, get, swaps: Math.min(give.length, get.length) });
+  const entriesOf = (from, count, overrides = {}) =>
+    data.allSpecies().slice(from, from + count).map((one) => entry(one.id, overrides));
+  const partner = { id: "p1", username: "p", displayName: "Partenaire" };
+  const state = (overrides = {}) => ({ partner, reserve: false, ...overrides });
+  const size = () => Math.max(1, Math.floor(getPokemonConfig().box.pageSize));
+  const json = (view) => ({ embed: view.embeds[0].toJSON(), rows: view.components.map((row) => row.toJSON()) });
+  const idsOf = (rows) => rows.flatMap((row) => row.components.map((component) => component.custom_id));
+
+  it("deux listes qui se partagent la même page : la plus courte s'arrête, l'autre continue", () => {
+    const match = matchOf(entriesOf(0, size() * 2 + 3), entriesOf(60, 3));
+    assert.equal(embeds.comparePage(match, 0).pages, 3);
+
+    const first = json(embeds.buildCompareView(match, state()));
+    assert.match(first.embed.description, /Tu peux donner\*\* \(\d+\)\n`#001` \*\*Bulbizarre\*\*/);
+    assert.match(first.embed.description, /Tu peux recevoir\*\* \(3\)\n`#061`/);
+    assert.match(first.embed.footer.text, /^Page 1\/3/);
+
+    const last = json(embeds.buildCompareView(match, state({ page: 2 })));
+    assert.match(last.embed.description, /Tu peux recevoir\*\* \(3\)\n\*Rien de plus sur cette page\.\*/, "la liste la plus courte n'a plus rien à montrer");
+    assert.match(last.embed.footer.text, /^Page 3\/3/);
+    assert.deepEqual(last.rows.map((row) => row.components.length), [1, 4], "pas de menu pour un côté sans ligne sur cette page : un menu, puis ◀ 3/3 ▶ et le bouton");
+
+    const beyond = json(embeds.buildCompareView(match, state({ page: 99 })));
+    assert.match(beyond.embed.footer.text, /^Page 3\/3/, "une page hors limites retombe sur la dernière");
+  });
+
+  it("chaque menu ne propose que les lignes de la page, jamais plus que Discord n'accepte", () => {
+    sandbox.writeConfig({ pokemon: { ...GEN1, box: { pageSize: 25 } } });
+    try {
+      const wide = entriesOf(0, 60, { arrivalId: species("Mackogneur").id, shiny: 9, free: 99, freeNormal: 0, spare: 99, total: 99 });
+      const match = matchOf(wide, entriesOf(70, 60, { arrivalId: species("Mackogneur").id, shiny: 9, free: 99, freeNormal: 0, spare: 99, total: 99 }));
+      for (const page of [0, 1, 2]) {
+        const { embed, rows } = json(embeds.buildCompareView(match, state({ page })));
+        assert.ok(embed.description.length <= 4096, `page ${page} : ${embed.description.length} caractères de description`);
+        assert.ok(embed.title.length <= 256 && embed.footer.text.length <= 2048);
+        assert.ok(rows.length <= 5);
+        const ids = idsOf(rows);
+        assert.equal(new Set(ids).size, ids.length, "Discord refuse un message dont deux composants partagent un customId");
+        for (const id of ids) assert.ok(id.length <= 100, `${id} : ${id.length} caractères`);
+        for (const menu of rows.filter((row) => row.components[0].type === 3)) {
+          const [select] = menu.components;
+          assert.ok(select.options.length >= 1 && select.options.length <= 25);
+          for (const option of select.options) {
+            assert.ok(option.label.length <= 100 && option.description.length <= 100 && option.value.length <= 100);
+          }
+        }
+        for (const row of rows) assert.ok(row.components.length <= 5);
+      }
+    } finally {
+      sandbox.writeConfig({ pokemon: GEN1 });
+    }
+  });
+
+  it("une page réglée à la main au-delà de 25 lignes ne fait pas planter les menus", () => {
+    sandbox.writeConfig({ pokemon: { ...GEN1, box: { pageSize: 40 } } });
+    try {
+      const match = matchOf(entriesOf(0, 40), entriesOf(60, 40));
+      const { rows } = json(embeds.buildCompareView(match, state()));
+      const menus = rows.filter((row) => row.components[0].type === 3);
+      assert.deepEqual(menus.map((menu) => menu.components[0].options.length), [25, 25]);
+    } finally {
+      sandbox.writeConfig({ pokemon: GEN1 });
+    }
+  });
+
+  it("le choix coche l'option et active le bouton ; un choix qui n'est plus proposé est écarté", () => {
+    const match = matchOf(entriesOf(0, 3), entriesOf(10, 3));
+    const [a, , c] = match.give;
+    const [d] = match.get;
+    const chosen = json(embeds.buildCompareView(match, state({ give: c.speciesId, get: d.speciesId })));
+    assert.deepEqual(chosen.embed.fields, [{ name: "🤝 Échange choisi", value: `**${data.getSpecies(c.speciesId).name}** ⇄ **${data.getSpecies(d.speciesId).name}**` }]);
+    const [giveMenu, getMenu, paging] = chosen.rows;
+    assert.deepEqual(giveMenu.components[0].options.map((option) => option.default), [false, false, true]);
+    assert.deepEqual(getMenu.components[0].options.map((option) => option.default), [true, false, false]);
+    assert.equal(paging.components.at(-1).disabled, false);
+    assert.equal(paging.components.at(-1).custom_id, `poke_cmpgo|p1|${c.speciesId}|${d.speciesId}|0`);
+    assert.equal(giveMenu.components[0].custom_id, `poke_cmpg|p1|${d.speciesId}|0|0`);
+    assert.equal(getMenu.components[0].custom_id, `poke_cmpr|p1|${c.speciesId}|0|0`);
+
+    const stale = json(embeds.buildCompareView(match, state({ give: 9999, get: a.speciesId })));
+    assert.equal(stale.embed.fields, undefined, "ni l'un ni l'autre n'est proposé");
+    assert.equal(stale.rows.at(-1).components.at(-1).disabled, true);
+    assert.equal(stale.rows.at(-1).components.at(-1).custom_id, "poke_cmpgo|p1|0|0|0");
+  });
+
+  it("sans échange possible, il n'y a rien à choisir : ni menu ni bouton, et la pagination seulement s'il y a plusieurs pages", () => {
+    const oneSided = matchOf(entriesOf(0, 3), []);
+    assert.deepEqual(embeds.buildCompareView(oneSided, state()).components, []);
+    const many = matchOf(entriesOf(0, size() + 1), []);
+    const { rows } = json(embeds.buildCompareView(many, state()));
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].components.length, 3, "◀, la page, ▶ : pas de bouton qui propose");
+    assert.deepEqual(json(embeds.buildCompareView(matchOf([], []), state())).rows, []);
+  });
+
+  it("une ligne dit le numéro, le nom, combien peuvent partir, les shiny et l'espèce qui arrivera", () => {
+    const machop = species("Machopeur");
+    const match = matchOf(
+      [
+        entry(species("Rattata").id),
+        entry(species("Roucool").id, { spare: 1, free: 2, freeNormal: 1 }),
+        entry(species("Pikachu").id, { spare: 3, free: 3, freeNormal: 1 }),
+        entry(machop.id, { arrivalId: species("Mackogneur").id, spare: 1 }),
+      ],
+      [entry(species("Chenipan").id)]
+    );
+    const { embed } = json(embeds.buildCompareView(match, state()));
+    assert.match(embed.description, /`#019` \*\*Rattata\*\* ×2\n/);
+    assert.match(embed.description, /\*\*Roucool\*\* ✨\n/, "un shiny peut partir : signalé, sans nombre quand il n'y en a qu'un");
+    assert.match(embed.description, /\*\*Pikachu\*\* ×3 ✨2\n/);
+    assert.match(embed.description, /\*\*Machopeur\*\* · arrive en \*\*Mackogneur\*\*/);
+    assert.match(embed.footer.text, /✨ : un shiny fait partie de ceux qui peuvent partir/);
+  });
+
+  it("le nombre d'échanges s'accorde, et la réserve d'évolution se signale quand elle est active", () => {
+    const one = json(embeds.buildCompareView(matchOf(entriesOf(0, 1), entriesOf(5, 1)), state({ reserve: true })));
+    assert.match(one.embed.description, /\*\*1 échange possible\*\* : une espèce contre une espèce/);
+    assert.match(one.embed.description, /🧬 De chaque côté/);
+    const two = json(embeds.buildCompareView(matchOf(entriesOf(0, 2), entriesOf(5, 2)), state()));
+    assert.match(two.embed.description, /\*\*2 échanges possibles\*\*/);
+    assert.doesNotMatch(two.embed.description, /🧬/);
+  });
+
+  it("avec qui échanger : une ligne par dresseur, des pages, et le dit quand personne ne convient", () => {
+    const list = Array.from({ length: size() + 2 }, (_, index) => ({ userId: `p-${String(index).padStart(2, "0")}`, swaps: index === 0 ? 1 : 2, give: 3, get: 2 }));
+    const page0 = embeds.buildPartnersEmbed(list, { reserve: false }).toJSON();
+    assert.match(page0.description, /<@p-00> · \*\*1\*\* échange · 🎁 3 · 📥 2/);
+    assert.match(page0.description, /<@p-01> · \*\*2\*\* échanges/);
+    assert.match(page0.footer.text, new RegExp(`^Page 1/2 · ${size() + 2} dresseurs`));
+    const page1 = embeds.buildPartnersEmbed(list, { page: 1, reserve: false }).toJSON();
+    assert.doesNotMatch(page1.description, /<@p-00>/, "la seconde page ne répète pas la première");
+    assert.deepEqual(embeds.buildPartnersRow(list.length, 1, { reserve: true }).toJSON().components.map((button) => button.custom_id), ["poke_cmpt|1|0|prev", "poke_cmpt_noop|1", "poke_cmpt|1|0|next"]);
+
+    const none = embeds.buildPartnersEmbed([], { reserve: true }).toJSON();
+    assert.match(none.description, /Personne n'a de quoi échanger avec toi pour l'instant/);
+    assert.match(none.description, /🧬/);
+  });
+
+  it("qui a besoin d'une espèce : ce que chacun donnerait en retour, et la forme qui arrive quand elle change", () => {
+    const machop = species("Machopeur");
+    const offer = entry(machop.id, { arrivalId: species("Mackogneur").id, spare: 1, free: 2, freeNormal: 1 });
+    const list = [{ userId: "n-a", back: 2 }, { userId: "n-b", back: 1 }, { userId: "n-c", back: 0 }];
+    const json1 = embeds.buildNeedersEmbed(machop, offer, list, { reserve: false }).toJSON();
+    assert.equal(json1.title, "📥 Qui a besoin de Machopeur");
+    assert.match(json1.description, /Tu peux donner \*\*1\*\* Machopeur ✨\. Voici ceux à qui \*\*Mackogneur\*\* manque : Machopeur y arrive sous cette forme/);
+    assert.match(json1.description, /<@n-a> · peut te donner \*\*2\*\* espèces en retour/);
+    assert.match(json1.description, /<@n-b> · peut te donner \*\*1\*\* espèce en retour/);
+    assert.match(json1.description, /<@n-c> · rien à te donner en retour/);
+
+    const plain = embeds.buildNeedersEmbed(species("Rattata"), entry(species("Rattata").id), [], { reserve: false }).toJSON();
+    assert.match(plain.description, /Voici ceux à qui il manque\./);
+    assert.match(plain.description, /Tout le monde a déjà un Rattata/);
+    assert.deepEqual(embeds.buildNeedersRow(species("Rattata").id, 3, 0, { reserve: true }).toJSON().components.map((button) => button.custom_id), [`poke_cmpn|${species("Rattata").id}|1|0|prev`, `poke_cmpn_noop|${species("Rattata").id}`, `poke_cmpn|${species("Rattata").id}|1|0|next`]);
   });
 });

@@ -576,6 +576,201 @@ describe("les boutons d'échange", () => {
   });
 });
 
+describe("la comparaison de /pk comparer", () => {
+  const rata = () => species("Rattata").id;
+  const chen = () => species("Chenipan").id;
+  async function pair() {
+    const a = newUser();
+    const b = newUser();
+    const mine = await ownMany("Rattata", 3, a);
+    const theirs = await ownMany("Chenipan", 3, b);
+    return { a, b, mine, theirs };
+  }
+  const rows = (payload) => payload.components.map((row) => row.toJSON());
+  const trades = () => dbAll(points, "SELECT * FROM pokemon_trades");
+  const choose = (customId, user, value) => click(customId, { user, values: [String(value)], run: handlePokemonSelect });
+  const propose = (a, b, { give = rata(), get = chen(), ...options } = {}) => click(`poke_cmpgo|${b}|${give}|${get}|0`, { user: a, ...options });
+
+  it("une page : la comparaison relue, au nom du dresseur comparé, sans texte résiduel", async () => {
+    const { a, b } = await pair();
+    const update = only(await click(`poke_cmp|${b}|0|0|0|0|next`, { user: a }), "update");
+    assert.equal(update.content, null);
+    assert.equal(embedOf(update).title, `🔁 Échanges avec Dresseur ${b}`);
+    assert.match(embedOf(update).description, /1 échange possible/);
+    assert.match(embedOf(update).description, /Rattata/);
+  });
+
+  it("la réserve d'évolution voyage dans les boutons : mise de côté avec 1, rendue avec 0", async () => {
+    const a = newUser();
+    const b = newUser();
+    await ownMany("Rattata", 3, a);
+    await ownMany("Chenipan", 3, b);
+    const description = async (customId) => embedOf(only(await click(customId, { user: a }), "update")).description;
+    assert.match(await description(`poke_cmp|${b}|0|0|0|0|next`), /Rattata/);
+    assert.doesNotMatch(await description(`poke_cmp|${b}|0|0|1|0|next`), /Rattata/, "il manque Rattatac : les Rattata servent à évoluer");
+    assert.match(await description(`poke_cmpt|0|0|next`), new RegExp(`<@${b}>`));
+    assert.match(await description(`poke_cmpt|1|0|next`), /Personne n'a de quoi échanger avec toi/);
+    assert.match(await description(`poke_cmpn|${rata()}|0|0|next`), new RegExp(`<@${b}>`));
+    const hidden = only(await click(`poke_cmpn|${rata()}|1|0|next`, { user: a }), "update");
+    assert.match(hidden.content, /Tu n'as plus de \*\*Rattata\*\* à donner/);
+  });
+
+  it("un dresseur parti du serveur se compare quand même : sa collection est toujours là", async () => {
+    const a = newUser();
+    await ownMany("Rattata", 2, a);
+    await ownMany("Chenipan", 2, "gone");
+    const update = only(await click("poke_cmp|gone|0|0|0|0|next", { user: a }), "update");
+    assert.match(embedOf(update).title, /Échanges avec Dresseur inconnu/);
+  });
+
+  it("choisir un côté réécrit le message : l'autre menu et le bouton portent le choix", async () => {
+    const { a, b } = await pair();
+    const afterGive = only(await choose(`poke_cmpg|${b}|0|0|0`, a, rata()), "update");
+    assert.deepEqual(embedOf(afterGive).fields, [{ name: "🤝 Échange choisi", value: "**Rattata** ⇄ *à choisir*" }]);
+    const [giveRow, getRow, paging] = rows(afterGive);
+    assert.equal(giveRow.components[0].options.find((option) => option.value === String(rata())).default, true, "le choix est coché");
+    assert.equal(getRow.components[0].custom_id, `poke_cmpr|${b}|${rata()}|0|0`, "l'autre menu sait déjà ce qui a été choisi");
+    assert.equal(paging.components.at(-1).disabled, true, "il manque encore un côté");
+
+    const afterGet = only(await choose(`poke_cmpr|${b}|${rata()}|0|0`, a, chen()), "update");
+    assert.deepEqual(embedOf(afterGet).fields, [{ name: "🤝 Échange choisi", value: "**Rattata** ⇄ **Chenipan**" }]);
+    const go = rows(afterGet)[2].components.at(-1);
+    assert.equal(go.custom_id, `poke_cmpgo|${b}|${rata()}|${chen()}|0`);
+    assert.equal(go.disabled, false);
+    assert.equal(rows(afterGet)[0].components[0].custom_id, `poke_cmpg|${b}|${chen()}|0|0`, "et le premier menu le sait aussi");
+  });
+
+  it("un choix qui n'est pas proposé est écarté, sans rien afficher de faux", async () => {
+    const { a, b } = await pair();
+    const update = only(await choose(`poke_cmpg|${b}|0|0|0`, a, species("Roucool").id), "update");
+    assert.equal(embedOf(update).fields, undefined);
+    assert.equal(rows(update)[2].components.at(-1).disabled, true);
+  });
+
+  it("proposer : l'offre naît publique, avec le moins précieux de chaque côté, et le clic est acquitté d'abord", async () => {
+    const { a, b, mine, theirs } = await pair();
+    const channel = fakeChannel();
+    const calls = await propose(a, b, { channel });
+    assert.equal(calls[0].method, "deferUpdate", "la lecture et la publication peuvent dépasser trois secondes");
+    const [trade] = await trades();
+    assert.equal(trade.status, "PENDING");
+    assert.equal(trade.from_user_id, a);
+    assert.equal(trade.to_user_id, b);
+    assert.equal(trade.offer_pokemon_id, mine[2], "le plus récent des Rattata, comme le retirerait reserveDuplicates");
+    assert.equal(trade.request_pokemon_id, theirs[2]);
+    assert.equal(trade.channel_id, "c1");
+    assert.equal(trade.message_id, "m1", "le message de l'offre est retenu");
+
+    assert.equal(channel.sent.length, 1);
+    const [sent] = channel.sent;
+    assert.equal(sent.content, `<@${b}>`);
+    assert.deepEqual(sent.allowedMentions, { users: [b] }, "seul le destinataire est mentionné");
+    assert.deepEqual(buttonIds(sent), [`poke_trade_accept|${trade.id}`, `poke_trade_decline|${trade.id}`, `poke_trade_cancel|${trade.id}`]);
+    assert.equal(embedOf(sent).description, `<@${a}> propose **#${mine[2]} Rattata ♂ (fertile)**\ncontre **#${theirs[2]} Chenipan ♂ (fertile)** de <@${b}>.`, "qui reçoit sait exactement ce qu'il aura");
+
+    const done = last(calls, "editReply");
+    assert.equal(done.content, `✅ Offre envoyée à <@${b}> dans <#c1>.`);
+    assert.deepEqual([done.embeds, done.components], [[], []], "le message privé n'a plus rien à proposer");
+    assert.deepEqual((await dbAll(points, "SELECT id FROM pokemon_owned WHERE user_id = ?", [a])).length, 3, "proposer ne retire rien : seul l'acceptation échange");
+  });
+
+  it("de bout en bout : l'offre se répond comme n'importe quelle autre, et les deux Pokédex gagnent une entrée", async () => {
+    const { a, b } = await pair();
+    await propose(a, b);
+    const [{ id }] = await trades();
+    const accepted = await click(`poke_trade_accept|${id}`, { user: b });
+    assert.ok(only(accepted, "update").components[0].toJSON().components.every((button) => button.disabled));
+    assert.equal((await trades())[0].status, "ACCEPTED");
+    const dex = async (user) => (await dbAll(points, "SELECT species_id, COUNT(*) AS n FROM pokemon_owned WHERE user_id = ? GROUP BY species_id", [user])).map((row) => [row.species_id, row.n]);
+    assert.deepEqual(await dex(a), [[chen(), 1], [rata(), 2]].sort((x, y) => x[0] - y[0]), "a reçoit un Chenipan, et garde ses Rattata");
+    assert.deepEqual(await dex(b), [[chen(), 2], [rata(), 1]].sort((x, y) => x[0] - y[0]), "b reçoit un Rattata, et garde ses Chenipan");
+  });
+
+  it("un shiny déverrouillé n'est cédé que faute de normal à donner", async () => {
+    const a = newUser();
+    const b = newUser();
+    await ownMany("Chenipan", 2, b);
+    await own("Rattata", a, { obtained: 1, locked: 1 });
+    await own("Rattata", a, { obtained: 2, shiny: 1, locked: 0 });
+    await propose(a, b);
+    assert.equal((await trades())[0].offer_is_shiny, 1, "le seul exemplaire libre est shiny : c'est lui qui part, et l'offre le montre");
+
+    await dbRun(points, "DELETE FROM pokemon_trades");
+    await own("Rattata", a, { obtained: 3 });
+    await propose(a, b);
+    assert.equal((await trades())[0].offer_is_shiny, 0, "un normal libre part avant un shiny");
+  });
+
+  it("un choix devenu impossible n'envoie rien : la comparaison est réécrite et dit ce qui a changé", async () => {
+    const { a, b, theirs } = await pair();
+    await dbRun(points, "DELETE FROM pokemon_owned WHERE user_id = ? AND id != ?", [b, theirs[0]]);
+    const channel = fakeChannel();
+    const calls = await propose(a, b, { channel });
+    assert.equal(last(calls, "editReply").content, `⚠️ <@${b}> n'a plus ce Pokémon à donner. Choisis ton échange à nouveau.`);
+    assert.equal(channel.sent.length, 0);
+    assert.equal((await trades()).length, 0);
+
+    const { a: a2, b: b2, mine } = await pair();
+    await dbRun(points, "DELETE FROM pokemon_owned WHERE user_id = ? AND id != ?", [a2, mine[0]]);
+    const mineGone = await propose(a2, b2);
+    assert.equal(last(mineGone, "editReply").content, "⚠️ Tu n'as plus ce Pokémon à donner. Choisis ton échange à nouveau.");
+
+    const { a: a3, b: b3 } = await pair();
+    const nothing = await propose(a3, b3, { give: 0, get: 0 });
+    assert.match(last(nothing, "editReply").content, /^⚠️ Ces deux Pokémon ne sont plus proposés/, "un clic fabriqué sans rien choisi");
+    assert.equal((await trades()).length, 0);
+  });
+
+  it("sans la permission de publier dans le salon : refus privé, rien n'est créé", async () => {
+    const { a, b } = await pair();
+    const calls = await propose(a, b, { channel: fakeChannel({ allowed: false }) });
+    const refusal = last(calls, "followUp");
+    assert.equal(refusal.content, "❌ Je ne peux pas publier d'embed dans <#c1>.");
+    assert.equal(refusal.flags, EPHEMERAL);
+    assert.equal((await trades()).length, 0, "le refus vient avant la création de l'offre");
+  });
+
+  it("un salon qui refuse l'envoi : l'offre est annulée plutôt qu'oubliée dans la base", async () => {
+    const { a, b } = await pair();
+    const calls = await propose(a, b, { channel: fakeChannel({ sendFails: new Error("Missing Access") }) });
+    assert.equal(last(calls, "followUp").content, "❌ Je n'ai pas pu publier l'offre dans <#c1>. Tu peux réessayer.");
+    assert.equal((await trades())[0].status, "CANCELLED");
+  });
+
+  it("une panne d'écriture : rien n'est envoyé, le refus le dit", async () => {
+    const { a, b } = await pair();
+    await dbRun(points, "CREATE TRIGGER panne BEFORE INSERT ON pokemon_trades BEGIN SELECT RAISE(ABORT, 'panne'); END");
+    const channel = fakeChannel();
+    try {
+      const calls = await propose(a, b, { channel });
+      assert.equal(last(calls, "followUp").content, "❌ Impossible de créer l'échange.");
+    } finally {
+      await dbRun(points, "DROP TRIGGER panne");
+    }
+    assert.equal(channel.sent.length, 0);
+    assert.equal((await trades()).length, 0);
+  });
+
+  it("« avec qui échanger » et « qui a besoin » se relisent à chaque page", async () => {
+    const { a, b } = await pair();
+    const partners = only(await click("poke_cmpt|0|0|next", { user: a }), "update");
+    assert.match(embedOf(partners).description, new RegExp(`<@${b}> · \\*\\*1\\*\\* échange · 🎁 1 · 📥 1`));
+    const needers = only(await click(`poke_cmpn|${rata()}|0|0|next`, { user: a }), "update");
+    assert.match(embedOf(needers).title, /Qui a besoin de Rattata/);
+    assert.match(embedOf(needers).description, new RegExp(`<@${b}> · peut te donner \\*\\*1\\*\\* espèce en retour`));
+
+    const unknown = only(await click("poke_cmpn|99999|0|0|next", { user: a }), "reply");
+    assert.equal(unknown.content, "❌ Espèce inconnue.");
+    assert.equal(unknown.flags, EPHEMERAL);
+
+    await dbRun(points, "DELETE FROM pokemon_owned WHERE user_id = ?", [a]);
+    await own("Rattata", a);
+    const gone = only(await click(`poke_cmpn|${rata()}|0|0|next`, { user: a }), "update");
+    assert.equal(gone.content, "❌ Tu n'as plus de **Rattata** à donner : relance /pk comparer.");
+    assert.deepEqual(gone.components, []);
+  });
+});
+
 describe("le parc safari sur Discord", () => {
   const goes = (customId, user) => click(customId, { user });
 

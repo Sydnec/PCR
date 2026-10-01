@@ -2124,6 +2124,16 @@
       "commit": "pending",
       "timestamp": "2026-10-01T12:33:30.000Z",
       "branch": "claude/vibrant-brown-s7suxt"
+    },
+    {
+      "type": "feature",
+      "name": "Nouvelle commande /pk comparer",
+      "description": "Compare les doublons de deux dresseurs pour trouver les échanges qui complètent le Pokédex des deux, avec un bouton pour proposer l'échange. Sans option, elle dit avec qui échanger ; avec un de tes doublons, à qui il manque.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-01T13:11:08.000Z",
+      "branch": "claude/vibrant-brown-s7suxt"
     }
   ]
 }
