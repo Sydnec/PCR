@@ -736,8 +736,8 @@ describe("la comparaison de /pk comparer", () => {
     assert.equal(rows(update)[2].components.at(-1).disabled, true);
   });
 
-  it("proposer : l'offre naît publique, avec le moins précieux de chaque côté, et le clic est acquitté d'abord", async () => {
-    const { a, b, mine, theirs } = await pair();
+  it("proposer : l'offre naît publique, avec le moins précieux qu'on donne et l'espèce demandée, et le clic est acquitté d'abord", async () => {
+    const { a, b, mine } = await pair();
     const channel = fakeChannel();
     const calls = await propose(a, b, { channel });
     assert.equal(calls[0].method, "deferUpdate", "la lecture et la publication peuvent dépasser trois secondes");
@@ -746,7 +746,8 @@ describe("la comparaison de /pk comparer", () => {
     assert.equal(trade.from_user_id, a);
     assert.equal(trade.to_user_id, b);
     assert.equal(trade.offer_pokemon_id, mine[2], "le plus récent des Rattata, comme le retirerait reserveDuplicates");
-    assert.equal(trade.request_pokemon_id, theirs[2]);
+    assert.equal(trade.request_pokemon_id, null, "le destinataire choisira son Chenipan en acceptant");
+    assert.equal(trade.request_species_id, chen());
     assert.equal(trade.channel_id, "c1");
     assert.equal(trade.message_id, "m1", "le message de l'offre est retenu");
 
@@ -755,7 +756,7 @@ describe("la comparaison de /pk comparer", () => {
     assert.equal(sent.content, `<@${b}>`);
     assert.deepEqual(sent.allowedMentions, { users: [b] }, "seul le destinataire est mentionné");
     assert.deepEqual(buttonIds(sent), [`poke_trade_accept|${trade.id}`, `poke_trade_decline|${trade.id}`, `poke_trade_cancel|${trade.id}`]);
-    assert.equal(embedOf(sent).description, `<@${a}> propose **#${mine[2]} Rattata ♂ (fertile)**\ncontre **#${theirs[2]} Chenipan ♂ (fertile)** de <@${b}>.`, "qui reçoit sait exactement ce qu'il aura");
+    assert.equal(embedOf(sent).description, `<@${a}> propose **#${mine[2]} Rattata ♂ (fertile)**\ncontre **un Chenipan** de <@${b}>, à son choix.`, "qui reçoit sait exactement ce qu'il aura, et choisit ce qu'il donne");
 
     const done = last(calls, "editReply");
     assert.equal(done.content, `✅ Offre envoyée à <@${b}> dans <#c1>.`);
@@ -767,8 +768,11 @@ describe("la comparaison de /pk comparer", () => {
     const { a, b } = await pair();
     await propose(a, b);
     const [{ id }] = await trades();
-    const accepted = await click(`poke_trade_accept|${id}`, { user: b });
-    assert.ok(only(accepted, "update").components[0].toJSON().components.every((button) => button.disabled));
+    const asked = await click(`poke_trade_accept|${id}`, { user: b });
+    assert.deepEqual(buttonIds(only(asked, "reply")), [`poke_trade_pick|${id}`], "il choisit le Chenipan qu'il donne");
+    const owned = await dbAll(points, "SELECT id FROM pokemon_owned WHERE user_id = ? AND species_id = ? ORDER BY id", [b, chen()]);
+    const accepted = await click(`poke_trade_pick|${id}`, { user: b, values: [`#${owned.at(-1).id}`], run: handlePokemonSelect });
+    assert.match(only(accepted, "update").content, /Échange effectué/);
     assert.equal((await trades())[0].status, "ACCEPTED");
     const dex = async (user) => (await dbAll(points, "SELECT species_id, COUNT(*) AS n FROM pokemon_owned WHERE user_id = ? GROUP BY species_id", [user])).map((row) => [row.species_id, row.n]);
     assert.deepEqual(await dex(a), [[chen(), 1], [rata(), 2]].sort((x, y) => x[0] - y[0]), "a reçoit un Chenipan, et garde ses Rattata");

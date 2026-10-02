@@ -68,12 +68,14 @@ verrouillé.
   d'abord les sacrifices, puis fait évoluer le suivant dans le même ordre, jamais un verrouillé.
   Celui qui évolue reste lui-même — numéro, ball, sexe, fertilité, shiny. Les **sacrifices**, de
   n'importe quel sexe et de n'importe quelle variante, sont choisis par le bot et disparaissent.
-- **Échange** : un individu précis de chaque côté, fertilité comprise — qui reçoit une femelle
-  fertile doit pouvoir compter dessus : si elle pond ou est verrouillée entre-temps, l'échange
-  échoue. L'individu change de dresseur sans cesser d'être lui-même : numéro, shiny, ball,
-  fertilité, sexe et surnom le suivent. Il arrive avec la date de l'échange, à la première case
-  libre du PC, et verrouillé s'il est shiny ou légendaire.
-  Quand l'offre naît du bouton de `/pk comparer`, c'est le bot qui choisit l'individu de chaque
-  côté, selon la règle ci-dessus : le moins précieux d'abord, jamais un verrouillé ni le dernier de
-  l'espèce. Un shiny déverrouillé ne part qu'à défaut d'un normal libre qui ne soit pas en vitrine,
-  et l'offre le montre.
+- **Échange** : ce qu'on donne se désigne (`mon_individu`), fertilité comprise — qui reçoit une
+  femelle fertile doit pouvoir compter dessus : si elle pond ou est verrouillée entre-temps,
+  l'échange échoue. Sans désignation, c'est le moins précieux qui part (règle ci-dessus). Ce
+  qu'on demande ne désigne que l'espèce : **le destinataire choisit son individu** en acceptant,
+  parmi ceux qui peuvent partir. L'individu change de dresseur sans cesser d'être lui-même :
+  numéro, shiny, ball, fertilité, sexe et surnom le suivent. Il arrive avec la date de l'échange,
+  à la première case libre du PC, et verrouillé s'il est shiny ou légendaire.
+  Quand l'offre naît du bouton de `/pk comparer`, c'est le bot qui choisit l'individu qu'on
+  donne, selon la règle ci-dessus : le moins précieux d'abord, jamais un verrouillé ni le dernier
+  de l'espèce. Un shiny déverrouillé ne part qu'à défaut d'un normal libre qui ne soit pas en
+  vitrine, et l'offre le montre.

@@ -419,9 +419,9 @@ function showNeedersPage(interaction, speciesId, reserve, page) {
 }
 
 // Le bouton « Proposer cet échange » : l'offre naît par le même chemin que
-// /pk echange (proposeTrade), avec pour chaque côté l'individu que
-// reserveDuplicates retirerait en premier — le moins précieux, jamais un
-// verrouillé ni le dernier de l'espèce. Tout se relit au clic : le choix a pu
+// /pk echange (proposeTrade). Ce qu'on donne est l'individu que reserveDuplicates
+// retirerait en premier — le moins précieux, jamais un verrouillé ni le dernier de
+// l'espèce ; ce qu'on demande ne désigne que l'espèce, comme sur /pk echange. Tout se relit au clic : le choix a pu
 // cesser d'être proposé depuis la comparaison. Comme le partage d'un bilan, c'est
 // le bot qui publie dans le salon : ses permissions se vérifient avant de créer
 // quoi que ce soit, et une offre que le salon n'a pas publiée est annulée plutôt
@@ -490,7 +490,8 @@ async function proposeFromComparison(interaction, state) {
         fromUserId: userId,
         toUserId: state.partnerId,
         offer: selectorOf(giving.row),
-        request: selectorOf(receiving.row),
+        // Le destinataire choisit lui-même le Pokémon qu'il donne, en acceptant.
+        request: { speciesId: theirs.speciesId },
         channelId: channel.id,
         unique: true,
       },
