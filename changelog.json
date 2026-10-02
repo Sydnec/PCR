@@ -1,7 +1,24 @@
 {
-  "version": "1.17.1",
-  "lastUpdated": "2026-10-01T16:54:26.719Z",
+  "version": "1.17.2",
+  "lastUpdated": "2026-10-02T07:16:47.096Z",
   "releases": [
+    {
+      "version": "1.17.2",
+      "date": "2026-10-02",
+      "title": "Release 1.17.2",
+      "features": [
+        {
+          "type": "feature",
+          "name": "/pk echange : points et objets",
+          "description": "On peut échanger des points ou des objets, contre un Pokémon ou entre eux (0 point pour offrir). Le destinataire choisit lui-même le Pokémon qu'il donne en acceptant.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-10-02T07:30:00.000Z",
+          "branch": "claude/vibrant-brown-s7suxt"
+        }
+      ]
+    },
     {
       "version": "1.17.1",
       "date": "2026-10-01",
@@ -2188,16 +2205,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "feature",
-      "name": "/pk echange : points et objets",
-      "description": "On peut échanger des points ou des objets, contre un Pokémon ou entre eux (0 point pour offrir). Le destinataire choisit lui-même le Pokémon qu'il donne en acceptant.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-10-02T07:30:00.000Z",
-      "branch": "claude/vibrant-brown-s7suxt"
-    }
-  ]
+  "pending": []
 }
