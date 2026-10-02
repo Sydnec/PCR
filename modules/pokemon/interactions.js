@@ -51,6 +51,7 @@ import {
   proposeTrade,
   resolveTradeAs,
   selectorOf,
+  parseIndividual,
   setTradeMessage,
   tradeCandidate,
 } from "./collection.js";
@@ -75,12 +76,15 @@ import {
   buildSafariView,
   buildSpeciesInfoEmbed,
   buildTradeEmbed,
+  buildTradePicker,
   buildTradeRow,
   buildShowcaseMessage,
   displayName,
   freeParkNotice,
+  individualChoices,
   safariPickerContent,
   showcaseNotice,
+  tradeNeedsChoice,
 } from "./embeds.js";
 
 const ephemeral = (interaction, content) =>
@@ -688,14 +692,66 @@ function showEvolutionChoices(interaction, speciesId, variant, helperKey = null)
 
 // ---------------------- Échanges ----------------------
 
+// Le message d'une offre, tel qu'il se réécrit à la fin : l'embed du résultat, et
+// plus aucun bouton actif.
+const tradeOutcome = (trade, status, note) => ({
+  content: note ?? null,
+  embeds: [buildTradeEmbed(trade, status)],
+  components: [buildTradeRow(trade.id, { disabled: true })],
+});
+
 function finishTrade(interaction, trade, status, note) {
-  interaction
-    .update({
-      content: note ?? null,
-      embeds: [buildTradeEmbed(trade, status)],
-      components: [buildTradeRow(trade.id, { disabled: true })],
-    })
-    .catch(() => {});
+  interaction.update(tradeOutcome(trade, status, note)).catch(() => {});
+}
+
+// Accepte l'offre et en écrit le résultat avec `write(trade, status, note)`. Le
+// bouton écrit sur son propre message ; le menu du destinataire, lui, vit dans un
+// éphémère et réécrit le message public.
+function acceptAndSettle(interaction, trade, options, write) {
+  acceptTrade(trade.id, options, (err, result) => {
+    if (err) {
+      handleException(err);
+      return ephemeral(interaction, "❌ Erreur base de données.");
+    }
+    if (!result.ok) return write(trade, "FAILED", `❌ ${result.reason}`);
+    pseudos(trade.from_user_id, trade.to_user_id).then(([from, to]) =>
+      log(`Échange #${trade.id} accepté entre ${from} et ${to}`)
+    );
+    // La ligne rendue porte l'individu que le destinataire a choisi.
+    write(result.trade, "ACCEPTED");
+  });
+}
+
+// L'offre demande un Pokémon sans le désigner : le destinataire le choisit parmi
+// ceux qu'il peut donner — de l'espèce demandée, jamais le dernier ni un verrouillé,
+// comme sur /pk echange. Le menu est privé : sa boîte ne regarde que lui.
+function askTradePick(interaction, trade) {
+  const species = getSpecies(trade.request_species_id);
+  getIndividuals(trade.to_user_id, (err, rows) => {
+    if (err) {
+      handleException("Lecture des Pokémon à échanger :", err);
+      return ephemeral(interaction, "❌ Erreur base de données.");
+    }
+    const choices = individualChoices(
+      rows.filter((row) => row.species_id === trade.request_species_id),
+      "",
+      (row) => !row.last && !row.locked
+    );
+    if (!species || !choices.length) {
+      return ephemeral(
+        interaction,
+        `❌ Tu n'as aucun ${species?.name ?? "Pokémon"} à donner : ils sont verrouillés, ` +
+          "ou il ne t'en reste qu'un."
+      );
+    }
+    interaction
+      .reply({
+        content: `🎯 Quel **${species.name}** donnes-tu ?`,
+        components: [buildTradePicker(trade.id, choices, species)],
+        flags: MessageFlags.Ephemeral,
+      })
+      .catch(() => {});
+  });
 }
 
 function handleTradeButton(interaction, action, tradeId) {
@@ -729,18 +785,45 @@ function handleTradeButton(interaction, action, tradeId) {
       });
     }
 
-    acceptTrade(tradeId, (err, result) => {
-      if (err) {
-        handleException(err);
-        return ephemeral(interaction, "❌ Erreur base de données.");
-      }
-      if (!result.ok) {
-        return finishTrade(interaction, trade, "FAILED", `❌ ${result.reason}`);
-      }
-      pseudos(trade.from_user_id, trade.to_user_id).then(([from, to]) =>
-        log(`Échange #${tradeId} accepté entre ${from} et ${to}`)
-      );
-      finishTrade(interaction, trade, "ACCEPTED");
+    // Une offre expirée n'a rien à faire choisir : acceptTrade le dit.
+    if (tradeNeedsChoice(trade) && trade.expires_at > Date.now()) {
+      return askTradePick(interaction, trade);
+    }
+    acceptAndSettle(interaction, trade, {}, (settled, status, note) =>
+      finishTrade(interaction, settled, status, note)
+    );
+  });
+}
+
+// Le Pokémon choisi par le destinataire : l'offre s'accepte avec lui. Le menu étant
+// un éphémère, il se referme, et c'est le message public de l'offre qui annonce le
+// résultat. Le choix se revalide à l'acceptation (acceptTrade) : le menu a pu
+// rester ouvert, le Pokémon a pu partir.
+function handleTradePick(interaction, tradeId) {
+  getTrade(tradeId, (err, trade) => {
+    if (err || !trade) return ephemeral(interaction, "❌ Échange introuvable.");
+    if (trade.status !== "PENDING") {
+      return ephemeral(interaction, "❌ Cet échange a déjà été traité.");
+    }
+    if (interaction.user.id !== trade.to_user_id) {
+      return ephemeral(interaction, "❌ Cet échange ne t'est pas destiné.");
+    }
+    const requestPokemonId = parseIndividual(interaction.values?.[0]);
+    if (!requestPokemonId) return ephemeral(interaction, "❌ Choisis un Pokémon dans la liste.");
+
+    acceptAndSettle(interaction, trade, { requestPokemonId }, (settled, status, note) => {
+      interaction
+        .update({
+          content: status === "ACCEPTED" ? "✅ Échange effectué." : note,
+          components: [],
+        })
+        .catch(() => {});
+      // Le message public n'existe pas toujours (offre dont l'envoi a échoué) :
+      // sans lui, l'éphémère a déjà dit le résultat.
+      if (!trade.message_id) return;
+      interaction.channel?.messages
+        ?.edit(trade.message_id, tradeOutcome(settled, status, note))
+        .catch(() => {});
     });
   });
 }
@@ -844,8 +927,9 @@ function handleSafariGo(interaction, mode, parkId, generations) {
   });
 }
 
-// Les menus du jeu. Un seul pour l'instant : le choix des générations du parc,
-// qui réécrit son message avec le choix porté par le bouton d'entrée.
+// Les menus du jeu : le choix des générations du parc, qui réécrit son message
+// avec le choix porté par le bouton d'entrée, les côtés d'une comparaison, et le
+// Pokémon que le destinataire d'un échange donne.
 export async function handlePokemonSelect(interaction) {
   const [action, ...args] = interaction.customId.split("|");
   switch (action) {
@@ -874,6 +958,9 @@ export async function handlePokemonSelect(interaction) {
         compareState([partnerId, give, interaction.values?.[0], reserve, page])
       );
     }
+
+    case "poke_trade_pick":
+      return handleTradePick(interaction, args[0]);
 
     default:
   }

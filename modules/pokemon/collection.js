@@ -1539,6 +1539,29 @@ function takeSide(side, ownerId, cb) {
   });
 }
 
+// Écrit sur la ligne de l'offre le Pokémon qu'un côté a donné, quand l'offre ne le
+// désignait pas. Au mieux : l'échange a eu lieu, un message final moins précis ne
+// l'annule pas.
+function recordGiven(trade, prefix, taken) {
+  if (!taken.row || trade[`${prefix}_pokemon_id`]) return;
+  const { row } = taken;
+  Object.assign(trade, {
+    [`${prefix}_pokemon_id`]: row.id,
+    [`${prefix}_is_shiny`]: row.is_shiny,
+    [`${prefix}_sex`]: row.sex,
+    [`${prefix}_form`]: row.form ?? null,
+  });
+  db.run(
+    `UPDATE pokemon_trades
+        SET ${prefix}_pokemon_id = ?, ${prefix}_is_shiny = ?, ${prefix}_sex = ?, ${prefix}_form = ?
+      WHERE id = ?`,
+    [row.id, row.is_shiny, row.sex, row.form ?? null, trade.id],
+    (err) => {
+      if (err) handleException("Enregistrement du Pokémon échangé :", err);
+    }
+  );
+}
+
 // Pourquoi un côté ne peut plus être retiré, dit à celui qui accepte. `mine` :
 // c'est le côté du destinataire, à qui l'on s'adresse. Les chiffres y sont : « tu en
 // as 1, il en faut 2 ».
@@ -1650,6 +1673,11 @@ export function acceptTrade(tradeId, options, cb) {
               requested.deliver(trade.from_user_id, (err) => {
                 if (err) return rollBack(err, { retract: offered.retract, to: trade.to_user_id });
                 recordTrade({ fromUserId: trade.from_user_id, toUserId: trade.to_user_id });
+                // L'offre garde l'individu qui a vraiment changé de main quand elle
+                // ne le désignait pas : le message final dit lequel, plutôt que
+                // « un Roucool ».
+                recordGiven(trade, "offer", offered);
+                recordGiven(trade, "request", requested);
                 cb(null, {
                   ok: true,
                   trade,

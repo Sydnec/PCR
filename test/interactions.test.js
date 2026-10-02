@@ -27,10 +27,12 @@ const EPHEMERAL = MessageFlags.Ephemeral;
 // Un salon où le bot peut publier, qui note ce qu'il envoie.
 function fakeChannel({ allowed = true, sendFails = null, thread = false, locked = false } = {}) {
   const sent = [];
+  const edited = [];
   return {
     id: "c1",
     name: "pokemon",
     sent,
+    edited,
     locked,
     isThread: () => thread,
     isTextBased: () => true,
@@ -41,7 +43,10 @@ function fakeChannel({ allowed = true, sendFails = null, thread = false, locked 
       sent.push(payload);
       return { id: "m1", edit: async () => {} };
     },
-    messages: { fetch: async (id) => ({ id, embeds: [], edit: async () => {} }) },
+    messages: {
+      fetch: async (id) => ({ id, embeds: [], edit: async () => {} }),
+      edit: async (id, payload) => edited.push({ id, payload }),
+    },
   };
 }
 
@@ -527,24 +532,92 @@ describe("les boutons d'évolution", () => {
 });
 
 describe("les boutons d'échange", () => {
-  async function trade({ from = "u-from", to = "u-to", expired = false } = {}) {
+  // `pinned` : l'offre désigne l'individu demandé, comme celles de /pk comparer ;
+  // sinon c'est au destinataire de le choisir en acceptant.
+  async function trade({ from = "u-from", to = "u-to", expired = false, pinned = false } = {}) {
     await ownMany("Rattata", 2, from);
-    await ownMany("Roucool", 2, to);
+    const theirs = await ownMany("Roucool", 2, to);
     const id = await call(collection.createTrade, {
       fromUserId: from, toUserId: to, offerSpeciesId: species("Rattata").id, requestSpeciesId: species("Roucool").id, channelId: "123",
+      requestPokemonId: pinned ? theirs[0] : null,
     });
     if (expired) await dbRun(points, "UPDATE pokemon_trades SET expires_at = ? WHERE id = ?", [Date.now() - 1, id]);
     return id;
   }
   const status = async (id) => (await dbGet(points, "SELECT status FROM pokemon_trades WHERE id = ?", [id])).status;
 
-  it("l'accepter échange les Pokémon et ferme l'offre", async () => {
-    const id = await trade();
+  it("accepter une offre qui désigne le Pokémon demandé échange les Pokémon et ferme l'offre", async () => {
+    const id = await trade({ pinned: true });
     const calls = await click(`poke_trade_accept|${id}`, { user: "u-to" });
     const update = only(calls, "update");
     assert.equal(await status(id), "ACCEPTED");
     assert.ok(update.components[0].toJSON().components.every((button) => button.disabled), "les boutons sont grisés");
     assert.equal((await dbAll(points, "SELECT id FROM pokemon_owned WHERE user_id = 'u-from' AND species_id = ?", [species("Roucool").id])).length, 1);
+  });
+
+  it("accepter une offre qui ne désigne que l'espèce ouvre un menu privé : on y choisit le Pokémon donné", async () => {
+    const id = await trade({ from: "p-from", to: "p-to" });
+    const owned = await dbAll(points, "SELECT id FROM pokemon_owned WHERE user_id = 'p-to' AND species_id = ? ORDER BY id", [species("Roucool").id]);
+    const asked = await click(`poke_trade_accept|${id}`, { user: "p-to" });
+    const menu = only(asked, "reply");
+    assert.equal(menu.flags, MessageFlags.Ephemeral, "sa boîte ne regarde que lui");
+    assert.deepEqual(buttonIds(menu), [`poke_trade_pick|${id}`]);
+    assert.equal(await status(id), "PENDING", "rien n'est échangé avant son choix");
+    const options = menu.components[0].toJSON().components[0].options;
+    assert.deepEqual(options.map((option) => option.value), [`#${owned[1].id}`, `#${owned[0].id}`], "les plus récents d'abord, comme /pk echange");
+
+    const channel = fakeChannel();
+    const picked = await click(`poke_trade_pick|${id}`, { user: "p-to", values: [`#${owned[1].id}`], run: handlePokemonSelect, channel });
+    assert.match(only(picked, "update").content, /Échange effectué/);
+    assert.deepEqual(only(picked, "update").components, []);
+    assert.equal(await status(id), "ACCEPTED");
+    const row = await dbGet(points, "SELECT user_id FROM pokemon_owned WHERE id = ?", [owned[1].id]);
+    assert.equal(row.user_id, "p-from", "le Pokémon choisi est parti");
+    // L'offre publique annonce le résultat, avec l'individu qui a vraiment changé de main.
+    assert.equal(channel.edited.length, 0, "message_id inconnu : l'éphémère a déjà tout dit");
+  });
+
+  it("le menu réécrit le message public de l'offre quand on le connaît, avec le Pokémon choisi", async () => {
+    const id = await trade({ from: "q-from", to: "q-to" });
+    await dbRun(points, "UPDATE pokemon_trades SET message_id = 'm9' WHERE id = ?", [id]);
+    const [, chosen] = await dbAll(points, "SELECT id FROM pokemon_owned WHERE user_id = 'q-to' AND species_id = ? ORDER BY id", [species("Roucool").id]);
+    const channel = fakeChannel();
+    await click(`poke_trade_pick|${id}`, { user: "q-to", values: [`#${chosen.id}`], run: handlePokemonSelect, channel });
+    assert.equal(channel.edited.length, 1);
+    assert.equal(channel.edited[0].id, "m9");
+    const embed = channel.edited[0].payload.embeds[0].toJSON();
+    assert.match(embed.title, /Échange effectué/);
+    assert.match(embed.description, new RegExp(`#${chosen.id} Roucool`), "l'individu donné s'affiche, plus « un Roucool »");
+    assert.ok(channel.edited[0].payload.components[0].toJSON().components.every((button) => button.disabled));
+  });
+
+  it("sans Pokémon libre à donner, le destinataire le lit en privé et l'offre reste ouverte", async () => {
+    const id = await trade({ from: "r-from", to: "r-to" });
+    await dbRun(points, "DELETE FROM pokemon_owned WHERE id = (SELECT MAX(id) FROM pokemon_owned WHERE user_id = 'r-to')");
+    const calls = await click(`poke_trade_accept|${id}`, { user: "r-to" });
+    assert.match(only(calls, "reply").content, /Tu n'as aucun Roucool à donner/);
+    assert.equal(await status(id), "PENDING");
+  });
+
+  it("le menu n'obéit qu'au destinataire, sur une offre encore ouverte, avec un choix lisible", async () => {
+    const id = await trade({ from: "s-from", to: "s-to" });
+    const [, chosen] = await dbAll(points, "SELECT id FROM pokemon_owned WHERE user_id = 's-to' AND species_id = ? ORDER BY id", [species("Roucool").id]);
+    const pick = (user, values) => click(`poke_trade_pick|${id}`, { user, values, run: handlePokemonSelect });
+    assert.match(only(await pick("intrus", [`#${chosen.id}`]), "reply").content, /ne t'est pas destiné/);
+    assert.match(only(await pick("s-to", ["n'importe quoi"]), "reply").content, /Choisis un Pokémon/);
+    assert.equal(await status(id), "PENDING");
+    await click(`poke_trade_decline|${id}`, { user: "s-to" });
+    assert.match(only(await pick("s-to", [`#${chosen.id}`]), "reply").content, /déjà été traité/);
+  });
+
+  it("un choix périmé fait échouer l'offre avec le motif, sans rien déplacer", async () => {
+    const id = await trade({ from: "t-from", to: "t-to" });
+    const [, chosen] = await dbAll(points, "SELECT id FROM pokemon_owned WHERE user_id = 't-to' AND species_id = ? ORDER BY id", [species("Roucool").id]);
+    await dbRun(points, "UPDATE pokemon_owned SET locked = 1 WHERE id = ?", [chosen.id]);
+    const calls = await click(`poke_trade_pick|${id}`, { user: "t-to", values: [`#${chosen.id}`], run: handlePokemonSelect });
+    assert.match(only(calls, "update").content, /Le Pokémon demandé n'est plus disponible/);
+    assert.equal(await status(id), "FAILED");
+    assert.equal((await dbAll(points, "SELECT id FROM pokemon_owned WHERE user_id = 't-from' AND species_id = ?", [species("Roucool").id])).length, 0);
   });
 
   it("seule la cible accepte ou refuse, seul l'auteur annule", async () => {
@@ -583,7 +656,7 @@ describe("les boutons d'échange", () => {
   });
 
   it("un Pokémon qui n'est plus disponible fait échouer l'offre avec le motif", async () => {
-    const id = await trade({ from: "a5", to: "b5" });
+    const id = await trade({ from: "a5", to: "b5", pinned: true });
     await dbRun(points, "DELETE FROM pokemon_owned WHERE user_id = 'a5' AND id = (SELECT MAX(id) FROM pokemon_owned WHERE user_id = 'a5')");
     const calls = await click(`poke_trade_accept|${id}`, { user: "b5" });
     assert.match(only(calls, "update").content, /Le Pokémon proposé n'est plus disponible/);

@@ -500,3 +500,51 @@ describe("la comparaison de deux dresseurs (/pk comparer)", () => {
     assert.deepEqual(embeds.buildNeedersRow(species("Rattata").id, 3, 0, { reserve: true }).toJSON().components.map((button) => button.custom_id), [`poke_cmpn|${species("Rattata").id}|1|0|prev`, `poke_cmpn_noop|${species("Rattata").id}`, `poke_cmpn|${species("Rattata").id}|1|0|next`]);
   });
 });
+
+describe("l'embed d'une offre d'échange (buildTradeEmbed)", () => {
+  const base = { id: 1, from_user_id: "u1", to_user_id: "u2", offer_species_id: 0, request_species_id: 0, offer_is_shiny: 0, request_is_shiny: 0 };
+  const text = (trade, status) => embeds.buildTradeEmbed(trade, status).toJSON().description;
+
+  it("des points contre un Pokémon dont le destinataire fait le choix", () => {
+    const description = text({ ...base, offer_points: 1500, request_species_id: species("Roucool").id });
+    assert.match(description, /<@u1> propose \*\*1\s?500 points\*\*/);
+    assert.match(description, /contre \*\*un Roucool\*\* de <@u2>, à son choix\./);
+  });
+
+  it("un objet s'écrit avec son nom et sa quantité, et un Pokémon désigné par son identifiant", () => {
+    const description = text({
+      ...base,
+      offer_item: "super_bonbon",
+      offer_item_qty: 3,
+      request_species_id: species("Roucool").id,
+      request_pokemon_id: 42,
+    });
+    assert.match(description, /Super Bonbon ×3/);
+    assert.match(description, /#42 Roucool\*\* de <@u2>\./);
+    assert.doesNotMatch(description, /à son choix/);
+  });
+
+  it("zéro point fait un cadeau, dans un sens comme dans l'autre", () => {
+    const given = text({ ...base, offer_species_id: species("Rattata").id, offer_pokemon_id: 7, request_points: 0 });
+    assert.match(given, /<@u1> offre \*\*#7 Rattata\*\* à <@u2>\./);
+    const asked = text({ ...base, offer_points: 0, request_item: "super_bonbon", request_item_qty: 1 });
+    assert.match(asked, /<@u1> demande \*\*.*Super Bonbon ×1\*\* à <@u2>, sans rien donner en retour\./);
+  });
+
+  it("une offre sans Pokémon n'a pas de vignette, et le menu de choix ne se demande que pour un Pokémon non désigné", () => {
+    const points = { ...base, offer_points: 10, request_points: 20 };
+    assert.equal(embeds.buildTradeEmbed(points).toJSON().thumbnail, undefined);
+    assert.equal(embeds.tradeNeedsChoice({ ...base, offer_points: 5, request_species_id: species("Roucool").id }), true);
+    assert.equal(embeds.tradeNeedsChoice({ ...base, request_species_id: species("Roucool").id, request_pokemon_id: 3 }), false);
+    assert.equal(embeds.tradeNeedsChoice(points), false);
+    assert.equal(embeds.tradeNeedsChoice({ ...base, request_item: "super_bonbon", request_item_qty: 1 }), false);
+  });
+
+  it("le menu de choix porte l'offre et plafonne le libellé", () => {
+    const row = embeds.buildTradePicker(5, [{ name: "x".repeat(150), value: "#9" }], species("Roucool")).toJSON();
+    const menu = row.components[0];
+    assert.equal(menu.custom_id, "poke_trade_pick|5");
+    assert.match(menu.placeholder, /Roucool/);
+    assert.equal(menu.options[0].label.length, 100);
+  });
+});
