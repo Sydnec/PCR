@@ -152,7 +152,7 @@ const POKEMON = {
         label: "Master Ball",
         emoji: "<:masterball:1551326387455926432>",
         sprite: "master-ball",
-        price: 6000,
+        price: 10000,
         // `price` est celui de la première, achetée en points ; chacune des
         // suivantes coûte ce facteur de fois plus que la précédente, pour chaque
         // dresseur (1 : prix fixe). Sans lui, une capture garantie devient le

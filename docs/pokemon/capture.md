@@ -39,7 +39,7 @@
   légendaires à taux 3 n'auraient jamais été attrapés. Le plancher vaut partout — lancers,
   probabilités affichées, parc safari — et ne touche que les taux plus bas que lui.
 - **La Master Ball renchérit à chaque achat** : `price` est celui de la première, puis chaque Master
-  Ball payée en points coûte `priceGrowth` fois la précédente (×1,2 : 6 000, 7 200, 8 640… avec le
+  Ball payée en points coûte `priceGrowth` fois la précédente (×1,2 : 10 000, 12 000, 14 400… avec le
   prix par défaut). Le compte est **propre à chaque dresseur** et ne redescend jamais. Les Master
   Balls offertes ne le font pas avancer, ni un lancer remboursé (battu à la milliseconde) : le
   compte se lit dans le journal des lancers, ce qu'un dresseur a réellement payé. `priceGrowth` à

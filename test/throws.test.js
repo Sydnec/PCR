@@ -197,7 +197,8 @@ describe("le tirage", () => {
   });
 
   it("un shiny rejoint la boîte verrouillé, comme un légendaire", async () => {
-    await setBalance(10_000);
+    // De quoi payer les deux lancers : une Hyper Ball, puis une Master Ball.
+    await setBalance(balls().hyper.price + balls().master.price);
     await seedSpawn("Roucool", { shiny: 1 });
     await throwBall("u1", "hyper", 0);
     const [shiny] = await owned();
