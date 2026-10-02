@@ -1307,11 +1307,17 @@ function tradeSideText(trade, prefix) {
 
 // Le destinataire choisit son Pokémon en acceptant quand l'offre en demande un sans
 // le désigner : c'est ce que le bouton « Accepter » lui demande avant d'échanger.
+//
+// Une offre d'avant ce choix peut réclamer un sexe, une fertilité ou une variante
+// précis : elle s'accepte comme elle l'a toujours été, sans menu qui les ignorerait.
 export const tradeNeedsChoice = (trade) =>
   Boolean(trade.request_species_id) &&
   !trade.request_pokemon_id &&
   (trade.request_points ?? null) === null &&
-  !trade.request_item;
+  !trade.request_item &&
+  !trade.request_sex &&
+  !trade.request_is_shiny &&
+  (trade.request_fertile ?? null) === null;
 
 export function buildTradeEmbed(trade, status = "PENDING") {
   const style = TRADE_STATUS[status] ?? TRADE_STATUS.PENDING;
@@ -1325,7 +1331,9 @@ export function buildTradeEmbed(trade, status = "PENDING") {
   const sentence = nothing("request")
     ? `<@${trade.from_user_id}> offre **${given}** à <@${trade.to_user_id}>.`
     : nothing("offer")
-      ? `<@${trade.from_user_id}> demande **${asked}** à <@${trade.to_user_id}>, sans rien donner en retour.`
+      ? `<@${trade.from_user_id}> demande **${asked}** à <@${trade.to_user_id}>` +
+        (tradeNeedsChoice(trade) ? ", à son choix" : "") +
+        ", sans rien donner en retour."
       : `<@${trade.from_user_id}> propose **${given}**\n` +
         `contre **${asked}** de <@${trade.to_user_id}>` +
         (tradeNeedsChoice(trade) ? ", à son choix." : ".");

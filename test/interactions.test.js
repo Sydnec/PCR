@@ -610,6 +610,17 @@ describe("les boutons d'échange", () => {
     assert.match(only(await pick("s-to", [`#${chosen.id}`]), "reply").content, /déjà été traité/);
   });
 
+  it("un menu ouvert sur une offre devenue expirée le dit en privé et ne réécrit pas le message public", async () => {
+    const id = await trade({ from: "v-from", to: "v-to" });
+    await dbRun(points, "UPDATE pokemon_trades SET message_id = 'm9' WHERE id = ?", [id]);
+    const [, chosen] = await dbAll(points, "SELECT id FROM pokemon_owned WHERE user_id = 'v-to' AND species_id = ? ORDER BY id", [species("Roucool").id]);
+    await dbRun(points, "UPDATE pokemon_trades SET expires_at = ? WHERE id = ?", [Date.now() - 1, id]);
+    const channel = fakeChannel();
+    const calls = await click(`poke_trade_pick|${id}`, { user: "v-to", values: [`#${chosen.id}`], run: handlePokemonSelect, channel });
+    assert.match(only(calls, "update").content, /Cette offre a expiré/);
+    assert.equal(channel.edited.length, 0, "ce n'est pas un « Échange impossible » : rien n'a manqué");
+  });
+
   it("un choix périmé fait échouer l'offre avec le motif, sans rien déplacer", async () => {
     const id = await trade({ from: "t-from", to: "t-to" });
     const [, chosen] = await dbAll(points, "SELECT id FROM pokemon_owned WHERE user_id = 't-to' AND species_id = ? ORDER BY id", [species("Roucool").id]);

@@ -761,6 +761,35 @@ describe("échanger des points, des objets, ou un Pokémon que le destinataire c
       before,
       "les points livrés à u2 sont repris, ceux de u1 rendus, l'objet de u2 aussi"
     );
+    assert.equal(await status(trade), "PENDING", "tout est remis en place : l'offre se rouvre, le destinataire peut réessayer");
+    assert.equal((await accept(trade)).ok, true, "la panne passée, la même offre aboutit");
+  });
+
+  it("ce qui a été livré et ne se reprend plus n'est pas rendu deux fois : rien ne se crée", async () => {
+    await setBalance("u1", 700);
+    await setItem("u2", "super_bonbon", 3);
+    const trade = await propose({ points: 700 }, { item: "super_bonbon", quantity: 3 });
+    // La livraison à u1 échoue, et u2 a déjà dépensé les points qu'on venait de lui verser.
+    await dbRun(points, "CREATE TRIGGER panne BEFORE INSERT ON pokemon_inventory WHEN NEW.user_id = 'u1' BEGIN SELECT RAISE(ABORT, 'panne'); END");
+    await dbRun(points, "CREATE TRIGGER depense AFTER INSERT ON points WHEN NEW.user_id = 'u2' BEGIN UPDATE points SET balance = 0 WHERE user_id = 'u2'; END");
+    await assert.rejects(() => accept(trade), /panne/);
+    await dbRun(points, "DROP TRIGGER panne");
+    await dbRun(points, "DROP TRIGGER depense");
+    assert.equal(await balance("u1"), 0, "les 700 points de u1 ne lui sont pas rendus : u2 les a dépensés");
+    assert.equal(await balance("u2"), 0);
+    assert.equal(await itemCount("u2", "super_bonbon"), 3, "u2 retrouve ce qu'il donnait");
+    assert.equal(await status(trade), "FAILED", "l'état est à examiner : l'offre reste fermée");
+  });
+
+  it("une offre expirée ou déjà traitée le dit sans que ce soit un manque : `stale`", async () => {
+    await setBalance("u1", 10);
+    const expired = await propose({ points: 10 }, { points: 0 });
+    await dbRun(points, "UPDATE pokemon_trades SET expires_at = ? WHERE id = ?", [Date.now() - 1, expired.id]);
+    const result = await accept(expired);
+    assert.deepEqual([result.ok, result.stale], [false, true]);
+    const short = await propose({ points: 999 }, { points: 0 });
+    const missing = await accept(short);
+    assert.deepEqual([missing.ok, missing.stale], [false, undefined], "un vrai manque n'est pas `stale`");
   });
 
   it("une offre mal formée est refusée à la création : montant négatif, objet inconnu, quantité nulle, côté vide", async () => {

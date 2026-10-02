@@ -705,7 +705,7 @@ function finishTrade(interaction, trade, status, note) {
   interaction.update(tradeOutcome(trade, status, note)).catch(() => {});
 }
 
-// Accepte l'offre et en écrit le résultat avec `write(trade, status, note)`. Le
+// Accepte l'offre et en écrit le résultat avec `write(trade, status, note, { stale })`. Le
 // bouton écrit sur son propre message ; le menu du destinataire, lui, vit dans un
 // éphémère et réécrit le message public.
 function acceptAndSettle(interaction, trade, options, write) {
@@ -714,7 +714,7 @@ function acceptAndSettle(interaction, trade, options, write) {
       handleException(err);
       return ephemeral(interaction, "❌ Erreur base de données.");
     }
-    if (!result.ok) return write(trade, "FAILED", `❌ ${result.reason}`);
+    if (!result.ok) return write(trade, "FAILED", `❌ ${result.reason}`, { stale: result.stale });
     pseudos(trade.from_user_id, trade.to_user_id).then(([from, to]) =>
       log(`Échange #${trade.id} accepté entre ${from} et ${to}`)
     );
@@ -812,7 +812,7 @@ function handleTradePick(interaction, tradeId) {
     const requestPokemonId = parseIndividual(interaction.values?.[0]);
     if (!requestPokemonId) return ephemeral(interaction, "❌ Choisis un Pokémon dans la liste.");
 
-    acceptAndSettle(interaction, trade, { requestPokemonId }, (settled, status, note) => {
+    acceptAndSettle(interaction, trade, { requestPokemonId }, (settled, status, note, meta) => {
       interaction
         .update({
           content: status === "ACCEPTED" ? "✅ Échange effectué." : note,
@@ -820,8 +820,10 @@ function handleTradePick(interaction, tradeId) {
         })
         .catch(() => {});
       // Le message public n'existe pas toujours (offre dont l'envoi a échoué) :
-      // sans lui, l'éphémère a déjà dit le résultat.
-      if (!trade.message_id) return;
+      // sans lui, l'éphémère a déjà dit le résultat. Une offre expirée ou déjà
+      // traitée, elle, n'a pas échoué faute de Pokémon : son message dit déjà vrai, ou
+      // le dira à son tour — on ne le réécrit pas en « Échange impossible ».
+      if (!trade.message_id || meta?.stale) return;
       interaction.channel?.messages
         ?.edit(trade.message_id, tradeOutcome(settled, status, note))
         .catch(() => {});

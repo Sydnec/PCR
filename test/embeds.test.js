@@ -531,6 +531,14 @@ describe("l'embed d'une offre d'échange (buildTradeEmbed)", () => {
     assert.match(asked, /<@u1> demande \*\*.*Super Bonbon ×1\*\* à <@u2>, sans rien donner en retour\./);
   });
 
+  it("un cadeau demandé dit aussi que le destinataire choisit, et une offre d'avant le menu s'accepte sans lui", () => {
+    const trade = { ...base, offer_points: 0, request_species_id: species("Machopeur").id };
+    assert.match(text(trade), /demande \*\*un Machopeur\*\* à <@u2>, à son choix, sans rien donner en retour\./);
+    for (const constraint of [{ request_sex: "F" }, { request_fertile: 1 }, { request_is_shiny: 1 }]) {
+      assert.equal(embeds.tradeNeedsChoice({ ...base, request_species_id: species("Roucool").id, ...constraint }), false, JSON.stringify(constraint));
+    }
+  });
+
   it("une offre sans Pokémon n'a pas de vignette, et le menu de choix ne se demande que pour un Pokémon non désigné", () => {
     const points = { ...base, offer_points: 10, request_points: 20 };
     assert.equal(embeds.buildTradeEmbed(points).toJSON().thumbnail, undefined);

@@ -837,7 +837,10 @@ describe("/pk echange", () => {
     assert.match(refusal(await trade({ membre: "u2", mes_points: 5, je_donne: ids("Rattata"), je_recois: ids("Roucool") })), /Un seul à la fois de ton côté/);
     assert.match(refusal(await trade({ membre: "u2", mes_points: 5, je_recois: ids("Roucool"), ses_points: 5 })), /Un seul à la fois de son côté/);
     assert.match(refusal(await trade({ membre: "u2", mes_points: 0, ses_points: 0 })), /Rien à échanger : les deux côtés sont à 0 point/);
-    assert.match(refusal(await trade({ membre: "u2", mon_individu: "#1", mes_points: 5, ses_points: 5 })), /demande de choisir l'espèce/);
+    assert.match(refusal(await trade({ membre: "u2", mon_individu: "#1", mes_points: 5, ses_points: 5 })), /`mon_individu` ne va qu'avec un Pokémon/);
+    assert.match(refusal(await trade({ membre: "u2", mon_individu: "#1", ses_points: 5 })), /Dis ce que tu donnes/);
+    assert.match(refusal(await trade({ membre: "u2", mes_points: 5, son_objet_quantite: 3, ses_points: 5 })), /`son_objet_quantite` ne va qu'avec un objet/);
+    assert.match(refusal(await trade({ membre: "u2", mon_objet_quantite: 2, ses_points: 5, je_donne: ids("Rattata") })), /`mon_objet_quantite` ne va qu'avec un objet/);
     assert.equal((await trades()).length, 0);
   });
 
@@ -920,7 +923,7 @@ describe("/pk echange", () => {
     await grant("charme_chroma_1", 1);
     const mine = payloadOf(await asked({ name: "mon_objet", value: "" }), "respond");
     assert.deepEqual(mine.map((choice) => choice.value), ["super_bonbon"], "le charme ne se propose pas");
-    assert.match(mine[0].name, /Super Bonbon ×3/);
+    assert.match(mine[0].name, /^Super Bonbon ×3$/, "pas d'emoji : ceux du serveur ne se rendent pas dans une proposition");
     assert.deepEqual(payloadOf(await asked({ name: "mon_objet", value: "zzz" }), "respond").map((choice) => choice.value), ["—"]);
     assert.match(payloadOf(await asked({ name: "son_objet", value: "" }), "respond")[0].name, /Choisis d'abord le dresseur/);
     assert.match(payloadOf(await asked({ name: "son_objet", value: "" }, { membre: "u2" }), "respond")[0].name, /Ce dresseur n'a aucun objet à échanger/);

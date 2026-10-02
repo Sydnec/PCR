@@ -1605,7 +1605,12 @@ export function acceptTrade(tradeId, options, cb) {
     function (err) {
       if (err) return cb(err);
       if (this.changes === 0) {
-        return cb(null, { ok: false, reason: "Cette offre a expiré ou a déjà été traitée." });
+        // `stale` : l'offre n'était déjà plus ouverte, ce n'est pas un côté qui a manqué.
+        return cb(null, {
+          ok: false,
+          stale: true,
+          reason: "Cette offre a expiré ou a déjà été traitée.",
+        });
       }
 
       getTrade(tradeId, (err, trade) => {
@@ -1630,48 +1635,67 @@ export function acceptTrade(tradeId, options, cb) {
         const fail = (reason) =>
           releaseTrade(tradeId, "FAILED", () => cb(null, { ok: false, reason }));
 
+        // La revendication a fermé l'offre. Tant que rien n'a bougé, ou que tout est
+        // remis en place, elle se rouvre : une panne passagère ne doit pas la tuer, et
+        // les boutons du message, encore affichés, disent vrai. Une compensation qui
+        // échoue la laisse fermée : l'état est à examiner, pas à rejouer.
+        const reopen = (cleanly, error) => {
+          if (!cleanly) return releaseTrade(tradeId, "FAILED", () => cb(error));
+          db.run(
+            "UPDATE pokemon_trades SET status = 'PENDING', resolved_at = NULL WHERE id = ? AND status = 'ACCEPTED'",
+            [tradeId],
+            (reopenError) => {
+              if (reopenError) handleException("Réouverture d'une offre :", reopenError);
+              cb(error);
+            }
+          );
+        };
+        const giveBack = (taken, cleanly, next) =>
+          taken.restore((restoreError) => {
+            if (restoreError) handleException("Restitution d'un échange :", restoreError);
+            next(cleanly && !restoreError);
+          });
+
         // Retrait chez l'initiateur, puis chez la cible, avec compensation si le
         // second échoue (le Pokémon a pu évoluer entre-temps, les points être
         // dépensés). Aucun ne cède son dernier de l'espèce : reserveDuplicates le
         // refuse, exactement comme pour une évolution ou une revente.
         takeSide(offerSide, trade.from_user_id, (err, offered, offerShortage) => {
-          if (err) return cb(err);
+          if (err) return reopen(true, err);
           if (!offered) return fail(shortageReason(offerShortage, { mine: false }));
 
           takeSide(requestSide, trade.to_user_id, (err, requested, requestShortage) => {
             if (err || !requested) {
               // Compensation : on rend à l'initiateur ce qu'on lui a retiré.
-              return offered.restore((restoreError) => {
-                if (restoreError) handleException("Restitution d'un échange :", restoreError);
-                if (err) return cb(err);
-                fail(shortageReason(requestShortage, { mine: true }));
-              });
+              return giveBack(offered, true, (cleanly) =>
+                err ? reopen(cleanly, err) : fail(shortageReason(requestShortage, { mine: true }))
+              );
             }
 
             // Livraison : chacun reçoit ce que l'autre donnait. Si la seconde
-            // échoue, la première se reprend, puis chacun retrouve le sien.
-            // Au mieux : rendre ce qu'on peut vaut mieux que le perdre.
-            const rollBack = (err, delivered) => {
+            // échoue, la première se reprend, puis chacun retrouve le sien. Au
+            // mieux : rendre ce qu'on peut vaut mieux que le perdre.
+            //
+            // Quand ce qui a été livré ne se reprend pas — les points sont déjà
+            // dépensés —, l'initiateur ne récupère rien : lui rendre sa part en plus
+            // créerait de la valeur. Le destinataire retrouve ce qu'il donnait, et
+            // l'offre reste fermée.
+            const rollBack = (err, deliveredOffer) => {
               handleException("Livraison d'un échange :", err);
-              const restoreBoth = () =>
-                offered.restore((offerError) => {
-                  if (offerError) handleException("Restitution d'un échange :", offerError);
-                  requested.restore((requestError) => {
-                    if (requestError) handleException("Restitution d'un échange :", requestError);
-                    cb(err);
-                  });
-                });
-              if (!delivered) return restoreBoth();
-              delivered.retract(delivered.to, (retractError) => {
-                if (retractError) handleException("Reprise d'un échange :", retractError);
-                restoreBoth();
+              const restoreRequested = (cleanly) =>
+                giveBack(requested, cleanly, (clean) => reopen(clean, err));
+              if (!deliveredOffer) return giveBack(offered, true, restoreRequested);
+              offered.retract(trade.to_user_id, (retractError) => {
+                if (!retractError) return giveBack(offered, true, restoreRequested);
+                handleException("Reprise d'un échange :", retractError);
+                restoreRequested(false);
               });
             };
 
             offered.deliver(trade.to_user_id, (err) => {
-              if (err) return rollBack(err, null);
+              if (err) return rollBack(err, false);
               requested.deliver(trade.from_user_id, (err) => {
-                if (err) return rollBack(err, { retract: offered.retract, to: trade.to_user_id });
+                if (err) return rollBack(err, true);
                 recordTrade({ fromUserId: trade.from_user_id, toUserId: trade.to_user_id });
                 // L'offre garde l'individu qui a vraiment changé de main quand elle
                 // ne le désignait pas : le message final dit lequel, plutôt que

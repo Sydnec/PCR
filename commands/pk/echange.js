@@ -22,9 +22,7 @@ import {
 } from "../../modules/pokemon/embeds.js";
 
 const promisify = (fn, ...args) =>
-  new Promise((resolve, reject) =>
-    fn(...args, (err, ...rest) => (err ? reject(err) : resolve(rest.length > 1 ? rest : rest[0])))
-  );
+  new Promise((resolve, reject) => fn(...args, (err, value) => (err ? reject(err) : resolve(value))));
 
 // Premier temps : les espèces dont `userId` a des Pokémon en trop, shiny ou
 // non — jamais le dernier de l'espèce, jamais un verrouillé.
@@ -101,7 +99,8 @@ function respondWithItems(interaction, userId, query, emptyLabel) {
       .map((row) => ({ row, item: getItem(row.item_key) }))
       .filter(({ item }) => item && isTradable(item))
       .map(({ row, item }) => ({
-        name: `${item.emoji} ${item.label} ×${row.count.toLocaleString("fr-FR")}`,
+        // Pas d'emoji : ceux du serveur ne se rendent pas dans une proposition.
+        name: `${item.label} ×${row.count.toLocaleString("fr-FR")}`,
         value: item.key,
       }))
       .filter((choice) => choice.name.toLowerCase().includes(needle))
@@ -148,8 +147,13 @@ async function readSide(interaction, names, owner, own) {
         `ou un objet — pas un mélange.`,
     };
   }
-  if (individual && !species) {
-    return { error: `\`${names.individual}\` demande de choisir l'espèce dans \`${names.species}\`.` };
+  // Une option qui ne va pas avec le côté choisi est refusée, pas ignorée : on
+  // publierait une offre différente de celle qu'on croit avoir tapée.
+  if (individual && (amount !== null || key !== null)) {
+    return { error: `\`${names.individual}\` ne va qu'avec un Pokémon (\`${names.species}\`).` };
+  }
+  if (interaction.options.getInteger(names.quantity) !== null && key === null) {
+    return { error: `\`${names.quantity}\` ne va qu'avec un objet (\`${names.item}\`).` };
   }
 
   if (amount !== null && amount !== undefined) {
