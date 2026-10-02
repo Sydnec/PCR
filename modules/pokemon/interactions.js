@@ -13,8 +13,8 @@ import {
 import { buildBalanceEmbed, getBalance } from "../economy.js";
 import { handleException, log } from "../utils.js";
 import { pseudoOf, pseudos } from "../pseudo.js";
-import { getPokemonConfig, getSafariConfig } from "./config.js";
-import { answerThrow, ballPanelRow, throwBall, trackPanel } from "./capture.js";
+import { getBall, getPokemonConfig, getSafariConfig } from "./config.js";
+import { answerThrow, ballPanelRow, getBallPrice, throwBall, trackPanel } from "./capture.js";
 import { getSpawn } from "./spawn.js";
 import { getBallItem, getBallStock, getItem, getItemCount } from "./items.js";
 import { claimDrop } from "./drops.js";
@@ -94,8 +94,12 @@ const ephemeral = (interaction, content) =>
 
 // Depuis le panneau de relance, la confirmation le TRANSFORME au lieu d'ouvrir
 // un éphémère de plus : c'est tout l'intérêt du panneau.
+//
+// C'est ICI que le dresseur apprend ce que lui coûte la Master Ball : son prix
+// monte à chaque achat, et le bouton de l'annonce, le même pour tous, ne peut
+// pas le dire.
 function askMasterBallConfirmation(interaction, spawnId, { panel = false } = {}) {
-  const ball = getPokemonConfig().capture.balls.master;
+  const ball = getBall("master");
 
   // Un refus répond exactement comme un cooldown : même règle, même fonction.
   const refuse = (content) => answerThrow(interaction, spawnId, content, { panel });
@@ -108,10 +112,11 @@ function askMasterBallConfirmation(interaction, spawnId, { panel = false } = {})
     if (err) handleException("Lecture des Master Balls offertes :", err);
     const gratuite = held > 0;
 
-    const suite = (balance) => {
-      if (!gratuite && balance < ball.price) {
+    const suite = (balance, price) => {
+      if (!gratuite && balance < price) {
         return refuse(
-          `❌ Une **${ball.label}** coûte **${ball.price}** points, tu en as **${balance}**.`
+          `❌ Une **${ball.label}** coûte **${price.toLocaleString("fr-FR")}** points, ` +
+            `tu en as **${balance.toLocaleString("fr-FR")}**.`
         );
       }
 
@@ -119,9 +124,13 @@ function askMasterBallConfirmation(interaction, spawnId, { panel = false } = {})
         new ButtonBuilder()
           // Le customId porte la promesse faite au dresseur : si la Master Ball
           // annoncée gratuite a disparu entre-temps, le lancer doit refuser, pas
-          // se rabattre sur 22 500 points jamais mentionnés.
-          .setCustomId(`poke_master_ok|${spawnId}${gratuite ? "|item" : ""}`)
-          .setLabel(gratuite ? "Utiliser ma Master Ball" : `Confirmer (-${ball.price})`)
+          // se rabattre sur 22 500 points jamais mentionnés. Payante, il porte
+          // le prix affiché : un achat fait entre-temps l'a fait monter, et le
+          // lancer refuse plutôt que de prendre plus.
+          .setCustomId(`poke_master_ok|${spawnId}|${gratuite ? "item" : price}`)
+          .setLabel(
+            gratuite ? "Utiliser ma Master Ball" : `Confirmer (-${price.toLocaleString("fr-FR")})`
+          )
           .setEmoji(ball.emoji)
           .setStyle(ButtonStyle.Danger),
         new ButtonBuilder()
@@ -137,9 +146,9 @@ function askMasterBallConfirmation(interaction, spawnId, { panel = false } = {})
           ? `⚠️ Tu vas utiliser ta **${ball.label}** offerte : la capture est garantie, mais ` +
             `elle est perdue si quelqu'un t'attrape le Pokémon avant.\n` +
             `Il t'en reste **${held}**.`
-          : `⚠️ La **${ball.label}** garantit la capture mais coûte **${ball.price}** points, ` +
+          : `⚠️ La **${ball.label}** garantit la capture mais coûte **${price.toLocaleString("fr-FR")}** points, ` +
             `et ils sont perdus si quelqu'un t'attrape le Pokémon avant.\n` +
-            `Ton solde : **${balance}** points.`,
+            `Ton solde : **${balance.toLocaleString("fr-FR")}** points.`,
         components: [row],
       };
 
@@ -154,15 +163,21 @@ function askMasterBallConfirmation(interaction, spawnId, { panel = false } = {})
         .catch(() => {});
     };
 
-    // Le solde ne sert qu'à celui qui va payer : inutile d'aller le lire pour
-    // annoncer une ball qui ne coûte rien.
-    if (gratuite) return suite(0);
-    getBalance(interaction.user.id, (err, balance) => {
+    // Le solde et le prix ne servent qu'à celui qui va payer : inutile d'aller
+    // les lire pour annoncer une ball qui ne coûte rien.
+    if (gratuite) return suite(0, 0);
+    getBallPrice(interaction.user.id, ball, (err, price) => {
       if (err) {
-        handleException(err);
+        handleException("Lecture du prix de la Master Ball :", err);
         return refuse("❌ Erreur base de données.");
       }
-      suite(balance);
+      getBalance(interaction.user.id, (err, balance) => {
+        if (err) {
+          handleException(err);
+          return refuse("❌ Erreur base de données.");
+        }
+        suite(balance, price);
+      });
     });
   });
 }
@@ -1197,10 +1212,13 @@ export async function handlePokemonButton(interaction) {
 
     // Toujours cliqué depuis un éphémère (la confirmation), donc toujours une
     // réécriture.
+    // `args[1]` : « item » (annoncée offerte) ou le prix affiché. Un bouton posté
+    // avant ce prix n'en porte pas, et part sans garde.
     case "poke_master_ok":
       return throwBall(interaction, args[0], "master", {
         panel: true,
         requireItem: args[1] === "item",
+        expectedPrice: /^\d+$/.test(args[1] ?? "") ? Number(args[1]) : null,
       });
 
     case "poke_master_cancel":

@@ -6,7 +6,7 @@
 // Les parts (rareté, objets, loterie) sont des poids rapportés à leur total,
 // exactement ceux que pickWeightedSpecies et pickWeightedItem cumulent.
 import { getConfig } from "../config.js";
-import { getBalls, getPokemonConfig, getSafariConfig } from "./config.js";
+import { getBalls, getPokemonConfig, getSafariConfig, hasPersonalPrice } from "./config.js";
 import {
   RARITIES,
   activeGeneration,
@@ -245,14 +245,17 @@ export function describeRules(bot) {
     },
     capture: {
       cooldownSeconds: config.capture.throwCooldownSeconds,
-      balls: getBalls().map(({ key, label, emoji, sprite, price, multiplier, guaranteed }) => ({
-        key,
-        label,
-        emoji,
-        image: itemImageUrl(sprite),
-        price,
-        multiplier,
-        guaranteed: Boolean(guaranteed),
+      // `price` est celui du premier achat ; pour une ball au prix personnel,
+      // `priceGrowth` dit de combien chacun des suivants renchérit, sinon null.
+      balls: getBalls().map((ball) => ({
+        key: ball.key,
+        label: ball.label,
+        emoji: ball.emoji,
+        image: itemImageUrl(ball.sprite),
+        price: ball.price,
+        priceGrowth: hasPersonalPrice(ball) ? Number(ball.priceGrowth) : null,
+        multiplier: ball.multiplier,
+        guaranteed: Boolean(ball.guaranteed),
       })),
       table: catchTable(config.spawn),
     },

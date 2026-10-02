@@ -295,11 +295,12 @@ describe("légendaires et plancher du taux de capture", () => {
     }
   });
 
-  it("la Master Ball à son prix reste moins chère que l'espérance de capture d'un légendaire à taux 10", () => {
+  // Pas de borne haute : la Master Ball est un luxe assumé. Son premier exemplaire
+  // dépasse l'espérance d'un légendaire à taux 10, et chaque achat renchérit.
+  it("la Master Ball n'est pas bradée : son prix de départ vaut plus de la moitié de l'espérance de capture d'un légendaire à taux 10", () => {
     const { balls } = getPokemonConfig().capture;
     const expected = balls.poke.price / data.catchProbability(10, balls.poke.multiplier, 1);
-    assert.ok(balls.master.price < expected, `${balls.master.price} ≥ ${Math.round(expected)}`);
-    assert.ok(balls.master.price > expected * 0.5, "mais pas bradée");
+    assert.ok(balls.master.price > expected * 0.5, `${balls.master.price} ≤ ${Math.round(expected * 0.5)}`);
   });
 });
 

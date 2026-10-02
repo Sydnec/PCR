@@ -225,6 +225,14 @@ const db = new sqlite3.Database(dbPath, (err) => {
             if (err) handleException("Erreur création index pokemon_throws_spawn :", err);
           }
         );
+        // Le prix de la Master Ball se lit dans ce journal : combien en a payé ce
+        // dresseur (getBallPrice, pokemon/capture.js).
+        db.run(
+          "CREATE INDEX IF NOT EXISTS idx_pokemon_throws_user_ball ON pokemon_throws(user_id, ball)",
+          (err) => {
+            if (err) handleException("Erreur création index pokemon_throws_user_ball :", err);
+          }
+        );
       }
     );
 

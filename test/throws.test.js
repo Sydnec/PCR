@@ -1,26 +1,25 @@
 // Le lancer de ball : la partie la plus délicate du jeu. Deux invariants à tenir
 // absolument — aucun solde sous zéro, et jamais deux vainqueurs pour le même
 // Pokémon — sur des clics simultanés. Ici, de vraies bases et le hasard figé.
-import { describe, it, beforeEach } from "node:test";
+import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { createSandbox, openDatabases, dbRun, dbGet, dbAll, eventually, withRandom, speciesByName } from "./helpers.js";
 
-createSandbox({
-  config: {
-    pokemon: {
-      generationOpenings: { 2: "2999-01-01T00:00:00+01:00" },
-      // L'embed public se rafraîchit après ce délai : court, pour ne pas retenir le processus.
-      spawn: { embedRefreshMs: 1 },
-      capture: { throwCooldownSeconds: 3 },
-    },
+const BASE_CONFIG = {
+  pokemon: {
+    generationOpenings: { 2: "2999-01-01T00:00:00+01:00" },
+    // L'embed public se rafraîchit après ce délai : court, pour ne pas retenir le processus.
+    spawn: { embedRefreshMs: 1 },
+    capture: { throwCooldownSeconds: 3 },
   },
-});
+};
+const sandbox = createSandbox({ config: BASE_CONFIG });
 const { points, stats } = await openDatabases();
 const capture = await import("../modules/pokemon/capture.js");
 const items = await import("../modules/pokemon/items.js");
 const economy = await import("../modules/economy.js");
 const data = await import("../modules/pokemon/data.js");
-const { getPokemonConfig } = await import("../modules/pokemon/config.js");
+const { getBall, getPokemonConfig } = await import("../modules/pokemon/config.js");
 
 const call = (fn, ...args) =>
   new Promise((resolve, reject) => fn(...args, (error, value) => (error ? reject(error) : resolve(value))));
@@ -198,7 +197,8 @@ describe("le tirage", () => {
   });
 
   it("un shiny rejoint la boîte verrouillé, comme un légendaire", async () => {
-    await setBalance(10_000);
+    // De quoi payer les deux lancers : une Hyper Ball, puis une Master Ball.
+    await setBalance(balls().hyper.price + balls().master.price);
     await seedSpawn("Roucool", { shiny: 1 });
     await throwBall("u1", "hyper", 0);
     const [shiny] = await owned();
@@ -310,6 +310,144 @@ describe("la course à un seul vainqueur", () => {
   });
 });
 
+describe("le prix progressif de la Master Ball", () => {
+  const fmt = (value) => value.toLocaleString("fr-FR");
+  // Le scénario du jeu : 10 000 au premier achat, puis ×1,2 à chaque suivant.
+  const progressive = (growth = 1.2) =>
+    sandbox.writeConfig({
+      pokemon: {
+        ...BASE_CONFIG.pokemon,
+        capture: { ...BASE_CONFIG.pokemon.capture, balls: { master: { price: 10_000, priceGrowth: growth } } },
+      },
+    });
+  beforeEach(() => progressive());
+  afterEach(() => sandbox.writeConfig(BASE_CONFIG));
+
+  // Un achat déjà fait, tel que le journal des lancers le garde.
+  const logPurchase = (user, cost, result = "CATCH") =>
+    dbRun(
+      points,
+      "INSERT INTO pokemon_throws (spawn_id, user_id, ball, cost, probability, result, thrown_at) VALUES (0, ?, 'master', ?, 1, ?, 1)",
+      [user, cost, result]
+    );
+  const priceOf = (user = "u1") => call(capture.getBallPrice, user, getBall("master"));
+
+  it("chaque achat payé en points renchérit le suivant de ×1,2", async () => {
+    await setBalance(100_000);
+    const costs = [];
+    for (let bought = 0; bought < 3; bought++) {
+      await seedSpawn("Mewtwo");
+      const before = await balance();
+      assert.equal((await throwBall("u1", "master", 0)).status, "catch");
+      costs.push(before - (await balance()));
+    }
+    assert.deepEqual(costs, [10_000, 12_000, 14_400]);
+    assert.deepEqual((await throws()).map((row) => row.cost), costs, "le journal garde ce qui a été payé");
+    assert.equal(await priceOf(), 17_280);
+  });
+
+  it("le compte est propre à chaque dresseur", async () => {
+    await logPurchase("u2", 10_000);
+    await logPurchase("u2", 12_000);
+    assert.equal(await priceOf("u2"), 14_400);
+    assert.equal(await priceOf("u1"), 10_000);
+  });
+
+  it("un achat fait avant la progression compte : il est déjà dans le journal", async () => {
+    await logPurchase("u1", 10_000);
+    await setBalance(50_000);
+    const outcome = await throwBall("u1", "master", 0);
+    assert.equal(outcome.payment.points, 12_000);
+    assert.equal(await balance(), 38_000);
+  });
+
+  it("une Master Ball offerte, ou un lancer remboursé, n'avance pas le compte", async () => {
+    await logPurchase("u1", 0);
+    await logPurchase("u1", 10_000, "VOID");
+    assert.equal(await priceOf(), 10_000);
+    await grant("ball_master", 1);
+    const outcome = await throwBall("u1", "master", 0, { requireItem: true });
+    assert.equal(outcome.payment.item, "ball_master");
+    assert.equal(await priceOf(), 10_000);
+  });
+
+  it("sans assez de points, le refus dit le prix de ce dresseur et ne débite rien", async () => {
+    await logPurchase("u1", 10_000);
+    await setBalance(11_999);
+    const outcome = await throwBall("u1", "master", 0);
+    assert.equal(outcome.status, "insufficient");
+    assert.equal(outcome.price, 12_000);
+    assert.match(capture.throwMessage(outcome), new RegExp(`coûte \\*\\*${fmt(12_000)}\\*\\* points, tu en as \\*\\*${fmt(11_999)}\\*\\*`));
+    assert.equal(await balance(), 11_999);
+    assert.equal((await spawnRow()).status, "ACTIVE");
+    assert.equal((await throws()).length, 1, "seul l'achat d'avant est au journal");
+  });
+
+  it("le prix annoncé à la confirmation est tenu : monté entre-temps, rien n'est débité", async () => {
+    await logPurchase("u1", 10_000);
+    await setBalance(50_000);
+    const outcome = await throwBall("u1", "master", 0, { expectedPrice: 10_000 });
+    assert.equal(outcome.status, "price-changed");
+    assert.equal(outcome.price, 12_000);
+    assert.equal(capture.isFinalThrow(outcome), false);
+    assert.match(capture.throwMessage(outcome), new RegExp(`passé à \\*\\*${fmt(12_000)}\\*\\* points depuis ta confirmation\\. Rien n'a été débité`));
+    assert.equal(await balance(), 50_000);
+    assert.equal((await spawnRow()).status, "ACTIVE");
+    assert.equal((await throws()).length, 1);
+
+    const kept = await throwBall("u1", "master", 0, { expectedPrice: 12_000 });
+    assert.equal(kept.status, "catch");
+    assert.equal(await balance(), 38_000);
+  });
+
+  it("une Master Ball en poche passe avant les points, quel que soit le prix annoncé", async () => {
+    await logPurchase("u1", 10_000);
+    await setBalance(50_000);
+    await grant("ball_master", 1);
+    const outcome = await throwBall("u1", "master", 0, { expectedPrice: 10_000 });
+    assert.equal(outcome.status, "catch");
+    assert.equal(outcome.payment.item, "ball_master");
+    assert.equal(await balance(), 50_000);
+  });
+
+  it("deux dresseurs qui visent juste ensemble : le perdant retrouve ce qu'il avait payé, à son prix", async () => {
+    await logPurchase("u1", 10_000);
+    await setBalance(50_000, "u1");
+    await setBalance(50_000, "u2");
+    const outcomes = await withRandom(0, () =>
+      Promise.all([call(capture.resolveThrow, client, "u1", 1, "master", {}), call(capture.resolveThrow, client, "u2", 1, "master", {})])
+    );
+    const [u1, u2] = outcomes;
+    assert.deepEqual(outcomes.map((outcome) => outcome.status).sort(), ["catch", "void"]);
+    assert.equal(await balance("u1"), u1.status === "catch" ? 50_000 - 12_000 : 50_000);
+    assert.equal(await balance("u2"), u2.status === "catch" ? 50_000 - 10_000 : 50_000);
+
+    const [loser, loserId, due] = u1.status === "void" ? [u1, "u1", 12_000] : [u2, "u2", 10_000];
+    assert.match(capture.throwMessage(loser), new RegExp(`\\*\\*${fmt(due)}\\*\\* points ont été remboursés`));
+    assert.equal((await throws()).find((row) => row.result === "VOID").cost, due, "le journal garde le montant rendu");
+    assert.equal(await priceOf(loserId), due, "un lancer remboursé ne renchérit pas");
+  });
+
+  it("un journal illisible ne fait rien payer : le lancer répond « error »", async () => {
+    await setBalance(50_000);
+    await dbRun(points, "ALTER TABLE pokemon_throws RENAME TO pokemon_throws_off");
+    try {
+      assert.equal((await throwBall("u1", "master", 0)).status, "error");
+    } finally {
+      await dbRun(points, "ALTER TABLE pokemon_throws_off RENAME TO pokemon_throws");
+    }
+    assert.equal(await balance(), 50_000);
+    assert.equal((await spawnRow()).status, "ACTIVE");
+  });
+
+  it("à 1, le prix redevient fixe", async () => {
+    progressive(1);
+    await logPurchase("u1", 10_000);
+    await logPurchase("u1", 10_000);
+    assert.equal(await priceOf(), 10_000);
+  });
+});
+
 describe("l'objet tenu", () => {
   beforeEach(() => grant("pepite", 0).catch(() => {}));
 
@@ -379,12 +517,14 @@ describe("les messages", () => {
     assert.match(message({ status: "no-item" }), /Tu n'as plus de \*\*Poké Ball\*\*/);
     assert.match(message({ status: "void", payment: { points: 100 } }), /\*\*100\*\* points ont été remboursés/);
     assert.match(message({ status: "void", payment: { item: "ball_poke", label: "Poké Ball" } }), /Poké Ball\*\* t'a été rendue/);
+    assert.match(message({ status: "insufficient", price: 12_000, balance: 50 }), /coûte \*\*12\D000\*\* points, tu en as \*\*50\*\*/);
+    assert.match(message({ status: "price-changed", price: 12_000 }), /passé à \*\*12\D000\*\* points depuis ta confirmation\. Rien n'a été débité/);
     assert.match(message({ status: "n'importe quoi" }), /Erreur base de données/);
   });
 
   it("les issues finales sont celles où il n'y a plus rien à relancer", () => {
     for (const status of ["gone", "unknown-species", "void", "catch"]) assert.equal(capture.isFinalThrow({ status }), true, status);
-    for (const status of ["miss", "insufficient", "cooldown", "no-item"]) assert.equal(capture.isFinalThrow({ status }), false, status);
+    for (const status of ["miss", "insufficient", "price-changed", "cooldown", "no-item"]) assert.equal(capture.isFinalThrow({ status }), false, status);
   });
 });
 

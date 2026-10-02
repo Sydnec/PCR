@@ -14,7 +14,7 @@ import {
   StringSelectMenuOptionBuilder,
   TextDisplayBuilder,
 } from "discord.js";
-import { getBall, getPokemonConfig, getSafariConfig } from "./config.js";
+import { getBall, getPokemonConfig, getSafariConfig, hasPersonalPrice } from "./config.js";
 import { getCharmItem, getItem, sortByCatalogue } from "./items.js";
 import {
   RARITIES,
@@ -172,6 +172,10 @@ export function buildSpawnEmbed(spawn, species, throws = [], announcement = null
 // Master Ball) — partie entre-temps, depuis le site par exemple, le lancer est
 // refusé au lieu d'être payé en silence. L'annonce, la même pour tous, garde
 // les prix ; `prices: false` les tait quand le sac n'a pas pu être lu.
+//
+// Une ball au prix personnel (la Master Ball, qui renchérit à chaque achat) n'en
+// affiche jamais : celui du bouton serait faux pour tous sauf pour qui n'en a
+// pas encore acheté. Sa confirmation donne le vrai.
 export function buildBallRow(
   spawnId,
   { disabled = false, panel = false, stock = null, prices = true } = {}
@@ -186,7 +190,7 @@ export function buildBallRow(
       : `${panel ? "poke_rethrow" : "poke_throw"}|${spawnId}|${key}${held ? "|item" : ""}`;
     const label = held
       ? `${ball.label} (offerte ×${held.toLocaleString("fr-FR")})`
-      : prices
+      : prices && !hasPersonalPrice(ball)
         ? `${ball.label} (${ball.price.toLocaleString("fr-FR")})`
         : ball.label;
     row.addComponents(

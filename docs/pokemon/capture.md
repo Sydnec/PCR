@@ -38,6 +38,15 @@
   (`capture.minCatchRate`, 10) : on ne peut pas affaiblir un Pokémon avant de lancer, et les
   légendaires à taux 3 n'auraient jamais été attrapés. Le plancher vaut partout — lancers,
   probabilités affichées, parc safari — et ne touche que les taux plus bas que lui.
+- **La Master Ball renchérit à chaque achat** : `price` est celui de la première, puis chaque Master
+  Ball payée en points coûte `priceGrowth` fois la précédente (×1,2 : 10 000, 12 000, 14 400… avec le
+  prix par défaut). Le compte est **propre à chaque dresseur** et ne redescend jamais. Les Master
+  Balls offertes ne le font pas avancer, ni un lancer remboursé (battu à la milliseconde) : le
+  compte se lit dans le journal des lancers, ce qu'un dresseur a réellement payé. `priceGrowth` à
+  1 rend le prix fixe. Le bouton du salon ne montre donc pas de prix — il serait faux pour presque
+  tous — : c'est la **confirmation** qui dit le tien, et son bouton le porte (`poke_master_ok`) :
+  si ton prix a monté entre-temps (un achat depuis le site), le lancer est refusé sans rien
+  débiter, avec le nouveau prix.
 - **Shiny** (~1/500) : une variante de l'espèce, pas une entrée de Pokédex à part. Le Pokédex dit
   combien on en a.
 - **Le sexe se voit dès l'apparition** : l'annonce le montre (« Un Pikachu ♀ sauvage apparaît ! »),

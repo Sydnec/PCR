@@ -131,7 +131,7 @@ ou par un groupe `{ "speciesId": 25, "isShiny": false, "sex": "F" }` — les deu
 | `POST /api/me/sell-item` | `{ key, quantity? }` (1 par défaut) | `{ sold, unit, points }` — comme `/pk revendre objet` : `409` pour un objet qui ne se revend pas ou qu'on n'a pas en assez d'exemplaires |
 | `POST /api/me/evolve` | Pokémon (celui qui évolue, avec `speciesId` son espèce attendue : refus s'il a déjà évolué), `targetId?`, `helper?` (clé d'un objet, ou `metamorph`), `confirmLocked?` (obligatoire pour un verrouillé, sinon 409) | `{ pokemon, sacrificesSpent, dittosSpent, shiniesSacrificed, pointsSpent, helper }` — `pokemon` est le même individu, sous sa nouvelle forme |
 | `POST /api/me/eggs` | `{ parent1, parent2 }` | `{ egg }` |
-| `POST /api/spawn/throw` | `{ spawnId, ball, requireItem? }` | `{ status, message, final, remaining, pokemon }` — `pokemon.shiny` : ce qui a rejoint la boîte, Charme Chroma compris |
+| `POST /api/spawn/throw` | `{ spawnId, ball, requireItem?, expectedPrice? }` | `{ status, message, final, remaining, pokemon }` — `pokemon.shiny` : ce qui a rejoint la boîte, Charme Chroma compris |
 | `POST /api/drops/:id/claim` | `{}` | `{ item }` — `409` si quelqu'un a été plus rapide, `403` pour le capteur du Pokémon qui l'a lâché |
 | `POST /api/safari/enter` | `{ parkId, generations? }` | `{ resumed, visit }` — entrée gratuite dans un parc ouvert. `generations` : les générations visées (entiers) ; les fermées sont ignorées, et sans elle, ou sans aucune valable, toutes |
 | `POST /api/safari/buy` | `{ generations? }` | `{ resumed, ticket, visit }` — entrée payante, au ticket d'abord |
@@ -146,9 +146,13 @@ ou par un groupe `{ "speciesId": 25, "isShiny": false, "sex": "F" }` — les deu
 
 Un lancer répond toujours `200` : un raté ou un « trop tard » sont des issues du jeu, pas des
 erreurs. `status` vaut `miss`, `catch`, `void` (battu, remboursé), `gone`, `cooldown`,
-`insufficient`, `no-item`, `unknown-ball` ou `error`. `message` est la phrase du panneau Discord,
+`insufficient`, `no-item`, `price-changed`, `unknown-ball` ou `error`. `message` est la phrase du panneau Discord,
 et `final` dit qu'il n'y a plus rien à relancer. `requireItem` interdit de payer en points : c'est
-la promesse d'une Master Ball annoncée offerte.
+la promesse d'une Master Ball annoncée offerte. `expectedPrice` (entier ≥ 0) est celle d'une ball
+payée : le prix affiché à la confirmation. Si le prix du dresseur a monté depuis — la Master Ball
+renchérit à chaque achat —, le lancer répond `price-changed` sans rien débiter. Le `price` des balls
+d'une apparition (`GET /api/spawn`) est celui du visiteur, et `GET /api/rules` donne `priceGrowth`
+(`null` pour une ball au prix fixe).
 
 Une action du parc avec un jeton périmé (déjà jouée, ici ou sur Discord) répond `409` sans rien
 consommer. `outcome` vaut `CATCH`, `MISS`, `MISS_FLED`, `BAIT`, `BAIT_FLED`, `FLED` ou

@@ -56,9 +56,10 @@ par terre plutôt que de le faire disparaître.
   doit pas dormir pendant qu'on prend la monnaie de son propriétaire. Le panneau de lancer, privé,
   l'annonce *Poké Ball (offerte ×2)*, et ce bouton-là ne prend jamais de points : si la ball est
   partie entre-temps (lancée depuis le site), le lancer est refusé sans rien débiter. L'annonce
-  publique, la même pour tous, garde le prix. La Master Ball garde sa
-  confirmation — elle ne coûte rien mais ne se retrouve pas. Le Ticket Safari suit la même règle
-  dans `/pk safari`, et il ignore le délai de 12 h : ce délai borne ce qu'on peut s'**acheter**.
+  publique, la même pour tous, garde les prix — sauf la Master Ball, dont le prix est personnel : il
+  est dans sa confirmation, et une Master Ball offerte s'y confirme aussi : elle ne coûte rien mais
+  ne se retrouve pas. Le Ticket Safari suit la même règle dans `/pk safari`, et il ignore le délai
+  de 12 h : ce délai borne ce qu'on peut s'**acheter**.
 - **Une ball offerte se rend en ball.** Battu à la milliseconde sur un Pokémon, on récupère l'objet,
   jamais sa valeur en points : la convertir en monnaie ferait d'un Pokémon disputé une petite
   imprimerie. Le lancer est alors journalisé à coût nul, ce qui garde honnête le total des points
