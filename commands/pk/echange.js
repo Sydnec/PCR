@@ -1,14 +1,18 @@
 import { MessageFlags } from "discord.js";
 import { handleException } from "../../modules/utils.js";
+import { getBalance } from "../../modules/economy.js";
 import {
   countBySpecies,
-  countGroup,
   getIndividuals,
   proposeTrade,
   resolveIndividual,
+  resolveSpecies,
+  selectorOf,
   setTradeMessage,
+  tradeCandidate,
 } from "../../modules/pokemon/collection.js";
 import { getSpecies, tradeEvolutionTarget } from "../../modules/pokemon/data.js";
+import { getInventory, getItem, getItemCount, isTradable } from "../../modules/pokemon/items.js";
 import {
   buildTradeEmbed,
   buildTradeRow,
@@ -17,13 +21,8 @@ import {
   respondHint as hint,
 } from "../../modules/pokemon/embeds.js";
 
-// Il reste toujours au moins un Pokémon de chaque espèce : on ne peut céder
-// que ce qu'on a en plus. acceptTrade tient la règle ; ce chiffre ne sert qu'à
-// ne proposer et n'accepter que des échanges qui ont une chance d'aboutir.
-const spareIn = (userId, group) =>
-  new Promise((resolve, reject) =>
-    countGroup(userId, group, (err, { spare }) => (err ? reject(err) : resolve(spare)))
-  );
+const promisify = (fn, ...args) =>
+  new Promise((resolve, reject) => fn(...args, (err, value) => (err ? reject(err) : resolve(value))));
 
 // Premier temps : les espèces dont `userId` a des Pokémon en trop, shiny ou
 // non — jamais le dernier de l'espèce, jamais un verrouillé.
@@ -60,13 +59,15 @@ function respondWithSpecies(interaction, userId, query, emptyLabel) {
   });
 }
 
-// Second temps : les individus de l'espèce choisie dans `speciesOption`,
-// jamais le dernier de l'espèce ni un verrouillé. Qui reçoit sait ainsi exactement quel
-// Pokémon il aura : sexe, variante, fertilité, ball.
-function respondWithIndividuals(interaction, userId, speciesOption, query) {
-  const species = getSpecies(Number(interaction.options.get(speciesOption)?.value));
+// Second temps, pour ce qu'on donne : les individus de l'espèce choisie dans
+// `je_donne`, jamais le dernier de l'espèce ni un verrouillé. Qui reçoit sait ainsi
+// exactement quel Pokémon il aura : sexe, variante, fertilité, ball. Ce qu'on
+// demande ne se choisit pas ici : c'est le destinataire qui désigne le sien en
+// acceptant.
+function respondWithIndividuals(interaction, userId, query) {
+  const species = getSpecies(Number(interaction.options.get("je_donne")?.value));
   if (!species) {
-    return hint(interaction, `⚠️ Choisis d'abord l'espèce dans l'option « ${speciesOption} »`);
+    return hint(interaction, "⚠️ Choisis d'abord l'espèce dans l'option « je_donne »");
   }
   getIndividuals(userId, (err, rows) => {
     if (err) {
@@ -85,11 +86,149 @@ function respondWithIndividuals(interaction, userId, speciesOption, query) {
   });
 }
 
+// Les objets de `userId` qui s'échangent, filtrés sur le libellé. Tous le sont,
+// sauf les charmes (isTradable).
+function respondWithItems(interaction, userId, query, emptyLabel) {
+  getInventory(userId, (err, rows) => {
+    if (err) {
+      handleException("Autocomplétion d'échange :", err);
+      return interaction.respond([]).catch(() => {});
+    }
+    const needle = query.toLowerCase();
+    const choices = rows
+      .map((row) => ({ row, item: getItem(row.item_key) }))
+      .filter(({ item }) => item && isTradable(item))
+      .map(({ row, item }) => ({
+        // Pas d'emoji : ceux du serveur ne se rendent pas dans une proposition.
+        name: `${item.label} ×${row.count.toLocaleString("fr-FR")}`,
+        value: item.key,
+      }))
+      .filter((choice) => choice.name.toLowerCase().includes(needle))
+      .slice(0, 25);
+    if (!choices.length) return hint(interaction, emptyLabel);
+    interaction.respond(choices).catch(() => {});
+  });
+}
+
+// Les trois façons de remplir un côté de l'offre : un Pokémon (l'espèce, et pour
+// ce qu'on donne l'individu), des points, ou un objet. Chaque côté en veut une
+// seule : aucune évolution ne demande à la fois un échange et un objet, il n'y a
+// donc rien à gagner à les mélanger. Zéro point est un côté valide : c'est ainsi
+// qu'on fait un cadeau.
+const OPTIONS = {
+  give: { species: "je_donne", individual: "mon_individu", points: "mes_points", item: "mon_objet", quantity: "mon_objet_quantite" },
+  get: { species: "je_recois", individual: null, points: "ses_points", item: "son_objet", quantity: "son_objet_quantite" },
+};
+
+// Un côté lu dans les options : `{ side }`, ou `{ error }` rédigé pour celui qui a
+// tapé la commande. `owner` est le dresseur chez qui le côté se retire, `own` dit
+// si c'est celui qui propose : « tu » ou « <@id> ». Chaque valeur s'est
+// peut-être tapée à la main ou a vieilli depuis l'autocomplétion : tout se relit.
+async function readSide(interaction, names, owner, own) {
+  const who = own ? "Tu" : `<@${owner}>`;
+  const species = interaction.options.getString(names.species);
+  const individual = names.individual ? interaction.options.getString(names.individual) : null;
+  const amount = interaction.options.getInteger(names.points);
+  const key = interaction.options.getString(names.item);
+  const filled = [species, amount, key].filter((value) => value !== null && value !== undefined);
+
+  if (filled.length === 0) {
+    return {
+      error:
+        `Dis ${own ? "ce que tu donnes" : "ce que tu demandes"} : un Pokémon ` +
+        `(\`${names.species}\`), des points (\`${names.points}\`) ou un objet ` +
+        `(\`${names.item}\`). \`${names.points}: 0\` pour ne rien ${own ? "donner" : "demander"}.`,
+    };
+  }
+  if (filled.length > 1) {
+    return {
+      error:
+        `Un seul à la fois ${own ? "de ton côté" : "de son côté"} : un Pokémon, des points ` +
+        `ou un objet — pas un mélange.`,
+    };
+  }
+  // Une option qui ne va pas avec le côté choisi est refusée, pas ignorée : on
+  // publierait une offre différente de celle qu'on croit avoir tapée.
+  if (individual && (amount !== null || key !== null)) {
+    return { error: `\`${names.individual}\` ne va qu'avec un Pokémon (\`${names.species}\`).` };
+  }
+  if (interaction.options.getInteger(names.quantity) !== null && key === null) {
+    return { error: `\`${names.quantity}\` ne va qu'avec un objet (\`${names.item}\`).` };
+  }
+
+  if (amount !== null && amount !== undefined) {
+    if (!Number.isInteger(amount) || amount < 0) return { error: "Un montant de points ne peut pas être négatif." };
+    const balance = await promisify(getBalance, owner);
+    if (amount > balance) {
+      return {
+        error:
+          `${who} ${own ? "n'as" : "n'a"} que **${balance.toLocaleString("fr-FR")}** points : ` +
+          `${own ? "il t'en faut" : "il lui en faut"} **${amount.toLocaleString("fr-FR")}**.`,
+      };
+    }
+    return { side: { points: amount } };
+  }
+
+  if (key !== null && key !== undefined) {
+    const item = getItem(key);
+    if (!item) return { error: "Objet inconnu : choisis-le dans la liste d'autocomplétion." };
+    if (!isTradable(item)) {
+      return { error: `**${item.label}** ne s'échange pas : un charme se gagne, il ne se transmet pas.` };
+    }
+    const quantity = interaction.options.getInteger(names.quantity) ?? 1;
+    if (!Number.isInteger(quantity) || quantity < 1) return { error: "La quantité doit être d'au moins 1." };
+    const held = await promisify(getItemCount, owner, key);
+    if (quantity > held) {
+      return {
+        error:
+          `${who} ${own ? "n'as" : "n'a"} que **${held.toLocaleString("fr-FR")}** ${item.label} : ` +
+          `${own ? "il t'en faut" : "il lui en faut"} **${quantity.toLocaleString("fr-FR")}**.`,
+      };
+    }
+    return { side: { item: key, quantity } };
+  }
+
+  // Un Pokémon. Celui qu'on donne se désigne (mon_individu), faute de quoi c'est le
+  // moins précieux, le plus récent à égalité (tradeCandidate) ; celui qu'on demande
+  // se choisit chez le destinataire, en acceptant : il faut seulement qu'il en ait un
+  // libre.
+  const { species: found, error } = resolveSpecies(species);
+  if (error) return { error };
+  if (own && individual) {
+    const selector = await promisify(resolveIndividual, owner, species, individual);
+    if (selector.error) return { error: selector.error };
+    if (selector.row.locked) {
+      return {
+        error:
+          `**${describeGroup(found, selector)}** est verrouillé 🛡️ : déverrouille-le avec ` +
+          `/pk verrou pour l'échanger.`,
+      };
+    }
+    if (selector.row.last) {
+      return {
+        error:
+          `**${describeGroup(found, selector)}** est ton dernier ${found.name} : il reste ` +
+          `toujours au moins un Pokémon de chaque espèce.`,
+      };
+    }
+    return { side: selector };
+  }
+  const candidate = await promisify(tradeCandidate, owner, found.id);
+  if (!candidate) {
+    return {
+      error:
+        `${who} ${own ? "n'as" : "n'a"} aucun ${found.name} à donner : ` +
+        `ils sont verrouillés, ou il ${own ? "ne t'en reste" : "ne lui en reste"} qu'un.`,
+    };
+  }
+  return { side: own ? selectorOf(candidate) : { speciesId: found.id } };
+}
+
 export default {
   describe: (sub) =>
     sub
       .setName("echange")
-      .setDescription("Propose un échange de Pokémon à un autre dresseur")
+      .setDescription("Propose un échange : Pokémon, points ou objets, de chaque côté")
       .addUserOption((option) =>
         option
           .setName("membre")
@@ -100,29 +239,64 @@ export default {
         option
           .setName("je_donne")
           .setDescription("L'espèce que tu proposes")
-          .setRequired(true)
+          .setRequired(false)
           .setAutocomplete(true)
       )
       .addStringOption((option) =>
         option
           .setName("mon_individu")
-          .setDescription("Le Pokémon précis que tu proposes")
-          .setRequired(true)
+          .setDescription("Le Pokémon précis que tu proposes (par défaut, le moins précieux)")
+          .setRequired(false)
           .setAutocomplete(true)
+      )
+      .addIntegerOption((option) =>
+        option
+          .setName("mes_points")
+          .setDescription("Des points que tu proposes (0 pour ne rien donner)")
+          .setRequired(false)
+          .setMinValue(0)
+      )
+      .addStringOption((option) =>
+        option
+          .setName("mon_objet")
+          .setDescription("Un objet que tu proposes")
+          .setRequired(false)
+          .setAutocomplete(true)
+      )
+      .addIntegerOption((option) =>
+        option
+          .setName("mon_objet_quantite")
+          .setDescription("Combien d'exemplaires de l'objet (1 par défaut)")
+          .setRequired(false)
+          .setMinValue(1)
       )
       .addStringOption((option) =>
         option
           .setName("je_recois")
-          .setDescription("L'espèce que tu demandes")
-          .setRequired(true)
+          .setDescription("L'espèce que tu demandes : le dresseur choisit lequel")
+          .setRequired(false)
           .setAutocomplete(true)
+      )
+      .addIntegerOption((option) =>
+        option
+          .setName("ses_points")
+          .setDescription("Des points que tu demandes (0 pour ne rien demander)")
+          .setRequired(false)
+          .setMinValue(0)
       )
       .addStringOption((option) =>
         option
-          .setName("son_individu")
-          .setDescription("Le Pokémon précis que tu demandes")
-          .setRequired(true)
+          .setName("son_objet")
+          .setDescription("Un objet que tu demandes")
+          .setRequired(false)
           .setAutocomplete(true)
+      )
+      .addIntegerOption((option) =>
+        option
+          .setName("son_objet_quantite")
+          .setDescription("Combien d'exemplaires de l'objet (1 par défaut)")
+          .setRequired(false)
+          .setMinValue(1)
       ),
 
   async autocomplete(interaction) {
@@ -137,7 +311,10 @@ export default {
       );
     }
     if (focused.name === "mon_individu") {
-      return respondWithIndividuals(interaction, interaction.user.id, "je_donne", query);
+      return respondWithIndividuals(interaction, interaction.user.id, query);
+    }
+    if (focused.name === "mon_objet") {
+      return respondWithItems(interaction, interaction.user.id, query, "Tu n'as aucun objet à échanger");
     }
 
     // Les autres options sont déjà lisibles pendant l'autocomplétion : on peut
@@ -159,111 +336,34 @@ export default {
         "Ce dresseur n'a rien à échanger"
       );
     }
-    return respondWithIndividuals(interaction, String(targetId), "je_recois", query);
+    if (focused.name === "son_objet") {
+      return respondWithItems(interaction, String(targetId), query, "Ce dresseur n'a aucun objet à échanger");
+    }
+    return interaction.respond([]).catch(() => {});
   },
 
   async execute(interaction) {
     try {
       const target = interaction.options.getUser("membre");
-      // Chaque côté est un individu précis, qui se résout chez son propriétaire
-      // — le sien pour ce qu'on donne, celui du destinataire pour ce qu'on
-      // demande — et doit être de l'espèce choisie juste avant.
-      const resolve = (ownerId, speciesOption, individualOption) =>
-        new Promise((ok, fail) =>
-          resolveIndividual(
-            ownerId,
-            interaction.options.getString(speciesOption),
-            interaction.options.getString(individualOption),
-            (err, selector) => (err ? fail(err) : ok(selector))
-          )
-        );
+      const refuse = (content) =>
+        interaction.reply({ content: `❌ ${content}`, flags: MessageFlags.Ephemeral });
+
+      if (target.id === interaction.user.id) return refuse("Tu ne peux pas échanger avec toi-même.");
+      if (target.bot) return refuse("Les bots ne collectionnent pas les Pokémon.");
+
       let offer, request;
       try {
         [offer, request] = await Promise.all([
-          resolve(interaction.user.id, "je_donne", "mon_individu"),
-          resolve(target.id, "je_recois", "son_individu"),
+          readSide(interaction, OPTIONS.give, interaction.user.id, true),
+          readSide(interaction, OPTIONS.get, target.id, false),
         ]);
       } catch (err) {
-        handleException("Lecture des Pokémon pour /pk echange :", err);
-        return interaction.reply({
-          content: "❌ Erreur base de données.",
-          flags: MessageFlags.Ephemeral,
-        });
+        handleException("Lecture des côtés pour /pk echange :", err);
+        return refuse("Erreur base de données.");
       }
-      const refus = offer.error ?? request.error;
-      if (refus) {
-        return interaction.reply({ content: `❌ ${refus}`, flags: MessageFlags.Ephemeral });
-      }
-
-      if (target.id === interaction.user.id) {
-        return interaction.reply({
-          content: "❌ Tu ne peux pas échanger avec toi-même.",
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-      if (target.bot) {
-        return interaction.reply({
-          content: "❌ Les bots ne collectionnent pas les Pokémon.",
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-      const offered = getSpecies(offer.speciesId);
-      const requested = getSpecies(request.speciesId);
-      if (!offered || !requested) {
-        return interaction.reply({
-          content:
-            "❌ Pokémon inconnu : choisis une proposition dans la liste d'autocomplétion.",
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-
-      // Une valeur tapée à la main contourne l'autocomplétion : sans ces
-      // contrôles, on publierait une offre qu'acceptTrade refuserait au clic.
-      // Le refus reste privé, avant que la proposition n'existe.
-      if (offer.row.locked) {
-        return interaction.reply({
-          content:
-            `❌ **${describeGroup(offered, offer)}** est verrouillé 🛡️ : déverrouille-le avec ` +
-            `/pk verrou pour l'échanger.`,
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-      if (request.row.locked) {
-        return interaction.reply({
-          content:
-            `❌ **${describeGroup(requested, request)}** est verrouillé 🛡️ chez ` +
-            `<@${target.id}> : il ne s'échange pas.`,
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-      let offerSpare, requestSpare;
-      try {
-        [offerSpare, requestSpare] = await Promise.all([
-          spareIn(interaction.user.id, offer),
-          spareIn(target.id, request),
-        ]);
-      } catch (err) {
-        handleException("Lecture des collections pour /pk echange :", err);
-        return interaction.reply({
-          content: "❌ Erreur base de données.",
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-      if (offerSpare === 0) {
-        return interaction.reply({
-          content:
-            `❌ **${describeGroup(offered, offer)}** est ton dernier ${offered.name} : il reste ` +
-            `toujours au moins un Pokémon de chaque espèce.`,
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-      if (requestSpare === 0) {
-        return interaction.reply({
-          content:
-            `❌ **${describeGroup(requested, request)}** est le dernier ${requested.name} de ` +
-            `<@${target.id}> : il lui en reste toujours un.`,
-          flags: MessageFlags.Ephemeral,
-        });
+      if (offer.error || request.error) return refuse(offer.error ?? request.error);
+      if (offer.side.points === 0 && request.side.points === 0) {
+        return refuse("Rien à échanger : les deux côtés sont à 0 point.");
       }
 
       await interaction.deferReply();
@@ -276,8 +376,8 @@ export default {
         {
           fromUserId: interaction.user.id,
           toUserId: target.id,
-          offer,
-          request,
+          offer: offer.side,
+          request: request.side,
           channelId: interaction.channelId,
         },
         async (err, trade) => {

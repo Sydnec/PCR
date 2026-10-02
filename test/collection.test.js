@@ -556,6 +556,301 @@ describe("échanger (createTrade / acceptTrade)", () => {
   });
 });
 
+describe("échanger des points, des objets, ou un Pokémon que le destinataire choisit", () => {
+  const roucool = () => ({ speciesId: species("Roucool").id });
+  const setBalance = (user, balance) =>
+    dbRun(
+      points,
+      "INSERT INTO points (user_id, balance) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET balance = ?",
+      [user, balance, balance]
+    );
+  const balance = async (user) =>
+    (await dbGet(points, "SELECT balance FROM points WHERE user_id = ?", [user]))?.balance ?? 0;
+  const setItem = (user, key, count) =>
+    dbRun(
+      points,
+      "INSERT INTO pokemon_inventory (user_id, item_key, count) VALUES (?, ?, ?) ON CONFLICT(user_id, item_key) DO UPDATE SET count = ?",
+      [user, key, count, count]
+    );
+  const itemCount = async (user, key) =>
+    (
+      await dbGet(
+        points,
+        "SELECT count FROM pokemon_inventory WHERE user_id = ? AND item_key = ?",
+        [user, key]
+      )
+    )?.count ?? 0;
+  const propose = (offer, request) =>
+    call(collection.proposeTrade, {
+      fromUserId: "u1",
+      toUserId: "u2",
+      offer,
+      request,
+      channelId: "salon",
+    });
+  const accept = (trade, options) => call(collection.acceptTrade, trade.id, options ?? {});
+  const status = async (trade) =>
+    (await dbGet(points, "SELECT status FROM pokemon_trades WHERE id = ?", [trade.id])).status;
+  const snapshot = async () => [
+    await owned("u1"),
+    await owned("u2"),
+    await balance("u1"),
+    await balance("u2"),
+    await itemCount("u1", "super_bonbon"),
+    await itemCount("u2", "super_bonbon"),
+  ];
+
+  it("une offre de points contre un Pokémon : le destinataire choisit lequel, même un shiny", async () => {
+    await setBalance("u1", 1000);
+    const [plain, shiny] = [
+      await give("Roucool", { user: "u2", obtained: 1 }),
+      await give("Roucool", { user: "u2", shiny: 1, obtained: 2 }),
+    ];
+    await give("Roucool", { user: "u2", obtained: 3 });
+    const trade = await propose({ points: 400 }, roucool());
+    assert.equal(trade.offer_points, 400);
+    assert.equal(trade.offer_species_id, 0, "pas de Pokémon de ce côté");
+    assert.equal(trade.request_pokemon_id, null, "l'individu se choisit en acceptant");
+
+    const result = await accept(trade, { requestPokemonId: shiny });
+    assert.equal(result.ok, true, result.reason);
+    assert.equal(await balance("u1"), 600);
+    assert.equal(await balance("u2"), 400);
+    assert.ok(
+      (await owned("u1")).some((row) => row.id === shiny),
+      "le shiny choisi est parti chez u1"
+    );
+    assert.ok(
+      (await owned("u2")).some((row) => row.id === plain),
+      "les autres restent"
+    );
+  });
+
+  it("sans choix du destinataire, l'individu est le moins précieux, et le plus récent à égalité", async () => {
+    await setBalance("u1", 100);
+    await give("Roucool", { user: "u2", obtained: 1 });
+    await give("Roucool", { user: "u2", obtained: 5 });
+    const newest = await give("Roucool", { user: "u2", obtained: 9 });
+    const result = await accept(await propose({ points: 100 }, roucool()));
+    assert.equal(result.ok, true, result.reason);
+    assert.ok((await owned("u1")).some((row) => row.id === newest));
+  });
+
+  it("un individu choisi qui n'est pas au destinataire, pas de l'espèce, ou verrouillé fait échouer l'offre, rien ne bouge", async () => {
+    await setBalance("u1", 500);
+    await giveMany("Roucool", 2, { user: "u2" });
+    const foreign = await give("Roucool", { user: "u3" });
+    const wrongSpecies = await give("Rattata", { user: "u2" });
+    await give("Rattata", { user: "u2", obtained: 2 });
+    const [locked] = await giveMany("Roucool", 2, { user: "u2", locked: 1 });
+    for (const requestPokemonId of [foreign, wrongSpecies, locked]) {
+      const before = await snapshot();
+      const trade = await propose({ points: 500 }, roucool());
+      const result = await accept(trade, { requestPokemonId });
+      assert.equal(result.ok, false);
+      assert.match(result.reason, /Le Pokémon demandé n'est plus disponible/);
+      assert.equal(await status(trade), "FAILED");
+      assert.deepEqual(
+        await snapshot(),
+        before,
+        "les points rendus à l'initiateur, aucun Pokémon déplacé"
+      );
+    }
+  });
+
+  it("un Pokémon contre des points, et un cadeau à zéro point sans ligne de solde", async () => {
+    const [mine] = await giveMany("Rattata", 2);
+    await setBalance("u2", 300);
+    const sale = await propose(
+      collection.selectorOf((await owned("u1")).find((row) => row.id === mine)),
+      { points: 300 }
+    );
+    assert.equal(sale.request_points, 300);
+    assert.equal((await accept(sale)).ok, true);
+    assert.equal(await balance("u1"), 300);
+    assert.equal(await balance("u2"), 0);
+    assert.ok((await owned("u2")).some((row) => row.id === mine));
+
+    await dbRun(points, "DELETE FROM points");
+    const [gift] = await giveMany("Rattata", 2);
+    const free = await propose(
+      collection.selectorOf((await owned("u1")).find((row) => row.id === gift)),
+      { points: 0 }
+    );
+    const result = await accept(free);
+    assert.equal(result.ok, true, result.reason);
+    assert.ok(
+      (await owned("u2")).some((row) => row.id === gift),
+      "offert sans rien demander"
+    );
+  });
+
+  it("des objets contre des points, et contre un Pokémon", async () => {
+    await setItem("u1", "super_bonbon", 5);
+    await setBalance("u2", 900);
+    const sale = await propose({ item: "super_bonbon", quantity: 3 }, { points: 900 });
+    assert.equal(sale.offer_item, "super_bonbon");
+    assert.equal(sale.offer_item_qty, 3);
+    assert.equal((await accept(sale)).ok, true);
+    assert.deepEqual(
+      [await itemCount("u1", "super_bonbon"), await itemCount("u2", "super_bonbon")],
+      [2, 3]
+    );
+    assert.deepEqual([await balance("u1"), await balance("u2")], [900, 0]);
+
+    const [mine] = await giveMany("Rattata", 2);
+    await setItem("u2", "super_bonbon", 3);
+    const swap = await propose(
+      collection.selectorOf((await owned("u1")).find((row) => row.id === mine)),
+      { item: "super_bonbon", quantity: 3 }
+    );
+    assert.equal((await accept(swap)).ok, true);
+    assert.deepEqual(
+      [await itemCount("u1", "super_bonbon"), await itemCount("u2", "super_bonbon")],
+      [5, 0]
+    );
+    assert.ok((await owned("u2")).some((row) => row.id === mine));
+  });
+
+  it("des points qui manquent : le refus donne les chiffres, l'offre échoue et rien ne bouge", async () => {
+    await setBalance("u1", 50);
+    await giveMany("Roucool", 2, { user: "u2" });
+    const before = await snapshot();
+    const mine = await propose({ points: 200 }, roucool());
+    const result = await accept(mine);
+    assert.equal(result.ok, false);
+    assert.match(result.reason, /n'a plus assez de points : il en a 50, il en faut 200/);
+    assert.equal(await status(mine), "FAILED");
+    assert.deepEqual(await snapshot(), before);
+
+    await setBalance("u1", 500);
+    await setBalance("u2", 10);
+    const theirs = await propose({ points: 1 }, { points: 1500 });
+    const refused = await accept(theirs);
+    assert.match(refused.reason, /Tu n'as plus assez de points : tu en as 10, il en faut 1\s?500/);
+    assert.equal(await balance("u1"), 500, "l'initiateur retrouve ses points");
+    assert.equal(await balance("u2"), 10);
+  });
+
+  it("un objet qui manque au destinataire rend à l'initiateur ce qu'on lui avait retiré", async () => {
+    await setBalance("u1", 400);
+    await setItem("u2", "super_bonbon", 1);
+    const trade = await propose({ points: 400 }, { item: "super_bonbon", quantity: 2 });
+    const result = await accept(trade);
+    assert.equal(result.ok, false);
+    assert.match(result.reason, /Tu n'as plus assez de Super Bonbon : tu en as 1, il en faut 2/);
+    assert.equal(await balance("u1"), 400);
+    assert.equal(await itemCount("u2", "super_bonbon"), 1);
+    assert.equal(await status(trade), "FAILED");
+  });
+
+  it("une livraison qui échoue reprend ce qui a été livré et rend à chacun le sien", async () => {
+    await setBalance("u1", 700);
+    await setItem("u2", "super_bonbon", 3);
+    const before = await snapshot();
+    const trade = await propose({ points: 700 }, { item: "super_bonbon", quantity: 3 });
+    // L'initiateur n'a pas encore de ligne d'inventaire : son crédit est un INSERT.
+    await dbRun(
+      points,
+      "CREATE TRIGGER panne BEFORE INSERT ON pokemon_inventory WHEN NEW.user_id = 'u1' BEGIN SELECT RAISE(ABORT, 'panne'); END"
+    );
+    await assert.rejects(() => accept(trade), /panne/);
+    await dbRun(points, "DROP TRIGGER panne");
+    assert.deepEqual(
+      await snapshot(),
+      before,
+      "les points livrés à u2 sont repris, ceux de u1 rendus, l'objet de u2 aussi"
+    );
+    assert.equal(await status(trade), "PENDING", "tout est remis en place : l'offre se rouvre, le destinataire peut réessayer");
+    assert.equal((await accept(trade)).ok, true, "la panne passée, la même offre aboutit");
+  });
+
+  it("ce qui a été livré et ne se reprend plus n'est pas rendu deux fois : rien ne se crée", async () => {
+    await setBalance("u1", 700);
+    await setItem("u2", "super_bonbon", 3);
+    const trade = await propose({ points: 700 }, { item: "super_bonbon", quantity: 3 });
+    // La livraison à u1 échoue, et u2 a déjà dépensé les points qu'on venait de lui verser.
+    await dbRun(points, "CREATE TRIGGER panne BEFORE INSERT ON pokemon_inventory WHEN NEW.user_id = 'u1' BEGIN SELECT RAISE(ABORT, 'panne'); END");
+    await dbRun(points, "CREATE TRIGGER depense AFTER INSERT ON points WHEN NEW.user_id = 'u2' BEGIN UPDATE points SET balance = 0 WHERE user_id = 'u2'; END");
+    await assert.rejects(() => accept(trade), /panne/);
+    await dbRun(points, "DROP TRIGGER panne");
+    await dbRun(points, "DROP TRIGGER depense");
+    assert.equal(await balance("u1"), 0, "les 700 points de u1 ne lui sont pas rendus : u2 les a dépensés");
+    assert.equal(await balance("u2"), 0);
+    assert.equal(await itemCount("u2", "super_bonbon"), 3, "u2 retrouve ce qu'il donnait");
+    assert.equal(await status(trade), "FAILED", "l'état est à examiner : l'offre reste fermée");
+  });
+
+  it("une offre expirée ou déjà traitée le dit sans que ce soit un manque : `stale`", async () => {
+    await setBalance("u1", 10);
+    const expired = await propose({ points: 10 }, { points: 0 });
+    await dbRun(points, "UPDATE pokemon_trades SET expires_at = ? WHERE id = ?", [Date.now() - 1, expired.id]);
+    const result = await accept(expired);
+    assert.deepEqual([result.ok, result.stale], [false, true]);
+    const short = await propose({ points: 999 }, { points: 0 });
+    const missing = await accept(short);
+    assert.deepEqual([missing.ok, missing.stale], [false, undefined], "un vrai manque n'est pas `stale`");
+  });
+
+  it("une offre mal formée est refusée à la création : montant négatif, objet inconnu, quantité nulle, côté vide", async () => {
+    const [mine] = await giveMany("Rattata", 2);
+    const pokemon = collection.selectorOf((await owned("u1")).find((row) => row.id === mine));
+    await assert.rejects(
+      () => propose({ points: -1 }, roucool()),
+      /Côté d'échange invalide|Montant invalide/
+    );
+    await assert.rejects(() => propose(pokemon, { item: "inconnu", quantity: 1 }), /Objet inconnu/);
+    await assert.rejects(
+      () => propose(pokemon, { item: "super_bonbon", quantity: 0 }),
+      /Quantité invalide/
+    );
+    await assert.rejects(() => propose(pokemon, {}), /Côté d'échange invalide/);
+    assert.equal(
+      (await dbAll(points, "SELECT id FROM pokemon_trades")).length,
+      0,
+      "rien n'est créé"
+    );
+  });
+
+  it("un charme ne s'échange pas : il se gagne, et un échange le dupliquerait", async () => {
+    const [mine] = await giveMany("Rattata", 2);
+    const pokemon = collection.selectorOf((await owned("u1")).find((row) => row.id === mine));
+    await assert.rejects(
+      () => propose(pokemon, { item: "charme_chroma_1", quantity: 1 }),
+      /intransmissible/
+    );
+  });
+
+  it("avec `unique`, deux offres de points identiques se retiennent, deux montants différents non", async () => {
+    const args = {
+      fromUserId: "u1",
+      toUserId: "u2",
+      offer: { points: 10 },
+      request: roucool(),
+      channelId: "salon",
+      unique: true,
+    };
+    const first = await call(collection.proposeTrade, args);
+    const again = await new Promise((resolve) =>
+      collection.proposeTrade(args, (err, trade, info) => resolve({ err, trade, info }))
+    );
+    assert.deepEqual([again.err, again.trade, again.info], [null, null, { duplicate: true }]);
+    const other = await call(collection.proposeTrade, { ...args, offer: { points: 11 } });
+    assert.equal(other.status, "PENDING");
+    assert.notEqual(other.id, first.id);
+    const item = await call(collection.proposeTrade, {
+      ...args,
+      offer: { item: "super_bonbon", quantity: 1 },
+    });
+    const item2 = await call(collection.proposeTrade, {
+      ...args,
+      offer: { item: "super_bonbon", quantity: 2 },
+    });
+    assert.equal(item.status, "PENDING");
+    assert.equal(item2.status, "PENDING");
+  });
+});
+
 describe("les échanges possibles entre deux dresseurs (tradeMatches)", () => {
   const matches = async (a = "u1", b = "u2", options) => collection.tradeMatches(await owned(a), await owned(b), options);
   const names = (list) => list.map((entry) => data.getSpecies(entry.speciesId).name);

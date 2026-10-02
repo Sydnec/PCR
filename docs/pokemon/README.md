@@ -77,9 +77,22 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
   (`pokemon.evolution.dittosPerCopy`). Les exemplaires de l'espèce partent d'abord, et il reste
   toujours un Métamorph. Il n'est jamais pris sans qu'on le demande, et le choix de la forme
   (Évoli) reste possible avec lui.
-- `/pk echange <membre> <je_donne> <mon_individu> <je_recois> <son_individu>` : échange entre
-  dresseurs, d'un Pokémon précis contre un autre, chacun choisi après son espèce : qui reçoit sait
-  exactement ce qu'il aura, fertilité comprise. **Seuls les doublons s'échangent** : contrairement
+- `/pk echange <membre>` + de quoi remplir **chaque côté** : un Pokémon, des points ou un objet.
+  - Ce que tu donnes : `je_donne` (+ `mon_individu`), `mes_points` ou `mon_objet`
+    (+ `mon_objet_quantite`). Ce que tu demandes : `je_recois`, `ses_points` ou `son_objet`
+    (+ `son_objet_quantite`). Un seul par côté, pas de mélange. `0` point fait un cadeau :
+    `mes_points: 0` pour demander sans rien donner, `ses_points: 0` pour offrir sans rien demander.
+  - Sans `mon_individu`, c'est le moins précieux de l'espèce qui part, le plus récent à égalité.
+    Le Pokémon demandé ne se désigne que par son espèce : **le destinataire choisit lequel**,
+    parmi ses Pokémon libres, dans un menu privé qui s'ouvre quand il clique sur « Accepter ».
+  - Tous les objets s'échangent, sauf les charmes : ils se gagnent en complétant un Pokédex, et un
+    échange les dupliquerait.
+  - Rien ne bouge avant l'acceptation, et tout se revérifie à ce moment : points, objets et
+    Pokémon doivent toujours être là, sinon l'offre échoue en disant ce qui manque (« tu en as 1,
+    il en faut 2 »), sans rien perdre ni créer.
+  - Chaque Pokémon échangé garde son identité : même numéro, même sexe, même ball, même surnom.
+    Qui reçoit sait exactement ce qu'il aura, fertilité comprise, quand l'offre le désigne.
+  **Seuls les doublons s'échangent** : contrairement
   aux jeux, avoir capturé un Pokémon ne suffit pas à le garder au Pokédex, il faut le posséder. Il
   en reste toujours au moins un de chaque espèce, shiny ou non, et l'autocomplétion ne propose que
   ce qu'on a en trop — `/pk doublons membre` le montre avant de proposer, et `/pk comparer`
@@ -97,8 +110,9 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
     te donner, et combien d'échanges 1 contre 1 en sortent. Un shiny déverrouillé reste proposé,
     signalé ✨. Deux menus choisissent un côté de l'échange chacun, puis **« Proposer cet
     échange »** publie l'offre dans le salon, avec le destinataire mentionné : même offre, mêmes
-    boutons et même acceptation que `/pk echange`. Le bot choisit lui-même l'individu de chaque
-    côté, le moins précieux d'abord (voir [Individus](individus.md#qui-part-quand-on-cède)). Une
+    boutons et même acceptation que `/pk echange`. Le bot choisit l'individu que tu donnes, le
+    moins précieux d'abord (voir [Individus](individus.md#qui-part-quand-on-cède)), et le
+    destinataire choisit le sien en acceptant. Une
     offre identique encore ouverte n'est pas republiée (« tu as déjà proposé cet échange »), et une
     offre que le salon n'a pas pu publier est annulée plutôt que laissée sans message.
   - sans option : **avec qui échanger**, le dresseur qui permet le plus d'échanges d'abord.
@@ -118,7 +132,7 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
   **toujours** conservé.
 
 `/pk evolution`, `/pk echange` et `/pk revendre pokemon` demandent l'espèce, puis l'individu parmi
-les siens — facultatif pour l'évolution et la revente. `/pk oeuf pondre` accepte un groupe de la liste ou **`#numéro`** — le numéro qu'affiche
+les siens — facultatif pour l'évolution, l'échange et la revente. `/pk oeuf pondre` accepte un groupe de la liste ou **`#numéro`** — le numéro qu'affiche
 `/pk boite` — pour désigner un Pokémon précis.
 - `/admin pokespawn` *(Admin)* : déclenche une apparition pour organiser un événement. Donne accès aux
   espèces hors pool naturel (légendaires, évolutions par échange ou par objet), avec forçage du shiny, texte

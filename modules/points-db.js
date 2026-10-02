@@ -344,6 +344,12 @@ const db = new sqlite3.Database(dbPath, (err) => {
     // Chaque côté désigne un individu précis (`*_pokemon_id`), avec son
     // espèce, sa variante, son sexe et sa fertilité, qui doivent être encore
     // les siens à l'acceptation.
+    //
+    // Un côté peut aussi être des points ou un objet : `*_species_id` vaut alors 0
+    // (« pas de Pokémon »), la colonne étant NOT NULL depuis l'origine et une
+    // reconstruction de la table n'en valant pas le risque sur une base en
+    // production. `*_pokemon_id` reste NULL pour un Pokémon que le destinataire
+    // choisira lui-même en acceptant.
     db.run(
       `CREATE TABLE IF NOT EXISTS pokemon_trades (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -366,12 +372,24 @@ const db = new sqlite3.Database(dbPath, (err) => {
         offer_pokemon_id INTEGER,
         request_pokemon_id INTEGER,
         offer_form TEXT,
-        request_form TEXT
+        request_form TEXT,
+        offer_points INTEGER,
+        request_points INTEGER,
+        offer_item TEXT,
+        offer_item_qty INTEGER,
+        request_item TEXT,
+        request_item_qty INTEGER
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_trades :", err);
         addColumn("pokemon_trades", "offer_form", "TEXT");
         addColumn("pokemon_trades", "request_form", "TEXT");
+        addColumn("pokemon_trades", "offer_points", "INTEGER");
+        addColumn("pokemon_trades", "request_points", "INTEGER");
+        addColumn("pokemon_trades", "offer_item", "TEXT");
+        addColumn("pokemon_trades", "offer_item_qty", "INTEGER");
+        addColumn("pokemon_trades", "request_item", "TEXT");
+        addColumn("pokemon_trades", "request_item_qty", "INTEGER");
       }
     );
 

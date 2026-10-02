@@ -1253,7 +1253,7 @@ const TRADE_STATUS = {
   FAILED: {
     color: 0xed4245,
     title: "⚠️ Échange impossible",
-    note: "L'un des deux Pokémon n'était plus disponible.",
+    note: "Un des deux côtés n'était plus disponible.",
   },
 };
 
@@ -1277,30 +1277,74 @@ function tradeEvolutionLines(trade) {
   return lines;
 }
 
+// Un côté de l'offre, tel qu'on le lit : des points, un objet ou un Pokémon.
+// Zéro point veut dire « rien » : c'est le côté d'un cadeau. Un Pokémon demandé
+// sans individu désigné est celui que le destinataire choisira en acceptant.
+function tradeSideText(trade, prefix) {
+  const points = trade[`${prefix}_points`];
+  if (points !== null && points !== undefined) {
+    return `${points.toLocaleString("fr-FR")} point${points > 1 ? "s" : ""}`;
+  }
+  const key = trade[`${prefix}_item`];
+  if (key) {
+    const item = getItem(key);
+    return `${item ? `${item.emoji} ${item.label}` : key} \u00D7${trade[`${prefix}_item_qty`].toLocaleString("fr-FR")}`;
+  }
+  const species = getSpecies(trade[`${prefix}_species_id`]);
+  if (!species) return "?";
+  if (!trade[`${prefix}_pokemon_id`] && prefix === "request") return `un ${species.name}`;
+  return describeGroup(species, {
+    pokemonId: trade[`${prefix}_pokemon_id`] ?? null,
+    isShiny: trade[`${prefix}_is_shiny`],
+    sex: trade[`${prefix}_sex`] || null,
+    form: trade[`${prefix}_form`] || null,
+    fertile:
+      trade[`${prefix}_fertile`] === null || trade[`${prefix}_fertile`] === undefined
+        ? null
+        : Boolean(trade[`${prefix}_fertile`]),
+  });
+}
+
+// Le destinataire choisit son Pokémon en acceptant quand l'offre en demande un sans
+// le désigner : c'est ce que le bouton « Accepter » lui demande avant d'échanger.
+//
+// Une offre d'avant ce choix peut réclamer un sexe, une fertilité ou une variante
+// précis : elle s'accepte comme elle l'a toujours été, sans menu qui les ignorerait.
+export const tradeNeedsChoice = (trade) =>
+  Boolean(trade.request_species_id) &&
+  !trade.request_pokemon_id &&
+  (trade.request_points ?? null) === null &&
+  !trade.request_item &&
+  !trade.request_sex &&
+  !trade.request_is_shiny &&
+  (trade.request_fertile ?? null) === null;
+
 export function buildTradeEmbed(trade, status = "PENDING") {
   const style = TRADE_STATUS[status] ?? TRADE_STATUS.PENDING;
   const offered = getSpecies(trade.offer_species_id);
-  const requested = getSpecies(trade.request_species_id);
-  const side = (prefix, species) =>
-    describeGroup(species, {
-      pokemonId: trade[`${prefix}_pokemon_id`] ?? null,
-      isShiny: trade[`${prefix}_is_shiny`],
-      sex: trade[`${prefix}_sex`] || null,
-      form: trade[`${prefix}_form`] || null,
-      fertile:
-        trade[`${prefix}_fertile`] === null || trade[`${prefix}_fertile`] === undefined
-          ? null
-          : Boolean(trade[`${prefix}_fertile`]),
-    });
+  const given = tradeSideText(trade, "offer");
+  const asked = tradeSideText(trade, "request");
+  const nothing = (prefix) => trade[`${prefix}_points`] === 0;
+
+  // Un côté à zéro point est un cadeau : on le dit comme tel plutôt que de faire
+  // lire « contre 0 point ».
+  const sentence = nothing("request")
+    ? `<@${trade.from_user_id}> offre **${given}** à <@${trade.to_user_id}>.`
+    : nothing("offer")
+      ? `<@${trade.from_user_id}> demande **${asked}** à <@${trade.to_user_id}>` +
+        (tradeNeedsChoice(trade) ? ", à son choix" : "") +
+        ", sans rien donner en retour."
+      : `<@${trade.from_user_id}> propose **${given}**\n` +
+        `contre **${asked}** de <@${trade.to_user_id}>` +
+        (tradeNeedsChoice(trade) ? ", à son choix." : ".");
 
   const embed = new EmbedBuilder()
     .setTitle(style.title)
     .setColor(style.color)
-    .setDescription(
-      `<@${trade.from_user_id}> propose **${side("offer", offered)}**\n` +
-        `contre **${side("request", requested)}** de <@${trade.to_user_id}>.`
-    )
-    .setThumbnail(spriteUrl(offered, trade.offer_is_shiny, trade.offer_form));
+    .setDescription(sentence);
+  if (offered) {
+    embed.setThumbnail(spriteUrl(offered, trade.offer_is_shiny, trade.offer_form));
+  }
 
   if (style.note) embed.addFields({ name: "Raison", value: style.note });
 
@@ -1320,6 +1364,18 @@ export function buildTradeEmbed(trade, status = "PENDING") {
     embed.setFooter({ text: "Seul le destinataire peut accepter ou refuser." });
   }
   return embed;
+}
+
+// Le menu où le destinataire choisit le Pokémon qu'il donne : `choices` vient de
+// individualChoices, et ne contient que des individus libres de partir. Un menu
+// de Discord n'en porte pas plus de vingt-cinq : les plus récents.
+export function buildTradePicker(tradeId, choices, species) {
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId(`poke_trade_pick|${tradeId}`)
+      .setPlaceholder(`Choisis le ${species.name} que tu donnes`)
+      .addOptions(choices.map(({ name, value }) => ({ label: name.slice(0, 100), value })))
+  );
 }
 
 export function buildTradeRow(tradeId, { disabled = false } = {}) {

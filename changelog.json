@@ -2188,5 +2188,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "feature",
+      "name": "/pk echange : points et objets",
+      "description": "On peut échanger des points ou des objets, contre un Pokémon ou entre eux (0 point pour offrir). Le destinataire choisit lui-même le Pokémon qu'il donne en acceptant.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-02T07:30:00.000Z",
+      "branch": "claude/vibrant-brown-s7suxt"
+    }
+  ]
 }
