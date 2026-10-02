@@ -61,6 +61,12 @@ export function getItem(key) {
   return isDefined(items[key]) ? resolve(key, items[key]) : null;
 }
 
+// Tous les objets s'échangent, sauf les charmes : ils se gagnent en complétant un
+// Pokédex, et checkCharms les redonne à qui le complète encore. Cédé, un charme
+// reviendrait à son premier porteur à la prochaine arrivée d'une espèce : un
+// échange le dupliquerait. Les Charmes Chroma s'obtiennent, ils ne se transmettent pas.
+export const isTradable = (item) => Boolean(item) && !item.charm;
+
 // Le Charme Chroma d'une génération, tel que le catalogue le déclare
 // (`charm.generation`), ou null.
 export const getCharmItem = (generation) =>
