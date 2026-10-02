@@ -13,7 +13,7 @@ const sandbox = createSandbox({
   config: { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } },
 });
 const data = await import("../modules/pokemon/data.js");
-const { getPokemonConfig, getSafariConfig } = await import("../modules/pokemon/config.js");
+const { getPokemonConfig, getSafariConfig, hasPersonalPrice, priceAfter } = await import("../modules/pokemon/config.js");
 
 const {
   catchProbability,
@@ -162,6 +162,32 @@ describe("probabilités par ball (ce que les embeds annoncent)", () => {
       .filter((ball) => !ball.guaranteed)
       .map((ball) => ball.price / ball.probability);
     for (const cost of costs) near(cost, costs[0], "coût espéré");
+  });
+});
+
+describe("le prix personnel des balls", () => {
+  it("la Master Ball renchérit par défaut, pas les autres", () => {
+    const { poke, super: great, hyper, master } = getPokemonConfig().capture.balls;
+    assert.equal(hasPersonalPrice(master), true);
+    for (const ball of [poke, great, hyper]) assert.equal(hasPersonalPrice(ball), false);
+  });
+
+  it("chaque achat coûte `priceGrowth` fois le précédent, calculé depuis le prix de base", () => {
+    const ball = { price: 10_000, priceGrowth: 1.2 };
+    assert.deepEqual(
+      [0, 1, 2, 3, 4].map((paid) => priceAfter(ball, paid)),
+      [10_000, 12_000, 14_400, 17_280, 20_736]
+    );
+  });
+
+  it("un facteur très haut ne donne jamais un prix infini", () => {
+    assert.equal(priceAfter({ price: 10_000, priceGrowth: 1_000 }, 500), Number.MAX_SAFE_INTEGER);
+  });
+
+  it("sans progression exploitable, le prix reste celui de la config", () => {
+    for (const priceGrowth of [undefined, 1, 0.5, "n'importe quoi"]) {
+      assert.equal(priceAfter({ price: 100, priceGrowth }, 7), 100, String(priceGrowth));
+    }
   });
 });
 

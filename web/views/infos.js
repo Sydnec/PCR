@@ -96,7 +96,11 @@ function capture(rules) {
           itemIcon(ball),
           " ",
           h("strong", {}, ball.label),
-          ` ${fmt(ball.price)} pts`,
+          // Au prix qui monte, celui d'ici est le premier : on dit de combien
+          // chaque achat suivant renchérit.
+          ball.priceGrowth
+            ? ` dès ${fmt(ball.price)} pts (+${fmt((ball.priceGrowth - 1) * 100)} % à chaque achat)`
+            : ` ${fmt(ball.price)} pts`,
           ball.guaranteed ? ", capture garantie" : ` (×${fmt(ball.multiplier)})`,
         ])
       )

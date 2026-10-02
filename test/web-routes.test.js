@@ -67,6 +67,18 @@ const callback = (fn, ...args) =>
 const setBalance = (amount, user = USER) =>
   dbRun(points, "INSERT INTO points (user_id, balance) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET balance = ?", [user, amount, amount]);
 const grant = (key, quantity, user = USER) => callback(items.grantItem, user, key, quantity, { source: "test" });
+// Le scénario du jeu : une Master Ball à 10 000, puis ×1,2 à chaque achat. Les
+// achats déjà faits sont ce que le journal des lancers garde.
+const withMasterPrice = async (check) => {
+  sandbox.writeConfig({ pokemon: { generation: 2, capture: { balls: { master: { price: 10_000, priceGrowth: 1.2 } } } } });
+  try {
+    await check();
+  } finally {
+    sandbox.writeConfig({ pokemon: { generation: 2 } });
+  }
+};
+const logPurchase = (user, cost) =>
+  dbRun(points, "INSERT INTO pokemon_throws (spawn_id, user_id, ball, cost, probability, result, thrown_at) VALUES (0, ?, 'master', ?, 1, 'CATCH', 1)", [user, cost]);
 
 async function own(name, { user = USER, shiny = 0, sex = "M", obtained = 1, sterile = 0, locked = 0, pos = null } = {}) {
   const { lastID } = await dbRun(
@@ -427,6 +439,20 @@ describe("l'apparition (/api/spawn)", () => {
     assert.equal(byKey.super.free, 1);
   });
 
+  it("le prix de la Master Ball est celui du visiteur : il monte à chaque achat payé", () =>
+    withMasterPrice(async () => {
+      await spawnRow("Roucool");
+      await setBalance(11_000);
+      const master = async () => (await spawn()).spawn.balls.find((ball) => ball.key === "master");
+      assert.deepEqual([(await master()).price, (await master()).usable], [10_000, true]);
+
+      await logPurchase(USER, 10_000);
+      // 11 000 points payaient 10 000 ; ils ne paient plus 12 000.
+      assert.deepEqual([(await master()).price, (await master()).usable], [12_000, false]);
+      const poke = (await spawn()).spawn.balls.find((ball) => ball.key === "poke");
+      assert.equal(poke.price, getPokemonConfig().capture.balls.poke.price, "les autres balls gardent leur prix");
+    }));
+
   it("un légendaire affiche son taux relevé et sa difficulté figée", async () => {
     await spawnRow("Mewtwo");
     const json = (await spawn()).spawn;
@@ -541,6 +567,40 @@ describe("un lancer (/api/spawn/throw)", () => {
     assert.equal(quick.status, "cooldown");
     assert.ok(quick.remaining >= 1);
     assert.match(quick.message, /Doucement/);
+  });
+
+  it("un prix annoncé qui a monté depuis la confirmation : « price-changed », rien n'est débité", () =>
+    withMasterPrice(async () => {
+      const user = trainer();
+      const id = await spawnRow("Roucool");
+      await setBalance(50_000, user.id);
+      await logPurchase(user.id, 10_000);
+      const result = await throwBall({ spawnId: id, ball: "master", expectedPrice: 10_000 }, user);
+      assert.equal(result.status, "price-changed");
+      assert.equal(result.final, false);
+      assert.match(result.message, /passé à \*\*12\D000\*\* points depuis ta confirmation/);
+      assert.equal(await callback(economy.getBalance, user.id), 50_000);
+    }));
+
+  it("au prix annoncé, la Master Ball paie ce prix", () =>
+    withMasterPrice(async () => {
+      const user = trainer();
+      const id = await spawnRow("Roucool");
+      await setBalance(50_000, user.id);
+      await logPurchase(user.id, 10_000);
+      const result = await throwBall({ spawnId: id, ball: "master", expectedPrice: 12_000 }, user);
+      assert.equal(result.status, "catch");
+      assert.equal(await callback(economy.getBalance, user.id), 38_000);
+    }));
+
+  it("un prix annoncé qui n'est pas un entier positif est refusé avant tout lancer", async () => {
+    const user = trainer();
+    const id = await spawnRow("Roucool");
+    await setBalance(1000, user.id);
+    for (const expectedPrice of [-1, 1.5, "100", true]) {
+      await failure(throwBall({ spawnId: id, ball: "poke", expectedPrice }, user), 400);
+    }
+    assert.equal(await callback(economy.getBalance, user.id), 1000);
   });
 
   it("la Master Ball sans l'objet quand le site la dit offerte : refus, jamais payée en points", async () => {

@@ -180,6 +180,16 @@ describe("écriture (/admin config)", () => {
     assert.equal(getConfig().pokemon.spawn.generationBoost, 2.5);
   });
 
+  it("refuse une progression de la Master Ball sous 1 : chaque achat coûterait moins que le précédent", () => {
+    const refused = writeConfigValue("pokemon.capture.balls.master.priceGrowth", "0,9");
+    assert.equal(refused.ok, false);
+    assert.match(refused.reason, /en dessous du minimum autorisé \(1\)/);
+    assert.equal(fs.existsSync(sandbox.configFile), false, "rien n'est écrit après un refus");
+    assert.equal(writeConfigValue("pokemon.capture.balls.master.priceGrowth", "1").ok, true, "1 : prix fixe");
+    assert.equal(writeConfigValue("pokemon.capture.balls.master.priceGrowth", "1,5").ok, true);
+    assert.equal(getConfig().pokemon.capture.balls.master.priceGrowth, 1.5);
+  });
+
   it("exige une date ISO complète, fuseau compris, pour ouvrir une génération", () => {
     for (const bad of ["2", "demain", "2026-10-30", "2026-10-30T18:00:00"]) {
       assert.equal(

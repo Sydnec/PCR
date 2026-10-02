@@ -115,6 +115,12 @@ describe("référentiels", () => {
     const hardest = rules.capture.table.at(-1);
     assert.ok(hardest.balls.every((ball) => ball.min >= 0 && ball.max <= 1));
   });
+
+  it("les règles disent de combien la Master Ball renchérit, et elle seule", async () => {
+    const { balls } = (await call("GET", "/api/rules")).capture;
+    const growth = Object.fromEntries(balls.map((ball) => [ball.key, ball.priceGrowth]));
+    assert.deepEqual(growth, { poke: null, super: null, hyper: null, master: 1.2 });
+  });
 });
 
 describe("sac : le prix de revente et la vente", () => {

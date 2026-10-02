@@ -109,14 +109,14 @@ export async function render(ctx) {
     coolTimer = setTimeout(draw, seconds * 1000);
   }
 
-  async function throwBall(ball, { requireItem = false } = {}) {
+  async function throwBall(ball, { requireItem = false, expectedPrice = null } = {}) {
     throwing = true;
     confirming = null;
     draw();
     try {
       const result = await api("/api/spawn/throw", {
         method: "POST",
-        body: { spawnId: state.spawn.id, ball: ball.key, requireItem },
+        body: { spawnId: state.spawn.id, ball: ball.key, requireItem, expectedPrice },
       });
       panel = { text: result.message, status: result.status };
       if (result.status === "cooldown") coolDown(result.remaining);
@@ -293,8 +293,10 @@ export async function render(ctx) {
           {
             class: "button danger",
             // Annoncée offerte, elle ne se paie jamais en points : même promesse
-            // que la confirmation Discord.
-            onclick: () => throwBall(ball, { requireItem: free }),
+            // que la confirmation Discord. Payante, le prix affiché est celui
+            // qu'on promet, et il ne doit pas avoir monté entre-temps.
+            onclick: () =>
+              throwBall(ball, { requireItem: free, expectedPrice: free ? null : ball.price }),
           },
           free ? `Utiliser ma ${ball.label}` : `Confirmer (-${fmt(ball.price)} pts)`
         ),

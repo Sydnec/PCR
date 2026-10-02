@@ -16,6 +16,7 @@ const items = await import("../modules/pokemon/items.js");
 const economy = await import("../modules/economy.js");
 const data = await import("../modules/pokemon/data.js");
 const { getPokemonConfig, getSafariConfig } = await import("../modules/pokemon/config.js");
+const { buildBallRow } = await import("../modules/pokemon/embeds.js");
 
 const GEN1 = { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } };
 const GEN2 = { pokemon: { generation: 2 } };
@@ -163,7 +164,7 @@ describe("lancer une ball depuis l'annonce", () => {
     assert.equal(await balance(user), 1000 - getPokemonConfig().capture.balls.poke.price);
   });
 
-  it("un raté : le panneau de relance reste, avec les prix", async () => {
+  it("un raté : le panneau de relance reste, avec les prix — sauf celui de la Master Ball", async () => {
     const user = newUser();
     const id = await spawnRow("Mewtwo");
     await setBalance(100000, user);
@@ -172,6 +173,17 @@ describe("lancer une ball depuis l'annonce", () => {
     assert.match(reply.content, /Raté/);
     assert.equal(reply.components.length, 1);
     assert.ok(buttonIds(reply).every((customId) => /^poke_re(throw|master)\|/.test(customId)), "les boutons du panneau relancent depuis le panneau");
+    assert.deepEqual(labels(reply).map((label) => /\(\d/.test(label)), [true, true, true, false], "chaque ball annonce son prix, la Master Ball renvoie à sa confirmation");
+  });
+
+  it("l'annonce publique ne dit pas le prix de la Master Ball : il est propre à chaque dresseur", () => {
+    const row = (options) => buildBallRow(1, options).toJSON().components.map((button) => button.label);
+    const [poke, , , master] = row();
+    assert.match(poke, /^Poké Ball \(\d+\)$/);
+    assert.equal(master, "Master Ball");
+    // Offerte, elle l'est pour celui qui la tient, et son nombre se dit.
+    assert.equal(row({ panel: true, stock: new Map([["master", 2]]) })[3], "Master Ball (offerte ×2)");
+    assert.equal(row({ prices: false })[3], "Master Ball");
   });
 
   it("depuis le panneau, c'est le même message qu'on réécrit : l'accusé est un `deferUpdate`", async () => {
@@ -240,6 +252,20 @@ describe("lancer une ball depuis l'annonce", () => {
 describe("la Master Ball et sa confirmation", () => {
   const price = () => getPokemonConfig().capture.balls.master.price;
 
+  const fmt = (value) => value.toLocaleString("fr-FR");
+  // Le scénario du jeu : 10 000 au premier achat, puis ×1,2 à chaque suivant.
+  const TEN_K = { pokemon: { ...GEN1.pokemon, capture: { balls: { master: { price: 10_000, priceGrowth: 1.2 } } } } };
+  // Des achats déjà faits, tels que le journal des lancers les garde.
+  const bought = async (user, costs) => {
+    for (const cost of costs) {
+      await dbRun(
+        points,
+        "INSERT INTO pokemon_throws (spawn_id, user_id, ball, cost, probability, result, thrown_at) VALUES (0, ?, 'master', ?, 1, 'CATCH', 1)",
+        [user, cost]
+      );
+    }
+  };
+
   it("depuis l'annonce, un éphémère demande confirmation avec le prix et le solde", async () => {
     const user = newUser();
     const id = await spawnRow("Roucool");
@@ -247,11 +273,83 @@ describe("la Master Ball et sa confirmation", () => {
     const calls = await click(`poke_master|${id}`, { user });
     const reply = only(calls, "reply");
     assert.equal(reply.flags, EPHEMERAL);
-    assert.match(reply.content, new RegExp(`coûte \\*\\*${price()}\\*\\* points`));
-    assert.match(reply.content, new RegExp(`Ton solde : \\*\\*${price() + 10}\\*\\* points`));
-    assert.deepEqual(buttonIds(reply), [`poke_master_ok|${id}`, `poke_master_cancel|${id}`]);
-    assert.match(labels(reply)[0], new RegExp(`Confirmer \\(-${price()}\\)`));
+    assert.match(reply.content, new RegExp(`coûte \\*\\*${fmt(price())}\\*\\* points`));
+    assert.match(reply.content, new RegExp(`Ton solde : \\*\\*${fmt(price() + 10)}\\*\\* points`));
+    assert.deepEqual(buttonIds(reply), [`poke_master_ok|${id}|${price()}`, `poke_master_cancel|${id}`]);
+    assert.match(labels(reply)[0], new RegExp(`Confirmer \\(-${fmt(price())}\\)`));
     assert.equal(await balance(user), price() + 10, "confirmer n'est pas payer");
+  });
+
+  it("la confirmation annonce le prix de CE dresseur : ×1,2 à chaque Master Ball payée", async () => {
+    sandbox.writeConfig(TEN_K);
+    const [veteran, newcomer] = [newUser(), newUser()];
+    const id = await spawnRow("Roucool");
+    await bought(veteran, [10_000, 12_000]);
+    await setBalance(50_000, veteran);
+    await setBalance(50_000, newcomer);
+
+    const mine = only(await click(`poke_master|${id}`, { user: veteran }), "reply");
+    assert.match(mine.content, new RegExp(`coûte \\*\\*${fmt(14_400)}\\*\\* points`));
+    assert.deepEqual(buttonIds(mine), [`poke_master_ok|${id}|14400`, `poke_master_cancel|${id}`]);
+    assert.equal(labels(mine)[0], `Confirmer (-${fmt(14_400)})`);
+
+    const theirs = only(await click(`poke_master|${id}`, { user: newcomer }), "reply");
+    assert.match(theirs.content, new RegExp(`coûte \\*\\*${fmt(10_000)}\\*\\* points`));
+  });
+
+  it("le refus pour solde insuffisant dit le prix de ce dresseur", async () => {
+    sandbox.writeConfig(TEN_K);
+    const user = newUser();
+    const id = await spawnRow("Roucool");
+    await bought(user, [10_000]);
+    await setBalance(5, user);
+    const calls = await click(`poke_master|${id}`, { user });
+    assert.match(only(calls, "reply").content, new RegExp(`coûte \\*\\*${fmt(12_000)}\\*\\* points, tu en as \\*\\*5\\*\\*`));
+  });
+
+  it("un prix illisible n'ouvre aucune confirmation : une erreur, pas un prix inventé", async () => {
+    const user = newUser();
+    const id = await spawnRow("Roucool");
+    await setBalance(50_000, user);
+    await dbRun(points, "ALTER TABLE pokemon_throws RENAME TO pokemon_throws_off");
+    try {
+      const reply = only(await click(`poke_master|${id}`, { user }), "reply");
+      assert.match(reply.content, /Erreur base de données/);
+      assert.ok(!buttonIds(reply).some((customId) => customId.startsWith("poke_master_ok")), "rien à confirmer");
+    } finally {
+      await dbRun(points, "ALTER TABLE pokemon_throws_off RENAME TO pokemon_throws");
+    }
+    assert.equal(await balance(user), 50_000);
+  });
+
+  it("confirmer paie le prix affiché, et la suivante coûte ×1,2", async () => {
+    sandbox.writeConfig(TEN_K);
+    const user = newUser();
+    const id = await spawnRow("Mewtwo");
+    await setBalance(30_000, user);
+    const calls = await withRandom(0.999, () => click(`poke_master_ok|${id}|10000`, { user }));
+    const reply = only(calls, "editReply");
+    assert.match(reply.content, new RegExp(`Bravo ! \\*\\*Mewtwo[^*]*\\*\\* rejoint ton Pokédex ! \\(\\*\\*-${fmt(10_000)}\\*\\* points\\)`));
+    assert.equal(await balance(user), 20_000);
+
+    const next = await spawnRow("Roucool");
+    const confirmation = only(await click(`poke_master|${next}`, { user }), "reply");
+    assert.match(confirmation.content, new RegExp(`coûte \\*\\*${fmt(12_000)}\\*\\* points`));
+    assert.deepEqual(buttonIds(confirmation), [`poke_master_ok|${next}|12000`, `poke_master_cancel|${next}`]);
+  });
+
+  it("confirmer un prix qui a monté entre-temps refuse : rien n'est débité", async () => {
+    sandbox.writeConfig(TEN_K);
+    const user = newUser();
+    const id = await spawnRow("Mewtwo");
+    await bought(user, [10_000]);
+    await setBalance(50_000, user);
+    const calls = await click(`poke_master_ok|${id}|10000`, { user });
+    const reply = only(calls, "editReply");
+    assert.match(reply.content, new RegExp(`passé à \\*\\*${fmt(12_000)}\\*\\* points depuis ta confirmation`));
+    assert.match(reply.content, /Rien n'a été débité/);
+    assert.equal(await balance(user), 50_000);
+    assert.equal((await dbGet(points, "SELECT status FROM pokemon_spawns WHERE id = ?", [id])).status, "ACTIVE");
   });
 
   it("depuis le panneau, la confirmation le transforme au lieu d'ouvrir un éphémère de plus", async () => {
@@ -280,7 +378,7 @@ describe("la Master Ball et sa confirmation", () => {
     const id = await spawnRow("Roucool");
     await setBalance(5, user);
     const calls = await click(`poke_master|${id}`, { user });
-    assert.match(only(calls, "reply").content, new RegExp(`coûte \\*\\*${price()}\\*\\* points, tu en as \\*\\*5\\*\\*`));
+    assert.match(only(calls, "reply").content, new RegExp(`coûte \\*\\*${fmt(price())}\\*\\* points, tu en as \\*\\*5\\*\\*`));
   });
 
   it("annuler rend le panneau, ou rien s'il n'y en a pas", async () => {
@@ -294,6 +392,8 @@ describe("la Master Ball et sa confirmation", () => {
     assert.deepEqual(only(bare, "update").components, []);
   });
 
+  // Le bouton d'une confirmation postée avant que le prix ne figure dans son
+  // customId n'en porte pas : il part sans garde, comme avant.
   it("confirmer lance : la capture est garantie", async () => {
     const user = newUser();
     const id = await spawnRow("Mewtwo");

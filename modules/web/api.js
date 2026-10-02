@@ -24,7 +24,13 @@ import {
   usableHelpers,
   DITTO_HELPER,
 } from "../pokemon/collection.js";
-import { isFinalThrow, resolveThrow, startThrow, throwMessage } from "../pokemon/capture.js";
+import {
+  getBallPrice,
+  isFinalThrow,
+  resolveThrow,
+  startThrow,
+  throwMessage,
+} from "../pokemon/capture.js";
 import {
   RARITIES,
   activeGeneration,
@@ -405,22 +411,26 @@ async function spawnJson(ctx, spawn, balance) {
       shiny: 0,
     },
     lineage,
-    balls: probabilitiesByBall(spawn.catch_rate).map((ball) => {
-      // Les balls offertes partent avant les points, comme sur Discord : une
-      // ball en poche se lance quel que soit le solde.
-      const free = freeBallCount(inventory, ball.key);
-      return {
-        key: ball.key,
-        label: ball.label,
-        emoji: ball.emoji,
-        image: itemImageUrl(ball.sprite),
-        price: ball.price,
-        probability: ball.probability,
-        guaranteed: Boolean(ball.guaranteed),
-        free,
-        usable: free > 0 || balance >= ball.price,
-      };
-    }),
+    balls: await Promise.all(
+      probabilitiesByBall(spawn.catch_rate).map(async (ball) => {
+        // Les balls offertes partent avant les points, comme sur Discord : une
+        // ball en poche se lance quel que soit le solde.
+        const free = freeBallCount(inventory, ball.key);
+        // Le prix de CE dresseur : celui de la Master Ball monte à chaque achat.
+        const price = await promise((cb) => getBallPrice(ctx.user.id, ball, cb));
+        return {
+          key: ball.key,
+          label: ball.label,
+          emoji: ball.emoji,
+          image: itemImageUrl(ball.sprite),
+          price,
+          probability: ball.probability,
+          guaranteed: Boolean(ball.guaranteed),
+          free,
+          usable: free > 0 || balance >= price,
+        };
+      })
+    ),
     throws: await Promise.all(
       throws.map(async (row) => ({
         trainer: await trainerOf(ctx.bot, row.user_id),
@@ -1094,7 +1104,9 @@ export const routes = [
   // paiement, même course. Toujours 200 : un raté ou un « trop tard » sont des
   // issues du jeu, pas des erreurs, et `status` dit laquelle. La Master Ball se
   // confirme côté site, comme sur Discord ; `requireItem` porte la même
-  // promesse : une ball annoncée offerte ne se paie jamais en points.
+  // promesse : une ball annoncée offerte ne se paie jamais en points. Payante,
+  // `expectedPrice` est le prix affiché à la confirmation : s'il a bougé depuis,
+  // le lancer est refusé (`price-changed`).
   {
     method: "POST",
     path: "/api/spawn/throw",
@@ -1105,11 +1117,22 @@ export const routes = [
       if (!Number.isInteger(spawnId) || spawnId <= 0) throw new HttpError(400, "spawnId invalide.");
       if (typeof ctx.body.ball !== "string") throw new HttpError(400, "ball manquante.");
       const requireItem = ctx.body.requireItem === true;
+      const expectedPrice = ctx.body.expectedPrice ?? null;
+      if (expectedPrice !== null && !(Number.isInteger(expectedPrice) && expectedPrice >= 0)) {
+        throw new HttpError(400, "expectedPrice invalide.");
+      }
 
       const outcome =
         startThrow(ctx.user.id, ctx.body.ball) ??
         (await promise((cb) =>
-          resolveThrow(ctx.bot, ctx.user.id, spawnId, ctx.body.ball, { requireItem }, cb)
+          resolveThrow(
+            ctx.bot,
+            ctx.user.id,
+            spawnId,
+            ctx.body.ball,
+            { requireItem, expectedPrice },
+            cb
+          )
         ));
       return {
         status: outcome.status,

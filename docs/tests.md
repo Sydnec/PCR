@@ -42,9 +42,9 @@ génération ouverte en cours de route.
 | Fichier                           | Ce qu'il vérifie                                                                                                   |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `config`, `config-migration`      | valeurs de base, ajustements à chaud, bornes, `config.local.json` repris en `config.json`                          |
-| `capture`                         | formule de capture, plancher des légendaires, balls, apparitions pondérées, difficulté, prix de la Master Ball      |
+| `capture`                         | formule de capture, plancher des légendaires, balls, apparitions pondérées, difficulté, prix des balls              |
 | `spawn`, `spawn-lifecycle`        | revendication gardée d'une apparition, durée de vie, fuite, remplacement, objets au sol, réparation au démarrage   |
-| `throws`                          | lancers : paiement, remboursement, courses entre dresseurs, ball offerte, shiny du Charme                          |
+| `throws`                          | lancers : paiement, remboursement, courses entre dresseurs, ball offerte, prix progressif de la Master Ball, shiny du Charme |
 | `safari`, `safari-entry`          | tirage des rencontres, appâts et fuite, actions, entrée payante ou offerte, reprise d'une visite                   |
 | `economy`, `redistribution`       | points, objets, revente, compensation en cascade, pot commun (plan, bail, rattrapage, simultanéité)                |
 | `evolution`, `collection`         | coût d'une évolution, sacrifices, objets, Métamorph, compensation ; individus, verrous, doublons, échanges, échanges possibles |

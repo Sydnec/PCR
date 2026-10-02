@@ -32,7 +32,8 @@ C'est **la même apparition** que dans le salon, et la même course : un lancer 
 le même chemin que les boutons Discord. Même prix, balls offertes utilisées d'abord, même
 cooldown (alterner Discord et le site ne fait pas lancer plus vite), et un seul vainqueur quelle
 que soit la porte. L'annonce du salon suit : le journal des lancers et la capture s'y affichent
-comme d'habitude. La Master Ball demande une confirmation, comme sur Discord.
+comme d'habitude. La Master Ball demande une confirmation, comme sur Discord, et le site affiche son prix à
+toi : il monte à chaque achat (voir [la capture](pokemon/capture.md)).
 
 La page relit l'apparition toutes les `web.spawnRefreshSeconds` (5 par défaut), seulement quand
 elle est ouverte et visible, et avec elle le solde et les balls en poche : des points gagnés sur

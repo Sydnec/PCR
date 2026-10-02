@@ -2205,5 +2205,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Master Ball : un prix qui monte à chaque achat",
+      "description": "Chaque Master Ball achetée coûte 20 % de plus que la précédente, pour chaque joueur. Son prix n'est plus sur le bouton : il s'affiche dans le message de confirmation.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-02T14:30:00.000Z",
+      "branch": "claude/vibrant-brown-s7suxt"
+    }
+  ]
 }

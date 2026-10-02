@@ -14,7 +14,7 @@ import db from "../points-db.js";
 import { addPoints, getBalance, spendPoints } from "../economy.js";
 import { handleException, log } from "../utils.js";
 import { pseudo } from "../pseudo.js";
-import { getBall, getPokemonConfig } from "./config.js";
+import { getBall, getPokemonConfig, hasPersonalPrice, priceAfter } from "./config.js";
 import { creditSpecies } from "./collection.js";
 import {
   consumeItem,
@@ -146,6 +146,29 @@ function logThrow(spawnId, userId, ballKey, cost, probability, result) {
   );
 }
 
+// Combien de fois ce dresseur a payé cette ball en points. Lu dans le journal
+// des lancers plutôt que dans un compteur à part : un lancer remboursé (VOID)
+// n'y compte pas, donc il n'y a rien à compenser, et les achats d'avant le prix
+// progressif y sont déjà. Une ball offerte, à coût nul, n'avance rien. Le délai
+// entre deux lancers d'un même dresseur laisse largement le temps à l'écriture
+// du précédent : le compte relu est à jour.
+function countPaidThrows(userId, ballKey, cb) {
+  db.get(
+    `SELECT COUNT(*) AS paid FROM pokemon_throws
+      WHERE user_id = ? AND ball = ? AND cost > 0 AND result != 'VOID'`,
+    [userId, ballKey],
+    (err, row) => cb(err, row?.paid ?? 0)
+  );
+}
+
+// Ce que coûterait à ce dresseur sa prochaine ball payée en points. Seule une
+// ball au prix personnel va lire le journal : un lancer ordinaire n'ajoute pas
+// de requête.
+export function getBallPrice(userId, ball, cb) {
+  if (!hasPersonalPrice(ball)) return cb(null, ball.price);
+  countPaidThrows(userId, ball.key, (err, paid) => (err ? cb(err) : cb(null, priceAfter(ball, paid))));
+}
+
 // Ce qu'a coûté un lancer, et de quoi le rendre. Une ball offerte passe AVANT
 // les points : c'est ce que le dresseur veut, un objet posé dans son sac ne doit
 // pas dormir pendant qu'on lui prend sa monnaie. Elle est consommée par le même
@@ -153,7 +176,8 @@ function logThrow(spawnId, userId, ballKey, cost, probability, result) {
 // jamais qu'une.
 //
 // Rend { item } pour une ball offerte, { points } pour un achat, ou null si rien
-// n'a pu payer.
+// n'a pu payer — le troisième argument dit alors à quel prix, et si ce prix a
+// bougé (`moved`).
 //
 // `requireItem` interdit la bascule vers les points. Il sert au seul chemin qui
 // en a besoin : la confirmation Master Ball, qui annonce « ta Master Ball
@@ -161,14 +185,25 @@ function logThrow(spawnId, userId, ballKey, cost, probability, result) {
 // disparu entre l'ouverture de la confirmation et le clic — un second panneau
 // ouvert ailleurs suffit — payer 22 500 points en silence serait exactement le
 // mésclic irrattrapable que cette confirmation existe pour empêcher.
-function payThrow(userId, ball, { requireItem = false } = {}, cb) {
+//
+// `expectedPrice` en est la jumelle pour une ball payée : le prix que la
+// confirmation a affiché. Un achat fait entre-temps — la Master Ball renchérit à
+// chaque fois — l'a fait monter ; on refuse plutôt que de prendre plus que ce
+// qui était annoncé.
+function payThrow(userId, ball, { requireItem = false, expectedPrice = null } = {}, cb) {
   const item = getBallItem(ball.key);
   const tryPoints = () =>
     requireItem
       ? cb(null, null)
-      : spendPoints(userId, ball.price, (err, debited) =>
-          cb(err, debited ? { points: ball.price } : null)
-        );
+      : getBallPrice(userId, ball, (err, price) => {
+          if (err) return cb(err, null);
+          if (expectedPrice !== null && price !== expectedPrice) {
+            return cb(null, null, { price, moved: true });
+          }
+          spendPoints(userId, price, (err, debited) =>
+            cb(err, debited ? { points: price } : null, { price })
+          );
+        });
 
   if (!item) return tryPoints();
   consumeItem(userId, item.key, 1, { source: "lancer" }, (err, consumed) => {
@@ -183,24 +218,25 @@ function payThrow(userId, ball, { requireItem = false } = {}, cb) {
 // Chemin de remboursement unique et journalisé. On ne rembourse qu'après un
 // paiement réussi, donc il y a toujours quelque chose à rendre — et on rend ce
 // qui a été pris : une ball offerte se rend en ball, jamais en points. La
-// convertir en monnaie ferait d'un Pokémon disputé une petite imprimerie.
+// convertir en monnaie ferait d'un Pokémon disputé une petite imprimerie. Et les
+// points se rendent au prix PAYÉ, pas à celui d'aujourd'hui.
 function refundThrow(userId, spawnId, ball, probability, payment, cb) {
   const gratuit = Boolean(payment?.item);
 
   const done = (err) => {
     if (err) handleException("Remboursement impossible :", err);
-    logThrow(spawnId, userId, ball.key, gratuit ? 0 : ball.price, probability, "VOID");
+    logThrow(spawnId, userId, ball.key, gratuit ? 0 : payment.points, probability, "VOID");
     pseudo(userId).then((name) =>
       log(
         `Remboursement à ${name} (spawn #${spawnId} déjà résolu) : ` +
-          (gratuit ? payment.label : `${ball.price} pts`)
+          (gratuit ? payment.label : `${payment.points} pts`)
       )
     );
     cb(null, { status: "void", ball, payment });
   };
 
   if (gratuit) return grantItem(userId, payment.item, 1, { source: "lancer-annule" }, done);
-  addPoints(userId, ball.price, done);
+  addPoints(userId, payment.points, done);
 }
 
 // ====================== LE LANCER ======================
@@ -226,7 +262,14 @@ export function startThrow(userId, ballKey) {
 // Second temps : paiement, tirage, réclamation, crédit. Rend toujours une
 // issue — { status, … } — et jamais d'erreur : une panne de base est
 // journalisée ici et devient l'issue « error », qu'il reste à afficher.
-export function resolveThrow(client, userId, spawnId, ballKey, { requireItem = false } = {}, cb) {
+export function resolveThrow(
+  client,
+  userId,
+  spawnId,
+  ballKey,
+  { requireItem = false, expectedPrice = null } = {},
+  cb
+) {
   const config = getPokemonConfig();
   const ball = getBall(ballKey);
   if (!ball) return cb(null, { status: "unknown-ball" });
@@ -248,7 +291,7 @@ export function resolveThrow(client, userId, spawnId, ballKey, { requireItem = f
 
     // 1. Paiement atomique : une ball offerte d'abord, le solde ensuite, et
     // refusé sans rien prélever si ni l'un ni l'autre ne suffit.
-    payThrow(userId, ball, { requireItem }, (err, payment) => {
+    payThrow(userId, ball, { requireItem, expectedPrice }, (err, payment, quote) => {
       if (err) {
         handleException("Paiement du lancer :", err);
         return cb(null, { status: "error" });
@@ -257,8 +300,11 @@ export function resolveThrow(client, userId, spawnId, ballKey, { requireItem = f
       if (!payment) {
         // Promis gratuit, et l'objet n'y est plus : on le dit, on ne débite pas.
         if (requireItem) return cb(null, { status: "no-item", ball });
+        // Le prix annoncé n'est plus le bon : on donne le nouveau, que le
+        // dresseur confirmera ou non.
+        if (quote.moved) return cb(null, { status: "price-changed", ball, price: quote.price });
         return getBalance(userId, (err, balance) =>
-          cb(null, { status: "insufficient", ball, balance })
+          cb(null, { status: "insufficient", ball, price: quote.price, balance })
         );
       }
 
@@ -433,7 +479,9 @@ export const isFinalThrow = (outcome) => FINAL.has(outcome.status);
 export function throwMessage(outcome) {
   const { ball, payment } = outcome;
   // Ce que le lancer a coûté, dit comme le dresseur l'a vécu.
-  const mention = payment?.item ? `${payment.label} offerte` : `**-${ball?.price}** points`;
+  const mention = payment?.item
+    ? `${payment.label} offerte`
+    : `**-${payment?.points.toLocaleString("fr-FR")}** points`;
 
   switch (outcome.status) {
     case "unknown-ball":
@@ -448,15 +496,20 @@ export function throwMessage(outcome) {
       return `❌ Tu n'as plus de **${ball.label}** dans ton inventaire. Rien n'a été débité.`;
     case "insufficient":
       return (
-        `❌ Solde insuffisant : une **${ball.label}** coûte **${ball.price}** points, ` +
-        `tu en as **${outcome.balance}**.`
+        `❌ Solde insuffisant : une **${ball.label}** coûte **${outcome.price.toLocaleString("fr-FR")}** points, ` +
+        `tu en as **${outcome.balance.toLocaleString("fr-FR")}**.`
+      );
+    case "price-changed":
+      return (
+        `❌ Le prix de ta **${ball.label}** est passé à **${outcome.price.toLocaleString("fr-FR")}** ` +
+        "points depuis ta confirmation. Rien n'a été débité."
       );
     case "void":
       return (
         "💨 Trop tard, quelqu'un a été plus rapide ! " +
         (payment?.item
           ? `Ta **${payment.label}** t'a été rendue.`
-          : `Tes **${ball.price}** points ont été remboursés.`)
+          : `Tes **${payment.points.toLocaleString("fr-FR")}** points ont été remboursés.`)
       );
     case "miss": {
       const { species, spawn } = outcome;
@@ -501,7 +554,7 @@ export async function throwBall(
   interaction,
   spawnId,
   ballKey,
-  { panel = false, requireItem = false } = {}
+  { panel = false, requireItem = false, expectedPrice = null } = {}
 ) {
   const userId = interaction.user.id;
 
@@ -529,7 +582,8 @@ export async function throwBall(
     }
   );
 
-  resolveThrow(interaction.client, userId, spawnId, ballKey, { requireItem }, async (err, outcome) => {
+  const options = { requireItem, expectedPrice };
+  resolveThrow(interaction.client, userId, spawnId, ballKey, options, async (err, outcome) => {
     // La réponse attend l'acquittement : sans lui, Discord refuserait editReply.
     if (!(await acknowledged)) return;
     // Un seul point de sortie décide de la forme de la réponse : les boutons

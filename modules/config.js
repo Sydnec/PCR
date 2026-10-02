@@ -153,6 +153,12 @@ const POKEMON = {
         emoji: "<:masterball:1551326387455926432>",
         sprite: "master-ball",
         price: 6000,
+        // `price` est celui de la première, achetée en points ; chacune des
+        // suivantes coûte ce facteur de fois plus que la précédente, pour chaque
+        // dresseur (1 : prix fixe). Sans lui, une capture garantie devient le
+        // geste courant de quiconque a de quoi la payer. Les balls offertes ne
+        // comptent pas : elles ne coûtent rien.
+        priceGrowth: 1.2,
         multiplier: 255,
         guaranteed: true,
       },
@@ -696,6 +702,8 @@ const BOUNDS = {
   // Sous 1, les générations récentes sortiraient MOINS que les anciennes :
   // l'inverse de ce que ce réglage promet.
   "pokemon.spawn.generationBoost": { min: 1 },
+  // Sous 1, chaque Master Ball achetée coûterait MOINS que la précédente.
+  "pokemon.capture.balls.master.priceGrowth": { min: 1 },
   // On n'ouvre que ce que le jeu de données contient. Le plafond est lu dans le
   // fichier plutôt qu'écrit ici : préparer la génération suivante, c'est
   // régénérer ce fichier, et rien d'autre ne doit avoir à suivre.
