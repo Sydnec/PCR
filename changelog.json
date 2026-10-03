@@ -1,7 +1,24 @@
 {
-  "version": "1.17.3",
-  "lastUpdated": "2026-10-03T07:39:38.281Z",
+  "version": "1.17.4",
+  "lastUpdated": "2026-10-03T11:22:35.066Z",
   "releases": [
+    {
+      "version": "1.17.4",
+      "date": "2026-10-03",
+      "title": "Release 1.17.4",
+      "features": [
+        {
+          "type": "chore",
+          "name": "Outil de rechargement du bot en développement",
+          "description": "Le rechargement automatique du bot en développement n'utilise plus nodemon mais Node lui-même, ce qui retire une dépendance signalée par l'audit de sécurité. Sans changement pour les joueurs.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-10-03T08:00:00.000Z",
+          "branch": "claude/vibrant-brown-s7suxt"
+        }
+      ]
+    },
     {
       "version": "1.17.3",
       "date": "2026-10-03",
@@ -2222,16 +2239,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "chore",
-      "name": "Outil de rechargement du bot en développement",
-      "description": "Le rechargement automatique du bot en développement n'utilise plus nodemon mais Node lui-même, ce qui retire une dépendance signalée par l'audit de sécurité. Sans changement pour les joueurs.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-10-03T08:00:00.000Z",
-      "branch": "claude/vibrant-brown-s7suxt"
-    }
-  ]
+  "pending": []
 }
