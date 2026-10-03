@@ -6,7 +6,7 @@
   "main": "./index.js",
   "scripts": {
     "start": "node ./index.js",
-    "dev": "nodemon ./index.js",
+    "dev": "node --watch ./index.js",
     "test": "node --test --test-reporter=spec \"test/**/*.test.js\"",
     "gen:pokemon": "node ./scripts/generate-pokemon-data.js",
     "lint": "eslint .",
@@ -40,7 +40,6 @@
     "@eslint/js": "^10.0.1",
     "eslint": "^10.11.0",
     "globals": "^17.13.0",
-    "nodemon": "^3.0.1",
     "prettier": "^3.9.9"
   },
   "engines": {
