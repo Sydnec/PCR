@@ -1,7 +1,24 @@
 {
-  "version": "1.17.2",
-  "lastUpdated": "2026-10-02T07:16:47.096Z",
+  "version": "1.17.3",
+  "lastUpdated": "2026-10-03T07:39:38.281Z",
   "releases": [
+    {
+      "version": "1.17.3",
+      "date": "2026-10-03",
+      "title": "Release 1.17.3",
+      "features": [
+        {
+          "type": "enhancement",
+          "name": "Master Ball : un prix qui monte à chaque achat",
+          "description": "Chaque Master Ball achetée coûte 20 % de plus que la précédente, pour chaque joueur. Son prix n'est plus sur le bouton : il s'affiche dans le message de confirmation.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-10-02T14:30:00.000Z",
+          "branch": "claude/vibrant-brown-s7suxt"
+        }
+      ]
+    },
     {
       "version": "1.17.2",
       "date": "2026-10-02",
@@ -2205,16 +2222,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "enhancement",
-      "name": "Master Ball : un prix qui monte à chaque achat",
-      "description": "Chaque Master Ball achetée coûte 20 % de plus que la précédente, pour chaque joueur. Son prix n'est plus sur le bouton : il s'affiche dans le message de confirmation.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-10-02T14:30:00.000Z",
-      "branch": "claude/vibrant-brown-s7suxt"
-    }
-  ]
+  "pending": []
 }

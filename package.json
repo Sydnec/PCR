@@ -1,6 +1,6 @@
 {
   "name": "pcr",
-  "version": "1.17.2",
+  "version": "1.17.3",
   "description": "",
   "type": "module",
   "main": "./index.js",
