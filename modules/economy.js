@@ -12,6 +12,78 @@ import { EmbedBuilder } from "discord.js";
 import db from "./points-db.js";
 import { handleException } from "./utils.js";
 import { pseudo } from "./pseudo.js";
+import { getConfig } from "./config.js";
+
+export const ONE_HOUR_MS = 60 * 60 * 1000;
+
+export function getNextUtcMidnight(now = Date.now()) {
+  const next = new Date(now);
+  next.setUTCHours(24, 0, 0, 0);
+  return next.getTime();
+}
+
+// Calcule quand le prochain message pourra rapporter des points.
+// Rend null si les points sont disponibles dès maintenant, ou le timestamp ms
+// de la prochaine disponibilité (après la fin de l'heure de carence ou au
+// prochain reset quotidien à minuit UTC).
+export function calculateNextPointsAt(
+  row,
+  { now = Date.now(), distribution = getConfig().messagePointsDistribution } = {}
+) {
+  const dist = distribution ?? {};
+  const today = new Date(now).toISOString().slice(0, 10);
+
+  let lastMessageAt = row && row.last_message_at ? row.last_message_at : 0;
+  let countToday = row && row.messages_today_count ? row.messages_today_count : 0;
+  const lastResetDate = row && row.last_reset_date ? row.last_reset_date : "";
+
+  // Si on a changé de jour, reset du compteur comme dans messageCreate.js
+  if (lastResetDate !== today) {
+    countToday = 0;
+    lastMessageAt = 0;
+  }
+
+  const rank = countToday + 1;
+  const pointsToAdd =
+    dist[rank] !== undefined ? dist[rank] : dist.default !== undefined ? dist.default : 5;
+
+  const nextMidnight = getNextUtcMidnight(now);
+
+  // Si le message suivant ne rapporte rien aujourd'hui (barème à 0 ou palier atteint),
+  // on attend le reset du lendemain si le 1er message de demain rapporte quelque chose.
+  if (pointsToAdd <= 0) {
+    const tomorrowPoints =
+      dist[1] !== undefined ? dist[1] : dist.default !== undefined ? dist.default : 5;
+    if (tomorrowPoints > 0) {
+      return nextMidnight;
+    }
+    return null;
+  }
+
+  // Jamais de message récompensé aujourd'hui : points disponibles dès maintenant
+  if (lastMessageAt === 0) {
+    return null;
+  }
+
+  // Moins d'une heure écoulée depuis le dernier message récompensé
+  if (now - lastMessageAt < ONE_HOUR_MS) {
+    const readyAt = lastMessageAt + ONE_HOUR_MS;
+    return Math.min(readyAt, nextMidnight);
+  }
+
+  return null;
+}
+
+export function getNextPointsAt(userId, cb) {
+  db.get(
+    "SELECT last_message_at, messages_today_count, last_reset_date FROM points WHERE user_id = ?",
+    [userId],
+    (err, row) => {
+      if (err) return cb(err, null);
+      cb(null, calculateNextPointsAt(row));
+    }
+  );
+}
 
 // Débite cost points si le solde le permet.
 // Rappelle cb(err, true) si le débit a eu lieu, cb(err, false) sinon.
@@ -63,8 +135,23 @@ export function getBalance(userId, cb) {
 // les points ne disent pas tout de ce qu'on peut lancer, une ball offerte passant
 // avant le solde. Absent — lecture de l'inventaire ratée — la ligne est omise
 // plutôt que d'afficher un « aucune ball » qui serait faux.
-export function buildBalanceEmbed(balance, { user = null, balls = null } = {}) {
+//
+// `nextPointsAt` ajoute le délai avant le prochain gain de points possible
+// (timestamp ms en futur, ou null/passé si disponible dès maintenant). Absent
+// (undefined) — lecture ratée ou appelant qui n'en a pas besoin comme la fiche
+// d'un Pokémon — la ligne est omise.
+export function buildBalanceEmbed(
+  balance,
+  { user = null, balls = null, nextPointsAt = undefined, now = Date.now() } = {}
+) {
   const lines = [`**${balance.toLocaleString("fr-FR")}** points`];
+  if (nextPointsAt !== undefined) {
+    if (nextPointsAt && nextPointsAt > now) {
+      lines.push(`⏳ Prochains points : <t:${Math.floor(nextPointsAt / 1000)}:R>`);
+    } else {
+      lines.push("✨ Prochains points : **disponibles**");
+    }
+  }
   if (balls) {
     lines.push(
       "",

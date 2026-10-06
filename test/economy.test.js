@@ -3,6 +3,7 @@
 // échoue : rien ne se perd, rien ne se crée.
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
+import { MessageFlags } from "discord.js";
 import { createSandbox, openDatabases, dbRun, dbAll, speciesByName, withRandom } from "./helpers.js";
 
 createSandbox({ config: { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } } });
@@ -12,6 +13,8 @@ const items = await import("../modules/pokemon/items.js");
 const sell = await import("../modules/pokemon/sell.js");
 const data = await import("../modules/pokemon/data.js");
 const { getPokemonConfig } = await import("../modules/pokemon/config.js");
+const soldeCommand = (await import("../commands/solde.js")).default;
+const { runCommand, payloadOf, fakeUser } = await import("./fake-discord.js");
 
 const call = (fn, ...args) =>
   new Promise((resolve, reject) =>
@@ -100,6 +103,148 @@ describe("points", () => {
   it("le solde se met en forme avec les séparateurs français", () => {
     const embed = economy.buildBalanceEmbed(12345).toJSON();
     assert.match(JSON.stringify(embed), /12[\s\u202f\u00a0]345/);
+  });
+
+  it("sans nextPointsAt, la ligne de délai n'apparaît pas", () => {
+    const embed = economy.buildBalanceEmbed(100).toJSON();
+    assert.doesNotMatch(embed.description, /Prochains points/);
+  });
+
+  it("avec nextPointsAt dans le futur, l'embed affiche le compte à rebours avec sablier", () => {
+    const future = Date.now() + 1800_000;
+    const embed = economy.buildBalanceEmbed(100, { nextPointsAt: future }).toJSON();
+    assert.match(embed.description, new RegExp(`⏳ Prochains points : <t:${Math.floor(future / 1000)}:R>`));
+  });
+
+  it("avec nextPointsAt disponible (null ou passé), l'embed indique que les points sont disponibles", () => {
+    const past = Date.now() - 10_000;
+    const embedNull = economy.buildBalanceEmbed(100, { nextPointsAt: null }).toJSON();
+    const embedPast = economy.buildBalanceEmbed(100, { nextPointsAt: past }).toJSON();
+    assert.match(embedNull.description, /✨ Prochains points : \*\*disponibles\*\*/);
+    assert.match(embedPast.description, /✨ Prochains points : \*\*disponibles\*\*/);
+  });
+
+  it("calculateNextPointsAt : disponible pour un dresseur sans ligne ou sans message", () => {
+    assert.equal(economy.calculateNextPointsAt(null), null);
+    assert.equal(economy.calculateNextPointsAt({ last_message_at: 0 }), null);
+  });
+
+  it("calculateNextPointsAt : donne le délai exact d'une heure après un message récent", () => {
+    const now = Date.UTC(2026, 9, 6, 12, 30, 0);
+    const lastMessageAt = now - 20 * 60 * 1000;
+    const row = {
+      last_message_at: lastMessageAt,
+      messages_today_count: 1,
+      last_reset_date: "2026-10-06",
+    };
+    const nextAt = economy.calculateNextPointsAt(row, { now });
+    assert.equal(nextAt, lastMessageAt + economy.ONE_HOUR_MS);
+  });
+
+  it("calculateNextPointsAt : disponible dès qu'une heure s'est écoulée", () => {
+    const now = Date.UTC(2026, 9, 6, 13, 15, 0);
+    const lastMessageAt = now - 65 * 60 * 1000;
+    const row = {
+      last_message_at: lastMessageAt,
+      messages_today_count: 1,
+      last_reset_date: "2026-10-06",
+    };
+    assert.equal(economy.calculateNextPointsAt(row, { now }), null);
+  });
+
+  it("calculateNextPointsAt : un changement de jour réinitialise le délai pour le 1er message", () => {
+    const now = Date.UTC(2026, 9, 6, 0, 15, 0);
+    const lastMessageAt = now - 30 * 60 * 1000;
+    const row = {
+      last_message_at: lastMessageAt,
+      messages_today_count: 5,
+      last_reset_date: "2026-10-05",
+    };
+    assert.equal(economy.calculateNextPointsAt(row, { now }), null);
+  });
+
+  it("calculateNextPointsAt : borne le délai à minuit UTC si l'heure déborde sur le jour suivant", () => {
+    const now = Date.UTC(2026, 9, 6, 23, 45, 0);
+    const lastMessageAt = now - 10 * 60 * 1000;
+    const row = {
+      last_message_at: lastMessageAt,
+      messages_today_count: 1,
+      last_reset_date: "2026-10-06",
+    };
+    const nextAt = economy.calculateNextPointsAt(row, { now });
+    const midnight = Date.UTC(2026, 9, 7, 0, 0, 0);
+    assert.equal(nextAt, midnight);
+  });
+
+  it("calculateNextPointsAt : quand le barème est épuisé pour la journée, attend minuit UTC", () => {
+    const now = Date.UTC(2026, 9, 6, 15, 0, 0);
+    const lastMessageAt = now - 70 * 60 * 1000;
+    const distribution = { 1: 10, default: 0 };
+    const row = {
+      last_message_at: lastMessageAt,
+      messages_today_count: 1,
+      last_reset_date: "2026-10-06",
+    };
+    const nextAt = economy.calculateNextPointsAt(row, { now, distribution });
+    const midnight = Date.UTC(2026, 9, 7, 0, 0, 0);
+    assert.equal(nextAt, midnight);
+  });
+
+  it("getNextPointsAt lit l'état en base", async () => {
+    const now = Date.now();
+    const today = new Date(now).toISOString().slice(0, 10);
+    const lastMsg = now - 15 * 60 * 1000;
+    await dbRun(
+      points,
+      "INSERT INTO points (user_id, balance, last_message_at, messages_today_count, last_reset_date) VALUES (?, 100, ?, 1, ?)",
+      ["u1", lastMsg, today]
+    );
+    const nextAt = await call(economy.getNextPointsAt, "u1");
+    assert.ok(nextAt > now);
+    assert.equal(nextAt, lastMsg + economy.ONE_HOUR_MS);
+
+    const unknownUserNextAt = await call(economy.getNextPointsAt, "inconnu");
+    assert.equal(unknownUserNextAt, null);
+  });
+
+  it("/solde affiche le solde et les points disponibles pour un dresseur sans message récent", async () => {
+    await setBalance(500, "u1");
+    const calls = await runCommand(soldeCommand, { user: "u1" });
+    const reply = payloadOf(calls, "reply");
+    assert.equal(reply.flags, MessageFlags.Ephemeral);
+    const embed = reply.embeds[0].toJSON();
+    assert.match(embed.description, /500[\s\u202f\u00a0]*points/);
+    assert.match(embed.description, /✨ Prochains points : \*\*disponibles\*\*/);
+  });
+
+  it("/solde affiche le compte à rebours quand le dresseur est en attente d'une heure", async () => {
+    const now = Date.now();
+    const today = new Date(now).toISOString().slice(0, 10);
+    const lastMsg = now - 20 * 60 * 1000;
+    await dbRun(
+      points,
+      "INSERT INTO points (user_id, balance, last_message_at, messages_today_count, last_reset_date) VALUES (?, 800, ?, 2, ?)",
+      ["u1", lastMsg, today]
+    );
+    const calls = await runCommand(soldeCommand, { user: "u1" });
+    const reply = payloadOf(calls, "reply");
+    const embed = reply.embeds[0].toJSON();
+    assert.match(embed.description, /800[\s\u202f\u00a0]*points/);
+    assert.match(embed.description, /⏳ Prochains points : <t:\d+:R>/);
+  });
+
+  it("/solde pour un autre dresseur affiche son solde et son statut", async () => {
+    await setBalance(1200, "u2");
+    const calls = await runCommand(soldeCommand, {
+      user: "u1",
+      users: { user: fakeUser("u2") },
+      options: { user: "u2" },
+    });
+    const reply = payloadOf(calls, "reply");
+    const embed = reply.embeds[0].toJSON();
+    assert.match(embed.title, /Solde de Dresseur u2/);
+    assert.match(embed.description, /1[\s\u202f\u00a0]200[\s\u202f\u00a0]*points/);
+    assert.match(embed.description, /✨ Prochains points : \*\*disponibles\*\*/);
   });
 });
 
