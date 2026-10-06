@@ -2239,5 +2239,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "feature",
+      "name": "/solde : compte à rebours avant les prochains points",
+      "description": "La réponse de /solde affiche désormais un compte à rebours dynamique précisant dans combien de temps le prochain message rapportera des points (ou confirme qu'ils sont disponibles dès maintenant).",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-06T12:05:00.000Z",
+      "branch": "solde_timer_points_countdown"
+    }
+  ]
 }
