@@ -43,8 +43,10 @@ export async function render(ctx) {
   // Ce qui n'appartient qu'à cet onglet : la Master Ball ou l'entrée du parc en
   // attente de confirmation, la réponse du dernier lancer, et la fin du
   // cooldown affiché.
+  // La confirmation de la Master Ball vise une apparition ({ key, spawnId }) : le salon et la
+  // pêche ont chacun la leur. Les balls spéciales s'ouvrent de même par apparition.
   let confirming = null;
-  let showSpecial = false;
+  const specialOpen = new Set();
   let buyingSafari = false;
   let panel = null;
   let throwing = false;
@@ -69,7 +71,12 @@ export async function render(ctx) {
         h(
           "div",
           { class: "capture-layout" },
-          h("div", { class: "capture-main" }, state.spawn ? spawnView() : waiting()),
+          h(
+            "div",
+            { class: "capture-main" },
+            state.spawn ? spawnView(state.spawn) : waiting(),
+            fishingView()
+          ),
           h("aside", { class: "capture-aside" }, journal(), drops())
         ),
       ].filter(Boolean)
@@ -85,8 +92,13 @@ export async function render(ctx) {
     }
     const nextSignature = JSON.stringify(next);
     if (!force && nextSignature === signature) return;
-    // Un nouveau Pokémon : la confirmation et la réponse visaient l'ancien.
-    if (next.spawn && next.spawn.id !== state.spawn?.id) {
+    // Un nouveau Pokémon, au salon ou au bout de la ligne : la confirmation et la réponse
+    // visaient l'ancien.
+    const touch = next.fishing?.spawn;
+    if (
+      (next.spawn && next.spawn.id !== state.spawn?.id) ||
+      (touch && touch.id !== state.fishing?.spawn?.id)
+    ) {
       confirming = null;
       panel = null;
     }
@@ -110,20 +122,30 @@ export async function render(ctx) {
     coolTimer = setTimeout(draw, seconds * 1000);
   }
 
-  async function throwBall(ball, { requireItem = false, expectedPrice = null } = {}) {
+  async function throwBall(ball, { requireItem = false, expectedPrice = null } = {}, spawn) {
     throwing = true;
     confirming = null;
     draw();
     try {
       const result = await api("/api/spawn/throw", {
         method: "POST",
-        body: { spawnId: state.spawn.id, ball: ball.key, requireItem, expectedPrice },
+        body: { spawnId: spawn.id, ball: ball.key, requireItem, expectedPrice },
       });
-      panel = { text: result.message, status: result.status };
+      panel = {
+        text: result.message,
+        status: result.status,
+        spawnId: spawn.id,
+        fished: Boolean(spawn.fished),
+      };
       if (result.status === "cooldown") coolDown(result.remaining);
       else if (!result.final) coolDown(state.cooldownSeconds);
     } catch (error) {
-      panel = { text: error.message, status: "error" };
+      panel = {
+        text: error.message,
+        status: "error",
+        spawnId: spawn.id,
+        fished: Boolean(spawn.fished),
+      };
     }
     throwing = false;
     await refreshAll();
@@ -131,8 +153,9 @@ export async function render(ctx) {
 
   // ---------------------- Le Pokémon ----------------------
 
-  function spawnView() {
-    const spawn = state.spawn;
+  // Une apparition du salon, ou la touche réservée au pêcheur (`fished`) : même carte, mêmes
+  // balls, mêmes chances.
+  function spawnView(spawn) {
     const species = ctx.species.get(spawn.speciesId);
     if (!species) return h("p", { class: "notice" }, "Un Pokémon inconnu apparaît…");
     const view = h(
@@ -159,7 +182,13 @@ export async function render(ctx) {
         spawn.shiny ? [icon("sparkle", { label: "Shiny" }), " "] : null,
         "Un ",
         pokemonName(species, false, spawn.sex, null, spawn.form),
-        spawn.shiny ? " shiny apparaît !" : " sauvage apparaît !"
+        spawn.fished
+          ? spawn.shiny
+            ? " shiny mord à la ligne !"
+            : " mord à la ligne !"
+          : spawn.shiny
+            ? " shiny apparaît !"
+            : " sauvage apparaît !"
       ),
       h(
         "p",
@@ -186,8 +215,8 @@ export async function render(ctx) {
         : null,
       wallet(),
       balls(spawn),
-      confirming ? confirmation(spawn) : null,
-      panel ? throwPanel() : null,
+      confirming?.spawnId === spawn.id ? confirmation(spawn) : null,
+      panel?.spawnId === spawn.id ? throwPanel() : null,
       lineageView(ctx, spawn.lineage, { currentId: spawn.speciesId, shiny: spawn.shiny })
     );
     // Un halo de la couleur de son premier type, comme la bordure de l'embed.
@@ -255,8 +284,8 @@ export async function render(ctx) {
           // La Master Ball se confirme, comme sur Discord : un mésclic ne se
           // rattrape pas.
           onclick: () => {
-            if (!ball.guaranteed) return throwBall(ball);
-            confirming = ball.key;
+            if (!ball.guaranteed) return throwBall(ball, {}, spawn);
+            confirming = { key: ball.key, spawnId: spawn.id };
             draw();
           },
         },
@@ -295,10 +324,10 @@ export async function render(ctx) {
         h(
           "button",
           {
-            class: `ball ball-special${showSpecial ? " ball-open" : ""}`,
+            class: `ball ball-special${specialOpen.has(spawn.id) ? " ball-open" : ""}`,
             disabled: throwing,
             onclick: () => {
-              showSpecial = !showSpecial;
+              if (!specialOpen.delete(spawn.id)) specialOpen.add(spawn.id);
               draw();
             },
           },
@@ -306,12 +335,12 @@ export async function render(ctx) {
           h("span", { class: "ball-text" }, h("span", { class: "ball-label" }, "Balls spéciales"))
         )
       ),
-      showSpecial ? h("div", { class: "balls" }, special.map(button)) : null
+      specialOpen.has(spawn.id) ? h("div", { class: "balls" }, special.map(button)) : null
     );
   }
 
   function confirmation(spawn) {
-    const ball = spawn.balls.find((candidate) => candidate.key === confirming);
+    const ball = spawn.balls.find((candidate) => candidate.key === confirming.key);
     if (!ball) return null;
     const free = ball.free > 0;
     return h(
@@ -339,7 +368,11 @@ export async function render(ctx) {
             // que la confirmation Discord. Payante, le prix affiché est celui
             // qu'on promet, et il ne doit pas avoir monté entre-temps.
             onclick: () =>
-              throwBall(ball, { requireItem: free, expectedPrice: free ? null : ball.price }),
+              throwBall(
+                ball,
+                { requireItem: free, expectedPrice: free ? null : ball.price },
+                spawn
+              ),
           },
           free ? `Utiliser ma ${ball.label}` : `Confirmer (-${fmt(ball.price)} pts)`
         ),
@@ -361,6 +394,75 @@ export async function render(ctx) {
   const throwPanel = () =>
     outcomePanel(panel.text, PANEL_ICONS[panel.status], `throw-${panel.status}`);
 
+  // ---------------------- La pêche ----------------------
+
+  async function castLine(rod) {
+    throwing = true;
+    draw();
+    try {
+      const result = await api("/api/fishing/cast", { method: "POST", body: { rod: rod.key } });
+      panel = result.ok ? null : { text: result.message, status: "error", fished: true };
+    } catch (error) {
+      panel = { text: error.message, status: "error", fished: true };
+    }
+    throwing = false;
+    await refreshAll();
+  }
+
+  // Les cannes, ou la touche qui attend : une seule à la fois, et elle n'est qu'au pêcheur.
+  // Rien ne s'affiche tant que la génération de la pêche est fermée.
+  function fishingView() {
+    const fishing = state.fishing;
+    if (!fishing?.open) return null;
+    const touch = fishing.spawn;
+    return h(
+      "section",
+      { class: "fishing" },
+      h("h3", {}, "Pêche"),
+      touch
+        ? [
+            h(
+              "p",
+              { class: "muted small" },
+              `Réservé à toi : il s'enfuit vers ${new Date(touch.fleesAt).toLocaleTimeString("fr-FR")}. ` +
+                "Les balls se paient comme sur une apparition."
+            ),
+            spawnView(touch),
+          ]
+        : [
+            h(
+              "div",
+              { class: "rods" },
+              fishing.rods.map((rod) => {
+                const poor = state.wallet.balance < rod.price;
+                const reason = !rod.owned
+                  ? "Tu n'as pas cette canne : elle tombe sur les Pokémon et se gagne à la loterie."
+                  : poor
+                    ? `Il te faut ${fmt(rod.price)} pts, tu en as ${fmt(state.wallet.balance)}.`
+                    : rod.description;
+                return h(
+                  "button",
+                  {
+                    class: `ball${rod.owned && !poor ? "" : " ball-off"}`,
+                    disabled: throwing || !rod.owned || poor,
+                    title: reason,
+                    onclick: () => castLine(rod),
+                  },
+                  h("span", { class: "ball-icon" }, itemIcon(rod)),
+                  h(
+                    "span",
+                    { class: "ball-text" },
+                    h("span", { class: "ball-label" }, rod.label),
+                    h("span", { class: "ball-meta" }, `${fmt(rod.price)} pts`)
+                  )
+                );
+              })
+            ),
+            panel?.fished ? throwPanel() : null,
+          ]
+    );
+  }
+
   // ---------------------- Entre deux apparitions ----------------------
 
   function waiting() {
@@ -370,7 +472,7 @@ export async function render(ctx) {
     return h(
       "div",
       { class: "spawn-empty" },
-      panel ? throwPanel() : null,
+      panel && !panel.fished ? throwPanel() : null,
       species
         ? h(
             "div",

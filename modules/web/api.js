@@ -67,6 +67,7 @@ import {
 } from "../pokemon/data.js";
 import { getBalls, getPokemonConfig, getSafariConfig } from "../pokemon/config.js";
 import { buyBalls, getShopView, getUnitCounts, openSpecialBalls } from "../pokemon/shop.js";
+import { castLine, getFishingSpawn, getRodsOf } from "../pokemon/fishing.js";
 import { announceDropClaim, claimDrop, getOpenDrops } from "../pokemon/drops.js";
 import { paidEntryRefund, safariOutcomeLine } from "../pokemon/embeds.js";
 import {
@@ -473,6 +474,30 @@ async function spawnJson(ctx, spawn, balance) {
   };
 }
 
+// La pêche du dresseur : ses cannes avec leur prix et ce qu'il en a, et la touche qui lui
+// est réservée, présentée comme une apparition (mêmes balls, mêmes chances). `open` dit si
+// la pêche existe déjà ; elle reste cachée tant que sa génération est fermée.
+async function fishingJson(ctx, balance) {
+  const rods = await promise((cb) => getRodsOf(ctx.user.id, cb));
+  if (!rods.length) return { open: false, rods: [], spawn: null };
+  const catchRow = await promise((cb) => getFishingSpawn(ctx.user.id, cb));
+  return {
+    open: true,
+    rods: rods.map((rod) => ({
+      key: rod.key,
+      label: rod.label,
+      emoji: rod.emoji,
+      image: itemImageUrl(rod.sprite),
+      description: rod.description,
+      price: rod.price,
+      owned: rod.owned,
+    })),
+    spawn: catchRow
+      ? { ...(await spawnJson(ctx, catchRow, balance)), fleesAt: catchRow.flees_at, fished: true }
+      : null,
+  };
+}
+
 // ---------------------- Parc safari ----------------------
 
 // Une visite du parc telle que le site l'affiche : la rencontre (chances, appât,
@@ -833,6 +858,7 @@ export const routes = [
         wallet,
         safari: (await safariState(ctx)).json,
         spawn: active ? await spawnJson(ctx, active, wallet.balance) : null,
+        fishing: await fishingJson(ctx, wallet.balance),
         last: last
           ? {
               id: last.id,
@@ -1186,6 +1212,24 @@ export const routes = [
               form: formJson(outcome.species, outcome.caught.form, Boolean(outcome.shiny)),
             }
           : null,
+      };
+    },
+  },
+
+  // Lancer sa ligne : la même fonction que /pk pecher. Un refus (points, canne, touche déjà
+  // là) est une issue du jeu et non une erreur : `ok` le dit, `message` est déjà rédigé.
+  {
+    method: "POST",
+    path: "/api/fishing/cast",
+    auth: true,
+    write: true,
+    handler: async (ctx) => {
+      if (typeof ctx.body.rod !== "string") throw new HttpError(400, "rod manquante.");
+      const result = await promise((cb) => castLine(ctx.user.id, ctx.body.rod, cb));
+      return {
+        ok: result.ok,
+        message: result.ok ? null : result.reason,
+        price: result.price ?? null,
       };
     },
   },

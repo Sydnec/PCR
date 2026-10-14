@@ -107,6 +107,11 @@ describe("référentiels", () => {
     assert.ok(catalogue.items.some((item) => item.key === "super_bonbon"));
   });
 
+  it("la pêche est cachée tant que sa génération est fermée", async () => {
+    const { fishing } = await call("GET", "/api/spawn");
+    assert.deepEqual(fishing, { open: false, rods: [], spawn: null });
+  });
+
   it("les règles en chiffres portent la durée de vie des légendaires et le plancher", async () => {
     const rules = await call("GET", "/api/rules");
     assert.ok(rules.spawn.legendaryFleeMultiplier >= 1);
