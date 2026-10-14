@@ -37,6 +37,7 @@ import {
 } from "./items.js";
 import { recordFusion, recordTrade } from "./stats.js";
 import { checkCharms } from "./charms.js";
+import { checkStarterRewards } from "./starters.js";
 
 // Un groupe d'individus : une espèce, une variante, et au besoin un sexe et une
 // fertilité. Les commandes encodent le tout dans la valeur d'une option ; une
@@ -502,7 +503,16 @@ export function getLeaderboard(limit, cb) {
 // l'annonce a montrés ; la ball est celle de la capture, NULL quand il n'y en a
 // pas eu. Rend l'individu créé { id, sex, form }.
 export function creditSpecies(userId, speciesId, isShiny, options, cb) {
-  const { ball = null, origin, sex = null, form = null, obtainedAt = Date.now() } = options;
+  const {
+    ball = null,
+    origin,
+    sex = null,
+    form = null,
+    obtainedAt = Date.now(),
+    // Les dons de starter ne relancent pas leur propre vérification : c'est elle
+    // qui les donne, et elle relit le Pokédex entre deux paliers.
+    checkStarters = true,
+  } = options;
   const species = getSpecies(speciesId);
   const chosenSex = sex ?? rollSex(species);
   const chosenForm = formOf(species, form) ? form : rollForm(species);
@@ -526,6 +536,7 @@ export function creditSpecies(userId, speciesId, isShiny, options, cb) {
       // Une espèce de plus peut compléter un Pokédex : le Charme Chroma suit,
       // sans retarder celui qui vient d'obtenir son Pokémon.
       checkCharms(userId);
+      if (checkStarters) checkStarterRewards(userId);
       cb(null, { id: this.lastID, sex: chosenSex, form: chosenForm });
     }
   );
@@ -642,7 +653,10 @@ export function restoreDuplicates(rows, cb = () => {}) {
     if (!row) {
       // Un Pokémon qui évolue change d'espèce, un Pokémon échangé change de
       // boîte : l'un comme l'autre peut compléter un Pokédex.
-      for (const userId of new Set(rows.map((entry) => entry.user_id))) checkCharms(userId);
+      for (const userId of new Set(rows.map((entry) => entry.user_id))) {
+        checkCharms(userId);
+        checkStarterRewards(userId);
+      }
       return cb(null);
     }
     // La place dans la boîte PC, le surnom, le verrou et le rang en vitrine

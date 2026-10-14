@@ -188,6 +188,21 @@ const POKEMON = {
   // et son porteur voit `multiplier` fois plus de shiny parmi les Pokémon de
   // cette génération : apparitions, parc safari, œufs.
   shinyCharm: { multiplier: 2 },
+  // Le starter de génération : à l'ouverture d'une génération prévue ici, chaque
+  // dresseur choisit une fois, définitivement, l'un des trois (identifiants du
+  // Pokédex) et reçoit le stade 1. La génération 1 n'a pas de choix : elle était là
+  // avant. Compléter le Pokédex de la génération — hors légendaires, comme le
+  // Charme Chroma — fait ensuite recevoir, une fois chacun, les paliers de
+  // `rewards` : `percent` du Pokédex, le `stade` de la lignée choisie, shiny ou non.
+  // Un palier déjà atteint au moment du choix se donne aussitôt (rattrapage).
+  starters: {
+    choices: { 2: [152, 155, 158] },
+    rewards: [
+      { percent: 33, stage: 2, shiny: false },
+      { percent: 66, stage: 3, shiny: false },
+      { percent: 100, stage: 1, shiny: true },
+    ],
+  },
   // Les œufs, seule porte vers les bébés. Un couple de parents — un mâle et une
   // femelle de la famille, Métamorph pouvant tenir l'un des deux rôles — pond
   // un œuf qui éclot au premier des deux seuils : tant d'heures, ou tant de

@@ -6,6 +6,7 @@ import { sweepSafari } from '../../modules/pokemon/safari.js';
 import { startWebServer } from '../../modules/web/server.js';
 import { setPseudoClient } from '../../modules/pseudo.js';
 import { repairCharms } from '../../modules/pokemon/charms.js';
+import { repairStarters } from '../../modules/pokemon/starters.js';
 import { migrateRetiredStones } from '../../modules/pokemon/items.js';
 
 const name = 'clientReady';
@@ -58,6 +59,10 @@ async function execute(bot) {
     // Les Charmes Chroma : ceux qu'un Pokédex déjà complet n'a pas encore
     // donnés, et les rôles de leurs porteurs, remis d'accord avec l'inventaire.
     repairCharms(bot);
+
+    // Les paliers de starter qu'un Pokédex atteint avant l'arrivée du système, ou
+    // une coupure, n'auraient pas encore donnés.
+    repairStarters(bot);
 
     // Les Pierres Feu, Foudre et Eau deviennent des Évolytes. Temporaire : à
     // retirer une fois déployé. Un échec (une transaction déjà ouverte) se

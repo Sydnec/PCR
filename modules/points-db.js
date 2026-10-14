@@ -674,6 +674,38 @@ const db = new sqlite3.Database(dbPath, (err) => {
       }
     );
 
+    // Le starter choisi à l'ouverture d'une génération : un par dresseur et par
+    // génération, définitif. La clé primaire rend le choix unique même sous deux
+    // clics simultanés (INSERT OR IGNORE).
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_starters (
+        user_id TEXT NOT NULL,
+        generation INTEGER NOT NULL,
+        species_id INTEGER NOT NULL,
+        chosen_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, generation)
+      )`,
+      (err) => {
+        if (err) handleException("Erreur création table pokemon_starters :", err);
+      }
+    );
+
+    // Les paliers de Pokédex déjà donnés pour un starter (`percent` : le palier
+    // de la configuration). La revendication précède le don, et se retire si le
+    // don échoue : un palier n'est jamais donné deux fois, ni perdu.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_starter_rewards (
+        user_id TEXT NOT NULL,
+        generation INTEGER NOT NULL,
+        percent INTEGER NOT NULL,
+        given_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, generation, percent)
+      )`,
+      (err) => {
+        if (err) handleException("Erreur création table pokemon_starter_rewards :", err);
+      }
+    );
+
     // Captures du parc : alimente le bilan de fin de session.
     db.run(
       `CREATE TABLE IF NOT EXISTS pokemon_safari_catches (
