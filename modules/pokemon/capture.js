@@ -27,8 +27,8 @@ import {
 } from "./items.js";
 import { dropItem, leavesItemBehind } from "./drops.js";
 import { ballMultiplier, catchProbability, charmFactor, getSpecies } from "./data.js";
-import { getOpenSpecialBall, getUnitCounts, restoreUnit, takeUnit } from "./shop.js";
-import { buildBallRow, displayName } from "./embeds.js";
+import { getOpenSpecialBall, getUnitCounts, openSpecialBalls, restoreUnit, takeUnit } from "./shop.js";
+import { buildBallRow, buildSpecialRow, displayName } from "./embeds.js";
 import { finalizeCaughtSpawn, getSpawn, refreshSpawnEmbed } from "./spawn.js";
 import { recordSpawnEnd, recordThrow } from "./stats.js";
 import { getCharms } from "./charms.js";
@@ -95,6 +95,35 @@ export function ballPanelRow(userId, spawnId) {
         reject(error);
       }
     })
+  );
+}
+
+// Le sous-menu des balls spéciales, avec ce qui sert à cette apparition : les balls
+// achetées avant elle. Une lecture ratée désactive les boutons plutôt que de promettre
+// des balls qu'on n'a peut-être pas.
+export function specialPanelRow(userId, spawnId, { panel = false } = {}) {
+  return new Promise((resolve) =>
+    getSpawn(spawnId, (spawnError, spawn) =>
+      getInventory(userId, (inventoryError, inventory) =>
+        getUnitCounts(
+          userId,
+          (err, counts) => {
+            const failed = spawnError ?? inventoryError ?? err;
+            if (failed) handleException("Lecture des balls spéciales :", failed);
+            resolve(
+              buildSpecialRow(spawnId, {
+                balls: openSpecialBalls(),
+                counts,
+                masterHeld: inventoryError ? 0 : freeBallCount(inventory, "master"),
+                panel,
+                disabled: Boolean(failed),
+              })
+            );
+          },
+          { spawnedAt: spawn?.spawned_at ?? 0 }
+        )
+      )
+    )
   );
 }
 

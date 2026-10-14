@@ -16,7 +16,7 @@ const items = await import("../modules/pokemon/items.js");
 const economy = await import("../modules/economy.js");
 const data = await import("../modules/pokemon/data.js");
 const { getPokemonConfig, getSafariConfig } = await import("../modules/pokemon/config.js");
-const { buildBallRow } = await import("../modules/pokemon/embeds.js");
+const { buildBallRow, buildSpecialRow } = await import("../modules/pokemon/embeds.js");
 
 const GEN1 = { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } };
 const GEN2 = { pokemon: { generation: 2 } };
@@ -131,7 +131,7 @@ const openPark = async () =>
 beforeEach(async () => {
   for (const table of [
     "points", "pokemon_owned", "pokemon_inventory", "pokemon_item_log", "pokemon_spawns", "pokemon_throws", "pokemon_drops",
-    "pokemon_trades", "pokemon_safari_sessions", "pokemon_safari_parks", "pokemon_showcase_shares", "pokemon_fusions", "points_log",
+    "pokemon_trades", "pokemon_ball_units", "pokemon_safari_sessions", "pokemon_safari_parks", "pokemon_showcase_shares", "pokemon_fusions", "points_log",
   ]) {
     await dbRun(points, `DELETE FROM ${table}`);
   }
@@ -172,18 +172,58 @@ describe("lancer une ball depuis l'annonce", () => {
     const reply = only(calls, "editReply");
     assert.match(reply.content, /Raté/);
     assert.equal(reply.components.length, 1);
-    assert.ok(buttonIds(reply).every((customId) => /^poke_re(throw|master)\|/.test(customId)), "les boutons du panneau relancent depuis le panneau");
-    assert.deepEqual(labels(reply).map((label) => /\(\d/.test(label)), [true, true, true, false], "chaque ball annonce son prix, la Master Ball renvoie à sa confirmation");
+    assert.ok(buttonIds(reply).every((customId) => /^poke_re(throw|special)\|/.test(customId)), "les boutons du panneau relancent depuis le panneau");
+    assert.deepEqual(labels(reply).map((label) => /\(\d/.test(label)), [true, true, true, false], "chaque ball annonce son prix, les balls spéciales n'en ont pas");
+    assert.equal(labels(reply).at(-1), "Balls spéciales", "la Master Ball est derrière ce bouton");
   });
 
-  it("l'annonce publique ne dit pas le prix de la Master Ball : il est propre à chaque dresseur", () => {
+  it("l'annonce publique ne montre plus la Master Ball : elle est dans les balls spéciales, sans prix", () => {
     const row = (options) => buildBallRow(1, options).toJSON().components.map((button) => button.label);
-    const [poke, , , master] = row();
+    const [poke, , , special] = row();
     assert.match(poke, /^Poké Ball \(\d+\)$/);
-    assert.equal(master, "Master Ball");
+    assert.equal(special, "Balls spéciales");
+    assert.equal(row().length, 4);
+    const menu = (options) => buildSpecialRow(1, { balls: [], ...options }).toJSON().components.map((button) => button.label);
+    assert.deepEqual(menu(), ["Master Ball"]);
     // Offerte, elle l'est pour celui qui la tient, et son nombre se dit.
-    assert.equal(row({ panel: true, stock: new Map([["master", 2]]) })[3], "Master Ball (offerte ×2)");
-    assert.equal(row({ prices: false })[3], "Master Ball");
+    assert.deepEqual(menu({ panel: true, masterHeld: 2 }), ["Master Ball (offerte ×2)", "Retour"]);
+  });
+
+  it("les balls spéciales : un éphémère depuis l'annonce, avec ce qui sert à CETTE apparition", async () => {
+    sandbox.writeConfig(GEN2);
+    const user = newUser();
+    const id = await spawnRow("Roucool");
+    const spawnedAt = (await dbGet(points, "SELECT spawned_at FROM pokemon_spawns WHERE id = ?", [id])).spawned_at;
+    await dbRun(points, "INSERT INTO pokemon_ball_units (user_id, ball, bought_at) VALUES (?, 'appat', ?), (?, 'appat', ?)", [user, spawnedAt - 100, user, spawnedAt + 100]);
+    const calls = await click(`poke_special|${id}`, { user });
+    const reply = only(calls, "reply");
+    assert.equal(reply.flags, MessageFlags.Ephemeral);
+    assert.match(reply.content, /achetée ne sert qu'aux Pokémon qui apparaissent \*\*après\*\* son achat/);
+    assert.deepEqual(labels(reply), ["Appât Ball (×1)", "Catalyseur Ball (×0)", "Master Ball"], "la seconde Appât Ball a été achetée après");
+    const buttons = reply.components[0].toJSON().components;
+    assert.deepEqual(buttons.map((button) => button.disabled ?? false), [false, true, false], "sans ball utilisable, le bouton est grisé");
+    assert.deepEqual(buttons.map((button) => button.custom_id), [`poke_throw|${id}|appat`, `poke_throw|${id}|catalyseur`, `poke_master|${id}`]);
+  });
+
+  it("depuis le panneau, le sous-menu réécrit le message ; « Retour » rend les balls ordinaires", async () => {
+    sandbox.writeConfig(GEN2);
+    const user = newUser();
+    const id = await spawnRow("Roucool");
+    const opened = only(await click(`poke_respecial|${id}`, { user }), "update");
+    assert.deepEqual(buttonIds(opened), [`poke_rethrow|${id}|appat`, `poke_rethrow|${id}|catalyseur`, `poke_remaster|${id}`, `poke_reback|${id}`]);
+    const back = only(await click(`poke_reback|${id}`, { user }), "update");
+    assert.deepEqual(labels(back).at(-1), "Balls spéciales");
+    assert.ok(buttonIds(back).every((customId) => /^poke_re(throw|special)\|/.test(customId)));
+  });
+
+  it("lancer une ball spéciale sans en avoir est refusé en le disant, rien n'est débité", async () => {
+    sandbox.writeConfig(GEN2);
+    const user = newUser();
+    const id = await spawnRow("Roucool");
+    await setBalance(5000, user);
+    const calls = await click(`poke_throw|${id}|appat`, { user });
+    assert.match(only(calls, "editReply").content, /Aucune \*\*Appât Ball\*\* ne peut servir ici/);
+    assert.equal(await balance(user), 5000);
   });
 
   it("depuis le panneau, c'est le même message qu'on réécrit : l'accusé est un `deferUpdate`", async () => {

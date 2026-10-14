@@ -181,13 +181,12 @@ export function buildBallRow(
   { disabled = false, panel = false, stock = null, prices = true } = {}
 ) {
   const row = new ActionRowBuilder();
+  // La Master Ball n'est plus ici : elle rejoint les balls spéciales, derrière le
+  // dernier bouton (buildSpecialRow).
   for (const [key, ball] of Object.entries(getPokemonConfig().capture.balls)) {
-    // La Master Ball passe par une confirmation : à 22 500 points, un mésclic
-    // n'est pas rattrapable.
+    if (ball.guaranteed) continue;
     const held = stock?.get(key) ?? 0;
-    const customId = ball.guaranteed
-      ? `${panel ? "poke_remaster" : "poke_master"}|${spawnId}`
-      : `${panel ? "poke_rethrow" : "poke_throw"}|${spawnId}|${key}${held ? "|item" : ""}`;
+    const customId = `${panel ? "poke_rethrow" : "poke_throw"}|${spawnId}|${key}${held ? "|item" : ""}`;
     const label = held
       ? `${ball.label} (offerte ×${held.toLocaleString("fr-FR")})`
       : prices && !hasPersonalPrice(ball)
@@ -198,7 +197,61 @@ export function buildBallRow(
         .setCustomId(customId)
         .setLabel(label)
         .setEmoji(ball.emoji)
-        .setStyle(ball.guaranteed ? ButtonStyle.Danger : ButtonStyle.Primary)
+        .setStyle(ButtonStyle.Primary)
+        .setDisabled(disabled)
+    );
+  }
+  row.addComponents(
+    new ButtonBuilder()
+      .setCustomId(`${panel ? "poke_respecial" : "poke_special"}|${spawnId}`)
+      .setLabel("Balls spéciales")
+      .setEmoji("🌟")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(disabled)
+  );
+  return row;
+}
+
+// Le sous-menu des balls spéciales : celles de la boutique (`balls`, avec pour chacune
+// ce qui sert à CETTE apparition dans `counts`) et la Master Ball, qui passe toujours
+// par sa confirmation — à 22 500 points, un mésclic n'est pas rattrapable. Aucun
+// prix : celui d'une ball achetée est déjà payé, celui de la Master Ball se lit sur
+// sa confirmation. Depuis le panneau, un bouton ramène aux balls ordinaires.
+export function buildSpecialRow(
+  spawnId,
+  { balls, counts, masterHeld = 0, panel = false, disabled = false }
+) {
+  const row = new ActionRowBuilder();
+  for (const ball of balls) {
+    const usable = counts?.get(ball.key)?.eligible ?? 0;
+    row.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`${panel ? "poke_rethrow" : "poke_throw"}|${spawnId}|${ball.key}`)
+        .setLabel(`${ball.label} (×${usable.toLocaleString("fr-FR")})`)
+        .setEmoji(ball.emoji)
+        .setStyle(ButtonStyle.Primary)
+        .setDisabled(disabled || usable === 0)
+    );
+  }
+  const master = getBall("master");
+  if (master) {
+    row.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`${panel ? "poke_remaster" : "poke_master"}|${spawnId}`)
+        .setLabel(
+          masterHeld ? `${master.label} (offerte ×${masterHeld.toLocaleString("fr-FR")})` : master.label
+        )
+        .setEmoji(master.emoji)
+        .setStyle(ButtonStyle.Danger)
+        .setDisabled(disabled)
+    );
+  }
+  if (panel) {
+    row.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`poke_reback|${spawnId}`)
+        .setLabel("Retour")
+        .setStyle(ButtonStyle.Secondary)
         .setDisabled(disabled)
     );
   }
