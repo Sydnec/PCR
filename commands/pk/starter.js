@@ -76,7 +76,7 @@ export default {
   describe: (sub) =>
     sub
       .setName("starter")
-      .setDescription("Choisis ton starter de génération, ou vois où en sont tes récompenses")
+      .setDescription("Ton starter de génération : choix et récompenses")
       .addStringOption((option) =>
         option
           .setName("pokemon")

@@ -30,7 +30,7 @@ export default {
       .addUserOption((option) =>
         option
           .setName("membre")
-          .setDescription("Le dresseur dont tu veux comparer les doublons et le Pokédex avec les tiens")
+          .setDescription("Le dresseur à comparer avec toi")
           .setRequired(false)
       )
       .addStringOption((option) =>
@@ -43,7 +43,7 @@ export default {
       .addBooleanOption((option) =>
         option
           .setName("evolutions")
-          .setDescription("Mettre de côté ce qu'il faut pour les évolutions qui manquent (oui par défaut)")
+          .setDescription("Garder de quoi faire évoluer (oui par défaut)")
           .setRequired(false)
       ),
 

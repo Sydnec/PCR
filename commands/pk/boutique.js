@@ -12,7 +12,7 @@ export default {
   describe: (sub) =>
     sub
       .setName("boutique")
-      .setDescription("La boutique des balls spéciales : vois le catalogue, ou achète-les")
+      .setDescription("Boutique des balls spéciales : catalogue et achat")
       .addStringOption((option) =>
         option
           .setName("ball")
