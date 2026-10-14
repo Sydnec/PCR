@@ -116,9 +116,10 @@ export function freeBallCount(inventory, ballKey) {
 // Soleil n'a rien à faire évoluer tant que Joliflor n'existe pas.
 // Une canne s'ouvre avec la pêche (`fishing.generation`), pas avec une génération écrite à
 // part sur l'objet : les deux ne peuvent pas diverger.
-export const itemOpen = (item) =>
-  Number(item?.rod ? getPokemonConfig().fishing?.generation : (item?.generation ?? 1)) <=
-  activeGeneration();
+export const itemGeneration = (item) =>
+  Number(item?.rod ? getPokemonConfig().fishing?.generation : (item?.generation ?? 1));
+
+export const itemOpen = (item) => itemGeneration(item) <= activeGeneration();
 
 export const itemDropWeight = (item) =>
   itemOpen(item) ? Math.max(0, Number(item?.dropWeight) || 0) : 0;
@@ -187,7 +188,7 @@ function openedChance(chance, weightOf) {
   const setting = Math.max(0, Math.min(1, Number(chance) || 0));
   const items = getItems();
   const base = items
-    .filter((item) => Number(item.generation ?? 1) <= 1)
+    .filter((item) => itemGeneration(item) <= 1)
     .reduce((sum, item) => sum + weightOf(item), 0);
   if (!base) return setting;
   const total = items.reduce((sum, item) => sum + weightOf(item), 0);

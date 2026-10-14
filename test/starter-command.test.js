@@ -103,6 +103,9 @@ describe("/pk starter", () => {
     const text = buildGenerationEmbed(2).toJSON().description;
     assert.match(text, /\/pk starter/);
     assert.match(text, /Germignon, Héricendre et Kaiminus/);
-    assert.doesNotMatch(buildGenerationEmbed(1).toJSON().description ?? "", /\/pk starter/);
+    assert.match(text, /La \*\*pêche\*\* ouvre.*\/pk pecher/s);
+    assert.match(text, /La \*\*boutique\*\* ouvre : \*\*Appât Ball\*\* et \*\*Catalyseur Ball\*\*.*\/pk boutique/s);
+    assert.doesNotMatch(text, /\*\*Canne\*\*/, "la Canne de base ne « tombe » pas");
+    assert.doesNotMatch(buildGenerationEmbed(1).toJSON().description ?? "", /\/pk starter|\/pk pecher|\/pk boutique/);
   });
 });

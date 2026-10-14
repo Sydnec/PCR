@@ -9,9 +9,9 @@
 import { EmbedBuilder } from "discord.js";
 import db from "../points-db.js";
 import { handleException, log } from "../utils.js";
-import { getPokemonConfig, getSafariConfig } from "./config.js";
+import { getPokemonConfig, getSafariConfig, getSpecialBalls } from "./config.js";
 import { activeGeneration, allSpecies, generationOrdinal, isLegendary } from "./data.js";
-import { getCharmItem, getItems } from "./items.js";
+import { getCharmItem, getItems, itemGeneration } from "./items.js";
 import { charmSpecies } from "./charms.js";
 import { starterChoices } from "./starters.js";
 import { resolveChannel } from "./spawn.js";
@@ -28,7 +28,8 @@ export function buildGenerationEmbed(generation) {
   const babies = species.filter((entry) => entry.isBaby).map((entry) => entry.name);
   const legendaries = species.filter(isLegendary).map((entry) => entry.name);
   const items = getItems()
-    .filter((item) => Number(item.generation) === generation)
+    // La Canne de base est donnée à tous : elle ne « tombe » pas, la pêche a sa ligne.
+    .filter((item) => itemGeneration(item) === generation && !item.rod?.base)
     .map((item) => `${item.emoji} **${item.label}**`);
   const charm = getCharmItem(generation);
   const lines = [
@@ -47,6 +48,19 @@ export function buildGenerationEmbed(generation) {
   }
   if (getSafariConfig().enabled !== false) {
     lines.push("🌿 Au parc safari, choisis la ou les générations que tu vises.");
+  }
+  if (Number(getPokemonConfig().fishing?.generation) === generation) {
+    lines.push(
+      "🎣 La **pêche** ouvre : une canne t'est donnée, lance ta ligne avec `/pk pecher`. Le Pokémon " +
+        "qui mord est pour toi seul."
+    );
+  }
+  const shopBalls = getSpecialBalls().filter((ball) => Number(ball.generation ?? 1) === generation);
+  if (shopBalls.length) {
+    lines.push(
+      `🛒 La **boutique** ouvre : ${names(shopBalls.map((ball) => `**${ball.label}**`))}, ` +
+        "achetées en points avec `/pk boutique`."
+    );
   }
   const starters = starterChoices(generation).map((entry) => entry.name);
   if (starters.length) {
