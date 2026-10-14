@@ -3,6 +3,7 @@ import { handleException } from "../../modules/utils.js";
 import { getPokemonConfig } from "../../modules/pokemon/config.js";
 import { getInventory } from "../../modules/pokemon/items.js";
 import { buildInventoryEmbed } from "../../modules/pokemon/embeds.js";
+import { getUnitCounts, openSpecialBalls } from "../../modules/pokemon/shop.js";
 
 // L'inventaire d'un dresseur. Réponse privée, comme le Pokédex : ce qu'on a en
 // poche regarde d'abord son propriétaire, et un inventaire vide n'a pas à
@@ -42,14 +43,24 @@ export default {
             .catch(() => {});
         }
 
-        interaction
-          .reply({
-            // `user` n'est passé que pour l'inventaire de quelqu'un d'autre :
-            // sinon l'embed tutoie, comme celui du solde.
-            embeds: [buildInventoryEmbed(rows, { user: target })],
-            flags: MessageFlags.Ephemeral,
-          })
-          .catch(() => {});
+        // Les balls de la boutique : une lecture ratée les omet plutôt que d'afficher
+        // un zéro qui mentirait.
+        getUnitCounts(owner.id, (unitError, counts) => {
+          if (unitError) handleException("Lecture des balls spéciales :", unitError);
+          const specials = unitError
+            ? []
+            : openSpecialBalls()
+                .map((ball) => ({ ...ball, held: counts.get(ball.key)?.held ?? 0 }))
+                .filter((ball) => ball.held > 0);
+          interaction
+            .reply({
+              // `user` n'est passé que pour l'inventaire de quelqu'un d'autre :
+              // sinon l'embed tutoie, comme celui du solde.
+              embeds: [buildInventoryEmbed(rows, { user: target, specials })],
+              flags: MessageFlags.Ephemeral,
+            })
+            .catch(() => {});
+        });
       });
     } catch (error) {
       handleException(error);

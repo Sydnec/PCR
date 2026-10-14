@@ -1157,6 +1157,18 @@ input[type="number"] {
   cursor: pointer;
 }
 
+/* Les balls ordinaires, puis celles qu'ouvre « Balls spéciales » : deux rangées. */
+.balls-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.ball-open {
+  border-color: var(--accent);
+}
+
 .ball:hover:not(:disabled) {
   border-color: var(--accent);
 }

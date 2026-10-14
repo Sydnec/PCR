@@ -11,6 +11,8 @@ export function getPokemonConfig() {
 
 // Renvoie la définition d'une ball, ou null si la clé est inconnue.
 export function getBall(key) {
+  const special = getSpecialBalls().find((ball) => ball.key === key);
+  if (special) return special;
   const balls = getPokemonConfig().capture.balls;
   // hasOwnProperty : sans lui, une clé héritée (« constructor », par exemple)
   // renvoyait un objet tronqué au lieu de null, et le lancer partait avec un
@@ -19,6 +21,19 @@ export function getBall(key) {
   const ball = balls[key];
   return ball ? { key, ...ball } : null;
 }
+
+// Les balls spéciales de la boutique, marquées `special` pour que le lancer les
+// distingue des balls ordinaires (capture.balls), qu'elles ne rejoignent jamais :
+// les fiches et les probabilités affichées n'ont pas à les compter.
+export function getSpecialBalls() {
+  const balls = getPokemonConfig().capture.specialBalls ?? {};
+  return Object.entries(balls)
+    .filter(([key]) => key !== "maxHeld")
+    .map(([key, ball]) => ({ key, special: true, ...ball }));
+}
+
+export const specialBallLimit = () =>
+  Math.max(1, Math.floor(Number(getPokemonConfig().capture.specialBalls?.maxHeld) || 10));
 
 export function getBalls() {
   const balls = getPokemonConfig().capture.balls;

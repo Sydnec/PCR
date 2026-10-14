@@ -26,8 +26,9 @@ import {
   grantItem,
 } from "./items.js";
 import { dropItem, leavesItemBehind } from "./drops.js";
-import { catchProbability, charmFactor, getSpecies } from "./data.js";
-import { buildBallRow, displayName } from "./embeds.js";
+import { ballMultiplier, catchProbability, charmFactor, getSpecies } from "./data.js";
+import { getOpenSpecialBall, getUnitCounts, openSpecialBalls, restoreUnit, takeUnit } from "./shop.js";
+import { buildBallRow, buildSpecialRow, displayName } from "./embeds.js";
 import { finalizeCaughtSpawn, getSpawn, refreshSpawnEmbed } from "./spawn.js";
 import { recordSpawnEnd, recordThrow } from "./stats.js";
 import { getCharms } from "./charms.js";
@@ -94,6 +95,35 @@ export function ballPanelRow(userId, spawnId) {
         reject(error);
       }
     })
+  );
+}
+
+// Le sous-menu des balls spéciales, avec ce qui sert à cette apparition : les balls
+// achetées avant elle. Une lecture ratée désactive les boutons plutôt que de promettre
+// des balls qu'on n'a peut-être pas.
+export function specialPanelRow(userId, spawnId, { panel = false } = {}) {
+  return new Promise((resolve) =>
+    getSpawn(spawnId, (spawnError, spawn) =>
+      getInventory(userId, (inventoryError, inventory) =>
+        getUnitCounts(
+          userId,
+          (err, counts) => {
+            const failed = spawnError ?? inventoryError ?? err;
+            if (failed) handleException("Lecture des balls spéciales :", failed);
+            resolve(
+              buildSpecialRow(spawnId, {
+                balls: openSpecialBalls(),
+                counts,
+                masterHeld: inventoryError ? 0 : freeBallCount(inventory, "master"),
+                panel,
+                disabled: Boolean(failed),
+              })
+            );
+          },
+          { spawnedAt: spawn?.spawned_at ?? 0 }
+        )
+      )
+    )
   );
 }
 
@@ -190,7 +220,20 @@ export function getBallPrice(userId, ball, cb) {
 // confirmation a affiché. Un achat fait entre-temps — la Master Ball renchérit à
 // chaque fois — l'a fait monter ; on refuse plutôt que de prendre plus que ce
 // qui était annoncé.
-function payThrow(userId, ball, { requireItem = false, expectedPrice = null } = {}, cb) {
+function payThrow(userId, ball, { requireItem = false, expectedPrice = null, spawn = null } = {}, cb) {
+  // Une ball spéciale ne se paie pas au lancer : elle a été achetée, et se prend dans
+  // la poche — la plus ancienne antérieure à l'apparition.
+  if (ball.special) {
+    return takeUnit(userId, ball.key, spawn.spawned_at, (err, unit) => {
+      if (err) return cb(err, null);
+      if (unit) return cb(null, { unit, label: ball.label });
+      getUnitCounts(userId, (err, counts) =>
+        err
+          ? cb(err, null)
+          : cb(null, null, { units: { held: counts.get(ball.key)?.held ?? 0 } })
+      );
+    });
+  }
   const item = getBallItem(ball.key);
   const tryPoints = () =>
     requireItem
@@ -221,7 +264,7 @@ function payThrow(userId, ball, { requireItem = false, expectedPrice = null } = 
 // convertir en monnaie ferait d'un Pokémon disputé une petite imprimerie. Et les
 // points se rendent au prix PAYÉ, pas à celui d'aujourd'hui.
 function refundThrow(userId, spawnId, ball, probability, payment, cb) {
-  const gratuit = Boolean(payment?.item);
+  const gratuit = Boolean(payment?.item || payment?.unit);
 
   const done = (err) => {
     if (err) handleException("Remboursement impossible :", err);
@@ -235,6 +278,9 @@ function refundThrow(userId, spawnId, ball, probability, payment, cb) {
     cb(null, { status: "void", ball, payment });
   };
 
+  // Une ball spéciale revient dans la poche avec sa date d'achat : elle servira à
+  // la prochaine apparition comme avant.
+  if (payment?.unit) return restoreUnit(payment.unit, done);
   if (gratuit) return grantItem(userId, payment.item, 1, { source: "lancer-annule" }, done);
   addPoints(userId, payment.points, done);
 }
@@ -253,7 +299,10 @@ function refundThrow(userId, spawnId, ball, probability, payment, cb) {
 // AVANT de différer sa réponse. Le cooldown est le même pour les deux portes :
 // alterner Discord et le site ne fait pas lancer plus vite.
 export function startThrow(userId, ballKey) {
-  if (!getBall(ballKey)) return { status: "unknown-ball" };
+  const ball = getBall(ballKey);
+  // Une ball spéciale dont la génération est fermée n'existe pas : le refus ne doit
+  // pas consommer le cooldown.
+  if (!ball || (ball.special && !getOpenSpecialBall(ballKey))) return { status: "unknown-ball" };
   const cooldownMs = getPokemonConfig().capture.throwCooldownSeconds * 1000;
   const remaining = tryConsumeCooldown(userId, cooldownMs);
   return remaining > 0 ? { status: "cooldown", remaining } : null;
@@ -279,25 +328,43 @@ export function resolveThrow(
       handleException("Lecture du spawn :", err);
       return cb(null, { status: "error" });
     }
-    // Sortie anticipée AVANT tout débit : un Pokémon déjà parti ne coûte rien.
-    if (!spawn || spawn.status !== "ACTIVE") return cb(null, { status: "gone" });
+    // Sortie anticipée AVANT tout débit : un Pokémon déjà parti ne coûte rien. Une pêche
+    // (FISHING) n'est ouverte qu'à son pêcheur, et seulement jusqu'à sa fuite : au-delà,
+    // elle est perdue comme un Pokémon du salon qui s'est enfui.
+    if (!spawn || (spawn.status !== "ACTIVE" && spawn.status !== "FISHING")) {
+      return cb(null, { status: "gone" });
+    }
+    if (spawn.status === "FISHING") {
+      if (spawn.reserved_for !== userId) return cb(null, { status: "not-yours" });
+      if (spawn.flees_at && spawn.flees_at <= Date.now()) return cb(null, { status: "gone" });
+    }
 
     const species = getSpecies(spawn.species_id);
     if (!species) return cb(null, { status: "unknown-species" });
 
+    // Une ball spéciale hors du jeu — sa génération est fermée — n'existe pas.
+    if (ball.special && !getOpenSpecialBall(ball.key)) return cb(null, { status: "unknown-ball" });
+
     const probability = ball.guaranteed
       ? 1
-      : catchProbability(spawn.catch_rate, ball.multiplier, config.capture.globalMultiplier);
+      : catchProbability(
+          spawn.catch_rate,
+          ballMultiplier(ball, { fished: Boolean(spawn.fished), speciesId: spawn.species_id }),
+          config.capture.globalMultiplier
+        );
 
     // 1. Paiement atomique : une ball offerte d'abord, le solde ensuite, et
     // refusé sans rien prélever si ni l'un ni l'autre ne suffit.
-    payThrow(userId, ball, { requireItem, expectedPrice }, (err, payment, quote) => {
+    payThrow(userId, ball, { requireItem, expectedPrice, spawn }, (err, payment, quote) => {
       if (err) {
         handleException("Paiement du lancer :", err);
         return cb(null, { status: "error" });
       }
 
       if (!payment) {
+        // Une ball spéciale : aucune achetée avant cette apparition. Les chiffres
+        // disent pourquoi (« tu en as 2, aucune n'est antérieure »).
+        if (quote?.units) return cb(null, { status: "no-unit", ball, ...quote.units });
         // Promis gratuit, et l'objet n'y est plus : on le dit, on ne débite pas.
         if (requireItem) return cb(null, { status: "no-item", ball });
         // Le prix annoncé n'est plus le bon : on donne le nouveau, que le
@@ -321,8 +388,9 @@ export function resolveThrow(
         // actif » : si le Pokémon a été capturé entre le débit et le tirage,
         // on rend les points au lieu de les brûler pour rien.
         return db.run(
-          "UPDATE pokemon_spawns SET throw_count = throw_count + 1 WHERE id = ? AND status = 'ACTIVE'",
-          [spawnId],
+          `UPDATE pokemon_spawns SET throw_count = throw_count + 1
+            WHERE id = ? AND (status = 'ACTIVE' OR (status = 'FISHING' AND flees_at > ?))`,
+          [spawnId, Date.now()],
           function (err) {
             if (err) {
               handleException("Comptabilisation du raté :", err);
@@ -351,8 +419,8 @@ export function resolveThrow(
         `UPDATE pokemon_spawns
             SET status = 'CAUGHT', caught_by = ?, caught_at = ?, caught_ball = ?,
                 ended_at = ?, throw_count = throw_count + 1
-          WHERE id = ? AND status = 'ACTIVE'`,
-        [userId, now, ball.key, now, spawnId],
+          WHERE id = ? AND (status = 'ACTIVE' OR (status = 'FISHING' AND flees_at > ?))`,
+        [userId, now, ball.key, now, spawnId, now],
         function (err) {
           if (err) {
             handleException("Réclamation du spawn :", err);
@@ -377,7 +445,8 @@ export function resolveThrow(
           // message public doit dire « il lâche » et non « il tenait » quand un
           // bouton « Ramasser » apparaît juste en dessous.
           const held = getItem(spawn.held_item);
-          const dropped = Boolean(held) && leavesItemBehind();
+          // Une pêche n'a pas de salon où poser l'objet : il suit le Pokémon.
+          const dropped = Boolean(held) && !spawn.fished && leavesItemBehind();
           // Il brille pour son vainqueur si c'est un shiny pour tout le salon, ou
           // s'il ne brillait que pour les porteurs du Charme Chroma de sa
           // génération et que le vainqueur en est un. Une lecture ratée le
@@ -471,7 +540,7 @@ export function resolveThrow(
 }
 
 // Les issues qui terminent le panneau : il n'y a plus rien à relancer.
-const FINAL = new Set(["gone", "unknown-species", "void", "catch"]);
+const FINAL = new Set(["gone", "not-yours", "unknown-species", "void", "catch"]);
 export const isFinalThrow = (outcome) => FINAL.has(outcome.status);
 
 // Ce qu'un lancer a donné, en toutes lettres. La seule rédaction de ces
@@ -481,7 +550,9 @@ export function throwMessage(outcome) {
   // Ce que le lancer a coûté, dit comme le dresseur l'a vécu.
   const mention = payment?.item
     ? `${payment.label} offerte`
-    : `**-${payment?.points.toLocaleString("fr-FR")}** points`;
+    : payment?.unit
+      ? `${payment.label} utilisée`
+      : `**-${payment?.points.toLocaleString("fr-FR")}** points`;
 
   switch (outcome.status) {
     case "unknown-ball":
@@ -490,10 +561,17 @@ export function throwMessage(outcome) {
       return `⏳ Doucement ! Attends encore **${outcome.remaining}s** avant de relancer.`;
     case "gone":
       return "💨 Ce Pokémon n'est plus là !";
+    case "not-yours":
+      return "❌ Ce Pokémon a mordu à la ligne d'un autre dresseur : il n'est pas pour toi.";
     case "unknown-species":
       return "❌ Espèce inconnue.";
     case "no-item":
       return `❌ Tu n'as plus de **${ball.label}** dans ton inventaire. Rien n'a été débité.`;
+    case "no-unit":
+      return (
+        `❌ Aucune **${ball.label}** ne peut servir ici : tu en as ${outcome.held}, mais une ball ` +
+        "achetée ne sert qu'aux Pokémon qui apparaissent après son achat. Rien n'a été débité."
+      );
     case "insufficient":
       return (
         `❌ Solde insuffisant : une **${ball.label}** coûte **${outcome.price.toLocaleString("fr-FR")}** points, ` +
@@ -507,7 +585,7 @@ export function throwMessage(outcome) {
     case "void":
       return (
         "💨 Trop tard, quelqu'un a été plus rapide ! " +
-        (payment?.item
+        (payment?.item || payment?.unit
           ? `Ta **${payment.label}** t'a été rendue.`
           : `Tes **${payment.points.toLocaleString("fr-FR")}** points ont été remboursés.`)
       );
@@ -591,7 +669,15 @@ export async function throwBall(
     interaction
       .editReply({
         content: throwMessage(outcome),
-        components: isFinalThrow(outcome) ? [] : [await ballPanelRow(userId, spawnId)],
+        // Après une ball spéciale, le panneau reste sur le sous-menu : on enchaîne sans
+        // le rouvrir, et les nombres sont à jour.
+        components: isFinalThrow(outcome)
+          ? []
+          : [
+              await (getBall(ballKey)?.special
+                ? specialPanelRow(userId, spawnId, { panel: true })
+                : ballPanelRow(userId, spawnId)),
+            ],
       })
       .catch(() => {});
   });

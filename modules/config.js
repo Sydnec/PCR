@@ -163,6 +163,35 @@ const POKEMON = {
         guaranteed: true,
       },
     },
+    // Les balls spéciales : à la boutique seulement (/pk boutique), jamais en drop
+    // ni à la loterie. Une ball achetée ne sert qu'aux apparitions qui viennent
+    // APRÈS son achat — pas à celle en cours —, et on en garde `maxHeld` de
+    // chaque en poche. Hors bonus, elles valent `multiplier` ; `bonus` la
+    // multiplie quand la condition est remplie : `fished` (le Pokémon vient d'une
+    // pêche) ou `item` (l'espèce évolue grâce à cet objet, lu dans le catalogue :
+    // `evolution.targets`). `generation` les garde hors du jeu tant qu'elle est
+    // fermée. Les emoji sont unicode : celui d'une ball du serveur reste à créer.
+    specialBalls: {
+      maxHeld: 10,
+      appat: {
+        label: "Appât Ball",
+        emoji: "🎣",
+        sprite: "lure-ball",
+        price: 230,
+        multiplier: 1,
+        generation: 2,
+        bonus: { fished: true, multiplier: 3 },
+      },
+      catalyseur: {
+        label: "Catalyseur Ball",
+        emoji: "⚙️",
+        sprite: "up-grade",
+        price: 300,
+        multiplier: 1,
+        generation: 2,
+        bonus: { item: "catalyseur", multiplier: 4 },
+      },
+    },
   },
   evolution: {
     // Le tarif du stade atteint. Un bébé qui devient adulte (Pichu → Pikachu,
@@ -188,6 +217,27 @@ const POKEMON = {
   // et son porteur voit `multiplier` fois plus de shiny parmi les Pokémon de
   // cette génération : apparitions, parc safari, œufs.
   shinyCharm: { multiplier: 2 },
+  // Le starter de génération : à l'ouverture d'une génération prévue ici, chaque
+  // dresseur choisit une fois, définitivement, l'un des trois (identifiants du
+  // Pokédex) et reçoit le stade 1. La génération 1 n'a pas de choix : elle était là
+  // avant. Compléter le Pokédex de la génération — hors légendaires, comme le
+  // Charme Chroma — fait ensuite recevoir, une fois chacun, les paliers de
+  // `rewards` : `percent` du Pokédex, le `stade` de la lignée choisie, shiny ou non.
+  // Un palier déjà atteint au moment du choix se donne aussitôt (rattrapage).
+  starters: {
+    choices: { 2: [152, 155, 158] },
+    rewards: [
+      { percent: 33, stage: 2, shiny: false },
+      { percent: 66, stage: 3, shiny: false },
+      { percent: 100, stage: 1, shiny: true },
+    ],
+  },
+  // La pêche : un Pokémon par lancer de ligne, réservé au pêcheur — il le voit lui seul,
+  // et peut le lancer pendant `fleeSeconds`, après quoi il s'enfuit. Les tables de pêche
+  // viennent des taux officiels (npm run gen:fishing). `wildRarityFactor` rend les espèces
+  // qui s'y pêchent plus rares à l'état sauvage, apparitions et parc safari compris
+  // (1 : aucune différence). Ouverte avec la génération 2, comme les cannes.
+  fishing: { generation: 2, fleeSeconds: 120, wildRarityFactor: 0.7 },
   // Les œufs, seule porte vers les bébés. Un couple de parents — un mâle et une
   // femelle de la famille, Métamorph pouvant tenir l'un des deux rôles — pond
   // un œuf qui éclot au premier des deux seuils : tant d'heures, ou tant de
@@ -360,6 +410,39 @@ const POKEMON = {
       ball: "master",
       description: "La capture garantie, offerte. Autant dire qu'elle ne se trouve pas.",
       dropWeight: 2,
+    },
+    // Les cannes à pêche (`rod`) : /pk pecher lance la ligne pour `price` points, et la
+    // canne choisit la table de pêche (`pool`, pokemon-fishing.json : old, good, super).
+    // Les trois cannes pêchent au même prix : c'est la table de pêche qui change, pas le tarif.
+    // `base` : la Canne est donnée à tous, une fois — jamais échangeable, sans quoi
+    // l'échanger la ferait redonner. Les deux autres tombent sur les Pokémon et se
+    // gagnent à la loterie, dès que la pêche est ouverte (`fishing.generation`).
+    canne: {
+      label: "Canne",
+      emoji: "🎣",
+      sprite: "old-rod",
+      description: "La canne de base : surtout des Magicarpe.",
+      rod: { pool: "old", price: 100, base: true },
+    },
+    super_canne: {
+      label: "Super Canne",
+      emoji: "🎣",
+      sprite: "good-rod",
+      description: "Des prises plus variées.",
+      dropWeight: 20,
+      lotteryWeight: 60,
+      lot: { min: 1, max: 1 },
+      rod: { pool: "good", price: 100 },
+    },
+    mega_canne: {
+      label: "Méga Canne",
+      emoji: "🎣",
+      sprite: "super-rod",
+      description: "Les prises les plus rares.",
+      dropWeight: 8,
+      lotteryWeight: 25,
+      lot: { min: 1, max: 1 },
+      rod: { pool: "super", price: 100 },
     },
     // Les charmes ne tombent pas et ne se revendent pas : ils se gagnent en
     // complétant un Pokédex, une fois pour toutes (modules/pokemon/charms.js).

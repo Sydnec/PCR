@@ -14,7 +14,13 @@ import {
   StringSelectMenuOptionBuilder,
   TextDisplayBuilder,
 } from "discord.js";
-import { getBall, getPokemonConfig, getSafariConfig, hasPersonalPrice } from "./config.js";
+import {
+  getBall,
+  getPokemonConfig,
+  getSafariConfig,
+  getSpecialBalls,
+  hasPersonalPrice,
+} from "./config.js";
 import { getCharmItem, getItem, sortByCatalogue } from "./items.js";
 import {
   RARITIES,
@@ -105,11 +111,10 @@ function probabilityLine(catchRate) {
 // d'œil et disent la même chose en un caractère.
 function throwLogField(throws) {
   if (!throws.length) return "*Personne n'a encore tenté sa chance.*";
-  const balls = getPokemonConfig().capture.balls;
   return throws
     .map(
       (row) =>
-        `${ballResultIcon(row.result)} <@${row.user_id}> ${balls[row.ball]?.emoji ?? row.ball}`
+        `${ballResultIcon(row.result)} <@${row.user_id}> ${getBall(row.ball)?.emoji ?? row.ball}`
     )
     .join("\n");
 }
@@ -122,7 +127,13 @@ export function buildSpawnEmbed(spawn, species, throws = [], announcement = null
   const name = displayName(species, false, spawn.sex, spawn.form);
   const embed = new EmbedBuilder()
     .setTitle(
-      isShiny ? `✨ Un ${name} SHINY apparaît ! ✨` : `Un ${name} sauvage apparaît !`
+      spawn.fished
+        ? isShiny
+          ? `✨ Un ${name} SHINY mord à la ligne ! ✨`
+          : `Un ${name} mord à la ligne !`
+        : isShiny
+          ? `✨ Un ${name} SHINY apparaît ! ✨`
+          : `Un ${name} sauvage apparaît !`
     )
     .setColor(embedColor(species, isShiny))
     .setImage(spriteUrl(species, isShiny, spawn.form))
@@ -181,13 +192,12 @@ export function buildBallRow(
   { disabled = false, panel = false, stock = null, prices = true } = {}
 ) {
   const row = new ActionRowBuilder();
+  // La Master Ball n'est plus ici : elle rejoint les balls spéciales, derrière le
+  // dernier bouton (buildSpecialRow).
   for (const [key, ball] of Object.entries(getPokemonConfig().capture.balls)) {
-    // La Master Ball passe par une confirmation : à 22 500 points, un mésclic
-    // n'est pas rattrapable.
+    if (ball.guaranteed) continue;
     const held = stock?.get(key) ?? 0;
-    const customId = ball.guaranteed
-      ? `${panel ? "poke_remaster" : "poke_master"}|${spawnId}`
-      : `${panel ? "poke_rethrow" : "poke_throw"}|${spawnId}|${key}${held ? "|item" : ""}`;
+    const customId = `${panel ? "poke_rethrow" : "poke_throw"}|${spawnId}|${key}${held ? "|item" : ""}`;
     const label = held
       ? `${ball.label} (offerte ×${held.toLocaleString("fr-FR")})`
       : prices && !hasPersonalPrice(ball)
@@ -198,7 +208,61 @@ export function buildBallRow(
         .setCustomId(customId)
         .setLabel(label)
         .setEmoji(ball.emoji)
-        .setStyle(ball.guaranteed ? ButtonStyle.Danger : ButtonStyle.Primary)
+        .setStyle(ButtonStyle.Primary)
+        .setDisabled(disabled)
+    );
+  }
+  row.addComponents(
+    new ButtonBuilder()
+      .setCustomId(`${panel ? "poke_respecial" : "poke_special"}|${spawnId}`)
+      .setLabel("Balls spéciales")
+      .setEmoji("🌟")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(disabled)
+  );
+  return row;
+}
+
+// Le sous-menu des balls spéciales : celles de la boutique (`balls`, avec pour chacune
+// ce qui sert à CETTE apparition dans `counts`) et la Master Ball, qui passe toujours
+// par sa confirmation — à 22 500 points, un mésclic n'est pas rattrapable. Aucun
+// prix : celui d'une ball achetée est déjà payé, celui de la Master Ball se lit sur
+// sa confirmation. Depuis le panneau, un bouton ramène aux balls ordinaires.
+export function buildSpecialRow(
+  spawnId,
+  { balls, counts, masterHeld = 0, panel = false, disabled = false }
+) {
+  const row = new ActionRowBuilder();
+  for (const ball of balls) {
+    const usable = counts?.get(ball.key)?.eligible ?? 0;
+    row.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`${panel ? "poke_rethrow" : "poke_throw"}|${spawnId}|${ball.key}`)
+        .setLabel(`${ball.label} (×${usable.toLocaleString("fr-FR")})`)
+        .setEmoji(ball.emoji)
+        .setStyle(ButtonStyle.Primary)
+        .setDisabled(disabled || usable === 0)
+    );
+  }
+  const master = getBall("master");
+  if (master) {
+    row.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`${panel ? "poke_remaster" : "poke_master"}|${spawnId}`)
+        .setLabel(
+          masterHeld ? `${master.label} (offerte ×${masterHeld.toLocaleString("fr-FR")})` : master.label
+        )
+        .setEmoji(master.emoji)
+        .setStyle(ButtonStyle.Danger)
+        .setDisabled(disabled)
+    );
+  }
+  if (panel) {
+    row.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`poke_reback|${spawnId}`)
+        .setLabel("Retour")
+        .setStyle(ButtonStyle.Secondary)
         .setDisabled(disabled)
     );
   }
@@ -374,13 +438,14 @@ const PARTICIPANTS_SHOWN = 5;
 // racontent l'engagement bien mieux qu'un total en points — on voit du premier
 // coup qui a sorti l'artillerie et qui a tenté sa chance à l'économie.
 function ballsLine(balls) {
-  const config = getPokemonConfig().capture.balls;
+  // Les balls spéciales viennent après les balls ordinaires.
+  const order = [...Object.keys(getPokemonConfig().capture.balls), ...getSpecialBalls().map((ball) => ball.key)];
   return Object.entries(balls)
     .filter(([, count]) => count > 0)
     // L'ordre du catalogue, donc de la moins chère à la plus chère : la ligne se
     // lit toujours dans le même sens d'un dresseur à l'autre.
-    .sort(([a], [b]) => Object.keys(config).indexOf(a) - Object.keys(config).indexOf(b))
-    .map(([key, count]) => `${count}\u00D7${config[key]?.emoji ?? key}`)
+    .sort(([a], [b]) => order.indexOf(a) - order.indexOf(b))
+    .map(([key, count]) => `${count}\u00D7${getBall(key)?.emoji ?? key}`)
     .join(" ");
 }
 
@@ -436,7 +501,7 @@ export function buildCaughtEmbed(
   // `charmed` : il brillait pour son vainqueur, porteur du Charme Chroma, et
   // c'est un shiny qui rejoint sa boîte.
   const isShiny = Boolean(spawn.is_shiny) || charmed;
-  const ball = getPokemonConfig().capture.balls[ballKey];
+  const ball = getBall(ballKey);
   const total = spending?.total ?? 0;
   const charm = charmed ? getCharmItem(species.generation) : null;
 
@@ -573,6 +638,7 @@ function ballOf(key) {
 const ORIGINS = {
   oeuf: "éclos d'un œuf",
   evolution: "obtenu par évolution",
+  starter: "starter de génération",
   migration: "ball inconnue",
 };
 
@@ -1114,7 +1180,7 @@ export function buildNeedersRow(speciesId, total, page, { reserve = true } = {})
   );
 }
 
-export function buildInventoryEmbed(rows, { user = null } = {}) {
+export function buildInventoryEmbed(rows, { user = null, specials = [] } = {}) {
   const embed = new EmbedBuilder()
     .setTitle(
       user
@@ -1123,7 +1189,7 @@ export function buildInventoryEmbed(rows, { user = null } = {}) {
     )
     .setColor(0xc27c0e);
 
-  if (!rows.length) {
+  if (!rows.length && !specials.length) {
     return embed.setDescription(
       user
         ? "*Son inventaire est vide.*"
@@ -1132,7 +1198,11 @@ export function buildInventoryEmbed(rows, { user = null } = {}) {
   }
 
   const total = rows.reduce((sum, row) => sum + row.count, 0);
-  embed.setDescription(`**${total}** objet${total > 1 ? "s" : ""} en poche.`);
+  embed.setDescription(
+    rows.length
+      ? `**${total}** objet${total > 1 ? "s" : ""} en poche.`
+      : "*Aucun objet, seulement des balls de la boutique.*"
+  );
 
   for (const row of sortByCatalogue(rows)) {
     const item = getItem(row.item_key);
@@ -1145,6 +1215,17 @@ export function buildInventoryEmbed(rows, { user = null } = {}) {
       value: item?.sellValue
         ? `${value}\n*Se revend **${item.sellValue.toLocaleString("fr-FR")}** points pièce.*`
         : value,
+      inline: false,
+    });
+  }
+  // Les balls de la boutique, à part : ce ne sont pas des objets du catalogue, et
+  // leur date d'achat décide de leur usage (voir /pk boutique).
+  if (specials.length) {
+    embed.addFields({
+      name: "Balls spéciales",
+      value: specials
+        .map((ball) => `${ball.emoji} ${ball.label} \u00D7${ball.held.toLocaleString("fr-FR")}`)
+        .join("\n"),
       inline: false,
     });
   }

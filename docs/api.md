@@ -60,7 +60,8 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
 | `GET /api/users/:userId/showcase` 🔒 | `{ trainer, mine, slots, pokemon }` — la vitrine d'un dresseur (`me` pour la sienne), ses Pokémon dans l'ordre |
 | `GET /api/trainers` 🔒 | `{ dexSize, trainers }` — tous les dresseurs ayant au moins un Pokémon, dans l'ordre du classement : `id`, `name`, `avatar`, `species` (espèces distinctes), `shinies`, `total`, `showcase` (Pokémon en vitrine) |
 | `GET /api/me/lineage/:speciesId` 🔒 | `{ lineage, forms }` — la lignée et ce que le dresseur possède de chaque maillon ; `forms`, pour une espèce à formes (Zarbi), chacune avec `key`, `name`, `icon` et `owned`, `null` sinon |
-| `GET /api/spawn` 🔒 | `{ refreshSeconds, cooldownSeconds, pausedUntil, wallet, safari, spawn, last, drops }` — l'apparition du salon. `spawn.charm` (ou `null`) : elle ne brille que pour les porteurs du Charme Chroma de sa génération (`label`, `image`, `mine` : le visiteur en est un, et `spawn.shiny` est alors vrai pour lui) |
+| `GET /api/shop` 🔒 | `{ balance, limit, balls: [{ key, label, emoji, image, price, effect, held }] }` — la boutique des balls spéciales, vide avant l'ouverture de la 2ᵉ génération |
+| `GET /api/spawn` 🔒 | `{ refreshSeconds, cooldownSeconds, pausedUntil, wallet, safari, spawn, fishing, last, drops }` — l'apparition du salon. `spawn.charm` (ou `null`) : elle ne brille que pour les porteurs du Charme Chroma de sa génération (`label`, `image`, `mine` : le visiteur en est un, et `spawn.shiny` est alors vrai pour lui) |
 | `GET /api/safari` 🔒 | `{ offer, visit }` — ce que le dresseur peut faire du parc, et sa visite en cours (`null` sinon) |
 | `GET /api/me/pc` 🔒 | `{ slotsPerBox, columns, maxBoxes, boxNameLength, nicknameLength, boxes, pokemon }` — la boîte PC |
 | `GET /api/admin/config` 🔑 | `{ status, tree }` — la configuration en arbre |
@@ -131,6 +132,8 @@ ou par un groupe `{ "speciesId": 25, "isShiny": false, "sex": "F" }` — les deu
 | `POST /api/me/sell-item` | `{ key, quantity? }` (1 par défaut) | `{ sold, unit, points }` — comme `/pk revendre objet` : `409` pour un objet qui ne se revend pas ou qu'on n'a pas en assez d'exemplaires |
 | `POST /api/me/evolve` | Pokémon (celui qui évolue, avec `speciesId` son espèce attendue : refus s'il a déjà évolué), `targetId?`, `helper?` (clé d'un objet, ou `metamorph`), `confirmLocked?` (obligatoire pour un verrouillé, sinon 409) | `{ pokemon, sacrificesSpent, dittosSpent, shiniesSacrificed, pointsSpent, helper }` — `pokemon` est le même individu, sous sa nouvelle forme |
 | `POST /api/me/eggs` | `{ parent1, parent2 }` | `{ egg }` |
+| `POST /api/fishing/cast` | `{ rod }` | `{ ok, message, price }` — comme `/pk pecher` : un refus (points, canne, touche déjà là) est `ok: false` avec son `message`. La touche se lit ensuite dans `fishing.spawn` de `GET /api/spawn` |
+| `POST /api/shop/buy` | `{ ball, quantity? }` | `{ ok, partial, bought, cost, message, balance, limit, balls }` — comme `/pk boutique` : un refus est `ok: false` avec les chiffres |
 | `POST /api/spawn/throw` | `{ spawnId, ball, requireItem?, expectedPrice? }` | `{ status, message, final, remaining, pokemon }` — `pokemon.shiny` : ce qui a rejoint la boîte, Charme Chroma compris |
 | `POST /api/drops/:id/claim` | `{}` | `{ item }` — `409` si quelqu'un a été plus rapide, `403` pour le capteur du Pokémon qui l'a lâché |
 | `POST /api/safari/enter` | `{ parkId, generations? }` | `{ resumed, visit }` — entrée gratuite dans un parc ouvert. `generations` : les générations visées (entiers) ; les fermées sont ignorées, et sans elle, ou sans aucune valable, toutes |

@@ -14,7 +14,7 @@ import { buildBalanceEmbed, getBalance } from "../economy.js";
 import { handleException, log } from "../utils.js";
 import { pseudoOf, pseudos } from "../pseudo.js";
 import { getBall, getPokemonConfig, getSafariConfig } from "./config.js";
-import { answerThrow, ballPanelRow, getBallPrice, throwBall, trackPanel } from "./capture.js";
+import { answerThrow, ballPanelRow, getBallPrice, specialPanelRow, throwBall, trackPanel } from "./capture.js";
 import { getSpawn } from "./spawn.js";
 import { getBallItem, getBallStock, getItem, getItemCount } from "./items.js";
 import { claimDrop } from "./drops.js";
@@ -31,7 +31,8 @@ import {
   resumeSession,
   startPaidSession,
 } from "./safari.js";
-import { activeGeneration, getSpecies } from "./data.js";
+import { activeGeneration, generationOrdinal, getSpecies } from "./data.js";
+import { chooseStarter, generationOfStarter } from "./starters.js";
 import { claimShowcaseShare, getShowcase, releaseShowcaseShare } from "./showcase.js";
 import { renderShowcaseImage } from "./showcase-image.js";
 import {
@@ -846,6 +847,50 @@ function handleTradePick(interaction, tradeId) {
   });
 }
 
+// ---------------------- Balls spéciales ----------------------
+
+const SPECIAL_BALLS_TEXT =
+  "🌟 **Balls spéciales** — une ball achetée ne sert qu'aux Pokémon qui apparaissent " +
+  "**après** son achat. La boutique : `/pk boutique`.";
+
+function showSpecialBalls(interaction, spawnId, { panel }) {
+  specialPanelRow(interaction.user.id, spawnId, { panel })
+    .then((row) => {
+      const payload = { content: SPECIAL_BALLS_TEXT, components: [row] };
+      return panel
+        ? interaction.update(payload)
+        : interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });
+    })
+    .then(() => trackPanel(interaction, spawnId, { replacing: !panel }))
+    .catch(() => {});
+}
+
+// ---------------------- Starter ----------------------
+
+// Le bouton de confirmation de /pk starter. Tout est revalidé : le message a pu
+// rester ouvert, la génération a pu se fermer, le choix a pu être fait entre-temps
+// depuis un autre message — chooseStarter refuse alors avec le choix déjà fait.
+function handleStarterChoice(interaction, speciesId) {
+  const generation = generationOfStarter(speciesId);
+  const settle = (content) => interaction.update({ content, components: [] }).catch(() => {});
+  if (!generation) return settle("❌ Ce starter n'est plus proposé.");
+  chooseStarter(interaction.user.id, generation, speciesId, (err, result) => {
+    if (err) {
+      handleException("Choix d'un starter :", err);
+      return settle("❌ Erreur base de données : rien n'a été donné, tu peux réessayer.");
+    }
+    if (!result.ok) return settle(`❌ ${result.reason}`);
+    const rewards = result.rewards
+      .map((reward) => `**${reward.species.name}${reward.shiny ? " ✨" : ""}** (${reward.percent} %)`)
+      .join(", ");
+    settle(
+      `✅ **${result.species.name}** rejoint ta boîte : c'est ton starter de la ` +
+        `${generationOrdinal(generation)} génération.` +
+        (rewards ? `\n🎁 Ton Pokédex avait déjà atteint des paliers : ${rewards}.` : "")
+    );
+  });
+}
+
 // ---------------------- Parc safari ----------------------
 
 // Le parc vit dans un message éphémère réécrit à chaque clic : chaque bouton est
@@ -1199,6 +1244,17 @@ export async function handlePokemonButton(interaction) {
     case "poke_master":
       return askMasterBallConfirmation(interaction, args[0]);
 
+    // Les balls spéciales : un éphémère depuis l'annonce, la réécriture du panneau
+    // depuis lui, et « Retour » qui ramène aux balls ordinaires.
+    case "poke_special":
+      return showSpecialBalls(interaction, args[0], { panel: false });
+    case "poke_respecial":
+      return showSpecialBalls(interaction, args[0], { panel: true });
+    case "poke_reback":
+      return ballPanelRow(interaction.user.id, args[0])
+        .then((row) => interaction.update({ content: "Choisis ta ball.", components: [row] }))
+        .catch(() => {});
+
     // Depuis le panneau : on le réécrit, au lieu d'empiler un message par jet.
     // `item` : annoncée offerte, la ball ne se paie jamais en points.
     case "poke_rethrow":
@@ -1344,6 +1400,13 @@ export async function handlePokemonButton(interaction) {
       return handleTradeButton(interaction, "decline", args[0]);
     case "poke_trade_cancel":
       return handleTradeButton(interaction, "cancel", args[0]);
+
+    case "poke_starter_ok":
+      return handleStarterChoice(interaction, args[0]);
+    case "poke_starter_no":
+      return interaction
+        .update({ content: "Choix annulé : tu peux choisir quand tu veux.", components: [] })
+        .catch(() => {});
 
     default:
       return;

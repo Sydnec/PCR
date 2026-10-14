@@ -65,7 +65,9 @@ export function getItem(key) {
 // Pokédex, et checkCharms les redonne à qui le complète encore. Cédé, un charme
 // reviendrait à son premier porteur à la prochaine arrivée d'une espèce : un
 // échange le dupliquerait. Les Charmes Chroma s'obtiennent, ils ne se transmettent pas.
-export const isTradable = (item) => Boolean(item) && !item.charm;
+// La Canne de base se donne à tous une fois (grantItemOnce) : échangée, elle serait
+// redonnée, comme un charme.
+export const isTradable = (item) => Boolean(item) && !item.charm && !item.rod?.base;
 
 // Le Charme Chroma d'une génération, tel que le catalogue le déclare
 // (`charm.generation`), ou null.
@@ -112,7 +114,12 @@ export function freeBallCount(inventory, ballKey) {
 //
 // Un objet d'une génération encore fermée ne tombe pas non plus : la Pierre
 // Soleil n'a rien à faire évoluer tant que Joliflor n'existe pas.
-export const itemOpen = (item) => Number(item?.generation ?? 1) <= activeGeneration();
+// Une canne s'ouvre avec la pêche (`fishing.generation`), pas avec une génération écrite à
+// part sur l'objet : les deux ne peuvent pas diverger.
+export const itemGeneration = (item) =>
+  Number(item?.rod ? getPokemonConfig().fishing?.generation : (item?.generation ?? 1));
+
+export const itemOpen = (item) => itemGeneration(item) <= activeGeneration();
 
 export const itemDropWeight = (item) =>
   itemOpen(item) ? Math.max(0, Number(item?.dropWeight) || 0) : 0;
@@ -181,7 +188,7 @@ function openedChance(chance, weightOf) {
   const setting = Math.max(0, Math.min(1, Number(chance) || 0));
   const items = getItems();
   const base = items
-    .filter((item) => Number(item.generation ?? 1) <= 1)
+    .filter((item) => itemGeneration(item) <= 1)
     .reduce((sum, item) => sum + weightOf(item), 0);
   if (!base) return setting;
   const total = items.reduce((sum, item) => sum + weightOf(item), 0);

@@ -43,7 +43,8 @@ export function getSpawn(spawnId, cb) {
 // suivant n'est pas arrivé.
 export function getLastEndedSpawn(cb) {
   db.get(
-    "SELECT * FROM pokemon_spawns WHERE status != 'ACTIVE' ORDER BY id DESC LIMIT 1",
+    // Une pêche, ouverte ou finie, n'est pas « le dernier Pokémon » du salon.
+    "SELECT * FROM pokemon_spawns WHERE status NOT IN ('ACTIVE', 'FISHING') AND fished = 0 ORDER BY id DESC LIMIT 1",
     [],
     (err, row) => cb(err, row ?? null)
   );
@@ -164,7 +165,7 @@ export function registerMessageForSpawn(client) {
             AND spawn_paused_until <= ?
             AND (
               ( NOT EXISTS (SELECT 1 FROM pokemon_spawns WHERE status = 'ACTIVE')
-                AND COALESCE((SELECT MAX(ended_at) FROM pokemon_spawns), 0) <= ? )
+                AND COALESCE((SELECT MAX(ended_at) FROM pokemon_spawns WHERE fished = 0), 0) <= ? )
               OR ( message_count >= ? AND last_spawn_at <= ?
                  AND NOT EXISTS (
                    SELECT 1 FROM pokemon_spawns WHERE status = 'ACTIVE' AND rarity = 'LEGENDAIRE'
@@ -394,7 +395,8 @@ export function endSpawnAsFled(client, spawn) {
   // d'avoir lancé la moindre ball. Le tirage est fait ICI et son résultat suit
   // jusqu'à l'embed : celui-ci doit dire « il lâche » et non « il emporte »
   // quand un bouton « Ramasser » vient d'apparaître juste en dessous.
-  const dropped = Boolean(spawn.held_item) && leavesItemBehind();
+  // Une pêche n'a pas de salon où poser l'objet : il s'en va avec le Pokémon.
+  const dropped = Boolean(spawn.held_item) && !spawn.fished && leavesItemBehind();
   if (dropped) dropItem(client, { spawn, itemKey: spawn.held_item });
 
   if (!spawn.channel_id || !spawn.message_id) return;

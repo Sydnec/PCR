@@ -10,6 +10,7 @@ import * as safari from "./views/safari.js";
 import * as boite from "./views/boite.js";
 import * as pokedex from "./views/pokedex.js";
 import * as sac from "./views/sac.js";
+import * as boutique from "./views/boutique.js";
 import * as oeuf from "./views/oeuf.js";
 import * as vitrine from "./views/vitrine.js";
 import * as dresseurs from "./views/dresseurs.js";
@@ -25,6 +26,7 @@ const ROUTES = {
   "/boite": boite,
   "/pokedex": pokedex,
   "/sac": sac,
+  "/boutique": boutique,
   "/oeuf": oeuf,
   "/vitrine": vitrine,
   "/dresseurs": dresseurs,
@@ -95,6 +97,8 @@ function renderAccount() {
   document.getElementById("nav").hidden = !ctx.me;
   // Le lien n'est qu'un confort : l'API refuse l'administration à tout autre.
   document.getElementById("nav-admin").hidden = !ctx.me?.user.admin;
+  // L'onglet de la boutique attend qu'une ball soit en vente (sa génération ouverte).
+  document.getElementById("nav-boutique").hidden = !ctx.me?.shop;
   if (!ctx.me) return account.replaceChildren();
   const { user, balance, balls } = ctx.me;
   account.replaceChildren(

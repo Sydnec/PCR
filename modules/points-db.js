@@ -182,11 +182,27 @@ const db = new sqlite3.Database(dbPath, (err) => {
         held_item TEXT,
         sex TEXT,
         charm_shiny INTEGER NOT NULL DEFAULT 0,
-        form TEXT
+        form TEXT,
+        fished INTEGER NOT NULL DEFAULT 0,
+        reserved_for TEXT
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_spawns :", err);
         addColumn("pokemon_spawns", "form", "TEXT");
+        // Le Pokémon vient d'une pêche : l'Appât Ball vaut alors son bonus.
+        addColumn("pokemon_spawns", "fished", "INTEGER NOT NULL DEFAULT 0");
+        // Une pêche est une apparition réservée au pêcheur, hors du salon : son statut
+        // est FISHING tant qu'elle est ouverte (jamais ACTIVE : l'index ci-dessous ne
+        // permet qu'une apparition du salon à la fois), et un dresseur n'en a qu'une.
+        addColumn("pokemon_spawns", "reserved_for", "TEXT", () =>
+          db.run(
+            `CREATE UNIQUE INDEX IF NOT EXISTS idx_pokemon_spawn_fishing
+               ON pokemon_spawns(reserved_for) WHERE status = 'FISHING'`,
+            (err) => {
+              if (err) handleException("Erreur création index pokemon_spawn_fishing :", err);
+            }
+          )
+        );
         // Garantie au niveau base : jamais deux spawns actifs en même temps.
         db.run(
           `CREATE UNIQUE INDEX IF NOT EXISTS idx_pokemon_spawn_active
@@ -674,6 +690,59 @@ const db = new sqlite3.Database(dbPath, (err) => {
       }
     );
 
+    // Le starter choisi à l'ouverture d'une génération : un par dresseur et par
+    // génération, définitif. La clé primaire rend le choix unique même sous deux
+    // clics simultanés (INSERT OR IGNORE).
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_starters (
+        user_id TEXT NOT NULL,
+        generation INTEGER NOT NULL,
+        species_id INTEGER NOT NULL,
+        chosen_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, generation)
+      )`,
+      (err) => {
+        if (err) handleException("Erreur création table pokemon_starters :", err);
+      }
+    );
+
+    // Les paliers de Pokédex déjà donnés pour un starter (`percent` : le palier
+    // de la configuration). La revendication précède le don, et se retire si le
+    // don échoue : un palier n'est jamais donné deux fois, ni perdu.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_starter_rewards (
+        user_id TEXT NOT NULL,
+        generation INTEGER NOT NULL,
+        percent INTEGER NOT NULL,
+        given_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, generation, percent)
+      )`,
+      (err) => {
+        if (err) handleException("Erreur création table pokemon_starter_rewards :", err);
+      }
+    );
+
+    // Les balls spéciales achetées, une ligne par ball : la date d'achat décide si
+    // elle sert à une apparition (seulement celles d'après). Consommée en la
+    // supprimant, rendue en la réinsérant telle quelle.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_ball_units (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        ball TEXT NOT NULL,
+        bought_at INTEGER NOT NULL
+      )`,
+      (err) => {
+        if (err) return handleException("Erreur création table pokemon_ball_units :", err);
+        db.run(
+          "CREATE INDEX IF NOT EXISTS idx_ball_units_user ON pokemon_ball_units(user_id, ball, bought_at)",
+          (err) => {
+            if (err) handleException("Erreur création index pokemon_ball_units :", err);
+          }
+        );
+      }
+    );
+
     // Captures du parc : alimente le bilan de fin de session.
     db.run(
       `CREATE TABLE IF NOT EXISTS pokemon_safari_catches (
@@ -754,11 +823,14 @@ function createPointsLog() {
 // attendu et ignoré. À appeler dans le rappel du CREATE TABLE, une fois la
 // table sûre d'exister. Chaque appel est temporaire, à retirer une fois
 // déployé.
-function addColumn(table, column, type) {
+// `done` s'exécute une fois la colonne sûre d'exister : un index qui la porte ne peut
+// pas partir avant.
+function addColumn(table, column, type, done = () => {}) {
   db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`, (err) => {
     if (err && !/duplicate column/i.test(err.message)) {
       handleException(`Erreur ajout de la colonne ${table}.${column} :`, err);
     }
+    done();
   });
 }
 
