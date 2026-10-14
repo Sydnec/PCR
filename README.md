@@ -26,6 +26,7 @@ Toutes ses commandes vivent sous `/pk`. → **[Documentation du jeu](docs/pokemo
 - [Individus](docs/pokemon/individus.md) — sexe, ball de capture, fertilité, `/pk boite`, et la vitrine
   (`/pk vitrine`) où chacun expose ses plus beaux Pokémon.
 - [Charme Chroma](docs/pokemon/charme.md) — un Pokédex de génération complété, deux fois plus de shiny.
+- [Starter de génération](docs/pokemon/starter.md) — un choix définitif à l'ouverture de la 2ᵉ génération, et ses évolutions en récompense.
 - [Œufs](docs/pokemon/oeufs.md) — la seule façon d'obtenir les bébés.
 - [Objets](docs/pokemon/objets.md) — ce que tiennent les Pokémon, balls offertes, objets d'évolution.
 - [Loterie](docs/pokemon/loterie.md) — un tirage par jour et par dresseur.

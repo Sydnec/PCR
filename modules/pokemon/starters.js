@@ -38,6 +38,14 @@ export function starterGenerations() {
     .sort((a, b) => a - b);
 }
 
+// La génération dont `speciesId` est un des starters proposés, parmi celles qui
+// sont ouvertes. Le choix se retrouve ainsi depuis l'espèce seule, qui est la valeur
+// d'autocomplétion et le numéro du bouton de confirmation.
+export const generationOfStarter = (speciesId) =>
+  starterGenerations().find((generation) =>
+    starterChoices(generation).some((species) => species.id === Number(speciesId))
+  ) ?? null;
+
 // L'espèce de la lignée d'un starter au `stage` demandé (1 : lui-même). Lue sur les
 // données brutes : les évolutions d'une génération fermée n'en sont pas filtrées,
 // puisque le rang d'une lignée ne dépend pas de l'ouverture du jeu. Null si la
@@ -73,7 +81,7 @@ export function getStarters(userId, cb) {
 }
 
 // Les paliers déjà donnés pour une génération, en pourcentages.
-function givenTiers(userId, generation, cb) {
+export function givenTiers(userId, generation, cb) {
   db.all(
     "SELECT percent FROM pokemon_starter_rewards WHERE user_id = ? AND generation = ?",
     [String(userId), generation],

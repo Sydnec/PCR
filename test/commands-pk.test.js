@@ -104,7 +104,7 @@ describe("la déclaration des commandes", () => {
     const files = fs.readdirSync(path.join(ROOT, "commands/pk")).map((file) => file.replace(/\.js$/, "")).sort();
     const declared = pk.data.toJSON().options.map((option) => option.name).sort();
     assert.deepEqual(declared, files);
-    assert.equal(declared.length, 17);
+    assert.equal(declared.length, 18);
   });
 
   it("toutes les commandes d'administration sont câblées au routeur /admin", async () => {

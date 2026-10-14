@@ -13,6 +13,7 @@ import { getPokemonConfig, getSafariConfig } from "./config.js";
 import { activeGeneration, allSpecies, generationOrdinal, isLegendary } from "./data.js";
 import { getCharmItem, getItems } from "./items.js";
 import { charmSpecies } from "./charms.js";
+import { starterChoices } from "./starters.js";
 import { resolveChannel } from "./spawn.js";
 
 const fr = (value) => value.toLocaleString("fr-FR");
@@ -46,6 +47,14 @@ export function buildGenerationEmbed(generation) {
   }
   if (getSafariConfig().enabled !== false) {
     lines.push("🌿 Au parc safari, choisis la ou les générations que tu vises.");
+  }
+  const starters = starterChoices(generation).map((entry) => entry.name);
+  if (starters.length) {
+    lines.push(
+      `🌱 Choisis ton starter parmi ${names(starters)} avec \`/pk starter\` : tu le reçois tout ` +
+        "de suite, le choix est définitif, et compléter le Pokédex de la génération te donne " +
+        "ensuite ses évolutions."
+    );
   }
   if (charm) {
     lines.push(

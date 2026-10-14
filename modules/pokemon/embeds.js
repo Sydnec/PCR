@@ -573,6 +573,7 @@ function ballOf(key) {
 const ORIGINS = {
   oeuf: "éclos d'un œuf",
   evolution: "obtenu par évolution",
+  starter: "starter de génération",
   migration: "ball inconnue",
 };
 
