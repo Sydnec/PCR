@@ -416,35 +416,32 @@ const POKEMON = {
     // Une canne n'abaisse pas son tarif : la Méga Canne pêche à 200 points, pas à 50.
     // `base` : la Canne est donnée à tous, une fois — jamais échangeable, sans quoi
     // l'échanger la ferait redonner. Les deux autres tombent sur les Pokémon et se
-    // gagnent à la loterie, à partir de la génération 2.
+    // gagnent à la loterie, dès que la pêche est ouverte (`fishing.generation`).
     canne: {
       label: "Canne",
       emoji: "🎣",
       sprite: "old-rod",
-      description: "Pêche à 50 points : surtout des Magicarpe.",
-      generation: 2,
+      description: "La canne de base : surtout des Magicarpe.",
       rod: { pool: "old", price: 50, base: true },
     },
     super_canne: {
       label: "Super Canne",
       emoji: "🎣",
       sprite: "good-rod",
-      description: "Pêche à 100 points : des prises plus variées.",
+      description: "Des prises plus variées.",
       dropWeight: 20,
       lotteryWeight: 60,
       lot: { min: 1, max: 1 },
-      generation: 2,
       rod: { pool: "good", price: 100 },
     },
     mega_canne: {
       label: "Méga Canne",
       emoji: "🎣",
       sprite: "super-rod",
-      description: "Pêche à 200 points : les prises les plus rares.",
+      description: "Les prises les plus rares.",
       dropWeight: 8,
       lotteryWeight: 25,
       lot: { min: 1, max: 1 },
-      generation: 2,
       rod: { pool: "super", price: 200 },
     },
     // Les charmes ne tombent pas et ne se revendent pas : ils se gagnent en

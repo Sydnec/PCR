@@ -302,7 +302,7 @@ export function spawnWeight(
   species,
   spawnConfig,
   itemOnly = itemOnlySpecies(),
-  rarity = fishingRarity()
+  rarity = null
 ) {
   if (species.tradeEvolution || species.isBaby || itemOnly.has(species.id)) return 0;
   const base = isLegendary(species)
@@ -312,7 +312,8 @@ export function spawnWeight(
   // /admin config, et un facteur sous 1 inverserait l'effet attendu.
   const boost = Math.max(1, Number(spawnConfig.generationBoost) || 1);
   // Ce qui se pêche est plus rare à l'état sauvage, une fois la pêche ouverte.
-  const fished = FISHABLE.has(species.id) ? rarity.factor : 1;
+  // Le facteur ne se lit que pour une espèce pêchable : les autres n'ont aucune lecture de config de plus.
+  const fished = FISHABLE.has(species.id) ? (rarity ?? fishingRarity()).factor : 1;
   return base * boost ** Math.max(0, (species.generation || 1) - 1) * fished;
 }
 
@@ -322,13 +323,12 @@ export function spawnWeight(
 export function fishingRarity() {
   const config = getPokemonConfig().fishing ?? {};
   const factor = Number(config.wildRarityFactor);
-  const open = activeGeneration() >= (Number(config.generation) || 2);
+  const open = fishingOpen();
   return { factor: open && Number.isFinite(factor) && factor > 0 ? factor : 1 };
 }
 
 // La pêche est-elle ouverte : sa génération l'est.
-export const fishingOpen = () =>
-  activeGeneration() >= (Number(getPokemonConfig().fishing?.generation) || 2);
+export const fishingOpen = () => activeGeneration() >= Number(getPokemonConfig().fishing?.generation);
 
 // La table d'une canne (`old`, `good`, `super`) : les espèces ouvertes et leur poids.
 export function fishingPool(poolKey) {

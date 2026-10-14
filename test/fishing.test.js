@@ -117,6 +117,43 @@ describe("lancer la ligne", () => {
     assert.equal(await balance(), 500);
   });
 
+  it("relire les cannes ou la touche n'écrit rien : seul le premier passage donne la Canne", async () => {
+    const logs = async () => (await dbAll(points, "SELECT * FROM pokemon_item_log")).length;
+    await call(fishing.getRodsOf, "u1");
+    const afterFirst = await logs();
+    assert.equal(afterFirst, 1, "la Canne de base, donnée une fois");
+    await call(fishing.getRodsOf, "u1");
+    await call(fishing.getRodsOf, "u1");
+    assert.equal(await logs(), afterFirst, "les relectures du site n'écrivent pas");
+
+    await setBalance(500);
+    const first = await cast();
+    await dbRun(points, "UPDATE pokemon_spawns SET flees_at = ? WHERE id = ?", [Date.now() - 1, first.spawn.id]);
+    assert.equal(await call(fishing.getFishingSpawn, "u1"), null, "enfuie : plus en cours");
+    assert.equal((await spawns())[0].status, "FISHING", "mais la lecture ne l'a pas fermée : c'est le prochain lancer qui le fait");
+  });
+
+  it("une touche écrite mais illisible n'est pas remboursée : elle existe, et le dit", async () => {
+    await setBalance(500);
+    const original = points.get;
+    points.get = function (sql, ...rest) {
+      if (/SELECT \* FROM pokemon_spawns WHERE id = \?/.test(sql)) return rest.at(-1)(new Error("panne de lecture"));
+      return original.call(this, sql, ...rest);
+    };
+    let result;
+    try {
+      result = await cast();
+    } finally {
+      points.get = original;
+    }
+    assert.equal(result.ok, false);
+    assert.equal(result.debited, true);
+    assert.match(result.reason, /50 points débités.*relance \/pk pecher/);
+    assert.equal(await balance(), 450, "pas de remboursement : la ligne existe");
+    assert.equal((await spawns()).length, 1);
+    assert.equal((await call(fishing.getFishingSpawn, "u1")).status, "FISHING", "elle se retrouve");
+  });
+
   it("la pêche attend sa génération", async () => {
     const config = getPokemonConfig();
     config.fishing.generation = 3;
@@ -181,6 +218,26 @@ describe("la capture d'une pêche", () => {
     const before = await balance();
     assert.equal((await throwBall("u1")).status, "gone");
     assert.equal(await balance(), before);
+  });
+
+  it("la fuite s'applique jusque dans l'écriture : une touche qui s'enfuit entre le débit et la capture n'est pas prise", async () => {
+    await hook();
+    const before = await balance();
+    const original = points.run;
+    // Entre le contrôle et l'écriture de la capture, l'échéance tombe.
+    points.run = function (sql, ...rest) {
+      if (/SET status = 'CAUGHT'/.test(sql)) original.call(this, "UPDATE pokemon_spawns SET flees_at = ? WHERE id = 1", [Date.now() - 1]);
+      return original.call(this, sql, ...rest);
+    };
+    let outcome;
+    try {
+      outcome = await throwBall("u1");
+    } finally {
+      points.run = original;
+    }
+    assert.equal(outcome.status, "void", "annulé, comme battu à la course");
+    assert.equal(await balance(), before, "la ball est remboursée");
+    assert.equal((await spawns())[0].status, "FISHING", "elle n'a pas été capturée");
   });
 
   it("l'Appât Ball vaut ×3 sur une pêche : la touche porte le drapeau", async () => {

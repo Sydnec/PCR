@@ -1,6 +1,7 @@
 import { MessageFlags } from "discord.js";
 import { handleException } from "../../modules/utils.js";
-import { getSpecies } from "../../modules/pokemon/data.js";
+import { generationOrdinal, getSpecies } from "../../modules/pokemon/data.js";
+import { getPokemonConfig } from "../../modules/pokemon/config.js";
 import { castLine, getFishingSpawn, getRodsOf } from "../../modules/pokemon/fishing.js";
 import { ballPanelRow } from "../../modules/pokemon/capture.js";
 import { buildSpawnEmbed, respondHint as hint } from "../../modules/pokemon/embeds.js";
@@ -65,7 +66,11 @@ export default {
       if (!key) {
         const rods = await promisify(getRodsOf, userId);
         if (!rods.length) {
-          return reply({ content: "La pêche n'est pas encore ouverte : elle arrive avec la 2e génération." });
+          return reply({
+            content: `La pêche n'est pas encore ouverte : elle arrive avec la ${generationOrdinal(
+              Number(getPokemonConfig().fishing.generation)
+            )} génération.`,
+          });
         }
         const lines = rods.map(
           (rod) =>
@@ -86,7 +91,16 @@ export default {
       const result = await promisify(castLine, userId, key);
       if (result.ok) {
         const intro = `🎣 Ça mord ! (**-${fr(result.price)}** points, ${result.rod.label})`;
-        return reply(await catchPayload(userId, result.spawn, intro));
+        // Les points sont partis et la touche existe : si l'affichage échoue, on le dit tel
+        // quel — le catch-all ci-dessous prétendrait que rien n'a été débité.
+        try {
+          return reply(await catchPayload(userId, result.spawn, intro));
+        } catch (error) {
+          handleException("Affichage d'une touche :", error);
+          return reply({
+            content: `🎣 Ça mord ! (**-${fr(result.price)}** points) mais l'affichage a échoué : relance \`/pk pecher\` pour retrouver ta touche.`,
+          });
+        }
       }
       // Une touche déjà là : on la remet sous les yeux plutôt que de la laisser se perdre.
       if (result.existing) {

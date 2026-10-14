@@ -31,7 +31,7 @@ describe("/pk pecher", () => {
     assert.equal(reply.flags, MessageFlags.Ephemeral, "personne d'autre ne la voit");
     assert.match(reply.content, /Ça mord ! \(\*\*-50\*\* points, Canne\)/);
     assert.match(reply.content, /Il s'enfuit dans \*\*\d+ s\*\*/);
-    assert.match(textOf(reply), /sauvage apparaît/);
+    assert.match(textOf(reply), /mord à la ligne/, "c'est une touche, pas une apparition du salon");
     const [row] = await dbAll(points, "SELECT id, status, reserved_for FROM pokemon_spawns");
     assert.deepEqual([row.status, row.reserved_for], ["FISHING", "u1"]);
     assert.deepEqual(buttonIds(reply).slice(0, 3), [`poke_rethrow|${row.id}|poke`, `poke_rethrow|${row.id}|super`, `poke_rethrow|${row.id}|hyper`]);

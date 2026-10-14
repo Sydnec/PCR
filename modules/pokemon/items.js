@@ -114,7 +114,11 @@ export function freeBallCount(inventory, ballKey) {
 //
 // Un objet d'une génération encore fermée ne tombe pas non plus : la Pierre
 // Soleil n'a rien à faire évoluer tant que Joliflor n'existe pas.
-export const itemOpen = (item) => Number(item?.generation ?? 1) <= activeGeneration();
+// Une canne s'ouvre avec la pêche (`fishing.generation`), pas avec une génération écrite à
+// part sur l'objet : les deux ne peuvent pas diverger.
+export const itemOpen = (item) =>
+  Number(item?.rod ? getPokemonConfig().fishing?.generation : (item?.generation ?? 1)) <=
+  activeGeneration();
 
 export const itemDropWeight = (item) =>
   itemOpen(item) ? Math.max(0, Number(item?.dropWeight) || 0) : 0;

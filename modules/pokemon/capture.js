@@ -388,8 +388,9 @@ export function resolveThrow(
         // actif » : si le Pokémon a été capturé entre le débit et le tirage,
         // on rend les points au lieu de les brûler pour rien.
         return db.run(
-          "UPDATE pokemon_spawns SET throw_count = throw_count + 1 WHERE id = ? AND status IN ('ACTIVE', 'FISHING')",
-          [spawnId],
+          `UPDATE pokemon_spawns SET throw_count = throw_count + 1
+            WHERE id = ? AND (status = 'ACTIVE' OR (status = 'FISHING' AND flees_at > ?))`,
+          [spawnId, Date.now()],
           function (err) {
             if (err) {
               handleException("Comptabilisation du raté :", err);
@@ -418,8 +419,8 @@ export function resolveThrow(
         `UPDATE pokemon_spawns
             SET status = 'CAUGHT', caught_by = ?, caught_at = ?, caught_ball = ?,
                 ended_at = ?, throw_count = throw_count + 1
-          WHERE id = ? AND status IN ('ACTIVE', 'FISHING')`,
-        [userId, now, ball.key, now, spawnId],
+          WHERE id = ? AND (status = 'ACTIVE' OR (status = 'FISHING' AND flees_at > ?))`,
+        [userId, now, ball.key, now, spawnId, now],
         function (err) {
           if (err) {
             handleException("Réclamation du spawn :", err);

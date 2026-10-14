@@ -127,7 +127,13 @@ export function buildSpawnEmbed(spawn, species, throws = [], announcement = null
   const name = displayName(species, false, spawn.sex, spawn.form);
   const embed = new EmbedBuilder()
     .setTitle(
-      isShiny ? `✨ Un ${name} SHINY apparaît ! ✨` : `Un ${name} sauvage apparaît !`
+      spawn.fished
+        ? isShiny
+          ? `✨ Un ${name} SHINY mord à la ligne ! ✨`
+          : `Un ${name} mord à la ligne !`
+        : isShiny
+          ? `✨ Un ${name} SHINY apparaît ! ✨`
+          : `Un ${name} sauvage apparaît !`
     )
     .setColor(embedColor(species, isShiny))
     .setImage(spriteUrl(species, isShiny, spawn.form))
