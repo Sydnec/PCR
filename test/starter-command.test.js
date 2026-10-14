@@ -92,6 +92,8 @@ describe("/pk starter", () => {
     assert.match(all[0].name, /Germignon — 2e génération/);
     const some = payloadOf(await runAutocomplete(pk, { sub: "starter", focused: { name: "pokemon", value: "kai" } }), "respond");
     assert.deepEqual(some.map((choice) => choice.value), ["158"]);
+    const typed = payloadOf(await runAutocomplete(pk, { sub: "starter", focused: { name: "pokemon", value: "xyz" } }), "respond");
+    assert.match(typed[0].name, /Aucun starter ne correspond/, "il en reste à choisir : ce n'est pas « déjà choisi »");
     await press("poke_starter_ok|152");
     const none = payloadOf(await runAutocomplete(pk, { sub: "starter", focused: { name: "pokemon", value: "" } }), "respond");
     assert.match(none[0].name, /Aucun starter à choisir/);

@@ -10,6 +10,7 @@ import {
   starterChoices,
   starterGenerations,
   starterProgress,
+  starterTiers,
   tierReached,
 } from "../../modules/pokemon/starters.js";
 import { respondHint as hint } from "../../modules/pokemon/embeds.js";
@@ -21,9 +22,7 @@ const promisify = (fn, ...args) =>
 // restent avec le pourcentage à atteindre.
 async function tierLines(userId, generation, starter, progress) {
   const given = await promisify(givenTiers, userId, generation);
-  return (getPokemonConfig().starters?.rewards ?? [])
-    .slice()
-    .sort((a, b) => a.percent - b.percent)
+  return starterTiers()
     .map((tier) => {
       const target = lineageAt(starter, tier.stage);
       const name = target ? `${target.name}${tier.shiny ? " ✨" : ""}` : "?";
@@ -41,7 +40,11 @@ async function tierLines(userId, generation, starter, progress) {
 async function statusText(userId) {
   const generations = starterGenerations();
   if (!generations.length) {
-    return "Aucune génération ouverte ne propose de starter pour l'instant : le choix arrive avec la 2e génération.";
+    const next = Object.keys(getPokemonConfig().starters?.choices ?? {}).map(Number).sort((a, b) => a - b)[0];
+    return (
+      "Aucune génération ouverte ne propose de starter pour l'instant" +
+      (next ? ` : le choix arrive avec la ${generationOrdinal(next)} génération.` : ".")
+    );
   }
   const blocks = [];
   for (const generation of generations) {
@@ -85,18 +88,20 @@ export default {
   async autocomplete(interaction) {
     const query = String(interaction.options.getFocused() ?? "").toLowerCase();
     try {
-      const choices = [];
+      const open = [];
       for (const generation of starterGenerations()) {
         const chosen = await promisify(getStarter, interaction.user.id, generation);
         if (chosen) continue;
         for (const species of starterChoices(generation)) {
-          const name = `${species.name} — ${generationOrdinal(generation)} génération`;
-          if (name.toLowerCase().includes(query)) choices.push({ name, value: String(species.id) });
+          open.push({ name: `${species.name} — ${generationOrdinal(generation)} génération`, value: String(species.id) });
         }
       }
-      if (!choices.length) {
+      // Rien à choisir et aucun nom qui corresponde ne se disent pas pareil.
+      if (!open.length) {
         return hint(interaction, "Aucun starter à choisir : déjà choisi, ou pas encore ouvert");
       }
+      const choices = open.filter((choice) => choice.name.toLowerCase().includes(query));
+      if (!choices.length) return hint(interaction, "Aucun starter ne correspond");
       await interaction.respond(choices.slice(0, 25)).catch(() => {});
     } catch (error) {
       handleException("Autocomplétion de /pk starter :", error);

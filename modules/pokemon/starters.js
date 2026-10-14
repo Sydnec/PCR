@@ -23,6 +23,27 @@ export function setStarterClient(client) {
 
 const config = () => getPokemonConfig().starters ?? { choices: {}, rewards: [] };
 
+// Les paliers de la configuration, triés et nettoyés : un réglage à chaud ne passe
+// pas par des bornes. Un palier sans stade valide donnerait une seconde copie du
+// stade 1, un pourcentage nul ou au-delà de 100 serait dû tout de suite ou jamais, et
+// deux paliers au même pourcentage ne se revendiquent qu'une fois.
+export function starterTiers() {
+  const seen = new Set();
+  return (config().rewards ?? [])
+    .filter((tier) => {
+      const valid =
+        Number.isInteger(tier?.stage) &&
+        tier.stage >= 1 &&
+        tier.percent > 0 &&
+        tier.percent <= 100 &&
+        Number.isInteger(tier.percent) &&
+        !seen.has(tier.percent);
+      if (valid) seen.add(tier.percent);
+      return valid;
+    })
+    .sort((a, b) => a.percent - b.percent);
+}
+
 // Les starters proposés pour une génération : ceux de la configuration qui
 // existent dans le jeu de données. Vide, la génération n'a pas de choix.
 export function starterChoices(generation) {
@@ -165,7 +186,7 @@ export function chooseStarter(userId, generation, speciesId, cb) {
 // échoue, si bien qu'un palier ne se donne jamais deux fois ni ne se perd. Rend
 // les paliers donnés par cet appel.
 export function checkStarterRewards(userId, cb = () => {}) {
-  const tiers = [...(config().rewards ?? [])].sort((a, b) => a.percent - b.percent);
+  const tiers = starterTiers();
   getStarters(userId, async (err, starters) => {
     if (err) {
       handleException("Lecture des starters :", err);
@@ -270,11 +291,31 @@ async function announceTier(userId, { generation, percent, species, shiny }) {
 
 // Au démarrage : les paliers que la vérification n'aurait pas encore donnés
 // (Pokédex atteint avant l'arrivée du système, ou arrivée interrompue).
+//
+// Le stade 1 aussi : le choix se revendique avant le don, et une coupure entre les
+// deux laisserait un choix « définitif » sans Pokémon. Un starter reçu ne quitte
+// jamais la boîte (il en reste toujours un de chaque espèce) : qui n'en a aucun ne
+// l'a donc jamais reçu.
 export function repairStarters(client) {
   setStarterClient(client);
-  db.all("SELECT DISTINCT user_id FROM pokemon_starters", [], async (err, rows) => {
+  db.all("SELECT user_id, species_id FROM pokemon_starters", [], async (err, rows) => {
     if (err) return handleException("Rattrapage des starters :", err);
-    for (const { user_id: userId } of rows ?? []) {
+    for (const { user_id: userId, species_id: speciesId } of rows ?? []) {
+      const owns = await new Promise((resolve) =>
+        db.get(
+          "SELECT 1 AS found FROM pokemon_owned WHERE user_id = ? AND species_id = ? LIMIT 1",
+          [userId, speciesId],
+          (err, row) => resolve(err ? true : Boolean(row))
+        )
+      );
+      if (!owns) {
+        await new Promise((resolve) =>
+          creditSpecies(userId, speciesId, false, { origin: "starter", checkStarters: false }, (err) => {
+            if (err) handleException("Rattrapage du stade 1 d'un starter :", err);
+            resolve();
+          })
+        );
+      }
       await new Promise((resolve) => checkStarterRewards(userId, resolve));
     }
   });

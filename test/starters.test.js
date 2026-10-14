@@ -3,7 +3,7 @@
 // légendaires), chacune donnée une fois, rattrapée si le choix vient tard.
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { createSandbox, openDatabases, dbRun, dbAll, dbGet } from "./helpers.js";
+import { createSandbox, openDatabases, dbRun, dbAll, dbGet, eventually, sleep } from "./helpers.js";
 
 createSandbox({ config: { pokemon: { generationOpenings: { 2: "2000-01-01T00:00:00+01:00" } } } });
 const { points } = await openDatabases();
@@ -100,6 +100,21 @@ describe("choisir son starter", () => {
   });
 });
 
+describe("le rattrapage au démarrage", () => {
+  it("un choix revendiqué sans Pokémon (coupure) reçoit son stade 1 ; un choix complet n'en reçoit pas de plus", async () => {
+    await dbRun(points, "INSERT INTO pokemon_starters (user_id, generation, species_id, chosen_at) VALUES ('u1', 2, ?, 1)", [KAIMINUS]);
+    await choose(HERICENDRE, "u2");
+    const client = { channels: { fetch: async () => null }, guilds: { fetch: async () => null } };
+    starters.repairStarters(client);
+    await eventually(async () => assert.deepEqual((await ownedIds("u1")).map((row) => row.species_id), [KAIMINUS]));
+    await sleep(150);
+    assert.equal((await ownedIds("u2")).length, 1, "u2 avait déjà son starter");
+    starters.repairStarters(client);
+    await sleep(150);
+    assert.equal((await ownedIds("u1")).length, 1, "un second passage ne redonne rien");
+  });
+});
+
 describe("les paliers du Pokédex", () => {
   it("chaque palier se donne une seule fois, à son pourcentage, de la lignée du starter", async () => {
     await choose(GERMIGNON);
@@ -176,6 +191,24 @@ describe("les paliers du Pokédex", () => {
     assert.equal(starters.tierReached({ have: 0, total: 0 }, 33), false, "un Pokédex sans espèce ne récompense personne");
     assert.equal(starters.tierReached({ have: 33, total: 100 }, 33), true);
     assert.equal(starters.tierReached({ have: 32, total: 100 }, 33), false);
+  });
+
+  it("un réglage à chaud absurde ne donne rien : stade manquant, pourcentage nul, doublon", async () => {
+    const config = await import("../modules/pokemon/config.js");
+    assert.deepEqual(starters.starterTiers().map((tier) => tier.percent), [33, 66, 100]);
+    const original = config.getPokemonConfig().starters.rewards;
+    try {
+      config.getPokemonConfig().starters.rewards = [
+        { percent: 33, shiny: false },
+        { percent: 0, stage: 2 },
+        { percent: 150, stage: 2 },
+        { percent: 50, stage: 2 },
+        { percent: 50, stage: 3 },
+      ];
+      assert.deepEqual(starters.starterTiers(), [{ percent: 50, stage: 2 }], "un seul palier valide, le premier à ce pourcentage");
+    } finally {
+      config.getPokemonConfig().starters.rewards = original;
+    }
   });
 
   it("lineageAt suit la lignée, sans dépendre de ce que le jeu a ouvert", () => {

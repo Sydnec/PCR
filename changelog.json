@@ -2260,7 +2260,7 @@
     {
       "type": "feature",
       "name": "Starter de génération",
-      "description": "À partir de la 2e génération, chaque dresseur choisit définitivement un starter parmi trois avec /pk starter. En complétant le Pokédex de la génération, il reçoit ses évolutions à 33 % et 66 %, puis le stade 1 en shiny à 100 %. Un choix tardif rattrape les paliers déjà atteints.",
+      "description": "À partir de la 2e génération, chacun choisit définitivement un starter parmi trois avec /pk starter, puis reçoit ses évolutions en complétant le Pokédex de la génération (33 %, 66 %, puis le stade 1 shiny à 100 %). Un choix tardif rattrape les paliers déjà atteints.",
       "announce": true,
       "author": "Sydnec",
       "commit": "pending",
