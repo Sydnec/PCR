@@ -213,7 +213,7 @@ describe("points", () => {
     const reply = payloadOf(calls, "reply");
     assert.equal(reply.flags, MessageFlags.Ephemeral);
     const embed = reply.embeds[0].toJSON();
-    assert.match(embed.description, /500[\s\u202f\u00a0]*points/);
+    assert.match(embed.description, /\*\*500\*\*[\s\u202f\u00a0]*points/);
     assert.match(embed.description, /✨ Prochains points : \*\*disponibles\*\*/);
   });
 
@@ -229,7 +229,7 @@ describe("points", () => {
     const calls = await runCommand(soldeCommand, { user: "u1" });
     const reply = payloadOf(calls, "reply");
     const embed = reply.embeds[0].toJSON();
-    assert.match(embed.description, /800[\s\u202f\u00a0]*points/);
+    assert.match(embed.description, /\*\*800\*\*[\s\u202f\u00a0]*points/);
     assert.match(embed.description, /⏳ Prochains points : <t:\d+:R>/);
   });
 
@@ -243,7 +243,7 @@ describe("points", () => {
     const reply = payloadOf(calls, "reply");
     const embed = reply.embeds[0].toJSON();
     assert.match(embed.title, /Solde de Dresseur u2/);
-    assert.match(embed.description, /1[\s\u202f\u00a0]200[\s\u202f\u00a0]*points/);
+    assert.match(embed.description, /\*\*1[\s\u202f\u00a0]200\*\*[\s\u202f\u00a0]*points/);
     assert.match(embed.description, /✨ Prochains points : \*\*disponibles\*\*/);
   });
 });
