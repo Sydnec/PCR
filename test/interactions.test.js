@@ -216,6 +216,18 @@ describe("lancer une ball depuis l'annonce", () => {
     assert.ok(buttonIds(back).every((customId) => /^poke_re(throw|special)\|/.test(customId)));
   });
 
+  it("après une ball spéciale, le panneau reste sur le sous-menu, nombres à jour", async () => {
+    sandbox.writeConfig(GEN2);
+    const user = newUser();
+    const id = await spawnRow("Mewtwo");
+    await dbRun(points, "INSERT INTO pokemon_ball_units (user_id, ball, bought_at) VALUES (?, 'appat', 1), (?, 'appat', 1)", [user, user]);
+    const calls = await withRandom(0.999, () => click(`poke_throw|${id}|appat`, { user }));
+    const reply = only(calls, "editReply");
+    assert.match(reply.content, /Raté/);
+    assert.deepEqual(labels(reply).slice(0, 2), ["Appât Ball (×1)", "Catalyseur Ball (×0)"], "une ball de moins, sans rouvrir le menu");
+    assert.ok(buttonIds(reply).includes(`poke_reback|${id}`));
+  });
+
   it("lancer une ball spéciale sans en avoir est refusé en le disant, rien n'est débité", async () => {
     sandbox.writeConfig(GEN2);
     const user = newUser();

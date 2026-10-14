@@ -102,7 +102,7 @@ describe("référentiels", () => {
     const catalogue = await call("GET", "/api/catalogue");
     assert.deepEqual(
       catalogue.balls.map((ball) => ball.key),
-      ["poke", "super", "hyper", "master", "appat", "catalyseur", "safari"]
+      ["poke", "super", "hyper", "master", "safari"]
     );
     assert.ok(catalogue.items.some((item) => item.key === "super_bonbon"));
   });

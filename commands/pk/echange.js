@@ -224,6 +224,9 @@ async function readSide(interaction, names, owner, own) {
   return { side: own ? selectorOf(candidate) : { speciesId: found.id } };
 }
 
+// Les descriptions des options sont volontairement courtes : /pk s'approche de la limite
+// de 8 000 caractères que Discord impose à une commande entière, et en dépasser un seul
+// fait refuser TOUTES les commandes au démarrage (voir test/commands-pk.test.js).
 export default {
   describe: (sub) =>
     sub

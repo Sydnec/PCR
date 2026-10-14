@@ -14,7 +14,13 @@ import {
   StringSelectMenuOptionBuilder,
   TextDisplayBuilder,
 } from "discord.js";
-import { getBall, getPokemonConfig, getSafariConfig, hasPersonalPrice } from "./config.js";
+import {
+  getBall,
+  getPokemonConfig,
+  getSafariConfig,
+  getSpecialBalls,
+  hasPersonalPrice,
+} from "./config.js";
 import { getCharmItem, getItem, sortByCatalogue } from "./items.js";
 import {
   RARITIES,
@@ -105,11 +111,10 @@ function probabilityLine(catchRate) {
 // d'œil et disent la même chose en un caractère.
 function throwLogField(throws) {
   if (!throws.length) return "*Personne n'a encore tenté sa chance.*";
-  const balls = getPokemonConfig().capture.balls;
   return throws
     .map(
       (row) =>
-        `${ballResultIcon(row.result)} <@${row.user_id}> ${balls[row.ball]?.emoji ?? row.ball}`
+        `${ballResultIcon(row.result)} <@${row.user_id}> ${getBall(row.ball)?.emoji ?? row.ball}`
     )
     .join("\n");
 }
@@ -427,13 +432,14 @@ const PARTICIPANTS_SHOWN = 5;
 // racontent l'engagement bien mieux qu'un total en points — on voit du premier
 // coup qui a sorti l'artillerie et qui a tenté sa chance à l'économie.
 function ballsLine(balls) {
-  const config = getPokemonConfig().capture.balls;
+  // Les balls spéciales viennent après les balls ordinaires.
+  const order = [...Object.keys(getPokemonConfig().capture.balls), ...getSpecialBalls().map((ball) => ball.key)];
   return Object.entries(balls)
     .filter(([, count]) => count > 0)
     // L'ordre du catalogue, donc de la moins chère à la plus chère : la ligne se
     // lit toujours dans le même sens d'un dresseur à l'autre.
-    .sort(([a], [b]) => Object.keys(config).indexOf(a) - Object.keys(config).indexOf(b))
-    .map(([key, count]) => `${count}\u00D7${config[key]?.emoji ?? key}`)
+    .sort(([a], [b]) => order.indexOf(a) - order.indexOf(b))
+    .map(([key, count]) => `${count}\u00D7${getBall(key)?.emoji ?? key}`)
     .join(" ");
 }
 
@@ -489,7 +495,7 @@ export function buildCaughtEmbed(
   // `charmed` : il brillait pour son vainqueur, porteur du Charme Chroma, et
   // c'est un shiny qui rejoint sa boîte.
   const isShiny = Boolean(spawn.is_shiny) || charmed;
-  const ball = getPokemonConfig().capture.balls[ballKey];
+  const ball = getBall(ballKey);
   const total = spending?.total ?? 0;
   const charm = charmed ? getCharmItem(species.generation) : null;
 

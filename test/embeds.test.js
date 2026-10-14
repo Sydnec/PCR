@@ -501,6 +501,16 @@ describe("la comparaison de deux dresseurs (/pk comparer)", () => {
   });
 });
 
+describe("les balls spéciales dans les embeds", () => {
+  it("le journal des lancers montre l'emoji d'une ball spéciale, pas sa clé", () => {
+    const row = { id: 1, species_id: species("Salamèche").id, is_shiny: 0, catch_rate: 255, rarity: "COMMUN", throw_count: 0, held_item: null, sex: null, charm_shiny: 0, form: null, spawned_at: 1, status: "ACTIVE" };
+    const embed = embeds.buildSpawnEmbed(row, species("Salamèche"), [{ user_id: "7", ball: "appat", result: "MISS" }]).toJSON();
+    const text = JSON.stringify(embed);
+    assert.ok(text.includes("🎣"));
+    assert.ok(!text.includes("appat"));
+  });
+});
+
 describe("l'embed d'une offre d'échange (buildTradeEmbed)", () => {
   const base = { id: 1, from_user_id: "u1", to_user_id: "u2", offer_species_id: 0, request_species_id: 0, offer_is_shiny: 0, request_is_shiny: 0 };
   const text = (trade, status) => embeds.buildTradeEmbed(trade, status).toJSON().description;

@@ -65,7 +65,7 @@ import {
   spriteUrl,
   typeColors,
 } from "../pokemon/data.js";
-import { getBalls, getPokemonConfig, getSafariConfig, getSpecialBalls } from "../pokemon/config.js";
+import { getBalls, getPokemonConfig, getSafariConfig } from "../pokemon/config.js";
 import { buyBalls, getShopView, getUnitCounts, openSpecialBalls } from "../pokemon/shop.js";
 import { announceDropClaim, claimDrop, getOpenDrops } from "../pokemon/drops.js";
 import { paidEntryRefund, safariOutcomeLine } from "../pokemon/embeds.js";
@@ -622,7 +622,7 @@ export const routes = [
     method: "GET",
     path: "/api/catalogue",
     handler: async () => ({
-      balls: [...getBalls(), ...getSpecialBalls(), getSafariConfig().ball].map(({ key, label, emoji, sprite }) => ({
+      balls: [...getBalls(), ...openSpecialBalls(), getSafariConfig().ball].map(({ key, label, emoji, sprite }) => ({
         key,
         label,
         emoji,

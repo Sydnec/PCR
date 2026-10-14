@@ -299,7 +299,10 @@ function refundThrow(userId, spawnId, ball, probability, payment, cb) {
 // AVANT de différer sa réponse. Le cooldown est le même pour les deux portes :
 // alterner Discord et le site ne fait pas lancer plus vite.
 export function startThrow(userId, ballKey) {
-  if (!getBall(ballKey)) return { status: "unknown-ball" };
+  const ball = getBall(ballKey);
+  // Une ball spéciale dont la génération est fermée n'existe pas : le refus ne doit
+  // pas consommer le cooldown.
+  if (!ball || (ball.special && !getOpenSpecialBall(ballKey))) return { status: "unknown-ball" };
   const cooldownMs = getPokemonConfig().capture.throwCooldownSeconds * 1000;
   const remaining = tryConsumeCooldown(userId, cooldownMs);
   return remaining > 0 ? { status: "cooldown", remaining } : null;
@@ -654,7 +657,15 @@ export async function throwBall(
     interaction
       .editReply({
         content: throwMessage(outcome),
-        components: isFinalThrow(outcome) ? [] : [await ballPanelRow(userId, spawnId)],
+        // Après une ball spéciale, le panneau reste sur le sous-menu : on enchaîne sans
+        // le rouvrir, et les nombres sont à jour.
+        components: isFinalThrow(outcome)
+          ? []
+          : [
+              await (getBall(ballKey)?.special
+                ? specialPanelRow(userId, spawnId, { panel: true })
+                : ballPanelRow(userId, spawnId)),
+            ],
       })
       .catch(() => {});
   });

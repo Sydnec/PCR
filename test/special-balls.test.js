@@ -2,12 +2,12 @@
 // qui décide si elles servent, et leur bonus au lancer.
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { createSandbox, openDatabases, dbRun, dbAll, withRandom, speciesByName } from "./helpers.js";
+import { createSandbox, openDatabases, dbRun, dbAll, dbGet, eventually, withRandom, speciesByName } from "./helpers.js";
 
 createSandbox({
   config: { pokemon: { generationOpenings: { 2: "2000-01-01T00:00:00+01:00" }, spawn: { embedRefreshMs: 1 }, capture: { throwCooldownSeconds: 0 } } },
 });
-const { points } = await openDatabases();
+const { points, stats } = await openDatabases();
 const shop = await import("../modules/pokemon/shop.js");
 const capture = await import("../modules/pokemon/capture.js");
 const economy = await import("../modules/economy.js");
@@ -82,6 +82,26 @@ describe("la boutique", () => {
     await dbRun(points, "DROP TRIGGER panne");
     assert.equal(await balance(), 1000);
     assert.equal((await units()).length, 0);
+  });
+
+  it("une erreur en cours d'achat : ce qui est livré existe, le reste est remboursé, et on le dit", async () => {
+    await setBalance(1000);
+    await dbRun(points, "CREATE TRIGGER panne BEFORE INSERT ON pokemon_ball_units WHEN (SELECT COUNT(*) FROM pokemon_ball_units WHERE user_id = NEW.user_id) >= 1 BEGIN SELECT RAISE(ABORT, 'panne'); END");
+    const result = await call(shop.buyBalls, "u1", "appat", 3);
+    await dbRun(points, "DROP TRIGGER panne");
+    assert.deepEqual([result.ok, result.partial, result.bought, result.cost], [true, true, 1, 230]);
+    assert.match(result.reason, /Une erreur a interrompu l'achat : 1 sur 3 achetée/);
+    assert.equal((await units()).length, 1);
+    assert.equal(await balance(), 1000 - 230, "seule la ball livrée est payée");
+  });
+
+  it("un achat compte dans les points dépensés du dresseur", async () => {
+    // Les statistiques s'accumulent d'un test à l'autre : on compare avant et après.
+    const spent = async () => (await dbGet(stats, "SELECT points_spent FROM pokemon_stats WHERE user_id = 'u1'"))?.points_spent ?? 0;
+    const before = await spent();
+    await setBalance(1000);
+    await call(shop.buyBalls, "u1", "catalyseur", 2);
+    await eventually(async () => assert.equal((await spent()) - before, 600));
   });
 
   it("une ball dont la génération est fermée n'est pas en vente", async () => {
@@ -186,6 +206,17 @@ describe("le lancer d'une ball spéciale", () => {
     const loser = first.status === "void" ? "u1" : "u2";
     assert.equal((await units(loser)).length, 1, "la perdante retrouve sa ball");
     assert.match(capture.throwMessage(first.status === "void" ? first : second), /Ta \*\*Appât Ball\*\* t'a été rendue/);
+  });
+
+  it("startThrow refuse une ball spéciale fermée avant de consommer le délai", () => {
+    const appat = getPokemonConfig().capture.specialBalls.appat;
+    appat.generation = 3;
+    try {
+      assert.deepEqual(capture.startThrow("u1", "appat"), { status: "unknown-ball" });
+    } finally {
+      appat.generation = 2;
+    }
+    assert.equal(capture.startThrow("u1", "appat"), null, "ouverte, elle part");
   });
 
   it("une ball dont la génération est fermée est inconnue au lancer", async () => {

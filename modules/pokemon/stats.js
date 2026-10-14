@@ -155,6 +155,16 @@ export function recordThrow({ userId, speciesId, ball, cost, probability, result
   }
 }
 
+// Des points dépensés en boutique : ils comptent dans les points dépensés du dresseur,
+// comme ceux d'un lancer, sans être des lancers.
+export function recordPurchase({ userId, cost }) {
+  try {
+    bumpStats(userId, { points_spent: cost });
+  } catch (error) {
+    handleException(error, "recordPurchase");
+  }
+}
+
 // Garde le meilleur record d'un dresseur : la capture la moins probable et la
 // capture la plus rapide. Les assignations d'un UPSERT SQLite sont toutes
 // évaluées sur la ligne d'origine, donc l'espèce et la probabilité restent

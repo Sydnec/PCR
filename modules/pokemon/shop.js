@@ -12,6 +12,7 @@ import { handleException } from "../utils.js";
 import { getSpecialBalls, specialBallLimit } from "./config.js";
 import { activeGeneration, getSpecies, speciesEvolvingWith } from "./data.js";
 import { getItem } from "./items.js";
+import { recordPurchase } from "./stats.js";
 
 // Les balls spéciales en vente : celles dont la génération est ouverte. Fermée, une
 // ball n'existe pas encore pour les dresseurs — ni en boutique, ni au lancer.
@@ -97,17 +98,26 @@ export function buyBalls(userId, ballKey, quantity, cb) {
       };
       const finish = (error) => {
         const missing = quantity - bought;
-        if (!missing) return cb(null, { ok: true, bought, cost });
+        if (!missing) {
+          recordPurchase({ userId: String(userId), cost });
+          return cb(null, { ok: true, bought, cost });
+        }
         // Rendre ce qui n'a pas été livré, au prix payé.
         addPoints(String(userId), unit * missing, (refundError) => {
           if (refundError) handleException("Remboursement d'un achat de balls :", refundError);
-          if (error) return cb(error);
+          // Rien livré : l'erreur est franche, et tout est remboursé. Livré en partie,
+          // l'achat existe — des balls en poche, des points débités — et se dit tel.
+          if (error && !bought) return cb(error);
+          if (error) handleException("Achat de balls interrompu :", error);
+          if (bought) recordPurchase({ userId: String(userId), cost: unit * bought });
           cb(null, {
             ok: bought > 0,
             partial: bought > 0,
             bought,
             cost: unit * bought,
-            reason: `Ta poche est pleine : ${bought} sur ${quantity} achetée${bought > 1 ? "s" : ""}, le reste est remboursé.`,
+            reason: error
+              ? `Une erreur a interrompu l'achat : ${bought} sur ${quantity} achetée${bought > 1 ? "s" : ""}, le reste est remboursé.`
+              : `Ta poche est pleine : ${bought} sur ${quantity} achetée${bought > 1 ? "s" : ""}, le reste est remboursé.`,
           });
         });
       };

@@ -55,6 +55,11 @@ describe("la boutique du site", () => {
     }
   });
 
+  it("le catalogue nomme les balls spéciales en vente, de quoi les afficher dans un journal de lancers", async () => {
+    const catalogue = await call("GET", "/api/catalogue");
+    assert.deepEqual(catalogue.balls.map((ball) => ball.key), ["poke", "super", "hyper", "master", "appat", "catalyseur", "safari"]);
+  });
+
   it("/api/me dit que la boutique est ouverte", async () => {
     assert.equal((await call("GET", "/api/me")).shop, true);
   });
