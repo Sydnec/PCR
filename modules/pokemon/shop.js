@@ -10,7 +10,8 @@ import db from "../points-db.js";
 import { addPoints, getBalance, spendPoints } from "../economy.js";
 import { handleException } from "../utils.js";
 import { getSpecialBalls, specialBallLimit } from "./config.js";
-import { activeGeneration } from "./data.js";
+import { activeGeneration, getSpecies, speciesEvolvingWith } from "./data.js";
+import { getItem } from "./items.js";
 
 // Les balls spéciales en vente : celles dont la génération est ouverte. Fermée, une
 // ball n'existe pas encore pour les dresseurs — ni en boutique, ni au lancer.
@@ -137,4 +138,48 @@ export function restoreUnit(unit, cb = () => {}) {
     [unit.user_id, unit.ball, unit.bought_at],
     (err) => cb(err)
   );
+}
+
+// Ce que fait une ball spéciale, en une phrase : lue dans son `bonus`, pour que la
+// boutique de Discord et celle du site disent la même chose et suivent la config.
+export function ballEffectText(ball) {
+  const times = ball.bonus?.multiplier;
+  if (!times) return `Capture ×${ball.multiplier}.`;
+  if (ball.bonus.fished) return `×${times} sur les Pokémon pêchés, ×${ball.multiplier} sur les autres.`;
+  if (ball.bonus.item) {
+    const item = getItem(ball.bonus.item);
+    const names = [...speciesEvolvingWith(ball.bonus.item)]
+      .map((id) => getSpecies(id)?.name)
+      .filter(Boolean);
+    return (
+      `×${times} sur les Pokémon qui évoluent avec ${item ? `le ${item.label}` : "cet objet"}` +
+      `${names.length ? ` (${names.join(", ")})` : ""}, ×${ball.multiplier} sur les autres.`
+    );
+  }
+  return `Capture ×${ball.multiplier}.`;
+}
+
+// Tout ce que montre la boutique à un dresseur : son solde, le plafond, et pour
+// chaque ball en vente son prix, son effet et ce qu'il en a. Une seule lecture pour
+// Discord et pour le site.
+export function getShopView(userId, cb) {
+  getBalance(userId, (err, balance) => {
+    if (err) return cb(err);
+    getUnitCounts(userId, (err, counts) => {
+      if (err) return cb(err);
+      cb(null, {
+        balance,
+        limit: specialBallLimit(),
+        balls: openSpecialBalls().map((ball) => ({
+          key: ball.key,
+          label: ball.label,
+          emoji: ball.emoji,
+          sprite: ball.sprite ?? null,
+          price: ball.price,
+          effect: ballEffectText(ball),
+          held: counts.get(ball.key)?.held ?? 0,
+        })),
+      });
+    });
+  });
 }

@@ -228,73 +228,73 @@ export default {
   describe: (sub) =>
     sub
       .setName("echange")
-      .setDescription("Propose un échange : Pokémon, points ou objets, de chaque côté")
+      .setDescription("Propose un échange : Pokémon, points ou objets")
       .addUserOption((option) =>
         option
           .setName("membre")
-          .setDescription("Le dresseur à qui proposer l'échange")
+          .setDescription("Le destinataire")
           .setRequired(true)
       )
       .addStringOption((option) =>
         option
           .setName("je_donne")
-          .setDescription("L'espèce que tu proposes")
+          .setDescription("Espèce que tu donnes")
           .setRequired(false)
           .setAutocomplete(true)
       )
       .addStringOption((option) =>
         option
           .setName("mon_individu")
-          .setDescription("Le Pokémon précis que tu proposes (par défaut, le moins précieux)")
+          .setDescription("Individu précis (défaut : le moins précieux)")
           .setRequired(false)
           .setAutocomplete(true)
       )
       .addIntegerOption((option) =>
         option
           .setName("mes_points")
-          .setDescription("Des points que tu proposes (0 pour ne rien donner)")
+          .setDescription("Points que tu donnes (0 : rien)")
           .setRequired(false)
           .setMinValue(0)
       )
       .addStringOption((option) =>
         option
           .setName("mon_objet")
-          .setDescription("Un objet que tu proposes")
+          .setDescription("Objet que tu donnes")
           .setRequired(false)
           .setAutocomplete(true)
       )
       .addIntegerOption((option) =>
         option
           .setName("mon_objet_quantite")
-          .setDescription("Combien d'exemplaires de l'objet (1 par défaut)")
+          .setDescription("Quantité (1 par défaut)")
           .setRequired(false)
           .setMinValue(1)
       )
       .addStringOption((option) =>
         option
           .setName("je_recois")
-          .setDescription("L'espèce que tu demandes : le dresseur choisit lequel")
+          .setDescription("Espèce demandée (il choisit lequel)")
           .setRequired(false)
           .setAutocomplete(true)
       )
       .addIntegerOption((option) =>
         option
           .setName("ses_points")
-          .setDescription("Des points que tu demandes (0 pour ne rien demander)")
+          .setDescription("Points demandés (0 : rien)")
           .setRequired(false)
           .setMinValue(0)
       )
       .addStringOption((option) =>
         option
           .setName("son_objet")
-          .setDescription("Un objet que tu demandes")
+          .setDescription("Objet demandé")
           .setRequired(false)
           .setAutocomplete(true)
       )
       .addIntegerOption((option) =>
         option
           .setName("son_objet_quantite")
-          .setDescription("Combien d'exemplaires de l'objet (1 par défaut)")
+          .setDescription("Quantité (1 par défaut)")
           .setRequired(false)
           .setMinValue(1)
       ),
