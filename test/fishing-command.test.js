@@ -55,8 +55,11 @@ describe("/pk pecher", () => {
         editReply: async (payload) => calls.push(payload),
         reply: async (payload) => calls.push(payload),
       };
-      await withRandom([0], () => handlePokemonButton(interaction));
-      for (let waited = 0; waited < 3000 && !calls.length; waited += 15) await new Promise((resolve) => setTimeout(resolve, 15));
+      // Le tirage se fait après le retour du routeur : le hasard reste figé jusqu'à la réponse.
+      await withRandom([0], async () => {
+        await handlePokemonButton(interaction);
+        for (let waited = 0; waited < 3000 && !calls.length; waited += 15) await new Promise((resolve) => setTimeout(resolve, 15));
+      });
       return calls.at(-1);
     };
     assert.match((await press("u2")).content, /pas pour toi/);
