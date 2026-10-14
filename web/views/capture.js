@@ -44,6 +44,7 @@ export async function render(ctx) {
   // attente de confirmation, la réponse du dernier lancer, et la fin du
   // cooldown affiché.
   let confirming = null;
+  let showSpecial = false;
   let buyingSafari = false;
   let panel = null;
   let throwing = false;
@@ -214,56 +215,98 @@ export async function render(ctx) {
     );
   }
 
+  // Les balls ordinaires d'abord ; la Master Ball et celles de la boutique sont
+  // rangées derrière « Balls spéciales », comme dans le sous-menu de Discord.
   function balls(spawn) {
     const cooling = Date.now() < coolUntil;
+    const standard = spawn.balls.filter((ball) => !ball.guaranteed);
+    // Une ball de la boutique sert si on en a acheté AVANT cette apparition : aucun
+    // prix au lancer, son nombre tient lieu de stock.
+    const special = [
+      ...spawn.specialBalls.map((ball) => ({
+        ...ball,
+        shop: true,
+        price: 0,
+        free: ball.eligible,
+        usable: ball.eligible > 0,
+        guaranteed: false,
+      })),
+      ...spawn.balls.filter((ball) => ball.guaranteed),
+    ];
+
+    const button = (ball) => {
+      // Hors de portée : pas assez de points, et aucune en poche (celle-là
+      // serait gratuite). Le serveur tranche de toute façon.
+      const reason = !ball.usable
+        ? ball.shop
+          ? ball.held
+            ? "Tes balls ont été achetées après l'apparition de ce Pokémon."
+            : "Achète-en à la boutique : elles servent aux Pokémon suivants."
+          : `Il te faut ${fmt(ball.price)} pts, tu en as ${fmt(ctx.me.balance)}.`
+        : cooling
+          ? "Attends la fin du cooldown."
+          : null;
+      return h(
+        "button",
+        {
+          class: `ball${ball.usable ? "" : " ball-off"}`,
+          disabled: throwing || cooling || !ball.usable,
+          title: reason,
+          // La Master Ball se confirme, comme sur Discord : un mésclic ne se
+          // rattrape pas.
+          onclick: () => {
+            if (!ball.guaranteed) return throwBall(ball);
+            confirming = ball.key;
+            draw();
+          },
+        },
+        // Le nombre en poche en pastille sur la ball, comme un compteur
+        // d'inventaire.
+        h(
+          "span",
+          { class: "ball-icon" },
+          itemIcon(ball),
+          ball.free ? h("span", { class: "ball-stock" }, fmt(ball.free)) : null
+        ),
+        h(
+          "span",
+          { class: "ball-text" },
+          h("span", { class: "ball-label" }, ball.label),
+          h(
+            "span",
+            { class: "ball-meta" },
+            // Une ball en poche est offerte : son prix ne compte pas. Une ball de
+            // la boutique est déjà payée, et ne porte pas de prix du tout.
+            ball.shop ? "achetée" : ball.free ? "offerte" : `${fmt(ball.price)} pts`,
+            " · ",
+            ball.guaranteed ? "garantie" : percent(ball.probability)
+          )
+        )
+      );
+    };
+
     return h(
       "div",
-      { class: "balls" },
-      spawn.balls.map((ball) => {
-        // Hors de portée : pas assez de points, et aucune en poche (celle-là
-        // serait gratuite). Le serveur tranche de toute façon.
-        const reason = !ball.usable
-          ? `Il te faut ${fmt(ball.price)} pts, tu en as ${fmt(ctx.me.balance)}.`
-          : cooling
-            ? "Attends la fin du cooldown."
-            : null;
-        return h(
+      { class: "balls-group" },
+      h(
+        "div",
+        { class: "balls" },
+        standard.map(button),
+        h(
           "button",
           {
-            class: `ball${ball.usable ? "" : " ball-off"}`,
-            disabled: throwing || cooling || !ball.usable,
-            title: reason,
-            // La Master Ball se confirme, comme sur Discord : un mésclic ne se
-            // rattrape pas.
+            class: `ball ball-special${showSpecial ? " ball-open" : ""}`,
+            disabled: throwing,
             onclick: () => {
-              if (!ball.guaranteed) return throwBall(ball);
-              confirming = ball.key;
+              showSpecial = !showSpecial;
               draw();
             },
           },
-          // Le nombre en poche en pastille sur la ball, comme un compteur
-          // d'inventaire.
-          h(
-            "span",
-            { class: "ball-icon" },
-            itemIcon(ball),
-            ball.free ? h("span", { class: "ball-stock" }, fmt(ball.free)) : null
-          ),
-          h(
-            "span",
-            { class: "ball-text" },
-            h("span", { class: "ball-label" }, ball.label),
-            h(
-              "span",
-              { class: "ball-meta" },
-              // Une ball en poche est offerte : son prix ne compte pas.
-              ball.free ? "offerte" : `${fmt(ball.price)} pts`,
-              " · ",
-              ball.guaranteed ? "garantie" : percent(ball.probability)
-            )
-          )
-        );
-      })
+          h("span", { class: "ball-icon" }, "🌟"),
+          h("span", { class: "ball-text" }, h("span", { class: "ball-label" }, "Balls spéciales"))
+        )
+      ),
+      showSpecial ? h("div", { class: "balls" }, special.map(button)) : null
     );
   }
 
