@@ -1,7 +1,44 @@
 {
-  "version": "1.17.5",
-  "lastUpdated": "2026-10-06T12:06:02.852Z",
+  "version": "1.18.0",
+  "lastUpdated": "2026-10-14T19:20:52.745Z",
   "releases": [
+    {
+      "version": "1.18.0",
+      "date": "2026-10-14",
+      "title": "Release 1.18.0",
+      "features": [
+        {
+          "type": "feature",
+          "name": "Starter de génération",
+          "description": "À partir de la 2e génération, chacun choisit définitivement un starter parmi trois avec /pk starter, puis reçoit ses évolutions en complétant le Pokédex de la génération (33 %, 66 %, puis le stade 1 shiny à 100 %). Un choix tardif rattrape les paliers déjà atteints.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-10-14T16:30:00.000Z",
+          "branch": "claude/vibrant-brown-s7suxt"
+        },
+        {
+          "type": "feature",
+          "name": "Boutique et balls spéciales",
+          "description": "À partir de la 2e génération, /pk boutique (et le site) vend l'Appât Ball et la Catalyseur Ball, qui ne servent qu'aux Pokémon apparus après leur achat. La Master Ball rejoint le menu « Balls spéciales ».",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-10-14T18:00:00.000Z",
+          "branch": "claude/vibrant-brown-s7suxt"
+        },
+        {
+          "type": "feature",
+          "name": "Pêche",
+          "description": "À partir de la 2e génération, /pk pecher (et le site) lance la ligne avec une canne, à 100 points le lancer : un Pokémon des taux officiels mord, réservé au pêcheur. Les espèces pêchables deviennent plus rares à l'état sauvage.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-10-14T19:00:00.000Z",
+          "branch": "claude/vibrant-brown-s7suxt"
+        }
+      ]
+    },
     {
       "version": "1.17.5",
       "date": "2026-10-06",
@@ -2256,36 +2293,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "feature",
-      "name": "Starter de génération",
-      "description": "À partir de la 2e génération, chacun choisit définitivement un starter parmi trois avec /pk starter, puis reçoit ses évolutions en complétant le Pokédex de la génération (33 %, 66 %, puis le stade 1 shiny à 100 %). Un choix tardif rattrape les paliers déjà atteints.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-10-14T16:30:00.000Z",
-      "branch": "claude/vibrant-brown-s7suxt"
-    },
-    {
-      "type": "feature",
-      "name": "Boutique et balls spéciales",
-      "description": "À partir de la 2e génération, /pk boutique (et le site) vend l'Appât Ball et la Catalyseur Ball, qui ne servent qu'aux Pokémon apparus après leur achat. La Master Ball rejoint le menu « Balls spéciales ».",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-10-14T18:00:00.000Z",
-      "branch": "claude/vibrant-brown-s7suxt"
-    },
-    {
-      "type": "feature",
-      "name": "Pêche",
-      "description": "À partir de la 2e génération, /pk pecher (et le site) lance la ligne avec une canne, à 100 points le lancer : un Pokémon des taux officiels mord, réservé au pêcheur. Les espèces pêchables deviennent plus rares à l'état sauvage.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-10-14T19:00:00.000Z",
-      "branch": "claude/vibrant-brown-s7suxt"
-    }
-  ]
+  "pending": []
 }
