@@ -413,7 +413,7 @@ const POKEMON = {
     },
     // Les cannes à pêche (`rod`) : /pk pecher lance la ligne pour `price` points, et la
     // canne choisit la table de pêche (`pool`, pokemon-fishing.json : old, good, super).
-    // Une canne n'abaisse pas son tarif : la Méga Canne pêche à 200 points, pas à 50.
+    // Les trois cannes pêchent au même prix : c'est la table de pêche qui change, pas le tarif.
     // `base` : la Canne est donnée à tous, une fois — jamais échangeable, sans quoi
     // l'échanger la ferait redonner. Les deux autres tombent sur les Pokémon et se
     // gagnent à la loterie, dès que la pêche est ouverte (`fishing.generation`).
@@ -422,7 +422,7 @@ const POKEMON = {
       emoji: "🎣",
       sprite: "old-rod",
       description: "La canne de base : surtout des Magicarpe.",
-      rod: { pool: "old", price: 50, base: true },
+      rod: { pool: "old", price: 100, base: true },
     },
     super_canne: {
       label: "Super Canne",
@@ -442,7 +442,7 @@ const POKEMON = {
       dropWeight: 8,
       lotteryWeight: 25,
       lot: { min: 1, max: 1 },
-      rod: { pool: "super", price: 200 },
+      rod: { pool: "super", price: 100 },
     },
     // Les charmes ne tombent pas et ne se revendent pas : ils se gagnent en
     // complétant un Pokédex, une fois pour toutes (modules/pokemon/charms.js).

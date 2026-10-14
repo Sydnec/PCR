@@ -2280,7 +2280,7 @@
     {
       "type": "feature",
       "name": "Pêche",
-      "description": "À partir de la 2e génération, /pk pecher (et le site) lance la ligne avec une canne à 50, 100 ou 200 points : un Pokémon des taux officiels mord, réservé au pêcheur. Les espèces pêchables deviennent plus rares à l'état sauvage.",
+      "description": "À partir de la 2e génération, /pk pecher (et le site) lance la ligne avec une canne, à 100 points le lancer : un Pokémon des taux officiels mord, réservé au pêcheur. Les espèces pêchables deviennent plus rares à l'état sauvage.",
       "announce": true,
       "author": "Sydnec",
       "commit": "pending",

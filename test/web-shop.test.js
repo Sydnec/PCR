@@ -97,14 +97,14 @@ describe("la pêche sur le site", () => {
     await setBalance(500);
     const { fishing } = await call("GET", "/api/spawn");
     assert.equal(fishing.open, true);
-    assert.deepEqual(fishing.rods.map((rod) => [rod.key, rod.price, rod.owned]), [["canne", 50, true], ["super_canne", 100, false], ["mega_canne", 200, false]]);
+    assert.deepEqual(fishing.rods.map((rod) => [rod.key, rod.price, rod.owned]), [["canne", 100, true], ["super_canne", 100, false], ["mega_canne", 100, false]]);
     assert.equal(fishing.spawn, null);
   });
 
   it("lancer la ligne débite la canne ; la touche arrive avec ses balls, ses balls spéciales et sa fuite", async () => {
     await setBalance(500);
     const result = await call("POST", "/api/fishing/cast", { rod: "canne" });
-    assert.deepEqual([result.ok, result.message, result.price], [true, null, 50]);
+    assert.deepEqual([result.ok, result.message, result.price], [true, null, 100]);
     const { fishing } = await call("GET", "/api/spawn");
     const touch = fishing.spawn;
     assert.ok(touch.fished && touch.fleesAt > Date.now());
@@ -117,7 +117,7 @@ describe("la pêche sur le site", () => {
     await setBalance(20);
     const refused = await call("POST", "/api/fishing/cast", { rod: "canne" });
     assert.equal(refused.ok, false);
-    assert.match(refused.message, /La Canne pêche à 50 points, tu en as 20/);
+    assert.match(refused.message, /La Canne pêche à 100 points, tu en as 20/);
     assert.equal((await dbAll(points, "SELECT * FROM pokemon_spawns")).length, 0);
   });
 

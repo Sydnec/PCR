@@ -4,7 +4,7 @@
 
 À l'ouverture de la **2ᵉ génération**, on peut lancer sa ligne : `/pk pecher canne:<nom>` (ou la section *Pêche* de la page Capture du site).
 
-- **Le lancer coûte le prix de la canne**, débité tout de suite : **Canne 50 points**, **Super Canne 100**, **Méga Canne 200**. Une canne ne baisse pas son tarif : la Méga Canne pêche à 200, jamais à 50.
+- **Le lancer coûte 100 points**, débités tout de suite, quelle que soit la canne : c'est la table de pêche qui change, pas le tarif (`rod.price` de chaque canne dans `modules/config.js`).
 - **Les cannes** : la Canne est donnée à tous (une seule fois, jamais échangeable). La Super Canne et la Méga Canne **tombent sur les Pokémon capturés** et se gagnent à la **loterie**.
 - **Un Pokémon mord, il est pour toi seul.** La touche est privée (un éphémère sur Discord, une carte sur le site) : personne d'autre ne peut lancer dessus. Elle s'enfuit au bout de **`fishing.fleeSeconds`** (2 minutes), et on n'a qu'**une touche à la fois** : tant qu'elle est là, une nouvelle pêche est refusée sans rien débiter.
 - **Les balls se paient comme sur une apparition du salon**, contrairement au safari. L'objet tenu suit le Pokémon capturé, sans course.

@@ -29,13 +29,13 @@ describe("/pk pecher", () => {
     await setBalance(500);
     const reply = payloadOf(await fish({ canne: "canne" }), "reply");
     assert.equal(reply.flags, MessageFlags.Ephemeral, "personne d'autre ne la voit");
-    assert.match(reply.content, /Ça mord ! \(\*\*-50\*\* points, Canne\)/);
+    assert.match(reply.content, /Ça mord ! \(\*\*-100\*\* points, Canne\)/);
     assert.match(reply.content, /Il s'enfuit dans \*\*\d+ s\*\*/);
     assert.match(textOf(reply), /mord à la ligne/, "c'est une touche, pas une apparition du salon");
     const [row] = await dbAll(points, "SELECT id, status, reserved_for FROM pokemon_spawns");
     assert.deepEqual([row.status, row.reserved_for], ["FISHING", "u1"]);
     assert.deepEqual(buttonIds(reply).slice(0, 3), [`poke_rethrow|${row.id}|poke`, `poke_rethrow|${row.id}|super`, `poke_rethrow|${row.id}|hyper`]);
-    assert.equal(await balance(), 450);
+    assert.equal(await balance(), 400);
   });
 
   it("les balls du panneau lancent sur la touche, et seul le pêcheur le peut", async () => {
@@ -73,13 +73,13 @@ describe("/pk pecher", () => {
     const again = payloadOf(await fish({ canne: "canne" }), "reply");
     assert.match(again.content, /Tu as déjà une touche au bout de ta ligne/);
     assert.ok(buttonIds(again)[0].startsWith("poke_rethrow|"), "ses boutons sont là, elle ne se perd pas");
-    assert.equal(await balance(), 450);
+    assert.equal(await balance(), 400);
     assert.equal((await dbAll(points, "SELECT id FROM pokemon_spawns")).length, 1);
   });
 
   it("les refus donnent les chiffres et ne débitent rien", async () => {
     await setBalance(30);
-    assert.match(payloadOf(await fish({ canne: "canne" }), "reply").content, /La Canne pêche à 50 points, tu en as 30/);
+    assert.match(payloadOf(await fish({ canne: "canne" }), "reply").content, /La Canne pêche à 100 points, tu en as 30/);
     assert.match(payloadOf(await fish({ canne: "mega_canne" }), "reply").content, /Tu n'as pas de Méga Canne/);
     assert.match(payloadOf(await fish({ canne: "n'importe quoi" }), "reply").content, /Choisis une canne/);
     assert.equal(await balance(), 30);
@@ -89,9 +89,9 @@ describe("/pk pecher", () => {
   it("sans option : les cannes, ce qu'on possède, et le rappel d'une touche en cours", async () => {
     await setBalance(500);
     const list = payloadOf(await fish(), "reply");
-    assert.match(list.content, /Canne.*50 points.*✅ tu l'as/s);
+    assert.match(list.content, /Canne.*100 points.*✅ tu l'as/s);
     assert.match(list.content, /Super Canne.*100 points.*🔒/s);
-    assert.match(list.content, /Méga Canne.*200 points/s);
+    assert.match(list.content, /Méga Canne.*100 points/s);
     assert.doesNotMatch(list.content, /Une touche t'attend/);
     await fish({ canne: "canne" });
     assert.match(payloadOf(await fish(), "reply").content, /Une touche t'attend/);
@@ -100,7 +100,7 @@ describe("/pk pecher", () => {
   it("l'autocomplétion ne propose que les cannes qu'on a, avec leur prix", async () => {
     const own = payloadOf(await runAutocomplete(pk, { sub: "pecher", focused: { name: "canne", value: "" } }), "respond");
     assert.deepEqual(own.map((choice) => choice.value), ["canne"]);
-    assert.match(own[0].name, /Canne — 50 points/);
+    assert.match(own[0].name, /Canne — 100 points/);
     await items.grantItem("u1", "super_canne", 1, { source: "test" }, () => {});
     await new Promise((resolve) => setTimeout(resolve, 80));
     const more = payloadOf(await runAutocomplete(pk, { sub: "pecher", focused: { name: "canne", value: "" } }), "respond");

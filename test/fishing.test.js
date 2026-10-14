@@ -59,7 +59,7 @@ describe("lancer la ligne", () => {
     await setBalance(500);
     const result = await cast();
     assert.equal(result.ok, true, result.reason);
-    assert.equal(await balance(), 450);
+    assert.equal(await balance(), 400);
     assert.equal(await call(items.getItemCount, "u1", "canne"), 1, "donnée à la première pêche");
     const [row] = await spawns();
     assert.deepEqual([row.status, row.fished, row.reserved_for], ["FISHING", 1, "u1"]);
@@ -75,7 +75,7 @@ describe("lancer la ligne", () => {
     assert.equal(second.ok, false);
     assert.match(second.reason, /déjà une touche/);
     assert.equal(second.existing.id, first.spawn.id);
-    assert.equal(await balance(), 450);
+    assert.equal(await balance(), 400);
     assert.equal((await spawns()).length, 1);
   });
 
@@ -83,7 +83,7 @@ describe("lancer la ligne", () => {
     await setBalance(500);
     const results = await Promise.all([cast(), cast()]);
     assert.equal(results.filter((result) => result.ok).length, 1);
-    assert.equal(await balance(), 450, "un seul lancer payé");
+    assert.equal(await balance(), 400, "un seul lancer payé");
     assert.equal((await spawns()).length, 1);
   });
 
@@ -106,7 +106,7 @@ describe("lancer la ligne", () => {
     assert.equal(await balance(), 80);
     await setBalance(300);
     assert.equal((await cast("super_canne")).ok, true);
-    assert.equal(await balance(), 200, "100 points, pas 50 : une canne ne baisse pas son tarif");
+    assert.equal(await balance(), 200, "100 points la Super Canne");
   });
 
   it("une touche qui ne s'enregistre pas rend les points", async () => {
@@ -148,8 +148,8 @@ describe("lancer la ligne", () => {
     }
     assert.equal(result.ok, false);
     assert.equal(result.debited, true);
-    assert.match(result.reason, /50 points débités.*relance \/pk pecher/);
-    assert.equal(await balance(), 450, "pas de remboursement : la ligne existe");
+    assert.match(result.reason, /100 points débités.*relance \/pk pecher/);
+    assert.equal(await balance(), 400, "pas de remboursement : la ligne existe");
     assert.equal((await spawns()).length, 1);
     assert.equal((await call(fishing.getFishingSpawn, "u1")).status, "FISHING", "elle se retrouve");
   });
@@ -169,7 +169,7 @@ describe("lancer la ligne", () => {
 
   it("les cannes du dresseur : la base possédée, les autres à gagner, par prix croissant", async () => {
     const rods = await call(fishing.getRodsOf, "u1");
-    assert.deepEqual(rods.map((rod) => [rod.key, rod.price, rod.owned]), [["canne", 50, true], ["super_canne", 100, false], ["mega_canne", 200, false]]);
+    assert.deepEqual(rods.map((rod) => [rod.key, rod.price, rod.owned]), [["canne", 100, true], ["super_canne", 100, false], ["mega_canne", 100, false]]);
   });
 
   it("la Canne de base ne s'échange pas, les autres oui", () => {
