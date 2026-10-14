@@ -50,6 +50,17 @@ describe("/pk boutique", () => {
     assert.equal((await units()).length, 9, "les refus n'ont rien donné");
   });
 
+  it("/pk inventaire montre les balls spéciales, et rien quand on n'en a pas", async () => {
+    const inventory = (options = {}) => runCommand(pk, { sub: "inventaire", options });
+    assert.doesNotMatch(textOf(payloadOf(await inventory(), "reply")), /Balls spéciales/);
+    await setBalance(1000);
+    await shop({ ball: "appat", quantite: 2 });
+    const text = textOf(payloadOf(await inventory(), "reply"));
+    assert.match(text, /Balls spéciales/);
+    assert.match(text, /Appât Ball ×2/);
+    assert.match(text, /Aucun objet, seulement des balls de la boutique/);
+  });
+
   it("l'autocomplétion propose les balls en vente avec leur prix", async () => {
     const all = payloadOf(await runAutocomplete(pk, { sub: "boutique", focused: { name: "ball", value: "" } }), "respond");
     assert.deepEqual(all.map((choice) => choice.value), ["appat", "catalyseur"]);

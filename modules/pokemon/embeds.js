@@ -1168,7 +1168,7 @@ export function buildNeedersRow(speciesId, total, page, { reserve = true } = {})
   );
 }
 
-export function buildInventoryEmbed(rows, { user = null } = {}) {
+export function buildInventoryEmbed(rows, { user = null, specials = [] } = {}) {
   const embed = new EmbedBuilder()
     .setTitle(
       user
@@ -1177,7 +1177,7 @@ export function buildInventoryEmbed(rows, { user = null } = {}) {
     )
     .setColor(0xc27c0e);
 
-  if (!rows.length) {
+  if (!rows.length && !specials.length) {
     return embed.setDescription(
       user
         ? "*Son inventaire est vide.*"
@@ -1186,7 +1186,11 @@ export function buildInventoryEmbed(rows, { user = null } = {}) {
   }
 
   const total = rows.reduce((sum, row) => sum + row.count, 0);
-  embed.setDescription(`**${total}** objet${total > 1 ? "s" : ""} en poche.`);
+  embed.setDescription(
+    rows.length
+      ? `**${total}** objet${total > 1 ? "s" : ""} en poche.`
+      : "*Aucun objet, seulement des balls de la boutique.*"
+  );
 
   for (const row of sortByCatalogue(rows)) {
     const item = getItem(row.item_key);
@@ -1199,6 +1203,17 @@ export function buildInventoryEmbed(rows, { user = null } = {}) {
       value: item?.sellValue
         ? `${value}\n*Se revend **${item.sellValue.toLocaleString("fr-FR")}** points pièce.*`
         : value,
+      inline: false,
+    });
+  }
+  // Les balls de la boutique, à part : ce ne sont pas des objets du catalogue, et
+  // leur date d'achat décide de leur usage (voir /pk boutique).
+  if (specials.length) {
+    embed.addFields({
+      name: "Balls spéciales",
+      value: specials
+        .map((ball) => `${ball.emoji} ${ball.label} \u00D7${ball.held.toLocaleString("fr-FR")}`)
+        .join("\n"),
       inline: false,
     });
   }

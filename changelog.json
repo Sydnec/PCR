@@ -2266,6 +2266,16 @@
       "commit": "pending",
       "timestamp": "2026-10-14T16:30:00.000Z",
       "branch": "claude/vibrant-brown-s7suxt"
+    },
+    {
+      "type": "feature",
+      "name": "Boutique et balls spéciales",
+      "description": "À partir de la 2e génération, /pk boutique (et le site) vend l'Appât Ball et la Catalyseur Ball, qui ne servent qu'aux Pokémon apparus après leur achat. La Master Ball rejoint le menu « Balls spéciales ».",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-14T18:00:00.000Z",
+      "branch": "claude/vibrant-brown-s7suxt"
     }
   ]
 }

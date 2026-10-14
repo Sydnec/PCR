@@ -33,7 +33,8 @@
 - **Depuis le site aussi** : l'onglet Capture du [site](../site.md) montre la même apparition et
   lance par le même chemin — même prix, même cooldown, même course.
 - **4 balls** : Poké Ball (×1), Super Ball (×2), Hyper Ball (×4) et Master Ball (capture garantie,
-  avec confirmation obligatoire). Les probabilités suivent la formule officielle de la génération 3,
+  avec confirmation obligatoire, rangée dans le menu **Balls spéciales** avec celles de la
+  [boutique](boutique.md)). Les probabilités suivent la formule officielle de la génération 3,
   à partir du taux de capture réel de chaque espèce, **relevé à un plancher**
   (`capture.minCatchRate`, 10) : on ne peut pas affaiblir un Pokémon avant de lancer, et les
   légendaires à taux 3 n'auraient jamais été attrapés. Le plancher vaut partout — lancers,
