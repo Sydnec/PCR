@@ -2276,6 +2276,16 @@
       "commit": "pending",
       "timestamp": "2026-10-14T18:00:00.000Z",
       "branch": "claude/vibrant-brown-s7suxt"
+    },
+    {
+      "type": "feature",
+      "name": "Pêche",
+      "description": "À partir de la 2e génération, /pk pecher (et le site) lance la ligne avec une canne à 50, 100 ou 200 points : un Pokémon des taux officiels mord, réservé au pêcheur. Les espèces pêchables deviennent plus rares à l'état sauvage.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-14T19:00:00.000Z",
+      "branch": "claude/vibrant-brown-s7suxt"
     }
   ]
 }

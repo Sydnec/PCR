@@ -125,6 +125,9 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
 - `/pk safari` : paie l'entrée du parc safari (voir [Parc Safari](safari.md)). Réponse privée.
 - `/pk inventaire [membre]` : les objets qu'un dresseur a en poche (voir [Objets](objets.md)).
 - `/pk loterie` : un tirage par jour et par dresseur (voir [Loterie](loterie.md)). Réponse privée.
+- `/pk pecher [canne]` : lance ta ligne avec une [canne](peche.md) (50, 100 ou 200 points) : un Pokémon
+  mord, réservé à toi, et s'enfuit au bout de 2 minutes. Sans option, tes cannes et ta touche en
+  cours. Ouverte avec la 2ᵉ génération. Réponse privée.
 - `/pk boutique [ball] [quantite]` : la [boutique des balls spéciales](boutique.md), ouverte avec la 2ᵉ
   génération. Sans option, le catalogue et ton solde ; avec une ball, l'achat. Réponse privée.
 - `/pk starter [pokemon]` : choisis ton [starter de génération](starter.md) — définitif, avec confirmation —
