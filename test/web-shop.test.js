@@ -1,0 +1,81 @@
+// Le site et les balls spéciales : la boutique (catalogue, achat), l'onglet qui
+// n'apparaît qu'une fois la génération ouverte, et les balls spéciales d'une
+// apparition avec ce qui sert à CETTE apparition.
+import { describe, it, beforeEach } from "node:test";
+import assert from "node:assert/strict";
+import { createSandbox, openDatabases, dbRun, dbAll, speciesByName } from "./helpers.js";
+
+createSandbox({ config: { pokemon: { generationOpenings: { 2: "2000-01-01T00:00:00+01:00" } } } });
+const { points } = await openDatabases();
+const { routes, HttpError } = await import("../modules/web/api.js");
+const data = await import("../modules/pokemon/data.js");
+
+const species = (name) => speciesByName(data.allSpecies, name);
+const route = (method, path) => routes.find((entry) => entry.method === method && entry.path === path);
+const call = (method, path, body = {}) =>
+  route(method, path).handler({ user: { id: "u1" }, body, params: {}, query: {}, bot: null });
+const setBalance = (amount) =>
+  dbRun(points, "INSERT INTO points (user_id, balance) VALUES ('u1', ?) ON CONFLICT(user_id) DO UPDATE SET balance = ?", [amount, amount]);
+
+beforeEach(async () => {
+  for (const table of ["points", "pokemon_ball_units", "pokemon_spawns", "points_log"]) await dbRun(points, `DELETE FROM ${table}`);
+});
+
+describe("la boutique du site", () => {
+  it("les routes demandent une connexion, et l'achat une écriture", () => {
+    assert.equal(route("GET", "/api/shop").auth, true);
+    assert.equal(route("POST", "/api/shop/buy").auth, true);
+    assert.equal(route("POST", "/api/shop/buy").write, true);
+  });
+
+  it("le catalogue porte prix, effet, image et ce qu'on en a", async () => {
+    await setBalance(900);
+    const shop = await call("GET", "/api/shop");
+    assert.equal(shop.balance, 900);
+    assert.equal(shop.limit, 10);
+    assert.deepEqual(shop.balls.map((ball) => [ball.key, ball.price, ball.held]), [["appat", 230, 0], ["catalyseur", 300, 0]]);
+    assert.match(shop.balls[0].effect, /×3 sur les Pokémon pêchés/);
+    assert.ok(shop.balls[0].image);
+  });
+
+  it("acheter rend la boutique à jour ; un refus dit pourquoi, avec les chiffres, sans rien débiter", async () => {
+    await setBalance(500);
+    const bought = await call("POST", "/api/shop/buy", { ball: "appat", quantity: 2 });
+    assert.deepEqual([bought.ok, bought.bought, bought.cost, bought.balance], [true, 2, 460, 40]);
+    assert.equal(bought.balls[0].held, 2);
+    const refused = await call("POST", "/api/shop/buy", { ball: "appat", quantity: 1 });
+    assert.equal(refused.ok, false);
+    assert.match(refused.message, /Il te faut 230 points, tu en as 40/);
+    assert.equal((await dbAll(points, "SELECT * FROM pokemon_ball_units")).length, 2);
+  });
+
+  it("un corps mal formé est refusé", async () => {
+    for (const body of [{}, { ball: 3 }, { ball: "appat", quantity: 0 }, { ball: "appat", quantity: 1.5 }]) {
+      await assert.rejects(() => call("POST", "/api/shop/buy", body), HttpError);
+    }
+  });
+
+  it("/api/me dit que la boutique est ouverte", async () => {
+    assert.equal((await call("GET", "/api/me")).shop, true);
+  });
+});
+
+describe("les balls spéciales d'une apparition", () => {
+  it("chaque ball dit ses chances et combien servent à CETTE apparition", async () => {
+    await dbRun(
+      points,
+      `INSERT INTO pokemon_spawns (id, species_id, is_shiny, catch_rate, rarity, status, spawned_at, flees_at, sex, charm_shiny, fished)
+       VALUES (1, ?, 0, ?, 'COMMUN', 'ACTIVE', 1000, 9999999999999, 'M', 0, 1)`,
+      [species("Onix").id, species("Onix").catchRate]
+    );
+    await dbRun(points, "INSERT INTO pokemon_ball_units (user_id, ball, bought_at) VALUES ('u1', 'appat', 500), ('u1', 'appat', 2000), ('u1', 'catalyseur', 500)");
+    const { spawn } = await call("GET", "/api/spawn");
+    const [appat, catalyseur] = spawn.specialBalls;
+    assert.deepEqual([appat.key, appat.held, appat.eligible], ["appat", 2, 1], "la seconde Appât Ball est postérieure");
+    assert.deepEqual([catalyseur.key, catalyseur.held, catalyseur.eligible], ["catalyseur", 1, 1]);
+    const base = data.catchProbability(species("Onix").catchRate, 1, 1);
+    assert.ok(Math.abs(appat.probability - Math.min(1, base * 3)) < 1e-9, "Onix pêché : ×3 pour l'Appât");
+    assert.ok(Math.abs(catalyseur.probability - Math.min(1, base * 4)) < 1e-9, "Onix évolue avec le Catalyseur : ×4");
+    assert.ok(spawn.balls.some((ball) => ball.key === "master"), "la Master Ball reste dans `balls`, que la vue range avec les spéciales");
+  });
+});

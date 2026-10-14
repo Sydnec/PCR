@@ -35,6 +35,8 @@ import {
   RARITIES,
   activeGeneration,
   allSpecies,
+  ballMultiplier,
+  catchProbability,
   charmFactor,
   dexSize,
   difficultyOf,
@@ -63,7 +65,8 @@ import {
   spriteUrl,
   typeColors,
 } from "../pokemon/data.js";
-import { getBalls, getPokemonConfig, getSafariConfig } from "../pokemon/config.js";
+import { getBalls, getPokemonConfig, getSafariConfig, getSpecialBalls } from "../pokemon/config.js";
+import { buyBalls, getShopView, getUnitCounts, openSpecialBalls } from "../pokemon/shop.js";
 import { announceDropClaim, claimDrop, getOpenDrops } from "../pokemon/drops.js";
 import { paidEntryRefund, safariOutcomeLine } from "../pokemon/embeds.js";
 import {
@@ -373,7 +376,8 @@ async function walletJson(userId) {
 async function spawnJson(ctx, spawn, balance) {
   const config = getPokemonConfig();
   const species = getSpecies(spawn.species_id);
-  const [throws, inventory, lineage, charms] = await Promise.all([
+  const specialBalls = openSpecialBalls();
+  const [throws, inventory, lineage, charms, unitCounts] = await Promise.all([
     promise((cb) => recentThrows(spawn.id, config.spawn.throwLogSize, cb)),
     promise((cb) => getInventory(ctx.user.id, cb)),
     lineageJson(ctx.user.id, species),
@@ -384,6 +388,18 @@ async function spawnJson(ctx, spawn, balance) {
         if (err) handleException("Lecture des Charmes Chroma :", err);
         cb(null, err ? [] : list);
       })
+    ),
+    // Une lecture ratée des balls spéciales les rend inutilisables plutôt que de
+    // faire échouer la page.
+    promise((cb) =>
+      getUnitCounts(
+        ctx.user.id,
+        (err, counts) => {
+          if (err) handleException("Lecture des balls spéciales :", err);
+          cb(null, err ? new Map() : counts);
+        },
+        { spawnedAt: spawn.spawned_at }
+      )
     ),
   ]);
   // Normal pour le salon, shiny pour les porteurs du Charme Chroma de sa
@@ -431,6 +447,22 @@ async function spawnJson(ctx, spawn, balance) {
         };
       })
     ),
+    // Les balls spéciales de la boutique : celles qu'on a achetées avant cette
+    // apparition servent (`eligible`), les autres non. La Master Ball, elle, reste
+    // dans `balls` : c'est au site de la ranger avec elles, comme sur Discord.
+    specialBalls: specialBalls.map((ball) => ({
+      key: ball.key,
+      label: ball.label,
+      emoji: ball.emoji,
+      image: itemImageUrl(ball.sprite),
+      probability: catchProbability(
+        spawn.catch_rate,
+        ballMultiplier(ball, { fished: Boolean(spawn.fished), speciesId: spawn.species_id }),
+        config.capture.globalMultiplier
+      ),
+      held: unitCounts.get(ball.key)?.held ?? 0,
+      eligible: unitCounts.get(ball.key)?.eligible ?? 0,
+    })),
     throws: await Promise.all(
       throws.map(async (row) => ({
         trainer: await trainerOf(ctx.bot, row.user_id),
@@ -560,7 +592,14 @@ export const routes = [
         walletJson(ctx.user.id),
         promise((cb) => getIncubatingEgg(ctx.user.id, cb)),
       ]);
-      return { user: ctx.user, ...wallet, egg: await eggWithCharm(egg) };
+      // `shop` : la boutique n'a des balls en vente qu'une fois leur génération ouverte,
+      // et l'onglet n'apparaît pas avant.
+      return {
+        user: ctx.user,
+        ...wallet,
+        egg: await eggWithCharm(egg),
+        shop: openSpecialBalls().length > 0,
+      };
     },
   },
 
@@ -583,7 +622,7 @@ export const routes = [
     method: "GET",
     path: "/api/catalogue",
     handler: async () => ({
-      balls: [...getBalls(), getSafariConfig().ball].map(({ key, label, emoji, sprite }) => ({
+      balls: [...getBalls(), ...getSpecialBalls(), getSafariConfig().ball].map(({ key, label, emoji, sprite }) => ({
         key,
         label,
         emoji,
@@ -1147,6 +1186,44 @@ export const routes = [
               form: formJson(outcome.species, outcome.caught.form, Boolean(outcome.shiny)),
             }
           : null,
+      };
+    },
+  },
+
+  // La boutique des balls spéciales : le catalogue de CE dresseur (ce qu'il en a, son
+  // solde), et l'achat — la même fonction que /pk boutique, donc les mêmes refus, déjà
+  // rédigés pour le joueur.
+  {
+    method: "GET",
+    path: "/api/shop",
+    auth: true,
+    handler: async (ctx) => {
+      const view = await promise((cb) => getShopView(ctx.user.id, cb));
+      return { ...view, balls: view.balls.map((ball) => ({ ...ball, image: itemImageUrl(ball.sprite) })) };
+    },
+  },
+
+  {
+    method: "POST",
+    path: "/api/shop/buy",
+    auth: true,
+    write: true,
+    handler: async (ctx) => {
+      if (typeof ctx.body.ball !== "string") throw new HttpError(400, "ball manquante.");
+      const quantity = ctx.body.quantity ?? 1;
+      if (!Number.isInteger(quantity) || quantity < 1) {
+        throw new HttpError(400, "quantity invalide.");
+      }
+      const result = await promise((cb) => buyBalls(ctx.user.id, ctx.body.ball, quantity, cb));
+      const view = await promise((cb) => getShopView(ctx.user.id, cb));
+      return {
+        ok: result.ok,
+        partial: Boolean(result.partial),
+        bought: result.bought ?? 0,
+        cost: result.cost ?? 0,
+        message: result.ok && !result.partial ? null : result.reason,
+        ...view,
+        balls: view.balls.map((ball) => ({ ...ball, image: itemImageUrl(ball.sprite) })),
       };
     },
   },
