@@ -368,6 +368,27 @@ export function catchProbability(catchRate, ballMultiplier, globalMultiplier) {
   return Math.min(1, Math.max(0, probability));
 }
 
+// Les espèces que `itemKey` fait évoluer (les clés de son `evolution.targets` dans le
+// catalogue) : le Catalyseur pour Onix, Insécateur, Hypocéan et Porygon. Lues dans la
+// configuration, jamais écrites à la main.
+export const speciesEvolvingWith = (itemKey) =>
+  new Set(
+    Object.keys(getPokemonConfig().items?.[itemKey]?.evolution?.targets ?? {}).map(Number)
+  );
+
+// Ce que vaut une ball face à cette apparition : son multiplicateur, ou celui de son
+// `bonus` quand la condition est remplie — le Pokémon vient d'une pêche (`fished`),
+// ou son espèce évolue grâce à l'objet du bonus. Le seul calcul du multiplicateur :
+// le lancer comme l'affichage passent par ici.
+export function ballMultiplier(ball, { fished = false, speciesId = null } = {}) {
+  const bonus = ball.bonus;
+  if (!bonus) return ball.multiplier;
+  const met =
+    (bonus.fished && fished) ||
+    (bonus.item && speciesId !== null && speciesEvolvingWith(bonus.item).has(Number(speciesId)));
+  return met ? ball.multiplier * bonus.multiplier : ball.multiplier;
+}
+
 // Probabilités affichées dans les embeds, pour que le joueur sache ce qu'il paie.
 export function probabilitiesByBall(catchRate) {
   const config = getPokemonConfig();

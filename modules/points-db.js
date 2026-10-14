@@ -182,11 +182,14 @@ const db = new sqlite3.Database(dbPath, (err) => {
         held_item TEXT,
         sex TEXT,
         charm_shiny INTEGER NOT NULL DEFAULT 0,
-        form TEXT
+        form TEXT,
+        fished INTEGER NOT NULL DEFAULT 0
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_spawns :", err);
         addColumn("pokemon_spawns", "form", "TEXT");
+        // Le Pokémon vient d'une pêche : l'Appât Ball vaut alors son bonus.
+        addColumn("pokemon_spawns", "fished", "INTEGER NOT NULL DEFAULT 0");
         // Garantie au niveau base : jamais deux spawns actifs en même temps.
         db.run(
           `CREATE UNIQUE INDEX IF NOT EXISTS idx_pokemon_spawn_active
@@ -703,6 +706,27 @@ const db = new sqlite3.Database(dbPath, (err) => {
       )`,
       (err) => {
         if (err) handleException("Erreur création table pokemon_starter_rewards :", err);
+      }
+    );
+
+    // Les balls spéciales achetées, une ligne par ball : la date d'achat décide si
+    // elle sert à une apparition (seulement celles d'après). Consommée en la
+    // supprimant, rendue en la réinsérant telle quelle.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_ball_units (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        ball TEXT NOT NULL,
+        bought_at INTEGER NOT NULL
+      )`,
+      (err) => {
+        if (err) return handleException("Erreur création table pokemon_ball_units :", err);
+        db.run(
+          "CREATE INDEX IF NOT EXISTS idx_ball_units_user ON pokemon_ball_units(user_id, ball, bought_at)",
+          (err) => {
+            if (err) handleException("Erreur création index pokemon_ball_units :", err);
+          }
+        );
       }
     );
 

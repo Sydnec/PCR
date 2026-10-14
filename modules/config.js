@@ -163,6 +163,35 @@ const POKEMON = {
         guaranteed: true,
       },
     },
+    // Les balls spéciales : à la boutique seulement (/pk boutique), jamais en drop
+    // ni à la loterie. Une ball achetée ne sert qu'aux apparitions qui viennent
+    // APRÈS son achat — pas à celle en cours —, et on en garde `maxHeld` de
+    // chaque en poche. Hors bonus, elles valent `multiplier` ; `bonus` la
+    // multiplie quand la condition est remplie : `fished` (le Pokémon vient d'une
+    // pêche) ou `item` (l'espèce évolue grâce à cet objet, lu dans le catalogue :
+    // `evolution.targets`). `generation` les garde hors du jeu tant qu'elle est
+    // fermée. Les emoji sont unicode : celui d'une ball du serveur reste à créer.
+    specialBalls: {
+      maxHeld: 10,
+      appat: {
+        label: "Appât Ball",
+        emoji: "🎣",
+        sprite: "lure-ball",
+        price: 230,
+        multiplier: 1,
+        generation: 2,
+        bonus: { fished: true, multiplier: 3 },
+      },
+      catalyseur: {
+        label: "Catalyseur Ball",
+        emoji: "⚙️",
+        sprite: "up-grade",
+        price: 300,
+        multiplier: 1,
+        generation: 2,
+        bonus: { item: "catalyseur", multiplier: 4 },
+      },
+    },
   },
   evolution: {
     // Le tarif du stade atteint. Un bébé qui devient adulte (Pichu → Pikachu,

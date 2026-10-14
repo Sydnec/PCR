@@ -26,7 +26,8 @@ import {
   grantItem,
 } from "./items.js";
 import { dropItem, leavesItemBehind } from "./drops.js";
-import { catchProbability, charmFactor, getSpecies } from "./data.js";
+import { ballMultiplier, catchProbability, charmFactor, getSpecies } from "./data.js";
+import { getOpenSpecialBall, getUnitCounts, restoreUnit, takeUnit } from "./shop.js";
 import { buildBallRow, displayName } from "./embeds.js";
 import { finalizeCaughtSpawn, getSpawn, refreshSpawnEmbed } from "./spawn.js";
 import { recordSpawnEnd, recordThrow } from "./stats.js";
@@ -190,7 +191,20 @@ export function getBallPrice(userId, ball, cb) {
 // confirmation a affiché. Un achat fait entre-temps — la Master Ball renchérit à
 // chaque fois — l'a fait monter ; on refuse plutôt que de prendre plus que ce
 // qui était annoncé.
-function payThrow(userId, ball, { requireItem = false, expectedPrice = null } = {}, cb) {
+function payThrow(userId, ball, { requireItem = false, expectedPrice = null, spawn = null } = {}, cb) {
+  // Une ball spéciale ne se paie pas au lancer : elle a été achetée, et se prend dans
+  // la poche — la plus ancienne antérieure à l'apparition.
+  if (ball.special) {
+    return takeUnit(userId, ball.key, spawn.spawned_at, (err, unit) => {
+      if (err) return cb(err, null);
+      if (unit) return cb(null, { unit, label: ball.label });
+      getUnitCounts(userId, (err, counts) =>
+        err
+          ? cb(err, null)
+          : cb(null, null, { units: { held: counts.get(ball.key)?.held ?? 0 } })
+      );
+    });
+  }
   const item = getBallItem(ball.key);
   const tryPoints = () =>
     requireItem
@@ -221,7 +235,7 @@ function payThrow(userId, ball, { requireItem = false, expectedPrice = null } = 
 // convertir en monnaie ferait d'un Pokémon disputé une petite imprimerie. Et les
 // points se rendent au prix PAYÉ, pas à celui d'aujourd'hui.
 function refundThrow(userId, spawnId, ball, probability, payment, cb) {
-  const gratuit = Boolean(payment?.item);
+  const gratuit = Boolean(payment?.item || payment?.unit);
 
   const done = (err) => {
     if (err) handleException("Remboursement impossible :", err);
@@ -235,6 +249,9 @@ function refundThrow(userId, spawnId, ball, probability, payment, cb) {
     cb(null, { status: "void", ball, payment });
   };
 
+  // Une ball spéciale revient dans la poche avec sa date d'achat : elle servira à
+  // la prochaine apparition comme avant.
+  if (payment?.unit) return restoreUnit(payment.unit, done);
   if (gratuit) return grantItem(userId, payment.item, 1, { source: "lancer-annule" }, done);
   addPoints(userId, payment.points, done);
 }
@@ -285,19 +302,29 @@ export function resolveThrow(
     const species = getSpecies(spawn.species_id);
     if (!species) return cb(null, { status: "unknown-species" });
 
+    // Une ball spéciale hors du jeu — sa génération est fermée — n'existe pas.
+    if (ball.special && !getOpenSpecialBall(ball.key)) return cb(null, { status: "unknown-ball" });
+
     const probability = ball.guaranteed
       ? 1
-      : catchProbability(spawn.catch_rate, ball.multiplier, config.capture.globalMultiplier);
+      : catchProbability(
+          spawn.catch_rate,
+          ballMultiplier(ball, { fished: Boolean(spawn.fished), speciesId: spawn.species_id }),
+          config.capture.globalMultiplier
+        );
 
     // 1. Paiement atomique : une ball offerte d'abord, le solde ensuite, et
     // refusé sans rien prélever si ni l'un ni l'autre ne suffit.
-    payThrow(userId, ball, { requireItem, expectedPrice }, (err, payment, quote) => {
+    payThrow(userId, ball, { requireItem, expectedPrice, spawn }, (err, payment, quote) => {
       if (err) {
         handleException("Paiement du lancer :", err);
         return cb(null, { status: "error" });
       }
 
       if (!payment) {
+        // Une ball spéciale : aucune achetée avant cette apparition. Les chiffres
+        // disent pourquoi (« tu en as 2, aucune n'est antérieure »).
+        if (quote?.units) return cb(null, { status: "no-unit", ball, ...quote.units });
         // Promis gratuit, et l'objet n'y est plus : on le dit, on ne débite pas.
         if (requireItem) return cb(null, { status: "no-item", ball });
         // Le prix annoncé n'est plus le bon : on donne le nouveau, que le
@@ -481,7 +508,9 @@ export function throwMessage(outcome) {
   // Ce que le lancer a coûté, dit comme le dresseur l'a vécu.
   const mention = payment?.item
     ? `${payment.label} offerte`
-    : `**-${payment?.points.toLocaleString("fr-FR")}** points`;
+    : payment?.unit
+      ? `${payment.label} utilisée`
+      : `**-${payment?.points.toLocaleString("fr-FR")}** points`;
 
   switch (outcome.status) {
     case "unknown-ball":
@@ -494,6 +523,11 @@ export function throwMessage(outcome) {
       return "❌ Espèce inconnue.";
     case "no-item":
       return `❌ Tu n'as plus de **${ball.label}** dans ton inventaire. Rien n'a été débité.`;
+    case "no-unit":
+      return (
+        `❌ Aucune **${ball.label}** ne peut servir ici : tu en as ${outcome.held}, mais une ball ` +
+        "achetée ne sert qu'aux Pokémon qui apparaissent après son achat. Rien n'a été débité."
+      );
     case "insufficient":
       return (
         `❌ Solde insuffisant : une **${ball.label}** coûte **${outcome.price.toLocaleString("fr-FR")}** points, ` +
@@ -507,7 +541,7 @@ export function throwMessage(outcome) {
     case "void":
       return (
         "💨 Trop tard, quelqu'un a été plus rapide ! " +
-        (payment?.item
+        (payment?.item || payment?.unit
           ? `Ta **${payment.label}** t'a été rendue.`
           : `Tes **${payment.points.toLocaleString("fr-FR")}** points ont été remboursés.`)
       );
