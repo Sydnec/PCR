@@ -65,7 +65,9 @@ export function getItem(key) {
 // Pokédex, et checkCharms les redonne à qui le complète encore. Cédé, un charme
 // reviendrait à son premier porteur à la prochaine arrivée d'une espèce : un
 // échange le dupliquerait. Les Charmes Chroma s'obtiennent, ils ne se transmettent pas.
-export const isTradable = (item) => Boolean(item) && !item.charm;
+// La Canne de base se donne à tous une fois (grantItemOnce) : échangée, elle serait
+// redonnée, comme un charme.
+export const isTradable = (item) => Boolean(item) && !item.charm && !item.rod?.base;
 
 // Le Charme Chroma d'une génération, tel que le catalogue le déclare
 // (`charm.generation`), ou null.

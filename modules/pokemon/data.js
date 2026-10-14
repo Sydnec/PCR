@@ -22,6 +22,13 @@ const dataset = JSON.parse(
 
 const byId = new Map(dataset.species.map((s) => [s.id, s]));
 
+// Les tables de pêche officielles, produites par scripts/generate-fishing-data.js et
+// commitées comme le reste : pour chaque canne, [espèce, pourcentage].
+const fishing = JSON.parse(
+  fs.readFileSync(path.join(__dirname, "../pokemon-fishing.json"), "utf8")
+);
+const FISHABLE = new Set(Object.values(fishing.rods).flatMap((pool) => pool.map(([id]) => id)));
+
 // Recherche insensible aux accents et à la casse : « evoli » doit trouver
 // « Évoli », « mr mime » doit trouver « M. Mime ».
 const normalize = (text) =>
@@ -291,7 +298,12 @@ export function itemOnlySpecies() {
 // du parc safari non, qui garde donc des poids sans majoration — on y choisit sa
 // génération. Un seul endroit décide, les tirages comme les tables de /admin poids
 // y passent.
-export function spawnWeight(species, spawnConfig, itemOnly = itemOnlySpecies()) {
+export function spawnWeight(
+  species,
+  spawnConfig,
+  itemOnly = itemOnlySpecies(),
+  rarity = fishingRarity()
+) {
   if (species.tradeEvolution || species.isBaby || itemOnly.has(species.id)) return 0;
   const base = isLegendary(species)
     ? spawnConfig.legendaryWeight
@@ -299,7 +311,44 @@ export function spawnWeight(species, spawnConfig, itemOnly = itemOnlySpecies()) 
   // Plancher à 1 : un réglage écrit à la main dans config.json échappe aux bornes de
   // /admin config, et un facteur sous 1 inverserait l'effet attendu.
   const boost = Math.max(1, Number(spawnConfig.generationBoost) || 1);
-  return base * boost ** Math.max(0, (species.generation || 1) - 1);
+  // Ce qui se pêche est plus rare à l'état sauvage, une fois la pêche ouverte.
+  const fished = FISHABLE.has(species.id) ? rarity.factor : 1;
+  return base * boost ** Math.max(0, (species.generation || 1) - 1) * fished;
+}
+
+// Le facteur de rareté des espèces pêchables (`fishing.wildRarityFactor`), ou 1 tant que
+// la pêche est fermée : elle s'ouvre avec sa génération, et rien ne change avant. Lu une
+// fois par tirage et passé à spawnWeight, plutôt que relu pour chacune des 251 espèces.
+export function fishingRarity() {
+  const config = getPokemonConfig().fishing ?? {};
+  const factor = Number(config.wildRarityFactor);
+  const open = activeGeneration() >= (Number(config.generation) || 2);
+  return { factor: open && Number.isFinite(factor) && factor > 0 ? factor : 1 };
+}
+
+// La pêche est-elle ouverte : sa génération l'est.
+export const fishingOpen = () =>
+  activeGeneration() >= (Number(getPokemonConfig().fishing?.generation) || 2);
+
+// La table d'une canne (`old`, `good`, `super`) : les espèces ouvertes et leur poids.
+export function fishingPool(poolKey) {
+  const generation = activeGeneration();
+  return (fishing.rods[poolKey] ?? [])
+    .map(([id, weight]) => ({ species: getSpecies(id), weight }))
+    .filter((entry) => isAvailable(entry.species, generation) && entry.weight > 0);
+}
+
+// Tire une espèce dans la table d'une canne, pondérée par les taux officiels.
+export function pickFished(poolKey) {
+  const pool = fishingPool(poolKey);
+  const total = pool.reduce((sum, entry) => sum + entry.weight, 0);
+  if (!total) return null;
+  let roll = Math.random() * total;
+  for (const entry of pool) {
+    roll -= entry.weight;
+    if (roll < 0) return entry.species;
+  }
+  return pool.at(-1).species;
 }
 
 // Un bébé ne sort que d'un œuf : aucune apparition ne le donne, et aucune
@@ -336,9 +385,10 @@ export function pickWeightedSpecies(spawnConfig, { generations = null } = {}) {
   const pool = [];
   let total = 0;
   const itemOnly = itemOnlySpecies();
+  const rarity = fishingRarity();
   for (const species of allSpecies()) {
     if (generations && !generations.includes(species.generation)) continue;
-    const weight = spawnWeight(species, spawnConfig, itemOnly);
+    const weight = spawnWeight(species, spawnConfig, itemOnly, rarity);
     if (weight > 0) {
       total += weight;
       pool.push({ species, cumulative: total });

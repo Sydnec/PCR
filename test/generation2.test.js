@@ -10,7 +10,9 @@ import assert from "node:assert/strict";
 import { createSandbox, openDatabases, dbRun, dbGet, dbAll, withRandom, speciesByName } from "./helpers.js";
 
 const GEN1_ONLY = { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } };
-const GEN2 = { pokemon: { generation: 2 } };
+// La rareté des espèces pêchables (fishing.wildRarityFactor) a ses tests dans fishing.test.js :
+// ici elle changerait les poids comparés, et ces tests ne parlent que des générations.
+const GEN2 = { pokemon: { generation: 2, fishing: { wildRarityFactor: 1 } } };
 const sandbox = createSandbox({ config: GEN2 });
 process.env.POKEMON_CHANNEL_ID = "123";
 const { points } = await openDatabases();
@@ -179,7 +181,9 @@ describe("la majoration des générations récentes", () => {
   const spawn = () => getPokemonConfig().spawn;
   // Le réglage se relit à chaque usage : on l'écrit dans le fichier, et l'état d'avant revient après.
   const withBoost = (value, run) => {
-    sandbox.writeConfig({ pokemon: { generation: 2, spawn: { generationBoost: value } } });
+    sandbox.writeConfig({
+      pokemon: { generation: 2, fishing: { wildRarityFactor: 1 }, spawn: { generationBoost: value } },
+    });
     try {
       return run();
     } finally {

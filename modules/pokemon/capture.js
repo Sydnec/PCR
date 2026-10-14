@@ -328,8 +328,16 @@ export function resolveThrow(
       handleException("Lecture du spawn :", err);
       return cb(null, { status: "error" });
     }
-    // Sortie anticipée AVANT tout débit : un Pokémon déjà parti ne coûte rien.
-    if (!spawn || spawn.status !== "ACTIVE") return cb(null, { status: "gone" });
+    // Sortie anticipée AVANT tout débit : un Pokémon déjà parti ne coûte rien. Une pêche
+    // (FISHING) n'est ouverte qu'à son pêcheur, et seulement jusqu'à sa fuite : au-delà,
+    // elle est perdue comme un Pokémon du salon qui s'est enfui.
+    if (!spawn || (spawn.status !== "ACTIVE" && spawn.status !== "FISHING")) {
+      return cb(null, { status: "gone" });
+    }
+    if (spawn.status === "FISHING") {
+      if (spawn.reserved_for !== userId) return cb(null, { status: "not-yours" });
+      if (spawn.flees_at && spawn.flees_at <= Date.now()) return cb(null, { status: "gone" });
+    }
 
     const species = getSpecies(spawn.species_id);
     if (!species) return cb(null, { status: "unknown-species" });
@@ -380,7 +388,7 @@ export function resolveThrow(
         // actif » : si le Pokémon a été capturé entre le débit et le tirage,
         // on rend les points au lieu de les brûler pour rien.
         return db.run(
-          "UPDATE pokemon_spawns SET throw_count = throw_count + 1 WHERE id = ? AND status = 'ACTIVE'",
+          "UPDATE pokemon_spawns SET throw_count = throw_count + 1 WHERE id = ? AND status IN ('ACTIVE', 'FISHING')",
           [spawnId],
           function (err) {
             if (err) {
@@ -410,7 +418,7 @@ export function resolveThrow(
         `UPDATE pokemon_spawns
             SET status = 'CAUGHT', caught_by = ?, caught_at = ?, caught_ball = ?,
                 ended_at = ?, throw_count = throw_count + 1
-          WHERE id = ? AND status = 'ACTIVE'`,
+          WHERE id = ? AND status IN ('ACTIVE', 'FISHING')`,
         [userId, now, ball.key, now, spawnId],
         function (err) {
           if (err) {
@@ -436,7 +444,8 @@ export function resolveThrow(
           // message public doit dire « il lâche » et non « il tenait » quand un
           // bouton « Ramasser » apparaît juste en dessous.
           const held = getItem(spawn.held_item);
-          const dropped = Boolean(held) && leavesItemBehind();
+          // Une pêche n'a pas de salon où poser l'objet : il suit le Pokémon.
+          const dropped = Boolean(held) && !spawn.fished && leavesItemBehind();
           // Il brille pour son vainqueur si c'est un shiny pour tout le salon, ou
           // s'il ne brillait que pour les porteurs du Charme Chroma de sa
           // génération et que le vainqueur en est un. Une lecture ratée le
@@ -530,7 +539,7 @@ export function resolveThrow(
 }
 
 // Les issues qui terminent le panneau : il n'y a plus rien à relancer.
-const FINAL = new Set(["gone", "unknown-species", "void", "catch"]);
+const FINAL = new Set(["gone", "not-yours", "unknown-species", "void", "catch"]);
 export const isFinalThrow = (outcome) => FINAL.has(outcome.status);
 
 // Ce qu'un lancer a donné, en toutes lettres. La seule rédaction de ces
@@ -551,6 +560,8 @@ export function throwMessage(outcome) {
       return `⏳ Doucement ! Attends encore **${outcome.remaining}s** avant de relancer.`;
     case "gone":
       return "💨 Ce Pokémon n'est plus là !";
+    case "not-yours":
+      return "❌ Ce Pokémon a mordu à la ligne d'un autre dresseur : il n'est pas pour toi.";
     case "unknown-species":
       return "❌ Espèce inconnue.";
     case "no-item":

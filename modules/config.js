@@ -232,6 +232,12 @@ const POKEMON = {
       { percent: 100, stage: 1, shiny: true },
     ],
   },
+  // La pêche : un Pokémon par lancer de ligne, réservé au pêcheur — il le voit lui seul,
+  // et peut le lancer pendant `fleeSeconds`, après quoi il s'enfuit. Les tables de pêche
+  // viennent des taux officiels (npm run gen:fishing). `wildRarityFactor` rend les espèces
+  // qui s'y pêchent plus rares à l'état sauvage, apparitions et parc safari compris
+  // (1 : aucune différence). Ouverte avec la génération 2, comme les cannes.
+  fishing: { generation: 2, fleeSeconds: 120, wildRarityFactor: 0.7 },
   // Les œufs, seule porte vers les bébés. Un couple de parents — un mâle et une
   // femelle de la famille, Métamorph pouvant tenir l'un des deux rôles — pond
   // un œuf qui éclot au premier des deux seuils : tant d'heures, ou tant de
@@ -404,6 +410,42 @@ const POKEMON = {
       ball: "master",
       description: "La capture garantie, offerte. Autant dire qu'elle ne se trouve pas.",
       dropWeight: 2,
+    },
+    // Les cannes à pêche (`rod`) : /pk pecher lance la ligne pour `price` points, et la
+    // canne choisit la table de pêche (`pool`, pokemon-fishing.json : old, good, super).
+    // Une canne n'abaisse pas son tarif : la Méga Canne pêche à 200 points, pas à 50.
+    // `base` : la Canne est donnée à tous, une fois — jamais échangeable, sans quoi
+    // l'échanger la ferait redonner. Les deux autres tombent sur les Pokémon et se
+    // gagnent à la loterie, à partir de la génération 2.
+    canne: {
+      label: "Canne",
+      emoji: "🎣",
+      sprite: "old-rod",
+      description: "Pêche à 50 points : surtout des Magicarpe.",
+      generation: 2,
+      rod: { pool: "old", price: 50, base: true },
+    },
+    super_canne: {
+      label: "Super Canne",
+      emoji: "🎣",
+      sprite: "good-rod",
+      description: "Pêche à 100 points : des prises plus variées.",
+      dropWeight: 20,
+      lotteryWeight: 60,
+      lot: { min: 1, max: 1 },
+      generation: 2,
+      rod: { pool: "good", price: 100 },
+    },
+    mega_canne: {
+      label: "Méga Canne",
+      emoji: "🎣",
+      sprite: "super-rod",
+      description: "Pêche à 200 points : les prises les plus rares.",
+      dropWeight: 8,
+      lotteryWeight: 25,
+      lot: { min: 1, max: 1 },
+      generation: 2,
+      rod: { pool: "super", price: 200 },
     },
     // Les charmes ne tombent pas et ne se revendent pas : ils se gagnent en
     // complétant un Pokédex, une fois pour toutes (modules/pokemon/charms.js).

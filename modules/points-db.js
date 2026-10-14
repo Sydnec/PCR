@@ -183,13 +183,26 @@ const db = new sqlite3.Database(dbPath, (err) => {
         sex TEXT,
         charm_shiny INTEGER NOT NULL DEFAULT 0,
         form TEXT,
-        fished INTEGER NOT NULL DEFAULT 0
+        fished INTEGER NOT NULL DEFAULT 0,
+        reserved_for TEXT
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_spawns :", err);
         addColumn("pokemon_spawns", "form", "TEXT");
         // Le Pokémon vient d'une pêche : l'Appât Ball vaut alors son bonus.
         addColumn("pokemon_spawns", "fished", "INTEGER NOT NULL DEFAULT 0");
+        // Une pêche est une apparition réservée au pêcheur, hors du salon : son statut
+        // est FISHING tant qu'elle est ouverte (jamais ACTIVE : l'index ci-dessous ne
+        // permet qu'une apparition du salon à la fois), et un dresseur n'en a qu'une.
+        addColumn("pokemon_spawns", "reserved_for", "TEXT", () =>
+          db.run(
+            `CREATE UNIQUE INDEX IF NOT EXISTS idx_pokemon_spawn_fishing
+               ON pokemon_spawns(reserved_for) WHERE status = 'FISHING'`,
+            (err) => {
+              if (err) handleException("Erreur création index pokemon_spawn_fishing :", err);
+            }
+          )
+        );
         // Garantie au niveau base : jamais deux spawns actifs en même temps.
         db.run(
           `CREATE UNIQUE INDEX IF NOT EXISTS idx_pokemon_spawn_active
@@ -810,11 +823,14 @@ function createPointsLog() {
 // attendu et ignoré. À appeler dans le rappel du CREATE TABLE, une fois la
 // table sûre d'exister. Chaque appel est temporaire, à retirer une fois
 // déployé.
-function addColumn(table, column, type) {
+// `done` s'exécute une fois la colonne sûre d'exister : un index qui la porte ne peut
+// pas partir avant.
+function addColumn(table, column, type, done = () => {}) {
   db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`, (err) => {
     if (err && !/duplicate column/i.test(err.message)) {
       handleException(`Erreur ajout de la colonne ${table}.${column} :`, err);
     }
+    done();
   });
 }
 
