@@ -767,7 +767,7 @@ describe("/pk comparer", () => {
 describe("/pk echange", () => {
   const trade = (options, users = { membre: fakeUser("u2") }, extra = {}) => runCommand(pk, { sub: "echange", options, users, ...extra });
   const ids = (name) => `pk:${species(name).id}`;
-  const thing = (key) => `item:${key}`;
+  const thing = (key, quantity = null) => (quantity === null ? `item:${key}` : `item:${key}:${quantity}`);
   // Un Pokémon contre un Pokémon, comme avant : ce qu'on donne désigné, ce qu'on
   // demande par son espèce — le destinataire choisira lequel en acceptant.
   const swap = (mine, extra = {}) => ({ membre: "u2", je_donne: ids("Rattata"), mon_individu: `#${mine}`, je_recois: ids("Roucool"), ...extra });
@@ -806,12 +806,12 @@ describe("/pk echange", () => {
   it("des points contre un Pokémon, un objet contre des points, un cadeau à zéro point", async () => {
     await setBalance(900);
     await ownMany("Roucool", 2, { user: "u2" });
-    await trade({ membre: "u2", je_donne: "pts", mon_nombre: 400, je_recois: ids("Roucool") });
+    await trade({ membre: "u2", je_donne: "400", je_recois: ids("Roucool") });
     await grant("super_bonbon", 4);
     await setBalance(700, "u2");
-    await trade({ membre: "u2", je_donne: thing("super_bonbon"), mon_nombre: 3, je_recois: "pts", son_nombre: 700 });
+    await trade({ membre: "u2", je_donne: thing("super_bonbon", 3), je_recois: "pts:700" });
     const [mine] = await ownMany("Rattata", 2);
-    await trade({ membre: "u2", je_donne: ids("Rattata"), mon_individu: `#${mine}`, je_recois: "rien" });
+    await trade({ membre: "u2", je_donne: ids("Rattata"), mon_individu: `#${mine}`, je_recois: "0" });
     const rows = await trades();
     assert.deepEqual(rows.map((row) => [row.offer_points, row.offer_item, row.offer_item_qty, row.request_points]), [
       [400, null, null, null],
@@ -825,23 +825,35 @@ describe("/pk echange", () => {
   it("l'objet demandé a une quantité d'un par défaut", async () => {
     await grant("super_bonbon", 2, "u2");
     await setBalance(50);
-    await trade({ membre: "u2", je_donne: "pts", mon_nombre: 50, je_recois: thing("super_bonbon") });
+    await trade({ membre: "u2", je_donne: "50 points", je_recois: thing("super_bonbon") });
     assert.equal((await trades())[0].request_item_qty, 1);
   });
 
-  it("chaque côté se remplit d'une seule chose : un côté vide, un nombre qui ne va pas ou un choix périmé sont refusés en le disant", async () => {
+  it("un nombre tapé à la main vaut des points : « 3000 », « 3 000 » ou « 3000 points », et « rien » vaut zéro", async () => {
+    await setBalance(5000);
+    await ownMany("Roucool", 2, { user: "u2" });
+    for (const typed of ["3000", "3 000", "3000 points", "pts:3000"]) {
+      await trade({ membre: "u2", je_donne: typed, je_recois: ids("Roucool") });
+    }
+    await trade({ membre: "u2", je_donne: "rien", je_recois: ids("Roucool") });
+    const rows = await trades();
+    assert.deepEqual(rows.map((row) => row.offer_points), [3000, 3000, 3000, 3000, 0]);
+    assert.equal(await balance("u1"), 5000, "rien ne bouge avant l'acceptation");
+  });
+
+  it("chaque côté se remplit d'une seule chose : un côté vide, un individu qui ne va pas ou un choix périmé sont refusés en le disant", async () => {
     await ownMany("Rattata", 2);
     await setBalance(100);
     await ownMany("Roucool", 2, { user: "u2" });
-    assert.match(refusal(await trade({ membre: "u2", je_recois: ids("Roucool") })), /Dis ce que tu donnes \(`je_donne`\).*« Rien » pour ne rien donner/);
-    assert.match(refusal(await trade({ membre: "u2", je_donne: "pts", mon_nombre: 5 })), /Dis ce que tu demandes \(`je_recois`\).*« Rien » pour ne rien demander/);
-    assert.match(refusal(await trade({ membre: "u2", je_donne: "rien", je_recois: "rien" })), /Rien à échanger : les deux côtés sont à 0 point/);
-    assert.match(refusal(await trade({ membre: "u2", je_donne: "pts", mon_nombre: 5, mon_individu: "#1", je_recois: "pts", son_nombre: 5 })), /`mon_individu` ne va qu'avec un Pokémon/);
-    assert.match(refusal(await trade({ membre: "u2", je_donne: ids("Rattata"), mon_nombre: 2, je_recois: "rien" })), /`mon_nombre` ne va qu'avec des points ou un objet/);
-    assert.match(refusal(await trade({ membre: "u2", je_donne: "rien", mon_nombre: 2, je_recois: "pts", son_nombre: 5 })), /`mon_nombre` ne va qu'avec des points ou un objet/);
-    assert.match(refusal(await trade({ membre: "u2", je_donne: "pts", je_recois: "rien" })), /Indique le nombre de points dans `mon_nombre`/);
-    assert.match(refusal(await trade({ membre: "u2", je_donne: "pts", mon_nombre: 5, je_recois: ids("Roucool"), son_nombre: 3 })), /`son_nombre` ne va qu'avec des points ou un objet/);
-    assert.match(refusal(await trade({ membre: "u2", je_donne: "pts", mon_nombre: 5, je_recois: "n'importe quoi" })), /autocomplétion/);
+    assert.match(refusal(await trade({ membre: "u2", je_recois: ids("Roucool") })), /Dis ce que tu donnes \(`je_donne`\).*0 pour ne rien donner/);
+    assert.match(refusal(await trade({ membre: "u2", je_donne: "5" })), /Dis ce que tu demandes \(`je_recois`\).*0 pour ne rien demander/);
+    assert.match(refusal(await trade({ membre: "u2", je_donne: "0", je_recois: "rien" })), /Rien à échanger : les deux côtés sont à 0 point/);
+    assert.match(refusal(await trade({ membre: "u2", je_donne: "5", mon_individu: "#1", je_recois: "5" })), /`mon_individu` ne va qu'avec un Pokémon/);
+    assert.match(refusal(await trade({ membre: "u2", je_donne: "n'importe quoi", je_recois: "5" })), /autocomplétion, ou tape un nombre/);
+    assert.match(refusal(await trade({ membre: "u2", je_donne: "—", je_recois: "5" })), /autocomplétion, ou tape un nombre/);
+    assert.match(refusal(await trade({ membre: "u2", je_donne: "5", je_recois: "n'importe quoi" })), /autocomplétion/);
+    assert.match(refusal(await trade({ membre: "u2", je_donne: "99999999999999999999999", je_recois: "5" })), /autocomplétion/);
+    assert.match(refusal(await trade({ membre: "u2", je_donne: thing("super_bonbon", 0), je_recois: "5" })), /au moins 1/);
     assert.equal((await trades()).length, 0);
   });
 
@@ -849,18 +861,18 @@ describe("/pk echange", () => {
     await setBalance(30);
     await setBalance(10, "u2");
     await grant("super_bonbon", 1);
-    assert.match(refusal(await trade({ membre: "u2", je_donne: "pts", mon_nombre: 200, je_recois: "rien" })), /Tu n'as que \*\*30\*\* points : il t'en faut \*\*200\*\*/);
-    assert.match(refusal(await trade({ membre: "u2", je_donne: "rien", je_recois: "pts", son_nombre: 500 })), /<@u2> n'a que \*\*10\*\* points : il lui en faut \*\*500\*\*/);
-    assert.match(refusal(await trade({ membre: "u2", je_donne: thing("super_bonbon"), mon_nombre: 3, je_recois: "rien" })), /Tu n'as que \*\*1\*\* Super Bonbon : il t'en faut \*\*3\*\*/);
-    assert.match(refusal(await trade({ membre: "u2", je_donne: "rien", je_recois: thing("super_bonbon") })), /<@u2> n'a que \*\*0\*\* Super Bonbon : il lui en faut \*\*1\*\*/);
+    assert.match(refusal(await trade({ membre: "u2", je_donne: "200", je_recois: "0" })), /Tu n'as que \*\*30\*\* points : il t'en faut \*\*200\*\*/);
+    assert.match(refusal(await trade({ membre: "u2", je_donne: "0", je_recois: "500" })), /<@u2> n'a que \*\*10\*\* points : il lui en faut \*\*500\*\*/);
+    assert.match(refusal(await trade({ membre: "u2", je_donne: thing("super_bonbon", 3), je_recois: "0" })), /Tu n'as que \*\*1\*\* Super Bonbon : il t'en faut \*\*3\*\*/);
+    assert.match(refusal(await trade({ membre: "u2", je_donne: "0", je_recois: thing("super_bonbon") })), /<@u2> n'a que \*\*0\*\* Super Bonbon : il lui en faut \*\*1\*\*/);
     assert.equal((await trades()).length, 0);
   });
 
   it("un objet inconnu ou un charme est refusé : un charme se gagne, il ne se transmet pas", async () => {
     await setBalance(10);
-    assert.match(refusal(await trade({ membre: "u2", je_donne: thing("inconnu"), je_recois: "rien" })), /Objet inconnu/);
+    assert.match(refusal(await trade({ membre: "u2", je_donne: thing("inconnu"), je_recois: "0" })), /Objet inconnu/);
     await grant("charme_chroma_1", 1);
-    assert.match(refusal(await trade({ membre: "u2", je_donne: thing("charme_chroma_1"), je_recois: "rien" })), /ne s'échange pas/);
+    assert.match(refusal(await trade({ membre: "u2", je_donne: thing("charme_chroma_1"), je_recois: "0" })), /ne s'échange pas/);
     assert.equal((await trades()).length, 0);
   });
 
@@ -903,36 +915,51 @@ describe("/pk echange", () => {
     assert.match(refusal(await trade(swap(mine, { je_recois: "n'importe quoi" }))), /autocomplétion/);
   });
 
-  it("l'autocomplétion : espèces en trop (avec l'évolution gratuite annoncée), points et rien, puis chez le destinataire", async () => {
+  it("l'autocomplétion : espèces en trop (avec l'évolution gratuite annoncée), consigne pour les points et rien, puis chez le destinataire", async () => {
     await ownMany("Machopeur", 2);
     await own("Rattata");
     const asked = (focused, options) => runAutocomplete(pk, { sub: "echange", options, focused });
     const mine = payloadOf(await asked({ name: "je_donne", value: "" }), "respond");
     assert.deepEqual(mine.map((choice) => choice.name), [
-      "Des points (indique le nombre)",
+      "Pour des points, tape un nombre (ex. 3000)",
       "Rien (0 point)",
       "Machopeur ×1 en trop — évoluera gratuitement en Mackogneur chez l'autre",
     ]);
-    assert.deepEqual(mine.map((choice) => choice.value), ["pts", "rien", ids("Machopeur")]);
+    assert.deepEqual(mine.map((choice) => choice.value), ["—", "pts:0", ids("Machopeur")]);
     assert.deepEqual(payloadOf(await asked({ name: "je_donne", value: "mackogneur" }), "respond").map((choice) => choice.value), [ids("Machopeur")]);
     assert.deepEqual(payloadOf(await asked({ name: "je_donne", value: "zzz" }), "respond").map((choice) => choice.value), ["—"]);
     const none = payloadOf(await asked({ name: "je_recois", value: "" }), "respond");
     assert.match(none[0].name, /Choisis d'abord le dresseur/);
     await ownMany("Roucool", 2, { user: "u2" });
     const theirs = payloadOf(await asked({ name: "je_recois", value: "" }, { membre: "u2" }), "respond");
-    assert.deepEqual(theirs.map((choice) => choice.name), ["Des points (indique le nombre)", "Rien (0 point : un cadeau)", "Roucool ×1 en trop"]);
+    assert.deepEqual(theirs.map((choice) => choice.name), ["Pour des points, tape un nombre (ex. 3000)", "Rien (0 point : un cadeau)", "Roucool ×1 en trop"]);
     const noSpecies = payloadOf(await asked({ name: "mon_individu", value: "" }), "respond");
     assert.match(noSpecies[0].name, /Choisis d'abord l'espèce dans l'option « je_donne »/);
-    const notSpecies = payloadOf(await asked({ name: "mon_individu", value: "" }, { je_donne: "pts" }), "respond");
+    const notSpecies = payloadOf(await asked({ name: "mon_individu", value: "" }, { je_donne: "300" }), "respond");
     assert.match(notSpecies[0].name, /Choisis d'abord l'espèce/);
     const individuals = payloadOf(await asked({ name: "mon_individu", value: "" }, { je_donne: ids("Machopeur") }), "respond");
     assert.deepEqual(individuals.map((choice) => choice.value), (await dbAll(points, "SELECT id FROM pokemon_owned WHERE user_id = 'u1' AND species_id = ? ORDER BY id DESC", [species("Machopeur").id])).map((row) => `#${row.id}`));
   });
 
-  it("l'autocomplétion des objets : les siens, puis ceux du destinataire, sans les charmes", async () => {
+  it("l'autocomplétion d'un nombre : le montant en points, ou la quantité d'un objet avec ce qu'on en a", async () => {
+    const asked = (focused, options) => runAutocomplete(pk, { sub: "echange", options, focused });
+    const answer = async (value, name = "je_donne", options) => payloadOf(await asked({ name, value }, options), "respond");
+    assert.deepEqual(await answer("3000"), [{ name: `${(3000).toLocaleString("fr-FR")} points`, value: "pts:3000" }]);
+    assert.deepEqual(await answer("3 000 pts"), [{ name: `${(3000).toLocaleString("fr-FR")} points`, value: "pts:3000" }]);
+    assert.deepEqual(await answer("1"), [{ name: "1 point", value: "pts:1" }]);
+    await grant("super_bonbon", 5);
+    await grant("charme_chroma_1", 1);
+    assert.deepEqual(await answer("3 bonbon"), [{ name: "3× Super Bonbon (sur 5)", value: "item:super_bonbon:3" }]);
+    assert.deepEqual((await answer("3x bonbon")).map((choice) => choice.value), ["item:super_bonbon:3"]);
+    assert.deepEqual((await answer("8 bonbon")).map((choice) => choice.name), ["8× Super Bonbon (sur 5)"], "le refus dira les chiffres");
+    assert.match((await answer("3 charme"))[0].name, /Aucun objet « charme » à échanger/);
+    assert.deepEqual(await answer("2 bonbon", "je_recois", { membre: "u2" }).then((r) => r[0].name), "Aucun objet « bonbon » à échanger");
+  });
+
+  it("l'autocomplétion des objets : les siens, puis ceux du destinataire, sans les charmes ni emoji", async () => {
     const asked = (focused, options) => runAutocomplete(pk, { sub: "echange", options, focused });
     const values = async (focused, options) => payloadOf(await asked(focused, options), "respond").map((choice) => choice.value);
-    assert.deepEqual(await values({ name: "je_donne", value: "" }), ["pts", "rien"], "rien d'autre à proposer");
+    assert.deepEqual(await values({ name: "je_donne", value: "" }), ["—", "pts:0"], "rien d'autre à proposer");
     await grant("super_bonbon", 3);
     await grant("charme_chroma_1", 1);
     const mine = payloadOf(await asked({ name: "je_donne", value: "bonbon" }), "respond");

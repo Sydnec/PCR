@@ -2307,7 +2307,7 @@
     {
       "type": "enhancement",
       "name": "/pk echange plus simple",
-      "description": "Chaque côté d'un échange se remplit avec deux options seulement : ce que l'on donne ou demande (Pokémon, objet, points ou rien) et un nombre.",
+      "description": "Chaque côté d'un échange se remplit avec une seule option : un Pokémon, un objet, ou directement un nombre de points (je_donne: 3000).",
       "announce": true,
       "author": "Sydnec",
       "commit": "pending",

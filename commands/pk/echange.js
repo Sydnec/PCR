@@ -16,6 +16,7 @@ import { getInventory, getItem, getItemCount, isTradable } from "../../modules/p
 import {
   buildTradeEmbed,
   buildTradeRow,
+  HINT_VALUE,
   describeGroup,
   individualChoices,
   respondHint as hint,
@@ -25,17 +26,42 @@ const promisify = (fn, ...args) =>
   new Promise((resolve, reject) => fn(...args, (err, value) => (err ? reject(err) : resolve(value))));
 
 // Ce qu'une option de côté (`je_donne`, `je_recois`) peut valoir : une espèce, un
-// objet, des points ou rien. Le préfixe dit de quoi il s'agit, pour que l'autocomplétion
-// mêle les trois sans qu'une clé d'objet se prenne pour un numéro d'espèce.
-const POINTS = "pts";
-const NOTHING = "rien";
+// objet ou des points. Le préfixe dit de quoi il s'agit, pour que l'autocomplétion
+// mêle les trois sans qu'une clé d'objet se prenne pour un numéro d'espèce. Un nombre
+// tapé à la main vaut des points (« 3000 », « 3 000 points »), sans passer par la liste :
+// c'est ce qui évite une option de plus pour le montant.
 const speciesValue = (id) => `pk:${id}`;
-const itemValue = (key) => `item:${key}`;
+const pointsValue = (amount) => `pts:${amount}`;
+const itemValue = (key, quantity = null) =>
+  quantity === null ? `item:${key}` : `item:${key}:${quantity}`;
+
 function parseChoice(value) {
-  if (value === POINTS || value === NOTHING) return { kind: value };
-  const [kind, ...rest] = String(value ?? "").split(":");
-  const id = rest.join(":");
-  return id && (kind === "pk" || kind === "item") ? { kind, id } : null;
+  const text = String(value ?? "").trim();
+  const amount = text.match(/^(?:pts:)?(\d[\d\s]*?)\s*(?:pts?|points?)?$/i);
+  if (amount) {
+    const points = Number(amount[1].replace(/\s/g, ""));
+    return Number.isSafeInteger(points) ? { kind: "points", amount: points } : null;
+  }
+  if (/^rien$/i.test(text)) return { kind: "points", amount: 0 };
+  const species = text.match(/^pk:(\d+)$/);
+  if (species) return { kind: "pk", id: species[1] };
+  const item = text.match(/^item:([^:]+)(?::(\d+))?$/);
+  if (item) {
+    const quantity = item[2] ? Number(item[2]) : 1;
+    return Number.isSafeInteger(quantity) ? { kind: "item", id: item[1], quantity } : null;
+  }
+  return null;
+}
+
+// Ce que l'autocomplétion lit d'une saisie qui commence par un nombre : « 3000 » (ou
+// « 3 000 », « 3000 points ») est un montant, « 3 bonbon » ou « 3x bonbon » une quantité
+// d'un objet. null quand la saisie ne commence pas par un nombre.
+function readNumberQuery(query) {
+  const text = String(query ?? "").trim();
+  const digits = text.replace(/\s*(?:pts?|points?)$/i, "");
+  if (/^\d[\d\s]*$/.test(digits)) return { amount: Number(digits.replace(/\s/g, "")), rest: "" };
+  const found = text.match(/^(\d+)(?:[x×]|\s)\s*(\S.*)$/i);
+  return found ? { amount: Number(found[1]), rest: found[2].trim() } : null;
 }
 
 // Premier temps : les espèces dont `userId` a des Pokémon en trop, shiny ou
@@ -63,18 +89,20 @@ function speciesChoices(userId, needle) {
 }
 
 // Les objets de `userId` qui s'échangent. Tous le sont, sauf les charmes
-// (isTradable).
-function itemChoices(userId, needle) {
+// (isTradable). Avec `quantity` (« 3 bonbon »), chaque choix porte cette quantité, et dit
+// combien en a `userId` : le refus, lui, donne les chiffres.
+function itemChoices(userId, needle, quantity = null) {
   return promisify(getInventory, userId).then((rows) =>
     rows
       .map((row) => ({ row, item: getItem(row.item_key) }))
-      .filter(({ item }) => item && isTradable(item))
+      .filter(({ item }) => item && isTradable(item) && item.label.toLowerCase().includes(needle))
       .map(({ row, item }) => ({
         // Pas d'emoji : ceux du serveur ne se rendent pas dans une proposition.
-        name: `${item.label} ×${row.count.toLocaleString("fr-FR")} (objet)`,
-        value: itemValue(item.key),
+        name: quantity !== null
+          ? `${quantity.toLocaleString("fr-FR")}× ${item.label} (sur ${row.count.toLocaleString("fr-FR")})`
+          : `${item.label} ×${row.count.toLocaleString("fr-FR")} (objet)`,
+        value: itemValue(item.key, quantity),
       }))
-      .filter((choice) => choice.name.toLowerCase().includes(needle))
   );
 }
 
@@ -89,16 +117,29 @@ function mixedChoices(specials, species, items) {
   return [...specials, ...species.slice(0, speciesShown), ...items.slice(0, itemsShown)];
 }
 
-// Les choix d'un côté : ce que `userId` peut donner, plus les points. `giving` dit si c'est
-// le côté de celui qui propose : « rien » n'y vaut pas la même chose qu'une demande.
+// Les choix d'un côté : ce que `userId` peut donner, plus « Rien ». Une saisie qui
+// commence par un nombre propose des points, ou une quantité d'un objet. `giving` dit si
+// c'est le côté de celui qui propose : « rien » n'y vaut pas la même chose qu'une demande.
 async function respondWithSide(interaction, userId, query, { giving, emptyLabel }) {
   const needle = query.toLowerCase();
   try {
+    const typed = readNumberQuery(query);
+    if (typed && !typed.rest) {
+      if (!Number.isSafeInteger(typed.amount)) return hint(interaction, "Ce nombre est trop grand");
+      const name = `${typed.amount.toLocaleString("fr-FR")} point${typed.amount > 1 ? "s" : ""}`;
+      return interaction.respond([{ name, value: pointsValue(typed.amount) }]).catch(() => {});
+    }
+    if (typed) {
+      const items = await itemChoices(userId, typed.rest.toLowerCase(), typed.amount);
+      if (!items.length) return hint(interaction, `Aucun objet « ${typed.rest} » à échanger`);
+      return interaction.respond(items.slice(0, MAX_CHOICES)).catch(() => {});
+    }
+
     const [species, items] = await Promise.all([speciesChoices(userId, needle), itemChoices(userId, needle)]);
     const specials = [
-      { name: "Des points (indique le nombre)", value: POINTS },
-      { name: giving ? "Rien (0 point)" : "Rien (0 point : un cadeau)", value: NOTHING },
-    ].filter((choice) => choice.name.toLowerCase().includes(needle));
+      { name: "Pour des points, tape un nombre (ex. 3000)", value: HINT_VALUE },
+      { name: giving ? "Rien (0 point)" : "Rien (0 point : un cadeau)", value: pointsValue(0) },
+    ].filter((choice) => !needle || (choice.value !== HINT_VALUE && choice.name.toLowerCase().includes(needle)));
     const choices = mixedChoices(specials, species, items);
     // Une liste vide est indiscernable d'une commande cassée : on dit explicitement
     // qu'il n'y a rien à échanger.
@@ -142,11 +183,10 @@ function respondWithIndividuals(interaction, userId, query) {
 // ce qu'on donne l'individu), des points, ou un objet. Chaque côté en veut une
 // seule : aucune évolution ne demande à la fois un échange et un objet, il n'y a
 // donc rien à gagner à les mélanger. Zéro point est un côté valide : c'est ainsi
-// qu'on fait un cadeau. Le nombre est celui des points ou la quantité de l'objet,
-// selon ce que le côté contient.
+// qu'on fait un cadeau.
 const OPTIONS = {
-  give: { choice: "je_donne", individual: "mon_individu", amount: "mon_nombre" },
-  get: { choice: "je_recois", individual: null, amount: "son_nombre" },
+  give: { choice: "je_donne", individual: "mon_individu" },
+  get: { choice: "je_recois", individual: null },
 };
 
 // Un côté lu dans les options : `{ side }`, ou `{ error }` rédigé pour celui qui a
@@ -157,34 +197,27 @@ async function readSide(interaction, names, owner, own) {
   const who = own ? "Tu" : `<@${owner}>`;
   const raw = interaction.options.getString(names.choice);
   const individual = names.individual ? interaction.options.getString(names.individual) : null;
-  const amount = interaction.options.getInteger(names.amount);
 
   if (raw === null || raw === undefined) {
     return {
       error:
         `Dis ${own ? "ce que tu donnes" : "ce que tu demandes"} (\`${names.choice}\`) : un Pokémon, ` +
-        `des points ou un objet. « Rien » pour ne rien ${own ? "donner" : "demander"}.`,
+        `un objet ou un nombre de points (0 pour ne rien ${own ? "donner" : "demander"}).`,
     };
   }
   const choice = parseChoice(raw);
-  if (!choice) return { error: "Choisis dans la liste d'autocomplétion." };
+  if (!choice) {
+    return { error: "Choisis dans la liste d'autocomplétion, ou tape un nombre pour des points." };
+  }
 
   // Une option qui ne va pas avec le côté choisi est refusée, pas ignorée : on
   // publierait une offre différente de celle qu'on croit avoir tapée.
   if (individual && choice.kind !== "pk") {
     return { error: `\`${names.individual}\` ne va qu'avec un Pokémon (\`${names.choice}\`).` };
   }
-  if (amount !== null && (choice.kind === "pk" || choice.kind === NOTHING)) {
-    return {
-      error: `\`${names.amount}\` ne va qu'avec des points ou un objet (\`${names.choice}\`).`,
-    };
-  }
 
-  if (choice.kind === NOTHING) return { side: { points: 0 } };
-
-  if (choice.kind === POINTS) {
-    if (amount === null) return { error: `Indique le nombre de points dans \`${names.amount}\`.` };
-    if (!Number.isInteger(amount) || amount < 0) return { error: "Un montant de points ne peut pas être négatif." };
+  if (choice.kind === "points") {
+    const amount = choice.amount;
     const balance = await promisify(getBalance, owner);
     if (amount > balance) {
       return {
@@ -203,8 +236,8 @@ async function readSide(interaction, names, owner, own) {
     if (!isTradable(item)) {
       return { error: `**${item.label}** ne s'échange pas : un charme se gagne, il ne se transmet pas.` };
     }
-    const quantity = amount ?? 1;
-    if (!Number.isInteger(quantity) || quantity < 1) return { error: "La quantité doit être d'au moins 1." };
+    const quantity = choice.quantity;
+    if (quantity < 1) return { error: "La quantité doit être d'au moins 1." };
     const held = await promisify(getItemCount, owner, key);
     if (quantity > held) {
       return {
@@ -255,8 +288,8 @@ async function readSide(interaction, names, owner, own) {
 // Les descriptions des options sont volontairement courtes : /pk s'approche de la limite
 // de 8 000 caractères que Discord impose à une commande entière, et en dépasser un seul
 // fait refuser TOUTES les commandes au démarrage (voir test/commands-pk.test.js). Pour la
-// même raison, chaque côté tient en deux options : ce qu'il contient (espèce, objet ou
-// points, dans une seule autocomplétion) et un nombre.
+// même raison, chaque côté tient en une seule option : espèce, objet ou points, dans la
+// même autocomplétion — un nombre tapé vaut des points, « 3 bonbon » trois de cet objet.
 export default {
   describe: (sub) =>
     sub
@@ -271,7 +304,7 @@ export default {
       .addStringOption((option) =>
         option
           .setName("je_donne")
-          .setDescription("Ce que tu donnes")
+          .setDescription("Ce que tu donnes (un nombre : des points)")
           .setRequired(false)
           .setAutocomplete(true)
       )
@@ -282,26 +315,12 @@ export default {
           .setRequired(false)
           .setAutocomplete(true)
       )
-      .addIntegerOption((option) =>
-        option
-          .setName("mon_nombre")
-          .setDescription("Points ou quantité")
-          .setRequired(false)
-          .setMinValue(0)
-      )
       .addStringOption((option) =>
         option
           .setName("je_recois")
-          .setDescription("Ce que tu demandes (il choisit lequel)")
+          .setDescription("Ce que tu demandes (un nombre : des points)")
           .setRequired(false)
           .setAutocomplete(true)
-      )
-      .addIntegerOption((option) =>
-        option
-          .setName("son_nombre")
-          .setDescription("Points ou quantité")
-          .setRequired(false)
-          .setMinValue(0)
       ),
 
   async autocomplete(interaction) {
