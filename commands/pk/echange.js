@@ -24,16 +24,25 @@ import {
 const promisify = (fn, ...args) =>
   new Promise((resolve, reject) => fn(...args, (err, value) => (err ? reject(err) : resolve(value))));
 
+// Ce qu'une option de côté (`je_donne`, `je_recois`) peut valoir : une espèce, un
+// objet, des points ou rien. Le préfixe dit de quoi il s'agit, pour que l'autocomplétion
+// mêle les trois sans qu'une clé d'objet se prenne pour un numéro d'espèce.
+const POINTS = "pts";
+const NOTHING = "rien";
+const speciesValue = (id) => `pk:${id}`;
+const itemValue = (key) => `item:${key}`;
+function parseChoice(value) {
+  if (value === POINTS || value === NOTHING) return { kind: value };
+  const [kind, ...rest] = String(value ?? "").split(":");
+  const id = rest.join(":");
+  return id && (kind === "pk" || kind === "item") ? { kind, id } : null;
+}
+
 // Premier temps : les espèces dont `userId` a des Pokémon en trop, shiny ou
 // non — jamais le dernier de l'espèce, jamais un verrouillé.
-function respondWithSpecies(interaction, userId, query, emptyLabel) {
-  getIndividuals(userId, (err, rows) => {
-    if (err) {
-      handleException("Autocomplétion d'échange :", err);
-      return interaction.respond([]).catch(() => {});
-    }
-    const needle = query.toLowerCase();
-    const choices = [...countBySpecies(rows)]
+function speciesChoices(userId, needle) {
+  return promisify(getIndividuals, userId).then((rows) =>
+    [...countBySpecies(rows)]
       .map(([speciesId, { spare }]) => {
         const species = getSpecies(speciesId);
         if (!species || spare < 1) return null;
@@ -46,17 +55,59 @@ function respondWithSpecies(interaction, userId, query, emptyLabel) {
           name:
             `${species.name} ×${spare} en trop` +
             (evolved ? ` — évoluera gratuitement en ${evolved.name} chez l'autre` : ""),
-          value: String(speciesId),
+          value: speciesValue(speciesId),
         };
       })
       .filter((choice) => choice && choice.name.toLowerCase().includes(needle))
-      .slice(0, 25);
+  );
+}
 
-    // Une liste vide est indiscernable d'une commande cassée : on dit
-    // explicitement qu'il n'y a aucun Pokémon à échanger.
+// Les objets de `userId` qui s'échangent. Tous le sont, sauf les charmes
+// (isTradable).
+function itemChoices(userId, needle) {
+  return promisify(getInventory, userId).then((rows) =>
+    rows
+      .map((row) => ({ row, item: getItem(row.item_key) }))
+      .filter(({ item }) => item && isTradable(item))
+      .map(({ row, item }) => ({
+        // Pas d'emoji : ceux du serveur ne se rendent pas dans une proposition.
+        name: `${item.label} ×${row.count.toLocaleString("fr-FR")} (objet)`,
+        value: itemValue(item.key),
+      }))
+      .filter((choice) => choice.name.toLowerCase().includes(needle))
+  );
+}
+
+// Une seule liste de 25 pour les trois sortes de choix : les entrées fixes d'abord, puis
+// les espèces et les objets se partagent la place, sans que l'un chasse l'autre — taper
+// quelques lettres suffit à tout retrouver.
+const MAX_CHOICES = 25;
+function mixedChoices(specials, species, items) {
+  const room = MAX_CHOICES - specials.length;
+  const itemsShown = Math.min(items.length, Math.max(10, room - species.length));
+  const speciesShown = Math.min(species.length, room - itemsShown);
+  return [...specials, ...species.slice(0, speciesShown), ...items.slice(0, itemsShown)];
+}
+
+// Les choix d'un côté : ce que `userId` peut donner, plus les points. `giving` dit si c'est
+// le côté de celui qui propose : « rien » n'y vaut pas la même chose qu'une demande.
+async function respondWithSide(interaction, userId, query, { giving, emptyLabel }) {
+  const needle = query.toLowerCase();
+  try {
+    const [species, items] = await Promise.all([speciesChoices(userId, needle), itemChoices(userId, needle)]);
+    const specials = [
+      { name: "Des points (indique le nombre)", value: POINTS },
+      { name: giving ? "Rien (0 point)" : "Rien (0 point : un cadeau)", value: NOTHING },
+    ].filter((choice) => choice.name.toLowerCase().includes(needle));
+    const choices = mixedChoices(specials, species, items);
+    // Une liste vide est indiscernable d'une commande cassée : on dit explicitement
+    // qu'il n'y a rien à échanger.
     if (!choices.length) return hint(interaction, emptyLabel);
-    interaction.respond(choices).catch(() => {});
-  });
+    return interaction.respond(choices).catch(() => {});
+  } catch (err) {
+    handleException("Autocomplétion d'échange :", err);
+    return interaction.respond([]).catch(() => {});
+  }
 }
 
 // Second temps, pour ce qu'on donne : les individus de l'espèce choisie dans
@@ -65,7 +116,8 @@ function respondWithSpecies(interaction, userId, query, emptyLabel) {
 // demande ne se choisit pas ici : c'est le destinataire qui désigne le sien en
 // acceptant.
 function respondWithIndividuals(interaction, userId, query) {
-  const species = getSpecies(Number(interaction.options.get("je_donne")?.value));
+  const choice = parseChoice(interaction.options.get("je_donne")?.value);
+  const species = choice?.kind === "pk" ? getSpecies(Number(choice.id)) : null;
   if (!species) {
     return hint(interaction, "⚠️ Choisis d'abord l'espèce dans l'option « je_donne »");
   }
@@ -86,38 +138,15 @@ function respondWithIndividuals(interaction, userId, query) {
   });
 }
 
-// Les objets de `userId` qui s'échangent, filtrés sur le libellé. Tous le sont,
-// sauf les charmes (isTradable).
-function respondWithItems(interaction, userId, query, emptyLabel) {
-  getInventory(userId, (err, rows) => {
-    if (err) {
-      handleException("Autocomplétion d'échange :", err);
-      return interaction.respond([]).catch(() => {});
-    }
-    const needle = query.toLowerCase();
-    const choices = rows
-      .map((row) => ({ row, item: getItem(row.item_key) }))
-      .filter(({ item }) => item && isTradable(item))
-      .map(({ row, item }) => ({
-        // Pas d'emoji : ceux du serveur ne se rendent pas dans une proposition.
-        name: `${item.label} ×${row.count.toLocaleString("fr-FR")}`,
-        value: item.key,
-      }))
-      .filter((choice) => choice.name.toLowerCase().includes(needle))
-      .slice(0, 25);
-    if (!choices.length) return hint(interaction, emptyLabel);
-    interaction.respond(choices).catch(() => {});
-  });
-}
-
 // Les trois façons de remplir un côté de l'offre : un Pokémon (l'espèce, et pour
 // ce qu'on donne l'individu), des points, ou un objet. Chaque côté en veut une
 // seule : aucune évolution ne demande à la fois un échange et un objet, il n'y a
 // donc rien à gagner à les mélanger. Zéro point est un côté valide : c'est ainsi
-// qu'on fait un cadeau.
+// qu'on fait un cadeau. Le nombre est celui des points ou la quantité de l'objet,
+// selon ce que le côté contient.
 const OPTIONS = {
-  give: { species: "je_donne", individual: "mon_individu", points: "mes_points", item: "mon_objet", quantity: "mon_objet_quantite" },
-  get: { species: "je_recois", individual: null, points: "ses_points", item: "son_objet", quantity: "son_objet_quantite" },
+  give: { choice: "je_donne", individual: "mon_individu", amount: "mon_nombre" },
+  get: { choice: "je_recois", individual: null, amount: "son_nombre" },
 };
 
 // Un côté lu dans les options : `{ side }`, ou `{ error }` rédigé pour celui qui a
@@ -126,37 +155,35 @@ const OPTIONS = {
 // peut-être tapée à la main ou a vieilli depuis l'autocomplétion : tout se relit.
 async function readSide(interaction, names, owner, own) {
   const who = own ? "Tu" : `<@${owner}>`;
-  const species = interaction.options.getString(names.species);
+  const raw = interaction.options.getString(names.choice);
   const individual = names.individual ? interaction.options.getString(names.individual) : null;
-  const amount = interaction.options.getInteger(names.points);
-  const key = interaction.options.getString(names.item);
-  const filled = [species, amount, key].filter((value) => value !== null && value !== undefined);
+  const amount = interaction.options.getInteger(names.amount);
 
-  if (filled.length === 0) {
+  if (raw === null || raw === undefined) {
     return {
       error:
-        `Dis ${own ? "ce que tu donnes" : "ce que tu demandes"} : un Pokémon ` +
-        `(\`${names.species}\`), des points (\`${names.points}\`) ou un objet ` +
-        `(\`${names.item}\`). \`${names.points}: 0\` pour ne rien ${own ? "donner" : "demander"}.`,
+        `Dis ${own ? "ce que tu donnes" : "ce que tu demandes"} (\`${names.choice}\`) : un Pokémon, ` +
+        `des points ou un objet. « Rien » pour ne rien ${own ? "donner" : "demander"}.`,
     };
   }
-  if (filled.length > 1) {
-    return {
-      error:
-        `Un seul à la fois ${own ? "de ton côté" : "de son côté"} : un Pokémon, des points ` +
-        `ou un objet — pas un mélange.`,
-    };
-  }
+  const choice = parseChoice(raw);
+  if (!choice) return { error: "Choisis dans la liste d'autocomplétion." };
+
   // Une option qui ne va pas avec le côté choisi est refusée, pas ignorée : on
   // publierait une offre différente de celle qu'on croit avoir tapée.
-  if (individual && (amount !== null || key !== null)) {
-    return { error: `\`${names.individual}\` ne va qu'avec un Pokémon (\`${names.species}\`).` };
+  if (individual && choice.kind !== "pk") {
+    return { error: `\`${names.individual}\` ne va qu'avec un Pokémon (\`${names.choice}\`).` };
   }
-  if (interaction.options.getInteger(names.quantity) !== null && key === null) {
-    return { error: `\`${names.quantity}\` ne va qu'avec un objet (\`${names.item}\`).` };
+  if (amount !== null && (choice.kind === "pk" || choice.kind === NOTHING)) {
+    return {
+      error: `\`${names.amount}\` ne va qu'avec des points ou un objet (\`${names.choice}\`).`,
+    };
   }
 
-  if (amount !== null && amount !== undefined) {
+  if (choice.kind === NOTHING) return { side: { points: 0 } };
+
+  if (choice.kind === POINTS) {
+    if (amount === null) return { error: `Indique le nombre de points dans \`${names.amount}\`.` };
     if (!Number.isInteger(amount) || amount < 0) return { error: "Un montant de points ne peut pas être négatif." };
     const balance = await promisify(getBalance, owner);
     if (amount > balance) {
@@ -169,13 +196,14 @@ async function readSide(interaction, names, owner, own) {
     return { side: { points: amount } };
   }
 
-  if (key !== null && key !== undefined) {
+  if (choice.kind === "item") {
+    const key = choice.id;
     const item = getItem(key);
     if (!item) return { error: "Objet inconnu : choisis-le dans la liste d'autocomplétion." };
     if (!isTradable(item)) {
       return { error: `**${item.label}** ne s'échange pas : un charme se gagne, il ne se transmet pas.` };
     }
-    const quantity = interaction.options.getInteger(names.quantity) ?? 1;
+    const quantity = amount ?? 1;
     if (!Number.isInteger(quantity) || quantity < 1) return { error: "La quantité doit être d'au moins 1." };
     const held = await promisify(getItemCount, owner, key);
     if (quantity > held) {
@@ -192,10 +220,10 @@ async function readSide(interaction, names, owner, own) {
   // moins précieux, le plus récent à égalité (tradeCandidate) ; celui qu'on demande
   // se choisit chez le destinataire, en acceptant : il faut seulement qu'il en ait un
   // libre.
-  const { species: found, error } = resolveSpecies(species);
+  const { species: found, error } = resolveSpecies(choice.id);
   if (error) return { error };
   if (own && individual) {
-    const selector = await promisify(resolveIndividual, owner, species, individual);
+    const selector = await promisify(resolveIndividual, owner, choice.id, individual);
     if (selector.error) return { error: selector.error };
     if (selector.row.locked) {
       return {
@@ -226,7 +254,9 @@ async function readSide(interaction, names, owner, own) {
 
 // Les descriptions des options sont volontairement courtes : /pk s'approche de la limite
 // de 8 000 caractères que Discord impose à une commande entière, et en dépasser un seul
-// fait refuser TOUTES les commandes au démarrage (voir test/commands-pk.test.js).
+// fait refuser TOUTES les commandes au démarrage (voir test/commands-pk.test.js). Pour la
+// même raison, chaque côté tient en deux options : ce qu'il contient (espèce, objet ou
+// points, dans une seule autocomplétion) et un nombre.
 export default {
   describe: (sub) =>
     sub
@@ -241,7 +271,7 @@ export default {
       .addStringOption((option) =>
         option
           .setName("je_donne")
-          .setDescription("Espèce que tu donnes")
+          .setDescription("Ce que tu donnes")
           .setRequired(false)
           .setAutocomplete(true)
       )
@@ -254,74 +284,41 @@ export default {
       )
       .addIntegerOption((option) =>
         option
-          .setName("mes_points")
-          .setDescription("Points que tu donnes (0 : rien)")
+          .setName("mon_nombre")
+          .setDescription("Points ou quantité")
           .setRequired(false)
           .setMinValue(0)
-      )
-      .addStringOption((option) =>
-        option
-          .setName("mon_objet")
-          .setDescription("Objet que tu donnes")
-          .setRequired(false)
-          .setAutocomplete(true)
-      )
-      .addIntegerOption((option) =>
-        option
-          .setName("mon_objet_quantite")
-          .setDescription("Quantité (1 par défaut)")
-          .setRequired(false)
-          .setMinValue(1)
       )
       .addStringOption((option) =>
         option
           .setName("je_recois")
-          .setDescription("Espèce demandée (il choisit lequel)")
+          .setDescription("Ce que tu demandes (il choisit lequel)")
           .setRequired(false)
           .setAutocomplete(true)
       )
       .addIntegerOption((option) =>
         option
-          .setName("ses_points")
-          .setDescription("Points demandés (0 : rien)")
+          .setName("son_nombre")
+          .setDescription("Points ou quantité")
           .setRequired(false)
           .setMinValue(0)
-      )
-      .addStringOption((option) =>
-        option
-          .setName("son_objet")
-          .setDescription("Objet demandé")
-          .setRequired(false)
-          .setAutocomplete(true)
-      )
-      .addIntegerOption((option) =>
-        option
-          .setName("son_objet_quantite")
-          .setDescription("Quantité (1 par défaut)")
-          .setRequired(false)
-          .setMinValue(1)
       ),
 
   async autocomplete(interaction) {
     const focused = interaction.options.getFocused(true);
     const query = String(focused.value ?? "");
     if (focused.name === "je_donne") {
-      return respondWithSpecies(
-        interaction,
-        interaction.user.id,
-        query,
-        "Tu n'as rien à échanger : il reste toujours un Pokémon de chaque espèce"
-      );
+      return respondWithSide(interaction, interaction.user.id, query, {
+        giving: true,
+        emptyLabel: "Tu n'as rien à échanger : il reste toujours un Pokémon de chaque espèce",
+      });
     }
     if (focused.name === "mon_individu") {
       return respondWithIndividuals(interaction, interaction.user.id, query);
     }
-    if (focused.name === "mon_objet") {
-      return respondWithItems(interaction, interaction.user.id, query, "Tu n'as aucun objet à échanger");
-    }
 
-    // Les autres options sont déjà lisibles pendant l'autocomplétion : on peut
-    // donc proposer la collection du destinataire.
+    // L'autre option est déjà lisible pendant l'autocomplétion : on peut donc
+    // proposer la collection du destinataire.
     //
     // getUser() renvoie TOUJOURS null ici : Discord n'envoie pas le bloc
     // `resolved` avec une interaction d'autocomplétion, et discord.js construit
@@ -332,15 +329,10 @@ export default {
     const targetId = interaction.options.get("membre")?.value;
     if (!targetId) return hint(interaction, "⚠️ Choisis d'abord le dresseur dans l'option « membre »");
     if (focused.name === "je_recois") {
-      return respondWithSpecies(
-        interaction,
-        String(targetId),
-        query,
-        "Ce dresseur n'a rien à échanger"
-      );
-    }
-    if (focused.name === "son_objet") {
-      return respondWithItems(interaction, String(targetId), query, "Ce dresseur n'a aucun objet à échanger");
+      return respondWithSide(interaction, String(targetId), query, {
+        giving: false,
+        emptyLabel: "Ce dresseur n'a rien à échanger",
+      });
     }
     return interaction.respond([]).catch(() => {});
   },

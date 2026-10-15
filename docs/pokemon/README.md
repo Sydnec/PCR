@@ -78,10 +78,12 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
   toujours un Métamorph. Il n'est jamais pris sans qu'on le demande, et le choix de la forme
   (Évoli) reste possible avec lui.
 - `/pk echange <membre>` + de quoi remplir **chaque côté** : un Pokémon, des points ou un objet.
-  - Ce que tu donnes : `je_donne` (+ `mon_individu`), `mes_points` ou `mon_objet`
-    (+ `mon_objet_quantite`). Ce que tu demandes : `je_recois`, `ses_points` ou `son_objet`
-    (+ `son_objet_quantite`). Un seul par côté, pas de mélange. `0` point fait un cadeau :
-    `mes_points: 0` pour demander sans rien donner, `ses_points: 0` pour offrir sans rien demander.
+  - Chaque côté tient en deux options : `je_donne` / `je_recois` (une espèce, un objet, « Des
+    points » ou « Rien », tous dans la même autocomplétion) et `mon_nombre` / `son_nombre` (le
+    nombre de points, ou la quantité de l'objet, 1 par défaut). `mon_individu` désigne un individu
+    précis de l'espèce que tu donnes. Un seul choix par côté, pas de mélange. « Rien » fait un
+    cadeau : `je_donne: Rien` pour demander sans rien donner, `je_recois: Rien` pour offrir sans
+    rien demander.
   - Sans `mon_individu`, c'est le moins précieux de l'espèce qui part, le plus récent à égalité.
     Le Pokémon demandé ne se désigne que par son espèce : **le destinataire choisit lequel**,
     parmi ses Pokémon libres, dans un menu privé qui s'ouvre quand il clique sur « Accepter ».

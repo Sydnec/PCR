@@ -2303,6 +2303,16 @@
       "commit": "pending",
       "timestamp": "2026-10-15T09:00:00.000Z",
       "branch": "fix/trade-evolution-autopick"
+    },
+    {
+      "type": "enhancement",
+      "name": "/pk echange plus simple",
+      "description": "Chaque côté d'un échange se remplit avec deux options seulement : ce que l'on donne ou demande (Pokémon, objet, points ou rien) et un nombre.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-15T10:00:00.000Z",
+      "branch": "refactor/echange-options"
     }
   ]
 }
