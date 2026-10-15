@@ -179,7 +179,7 @@ describe("rencontre du parc safari : le reste", () => {
   it("ferme le bouton d'appât au plafond", () => {
     const open = encounter("Bulbizarre").view.components[0].toJSON().components;
     const capped = encounter("Bulbizarre", { encounter_bait: 2 }).view.components[0].toJSON().components;
-    assert.equal(open.length, 3);
+    assert.equal(open.length, 4);
     assert.ok(!open[1].disabled);
     assert.equal(capped[1].disabled, true);
     assert.ok(open[0].custom_id.startsWith("poke_safari_ball|1|24"));
@@ -564,5 +564,93 @@ describe("l'embed d'une offre d'échange (buildTradeEmbed)", () => {
     assert.equal(menu.custom_id, "poke_trade_pick|5");
     assert.match(menu.placeholder, /Roucool/);
     assert.equal(menu.options[0].label.length, 100);
+  });
+});
+
+describe("parc safari : le partage en direct", () => {
+  const author = { displayName: "Sacha", avatarURL: "https://cdn.test/s.png" };
+  const live = (name, overrides = {}, options = {}) =>
+    embeds.buildSafariLiveView(session(name, { expires_at: Date.now() + 60_000, ...overrides }), {
+      author,
+      owned: { normal: 0, shiny: 0 },
+      lineage: lineageOf(name),
+      ...options,
+    });
+
+  it("la rangée de rencontre propose le direct tant que rien n'est partagé", () => {
+    const open = encounter("Bulbizarre").view.components[0].toJSON().components;
+    assert.equal(open[3].custom_id, "poke_safari_live|1");
+    assert.equal(open[3].label, "Partager en direct");
+    const shared = encounter("Bulbizarre", { shared_at: 5 }).view.components[0].toJSON().components;
+    assert.deepEqual(shared.map((button) => button.custom_id).filter((id) => id.startsWith("poke_safari_live")), []);
+  });
+
+  it("montre la rencontre signée, les dernières actions, les prises et les actions restantes", () => {
+    const view = live(
+      "Bulbizarre",
+      { actions_left: 20 },
+      {
+        events: [
+          { outcome: "BAIT", species_id: species("Bulbizarre").id, is_shiny: 0, sex: null, form: null },
+          { outcome: "CATCH", species_id: species("Roucool").id, is_shiny: 1, sex: null, form: null },
+        ],
+        catches: [{ species_id: species("Roucool").id, is_shiny: 1, form: null }],
+      }
+    );
+    assert.deepEqual(view.components, [], "personne d'autre ne joue depuis le message public");
+    const embed = view.embeds[0].toJSON();
+    assert.match(embed.author.name, /^Sacha · en direct du parc safari$/);
+    assert.equal(embed.author.icon_url, author.avatarURL);
+    assert.match(embed.title, /Bulbizarre sauvage l'observe/);
+    assert.equal(field(embed, "Actions restantes").value, `**20** / ${safari().actionsPerSession}`);
+    const recent = field(embed, "Dernières actions").value.split("\n");
+    assert.equal(recent.length, 2);
+    assert.match(recent[0], /Appât lancé à \*\*Bulbizarre\*\*/);
+    assert.match(recent[1], /Roucool.*\*\* capturé !/);
+    assert.match(field(embed, "Prises (1)").value, /Roucool/);
+  });
+
+  it("raconte la collection du dresseur à la troisième personne", () => {
+    const embed = live("Tauros", {}, { lineage: lineageOf("Tauros") }).embeds[0].toJSON();
+    assert.equal(field(embed, "Son Pokédex").value, "🆕 Il lui manque !");
+    assert.equal(field(embed, "Ton Pokédex"), undefined);
+  });
+
+  it("une visite sans action jouée le dit, plutôt qu'un champ vide", () => {
+    const embed = live("Bulbizarre").embeds[0].toJSON();
+    assert.match(field(embed, "Dernières actions").value, /La visite commence/);
+    assert.match(field(embed, "Prises (0)").value, /Rien pour l'instant/);
+  });
+
+  it("une visite finie devient le bilan public signé", () => {
+    const embed = live("Bulbizarre", { status: "FINISHED", actions_left: 0 }, { catches: [] }).embeds[0].toJSON();
+    assert.equal(embed.title, "🏕️ Fin de la visite");
+    assert.match(embed.description, /\*\*Sacha\*\* ressort du parc les mains vides/);
+    assert.doesNotMatch(embed.description, /grilles/);
+    assert.equal(embed.thumbnail.url, author.avatarURL);
+  });
+
+  it("une visite expirée en route dit combien d'actions sont restées", () => {
+    const embed = live("Bulbizarre", { actions_left: 3, expires_at: Date.now() - 1 }).embeds[0].toJSON();
+    assert.equal(embed.title, "🏕️ Fin de la visite");
+    assert.match(embed.description, /grilles ont fermé avant la fin : \*\*3\*\* actions jamais jouées/);
+  });
+
+  it("le bilan privé d'une visite suivie en direct renvoie au direct", () => {
+    const view = embeds.buildSafariView(
+      session("Bulbizarre", { status: "FINISHED", actions_left: 0, shared_at: 5, live_channel_id: "c9", live_message_id: "m9" }),
+      { catches: [] }
+    );
+    assert.match(view.content, /Ton bilan remplace le direct dans <#c9>/);
+    assert.deepEqual(view.components, []);
+  });
+
+  it("raconte chaque issue au public", () => {
+    const line = (outcome) =>
+      embeds.safariEventLine({ outcome, species_id: species("Bulbizarre").id, is_shiny: 0, sex: null, form: null }, safari());
+    for (const outcome of ["CATCH", "MISS", "MISS_FLED", "BAIT", "BAIT_FLED", "FLED", "FLEE_FAILED"]) {
+      assert.match(line(outcome), /Bulbizarre/, outcome);
+    }
+    assert.equal(line("INCONNU"), null);
   });
 });

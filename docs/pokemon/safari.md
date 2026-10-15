@@ -64,6 +64,14 @@ visite. C'est le seul contenu Pokémon où les actions ne coûtent rien.
   du dresseur revenait à lui refuser un bouton qu'on lui avait mis sous les yeux. Un envoi qui
   échoue rend le droit de réessayer. Une visite finie **sur le site** se partage aussi, au clic,
   dans le salon des apparitions (voir [le site](../site.md#parc-safari)) — avec le même verrou.
+- **Partage en direct** : pendant la visite, le bouton **« 📡 Partager en direct »** publie la
+  partie dans le salon courant, signée du dresseur : le Pokémon en cours (chances, appâts, risque
+  qu'il détale, et ce que le dresseur en possède déjà), les 5 dernières actions, les actions
+  restantes et les prises. Le message se réécrit à chaque action, depuis Discord comme depuis le
+  site, puis devient le **bilan public** à la fin — y compris quand la visite expire avant, avec
+  le nombre d'actions jamais jouées. Un direct ne s'arrête pas, et il tient lieu de partage du
+  bilan : même verrou, donc plus de bouton « Partager mon bilan » ensuite. Impossible en message
+  privé, et refusé sans rien consommer si le bot ne peut pas publier dans le salon.
 - Tout l'état vit en base : les boutons répondent encore après un redémarrage du bot, et un
   double-clic ne peut pas jouer deux fois la même action.
 - **Sur le site** aussi, depuis l'onglet Capture : reprendre sa visite, entrer dans un parc ouvert

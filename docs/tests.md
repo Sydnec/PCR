@@ -45,7 +45,7 @@ génération ouverte en cours de route.
 | `capture`                         | formule de capture, plancher des légendaires, balls, apparitions pondérées, difficulté, prix des balls              |
 | `spawn`, `spawn-lifecycle`        | revendication gardée d'une apparition, durée de vie, fuite, remplacement, objets au sol, réparation au démarrage   |
 | `throws`                          | lancers : paiement, remboursement, courses entre dresseurs, ball offerte, prix progressif de la Master Ball, shiny du Charme |
-| `safari`, `safari-entry`          | tirage des rencontres, appâts et fuite, actions, entrée payante ou offerte, reprise d'une visite                   |
+| `safari`, `safari-entry`, `safari-live` | tirage des rencontres, appâts et fuite, actions, entrée payante ou offerte, reprise d'une visite, partage en direct |
 | `economy`, `redistribution`       | points, objets, revente, compensation en cascade, pot commun (plan, bail, rattrapage, simultanéité)                |
 | `evolution`, `collection`         | coût d'une évolution, sacrifices, objets, Métamorph, compensation ; individus, verrous, doublons, échanges, échanges possibles |
 | `eggs`, `lottery-charms`          | ponte, éclosion, compteur de messages ; loterie quotidienne, Charme Chroma et ses rôles                            |

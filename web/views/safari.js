@@ -41,6 +41,7 @@ export async function render(ctx) {
   let acting = false;
   let buying = false;
   let sharing = false;
+  let goingLive = false;
 
   const body = h("div", { class: "safari" });
   const draw = () => body.replaceChildren(visit ? visitView() : offerView());
@@ -100,6 +101,25 @@ export async function render(ctx) {
       toast(error.message, "error");
     }
     sharing = false;
+    draw();
+  }
+
+  // Le direct part dans le salon Pokémon, comme le bilan : le bot y publie la
+  // rencontre et réécrit son message à chaque action, d'ici comme de Discord.
+  // Même verrou que le bilan : une visite en direct ne se partage plus ensuite.
+  async function goLive() {
+    goingLive = true;
+    draw();
+    try {
+      await api("/api/safari/live", { method: "POST", body: { sessionId: visit.id } });
+      visit.live = true;
+      visit.shared = true;
+      toast("Ta visite est en direct dans le salon Pokémon.", "success");
+    } catch (error) {
+      if (error.details?.shared) visit.shared = true;
+      toast(error.message, "error");
+    }
+    goingLive = false;
     draw();
   }
 
@@ -265,7 +285,11 @@ export async function render(ctx) {
           ? h("a", { class: "button ghost", href: "/boite", "data-link": true }, "Voir ma boîte")
           : null,
         visit.shared
-          ? h("button", { class: "button ghost", disabled: true }, "Bilan partagé")
+          ? h(
+              "button",
+              { class: "button ghost", disabled: true },
+              visit.live ? "Bilan publié dans le direct" : "Bilan partagé"
+            )
           : h(
               "button",
               { class: "button ghost", disabled: sharing, onclick: share },
@@ -294,11 +318,28 @@ export async function render(ctx) {
       progressBar((visit.actionsLeft / visit.actionsTotal) * 100),
       visit.finished
         ? null
-        : h(
-            "p",
-            { class: "muted small" },
-            `Visite ouverte jusqu'au ${dateTimeFr(visit.expiresAt)}.`
-          )
+        : [
+            h(
+              "p",
+              { class: "muted small" },
+              `Visite ouverte jusqu'au ${dateTimeFr(visit.expiresAt)}.`
+            ),
+            // Une visite expirée que le balayage n'a pas encore close : le
+            // direct serait refusé, le bouton ne promet rien.
+            visit.expiresAt <= Date.now()
+              ? null
+              : visit.shared
+                ? h(
+                    "p",
+                    { class: "muted small" },
+                    visit.live ? "En direct dans le salon Pokémon." : "Visite déjà partagée."
+                  )
+                : h(
+                    "button",
+                    { class: "button ghost", disabled: goingLive, onclick: goLive },
+                    "Partager en direct"
+                  ),
+          ]
     );
   }
 

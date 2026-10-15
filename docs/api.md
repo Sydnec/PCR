@@ -139,6 +139,7 @@ ou par un groupe `{ "speciesId": 25, "isShiny": false, "sex": "F" }` — les deu
 | `POST /api/safari/enter` | `{ parkId, generations? }` | `{ resumed, visit }` — entrée gratuite dans un parc ouvert. `generations` : les générations visées (entiers) ; les fermées sont ignorées, et sans elle, ou sans aucune valable, toutes |
 | `POST /api/safari/buy` | `{ generations? }` | `{ resumed, ticket, visit }` — entrée payante, au ticket d'abord |
 | `POST /api/safari/action` | `{ sessionId, token, action }` | `{ outcome, message, visit }` — `action` : `BALL`, `BAIT` ou `FLEE` |
+| `POST /api/safari/live` | `{ sessionId }` | `{ live: true }` — met la visite en cours en direct dans le salon Pokémon ; `409` avec `shared` quand elle est déjà partagée. La visite porte alors `live` (et `shared`) |
 | `POST /api/me/pc/move` | `{ pokemonId, pos }` | la boîte PC relue — l'occupant de la case prend l'ancienne place |
 | `POST /api/me/pc/boxes/:box/name` | `{ name }` | `{ name, custom }` — vide : nom par défaut |
 | `POST /api/me/pokemon/:id/nickname` | `{ nickname }` | `{ nickname }` — vide : plus de surnom |

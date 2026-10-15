@@ -293,6 +293,56 @@ describe("parc safari : la visite et sa lignée", () => {
   });
 });
 
+describe("parc safari : le partage en direct", () => {
+  const sent = [];
+  const channel = {
+    id: "c1",
+    isTextBased: () => true,
+    send: async (payload) => (sent.push(payload), { id: "m1" }),
+    messages: { edit: async () => {} },
+  };
+  const bot = {
+    guilds: { fetch: async () => ({ members: { fetch: async () => ({ displayName: "Sacha", displayAvatarURL: () => "https://cdn.test/s.png" }) } }) },
+    channels: { fetch: async () => channel },
+  };
+  const live = (body, user = { id: "u1" }) => route("POST", "/api/safari/live").handler({ ...ctx({ body, user }), bot });
+
+  beforeEach(async () => {
+    sent.length = 0;
+    process.env.POKEMON_CHANNEL_ID = "pk";
+    await dbRun(
+      points,
+      `INSERT INTO pokemon_safari_sessions
+         (id, user_id, status, actions_left, started_at, expires_at, encounter_no,
+          encounter_species_id, encounter_is_shiny, encounter_catch_rate, encounter_bait)
+       VALUES (1, 'u1', 'ACTIVE', 25, 1, ?, 1, ?, 0, ?, 0)`,
+      [Date.now() + 3_600_000, species("Bulbizarre").id, species("Bulbizarre").catchRate]
+    );
+  });
+
+  it("publie la visite dans le salon Pokémon, signée du membre, et la visite le dit", async () => {
+    assert.deepEqual(await live({ sessionId: 1 }), { live: true });
+    assert.equal(sent.length, 1);
+    assert.match(sent[0].embeds[0].toJSON().author.name, /^Sacha/);
+    const { visit } = await call("GET", "/api/safari");
+    assert.equal(visit.live, true);
+    assert.equal(visit.shared, true);
+  });
+
+  it("refuse une entrée invalide (400), un second direct ou la visite d'un autre (409)", async () => {
+    for (const body of [{}, { sessionId: 0 }, { sessionId: "x" }]) {
+      assert.equal((await failure(live(body))).status, 400);
+    }
+    const stranger = await failure(live({ sessionId: 1 }, { id: "intrus" }));
+    assert.equal(stranger.status, 409);
+    await live({ sessionId: 1 });
+    const again = await failure(live({ sessionId: 1 }));
+    assert.equal(again.status, 409);
+    assert.equal(again.details.shared, true, "le site ferme son bouton");
+    assert.equal(sent.length, 1);
+  });
+});
+
 describe("administration des réglages", () => {
   beforeEach(() => sandbox.removeConfig());
 

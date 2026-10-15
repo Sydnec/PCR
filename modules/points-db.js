@@ -648,7 +648,11 @@ const db = new sqlite3.Database(dbPath, (err) => {
         encounter_sex TEXT,
         shared_at INTEGER,
         generations TEXT,
-        encounter_form TEXT
+        encounter_form TEXT,
+        live_channel_id TEXT,
+        live_message_id TEXT,
+        live_author TEXT,
+        live_closed_at INTEGER
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_safari_sessions :", err);
@@ -656,6 +660,12 @@ const db = new sqlite3.Database(dbPath, (err) => {
         // rencontre, comme celle d'une apparition.
         addColumn("pokemon_safari_sessions", "generations", "TEXT");
         addColumn("pokemon_safari_sessions", "encounter_form", "TEXT");
+        // Le message public qui suit la visite en direct : son salon, son id, la
+        // signature figée à l'activation (JSON), et le jour où il a reçu le bilan.
+        addColumn("pokemon_safari_sessions", "live_channel_id", "TEXT");
+        addColumn("pokemon_safari_sessions", "live_message_id", "TEXT");
+        addColumn("pokemon_safari_sessions", "live_author", "TEXT");
+        addColumn("pokemon_safari_sessions", "live_closed_at", "INTEGER");
         // Une seule session à la fois par dresseur, garanti en base. Les index
         // se créent l'un après l'autre : sqlite3 n'ordonne pas deux db.run
         // successifs.
@@ -782,6 +792,32 @@ const db = new sqlite3.Database(dbPath, (err) => {
              ON pokemon_safari_catches(session_id, id)`,
           (err) => {
             if (err) handleException("Erreur création index pokemon_safari_catches_session :", err);
+          }
+        );
+      }
+    );
+
+    // Le journal des actions d'une visite : les dernières que montre le
+    // partage en direct. L'éphémère n'en garde que la dernière, le public les
+    // découvre en cours de route et a besoin de quelques lignes de contexte.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_safari_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id INTEGER NOT NULL,
+        outcome TEXT NOT NULL,
+        species_id INTEGER NOT NULL,
+        is_shiny INTEGER NOT NULL DEFAULT 0,
+        sex TEXT,
+        form TEXT,
+        played_at INTEGER NOT NULL
+      )`,
+      (err) => {
+        if (err) return handleException("Erreur création table pokemon_safari_events :", err);
+        db.run(
+          `CREATE INDEX IF NOT EXISTS idx_pokemon_safari_events_session
+             ON pokemon_safari_events(session_id, id)`,
+          (err) => {
+            if (err) handleException("Erreur création index pokemon_safari_events_session :", err);
           }
         );
       }

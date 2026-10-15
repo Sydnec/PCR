@@ -85,8 +85,10 @@ import {
   getEntryOffer,
   getSessionCatches,
   playAction,
+  refreshLiveShare,
   refreshParkMessage,
   shareRecap,
+  startLiveShareFromSite,
   startPaidSession,
 } from "../pokemon/safari.js";
 import {
@@ -518,6 +520,8 @@ async function visitJson(session, owned, lineageOwned) {
     finished,
     // Le verrou du partage du bilan, partagé avec le bouton Discord.
     shared: Boolean(session.shared_at),
+    // La visite suivie en direct dans un salon : le même verrou, un message à part.
+    live: Boolean(session.live_message_id),
     catches: catches.map((row) => ({
       speciesId: row.species_id,
       shiny: Boolean(row.is_shiny),
@@ -973,6 +977,7 @@ export const routes = [
         playAction(ctx.user.id, sessionId, String(token), action, cb)
       );
       if (!result.ok) throw new HttpError(409, result.reason);
+      refreshLiveShare(ctx.bot, result.session.id);
       return {
         outcome: result.outcome,
         message: safariOutcomeLine(result, getSafariConfig()),
@@ -1001,6 +1006,29 @@ export const routes = [
       });
       if (!result.ok) throw new HttpError(409, result.reason, { shared: Boolean(result.shared) });
       return { shared: true };
+    },
+  },
+
+  // Partager la visite en cours en direct dans le salon Pokémon : le bouton
+  // « Partager en direct » de Discord. `shared` dans le refus dit que le verrou
+  // est pris : le site ferme son bouton.
+  {
+    method: "POST",
+    path: "/api/safari/live",
+    auth: true,
+    write: true,
+    handler: async (ctx) => {
+      const sessionId = Number(ctx.body.sessionId);
+      if (!Number.isInteger(sessionId) || sessionId <= 0) {
+        throw new HttpError(400, "sessionId invalide.");
+      }
+      const trainer = await trainerOf(ctx.bot, ctx.user.id, 128);
+      const result = await startLiveShareFromSite(ctx.bot, ctx.user.id, sessionId, {
+        displayName: trainer.name ?? (await pseudo(ctx.user.id)),
+        avatarURL: trainer.avatar,
+      });
+      if (!result.ok) throw new HttpError(409, result.reason, { shared: Boolean(result.shared) });
+      return { live: true };
     },
   },
 

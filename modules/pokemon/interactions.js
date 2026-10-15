@@ -27,9 +27,11 @@ import {
   getEntryOffer,
   playAction,
   prepareShare,
+  refreshLiveShare,
   refreshParkMessage,
   releaseShare,
   resumeSession,
+  startLiveShare,
   startPaidSession,
 } from "./safari.js";
 import { activeGeneration, generationOrdinal, getSpecies } from "./data.js";
@@ -1184,6 +1186,47 @@ function handleSafariShare(interaction, sessionId) {
   });
 }
 
+// Partager sa visite en direct dans le salon où l'on joue : le bot y publie la
+// rencontre, puis suit la partie jusqu'au bilan. Mêmes gardes que le partage du
+// bilan, dans le même ordre : les permissions du bot avant toute revendication,
+// l'acquittement avant l'envoi. En message privé, il n'y a personne à qui
+// montrer la partie.
+async function handleSafariLive(interaction, sessionId) {
+  const channel = interaction.channel;
+  if (!channel || channel.isDMBased?.()) {
+    return ephemeral(interaction, "❌ Le partage en direct se fait dans un salon du serveur.");
+  }
+  const probleme = postingProblem(interaction, channel);
+  if (probleme) return ephemeral(interaction, probleme);
+
+  await interaction.deferUpdate().catch(() => {});
+  const dire = (content) =>
+    interaction.followUp({ content, flags: MessageFlags.Ephemeral }).catch(() => {});
+
+  let result;
+  try {
+    result = await startLiveShare(interaction.client, interaction.user.id, Number(sessionId), channel, {
+      // Pseudo ET avatar du membre, comme le bilan : une signature cohérente.
+      displayName: interaction.member?.displayName ?? interaction.user.username,
+      avatarURL: interaction.member?.displayAvatarURL?.() ?? interaction.user.displayAvatarURL(),
+    });
+  } catch (error) {
+    handleException("Partage en direct du parc safari :", error);
+    return dire("❌ Erreur base de données.");
+  }
+  if (!result.ok) return dire(`❌ ${result.reason}`);
+
+  log(`Partage en direct de la visite safari #${result.session.id} par ${pseudoOf(interaction)}`);
+  // Seuls le texte et les boutons changent : l'embed de la rencontre reste en
+  // place, et le bouton du direct disparaît avec le verrou.
+  await interaction
+    .editReply({
+      content: `\u{1F4E1} Ta visite est en direct dans ${channel}.`,
+      components: buildSafariView(result.session).components,
+    })
+    .catch(() => {});
+}
+
 // Montrer sa vitrine dans le salon. Un envoi par dresseur toutes les
 // `shareCooldownMinutes`, revendiqué en base avant l'envoi et rendu s'il n'a
 // pas pu partir — comme le partage du bilan du parc. La vitrine se relit au
@@ -1258,6 +1301,7 @@ function handleSafariAction(interaction, action, sessionId, token) {
     // valide, on se contente d'expliquer à part pourquoi le clic n'a rien fait.
     if (!result.ok) return ephemeral(interaction, `❌ ${result.reason}`);
 
+    refreshLiveShare(interaction.client, result.session.id);
     interaction
       .update(
         buildSafariView(result.session, {
@@ -1437,6 +1481,9 @@ export async function handlePokemonButton(interaction) {
 
     case "poke_safari_share":
       return handleSafariShare(interaction, args[0]);
+
+    case "poke_safari_live":
+      return handleSafariLive(interaction, args[0]);
 
     case "poke_showcase_share":
       // Asynchrone et détaché du routeur : une exception ne doit pas partir en

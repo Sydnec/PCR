@@ -368,7 +368,13 @@ describe("parc safari", () => {
       assert.ok(embed.fields.length <= 25, entry.name);
       for (const field of embed.fields) assert.ok(field.value.length <= 1024, `${entry.name} / ${field.name}`);
       assert.ok(embed.footer.text.length <= 2048, entry.name);
-      assert.equal(view.components[0].toJSON().components.length, 3);
+      assert.equal(view.components[0].toJSON().components.length, 4);
+      // Le message public de la même rencontre, journal et prises pleins.
+      const events = Array.from({ length: 5 }, () => ({ outcome: "MISS_FLED", species_id: entry.id, is_shiny: 1, sex: null, form: null }));
+      const catches = Array.from({ length: 25 }, () => ({ species_id: entry.id, is_shiny: 1, form: null }));
+      const live = embeds.buildSafariLiveView({ ...session, expires_at: Date.now() + 60_000 }, { author: { displayName: "D", avatarURL: null }, events, catches, owned: { normal: 1, shiny: 0 }, lineage }).embeds[0].toJSON();
+      assert.ok(live.fields.length <= 25, entry.name);
+      for (const field of live.fields) assert.ok(field.value.length <= 1024, `${entry.name} / ${field.name} (direct)`);
     }
   });
 
