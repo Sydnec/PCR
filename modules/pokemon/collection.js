@@ -957,6 +957,27 @@ export function describeEvolution(
 // variante — les boutons d'avant le choix de l'individu — en fait évoluer un
 // du sexe et de la variante demandés.
 export function evolve(userId, group, chosenTargetId, helperKey, cb) {
+  // Sans individu désigné, un reçu en échange passe avant : son évolution d'échange
+  // ne coûte rien, là où le premier venu aurait payé. Ni une variante demandée, ni
+  // un objet, ni une autre forme ne se contournent : le choix du joueur prime.
+  const tradeTarget = tradeEvolutionTarget(getSpecies(group.speciesId));
+  if (
+    !group.pokemonId &&
+    !group.tradedChecked &&
+    tradeTarget &&
+    anyVariant(group.isShiny) &&
+    !group.sex &&
+    !helperKey &&
+    (!chosenTargetId || Number(chosenTargetId) === tradeTarget.id)
+  ) {
+    return tradedEvolver(userId, group.speciesId, (err, row) => {
+      if (err) return cb(err);
+      const next = row
+        ? { pokemonId: row.id, speciesId: group.speciesId, confirmLocked: group.confirmLocked }
+        : { ...group, tradedChecked: true };
+      evolve(userId, next, chosenTargetId, helperKey, cb);
+    });
+  }
   // L'individu se lit une fois : son espèce, quand on ne la donne pas, et son
   // origine, qui décide de la gratuité d'une évolution d'échange.
   if (group.pokemonId && group.row === undefined) {
@@ -1881,6 +1902,24 @@ export function tradeCandidate(userId, speciesId, cb) {
   db.get(
     `SELECT o.* FROM pokemon_owned o
       WHERE o.user_id = ? AND o.species_id = ? AND o.locked = 0 AND ${ENTRY_COUNT} > 1
+      ORDER BY ${LEAST_PRECIOUS_FIRST}
+      LIMIT 1`,
+    [userId, Number(speciesId)],
+    (err, row) => cb(err, row ?? null)
+  );
+}
+
+// L'individu reçu en échange que le bot fait évoluer de lui-même : celui qui
+// évolue gratuitement vers sa forme d'échange, le moins précieux d'abord
+// (LEAST_PRECIOUS_FIRST, comme tout autre départ). Jamais un verrouillé, jamais
+// le dernier de l'espèce — il faut un exemplaire derrière lui. null si l'espèce
+// n'évolue pas à l'échange ou si aucun reçu n'est disponible.
+export function tradedEvolver(userId, speciesId, cb) {
+  if (!tradeEvolutionTarget(getSpecies(speciesId))) return cb(null, null);
+  db.get(
+    `SELECT o.* FROM pokemon_owned o
+      WHERE o.user_id = ? AND o.species_id = ? AND o.origin = 'echange' AND o.locked = 0
+        AND ${ENTRY_COUNT} > 1
       ORDER BY ${LEAST_PRECIOUS_FIRST}
       LIMIT 1`,
     [userId, Number(speciesId)],

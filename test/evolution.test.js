@@ -420,6 +420,68 @@ describe("l'évolution d'échange d'un Pokémon reçu en échange", () => {
     assert.ok(first);
   });
 
+  const anyMachop = () => ({ speciesId: species("Machopeur").id, isShiny: null });
+
+  it("sans individu désigné, le bot prend un reçu en échange plutôt que le premier venu : gratuit", async () => {
+    // Le non échangé est le plus récent, donc le premier à partir sans cette règle.
+    const [fresh, id] = [await give("Machopeur", { obtained: 9 }), await traded("Machopeur", { obtained: 1 })];
+    await setBalance(0);
+    const result = await evolve(anyMachop());
+    assert.equal(result.ok, true, result.reason);
+    assert.deepEqual(result.spent, { sacrifices: 0, dittos: 0, shinies: 0 });
+    assert.equal(await balance(), 0);
+    assert.deepEqual((await ofSpecies("Mackogneur")).map((row) => row.id), [id]);
+    assert.deepEqual((await ofSpecies("Machopeur")).map((row) => row.id), [fresh], "le non échangé reste");
+  });
+
+  it("parmi plusieurs reçus, le moins précieux : un normal avant un shiny, puis le plus récent", async () => {
+    await give("Machopeur");
+    const shiny = await traded("Machopeur", { shiny: 1, obtained: 2 });
+    const old = await traded("Machopeur", { obtained: 3 });
+    const recent = await traded("Machopeur", { obtained: 8 });
+    assert.equal((await call(collection.tradedEvolver, "u1", species("Machopeur").id)).id, recent);
+    const result = await evolve(anyMachop());
+    assert.equal(result.evolved.id, recent);
+    assert.deepEqual((await ofSpecies("Mackogneur")).map((row) => row.id), [recent]);
+    assert.ok(shiny && old);
+  });
+
+  it("un shiny reçu en échange évolue gratuitement, même devant un normal qui n'a pas été échangé", async () => {
+    await give("Machopeur");
+    const shiny = await traded("Machopeur", { shiny: 1, obtained: 2 });
+    await setBalance(0);
+    const result = await evolve(anyMachop());
+    assert.equal(result.ok, true, result.reason);
+    assert.equal(result.evolved.id, shiny);
+    assert.equal(result.isShiny, true);
+  });
+
+  it("ni un verrouillé reçu, ni le dernier de l'espèce : on retombe sur l'évolution payante", async () => {
+    await traded("Machopeur", { locked: 1 });
+    await give("Machopeur", { obtained: 2 });
+    await setBalance(0);
+    assert.equal(await call(collection.tradedEvolver, "u1", species("Machopeur").id), null);
+    const locked = await evolve(anyMachop());
+    assert.equal(locked.ok, false, "Mackogneur se paie quand rien ne vient d'un échange");
+
+    await dbRun(points, "DELETE FROM pokemon_owned");
+    await traded("Machopeur");
+    assert.equal(await call(collection.tradedEvolver, "u1", species("Machopeur").id), null, "le seul exemplaire reste");
+    const lone = await evolve(anyMachop());
+    assert.equal(lone.ok, false);
+    assert.equal((await ofSpecies("Machopeur")).length, 1, "rien n'a bougé");
+  });
+
+  it("une variante demandée, un objet ou un autre dresseur ne déclenchent pas ce choix", async () => {
+    await give("Machopeur", { obtained: 2 });
+    await traded("Machopeur", { shiny: 1, obtained: 1 });
+    await setBalance(0);
+    const normal = await evolve({ speciesId: species("Machopeur").id, isShiny: false });
+    assert.equal(normal.ok, false, "un normal demandé ne devient pas le shiny reçu");
+    assert.equal(await call(collection.tradedEvolver, "u2", species("Machopeur").id), null);
+    assert.equal(await call(collection.tradedEvolver, "u1", species("Rattata").id), null, "Rattata n'évolue pas à l'échange");
+  });
+
   it("le plan le dit : gratuit, deux exemplaires requis, `traded` pour l'écran", () => {
     const plan = collection.describeEvolution(species("Machopeur").id, null, null, { traded: true });
     assert.deepEqual([plan.points, plan.sacrifices, plan.required, plan.traded], [0, 0, 2, true]);
