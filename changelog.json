@@ -1,7 +1,24 @@
 {
-  "version": "1.18.1",
-  "lastUpdated": "2026-10-15T07:46:06.128Z",
+  "version": "1.18.2",
+  "lastUpdated": "2026-10-15T13:31:38.571Z",
   "releases": [
+    {
+      "version": "1.18.2",
+      "date": "2026-10-15",
+      "title": "Release 1.18.2",
+      "features": [
+        {
+          "type": "enhancement",
+          "name": "Confirmation avant l'entrée payante du safari",
+          "description": "/pk safari demande confirmation avant de débiter : tu vois si l'entrée prend un Ticket Safari ou des points (et ce qu'il te restera), et tu peux annuler.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-10-15T12:00:00.000Z",
+          "branch": "claude/vibrant-brown-s7suxt"
+        }
+      ]
+    },
     {
       "version": "1.18.1",
       "date": "2026-10-15",
@@ -2330,16 +2347,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "enhancement",
-      "name": "Confirmation avant l'entrée payante du safari",
-      "description": "/pk safari demande confirmation avant de débiter : tu vois si l'entrée prend un Ticket Safari ou des points (et ce qu'il te restera), et tu peux annuler.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-10-15T12:00:00.000Z",
-      "branch": "claude/vibrant-brown-s7suxt"
-    }
-  ]
+  "pending": []
 }
