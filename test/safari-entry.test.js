@@ -253,7 +253,30 @@ describe("ce que le dresseur peut faire du parc", () => {
 
   it("assez de points : l'achat est possible", async () => {
     await setBalance(price());
-    assert.equal((await call(safari.getEntryOffer, "u1")).blocked, null);
+    const offer = await call(safari.getEntryOffer, "u1");
+    assert.equal(offer.blocked, null);
+    assert.equal(offer.refusal, null);
+    assert.equal(offer.balance, price());
+  });
+
+  it("annonce le refus avec les mots mêmes de l'achat, solde et délai", async () => {
+    await setBalance(price() - 1);
+    const offer = await call(safari.getEntryOffer, "u1");
+    const refused = await call(safari.startPaidSession, "u1", {});
+    assert.deepEqual(offer.refusal, refused);
+    assert.equal(offer.balance, price() - 1);
+
+    await setBalance(price() * 2);
+    await call(safari.startPaidSession, "u1", {});
+    await dbRun(points, "UPDATE pokemon_safari_sessions SET status = 'FINISHED'");
+    const cooling = await call(safari.getEntryOffer, "u1");
+    assert.deepEqual(cooling.refusal, await call(safari.startPaidSession, "u1", {}));
+    assert.equal(cooling.refusal.code, "COOLDOWN");
+  });
+
+  it("un ticket lève le refus annoncé", async () => {
+    await grantTicket(1);
+    assert.equal((await call(safari.getEntryOffer, "u1")).refusal, null);
   });
 
   it("un parc ouvert offre l'entrée, un parc réservé à un autre non", async () => {

@@ -1187,6 +1187,72 @@ describe("le parc safari sur Discord", () => {
     const calls = await goes("poke_safari_go|paid||1", newUser());
     assert.match(only(calls, "update").content, /parc safari est fermé/);
   });
+
+  it("le bouton de confirmation débite l'entrée, et seulement lui", async () => {
+    const user = newUser();
+    const price = getSafariConfig().entryPrice;
+    await setBalance(price + 50, user);
+    const reply = only(await goes("poke_safari_go|paid|0|1", user), "update");
+    assert.ok(reply.embeds.length >= 1, "la visite s'affiche");
+    assert.match(reply.content, /Tu paies/);
+    assert.equal(await balance(user), 50);
+    assert.equal((await dbAll(points, "SELECT id FROM pokemon_safari_sessions WHERE user_id = ?", [user])).length, 1);
+  });
+
+  it("le bouton de confirmation consomme le Ticket Safari plutôt que les points", async () => {
+    const user = newUser();
+    await setBalance(100, user);
+    await grant("ticket_safari", 1, user);
+    const reply = only(await goes("poke_safari_go|paid|0|1", user), "update");
+    assert.match(reply.content, /Tu présentes ton/);
+    assert.equal(await count("ticket_safari", user), 0);
+    assert.equal(await balance(user), 100);
+  });
+
+  it("annuler l'entrée payante ne débite rien et retire les boutons", async () => {
+    const user = newUser();
+    const price = getSafariConfig().entryPrice;
+    await setBalance(price, user);
+    await grant("ticket_safari", 1, user);
+    const reply = only(await goes("poke_safari_cancel", user), "update");
+    assert.equal(reply.content, "↩️ Entrée annulée : rien n'a été débité.");
+    assert.deepEqual(reply.components, []);
+    assert.deepEqual(reply.embeds, []);
+    assert.equal(await balance(user), price);
+    assert.equal(await count("ticket_safari", user), 1);
+    assert.equal((await dbAll(points, "SELECT id FROM pokemon_safari_sessions WHERE user_id = ?", [user])).length, 0);
+  });
+
+  it("le choix des générations d'une entrée payante se réécrit avec le prix du moment, et ne débite rien", async () => {
+    sandbox.writeConfig(GEN2);
+    const user = newUser();
+    const price = getSafariConfig().entryPrice;
+    await setBalance(price + 7, user);
+    const menu = only(await click("poke_safari_gens|paid|0", { user, values: ["2"], run: handlePokemonSelect }), "update");
+    assert.match(menu.content, new RegExp(`${price.toLocaleString("fr-FR")}\\*\\* points seront débités : il t'en restera \\*\\*7\\*\\*`));
+    const [, row] = menu.components.map((component) => component.toJSON());
+    assert.deepEqual(row.components.map((button) => [button.custom_id, button.label]), [
+      ["poke_safari_go|paid|0|2", `Payer ${price.toLocaleString("fr-FR")} points et entrer`],
+      ["poke_safari_cancel", "Annuler"],
+    ]);
+    assert.equal(await balance(user), price + 7);
+
+    await grant("ticket_safari", 1, user);
+    const withTicket = only(await click("poke_safari_gens|paid|0", { user, values: ["1", "2"], run: handlePokemonSelect }), "update");
+    assert.match(withTicket.content, /Un \*\*Ticket Safari\*\* sera utilisé/);
+    assert.equal(withTicket.components[1].toJSON().components[0].label, "Utiliser mon Ticket et entrer");
+    assert.equal(await count("ticket_safari", user), 1);
+  });
+
+  it("un menu d'entrée payante resté ouvert se ferme sur le refus quand le solde ne suffit plus", async () => {
+    sandbox.writeConfig(GEN2);
+    const user = newUser();
+    await setBalance(10, user);
+    const menu = only(await click("poke_safari_gens|paid|0", { user, values: ["1"], run: handlePokemonSelect }), "update");
+    assert.match(menu.content, /^❌ L'entrée du parc safari coûte \*\*\d+\*\* points, tu en as \*\*10\*\*/);
+    assert.deepEqual(menu.components, []);
+    assert.equal(await balance(user), 10);
+  });
 });
 
 describe("le partage du bilan de safari", () => {

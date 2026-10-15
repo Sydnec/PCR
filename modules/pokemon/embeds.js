@@ -1774,8 +1774,10 @@ export function buildSafariView(
 // multiple, toutes cochées par défaut, et le bouton qui entre. Le bouton porte
 // le choix dans son customId (« 1,2 ») : le menu réécrit le message à chaque
 // changement, rien n'est gardé en mémoire. `mode` : « park » pour l'entrée
-// gratuite d'un parc ouvert (`parkId`), « paid » pour /pk safari.
-export function buildSafariGenerationPicker(mode, parkId, selected = null) {
+// gratuite d'un parc ouvert (`parkId`), « paid » pour /pk safari : son bouton est
+// alors la confirmation du paiement (`offer`, de getEntryOffer), avec de quoi
+// renoncer.
+export function buildSafariGenerationPicker(mode, parkId, selected = null, offer = null) {
   const choices = safariGenerationChoices();
   const all = choices.map((choice) => choice.generation);
   const valid = (selected ?? []).filter((generation) => all.includes(generation));
@@ -1794,15 +1796,90 @@ export function buildSafariGenerationPicker(mode, parkId, selected = null) {
           .setDefault(chosen.includes(generation))
       )
     );
-  const enter = new ButtonBuilder()
-    .setCustomId(`poke_safari_go|${mode}|${parkId}|${chosen.join(",")}`)
-    .setLabel("Entrer dans le parc")
-    .setEmoji("\u{1F33F}")
-    .setStyle(ButtonStyle.Success);
-  return [
-    new ActionRowBuilder().addComponents(select),
-    new ActionRowBuilder().addComponents(enter),
-  ];
+  const goId = `poke_safari_go|${mode}|${parkId}|${chosen.join(",")}`;
+  const enter =
+    mode === "paid" && offer
+      ? buildPaidEntryButtons(offer, goId)
+      : new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setCustomId(goId)
+            .setLabel("Entrer dans le parc")
+            .setEmoji("\u{1F33F}")
+            .setStyle(ButtonStyle.Success)
+        );
+  return [new ActionRowBuilder().addComponents(select), enter];
+}
+
+// Ce que l'entrée payante consomme, dit avant de le faire : un Ticket Safari
+// s'il en reste (il passe avant les points, comme à startPaidSession), sinon le
+// prix, avec ce qu'il restera au dresseur.
+function paidEntryCostLine(offer) {
+  if (offer.tickets) {
+    return (
+      `\u{1F39F}️ Un **Ticket Safari** sera utilisé (tu en as ` +
+      `**${offer.tickets.toLocaleString("fr-FR")}**), aucun point débité.`
+    );
+  }
+  return (
+    `**${offer.price.toLocaleString("fr-FR")}** points seront débités : il t'en restera ` +
+    `**${(offer.balance - offer.price).toLocaleString("fr-FR")}**.`
+  );
+}
+
+// Le bouton qui paie porte ce qu'il consomme dans son libellé, à côté de celui
+// qui renonce. `goId` est le bouton d'entrée de handleSafariGo : c'est lui qui
+// débite, après avoir tout revérifié.
+function buildPaidEntryButtons(offer, goId) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(goId)
+      .setLabel(
+        offer.tickets
+          ? "Utiliser mon Ticket et entrer"
+          : `Payer ${offer.price.toLocaleString("fr-FR")} points et entrer`
+      )
+      .setEmoji("\u{1F33F}")
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId("poke_safari_cancel")
+      .setLabel("Annuler")
+      .setStyle(ButtonStyle.Secondary)
+  );
+}
+
+// Ce que /pk safari répond d'après getEntryOffer, avant tout débit : reprendre
+// la visite en cours, signaler le parc offert, dire le refus prévisible avec ses
+// chiffres, ou demander confirmation. `selected` : les générations déjà cochées
+// quand le menu se réécrit.
+export function buildPaidEntryPrompt(offer, selected = null) {
+  if (offer.ongoing) {
+    return buildSafariView(offer.ongoing.session, {
+      owned: offer.ongoing.owned,
+      lineage: offer.ongoing.lineage,
+      resumed: true,
+    });
+  }
+  if (offer.freePark) return { content: freeParkNotice(), embeds: [], components: [] };
+  if (offer.refusal) return buildPaidEntryReply(offer.refusal);
+
+  // Une seule génération ouverte : rien à choisir, la question suffit.
+  const choices = safariGenerationChoices();
+  if (choices.length === 1) {
+    return {
+      content:
+        `\u{1F3D5}️ **Entrer dans le parc safari ?** ${offer.actions} actions, et plus rien ` +
+        `à débourser ensuite.\n${paidEntryCostLine(offer)}`,
+      embeds: [],
+      components: [
+        buildPaidEntryButtons(offer, `poke_safari_go|paid|0|${choices[0].generation}`),
+      ],
+    };
+  }
+  return {
+    content: safariPickerContent("paid", offer),
+    embeds: [],
+    components: buildSafariGenerationPicker("paid", 0, selected, offer),
+  };
 }
 
 // Une visite offerte attend : on ne débite pas le prix d'une entrée pour la
@@ -1816,16 +1893,13 @@ export function freeParkNotice() {
   );
 }
 
-// Le message du choix des générations : ce qui attend derrière le bouton.
-export function safariPickerContent(mode) {
-  const config = getSafariConfig();
+// Le message du choix des générations : ce qui attend derrière le bouton. Pour
+// l'entrée payante (`offer`, de getEntryOffer), il dit ce que le clic consomme.
+export function safariPickerContent(mode, offer = null) {
   return (
     "\u{1F33F} **Quelles générations vises-tu ?** Les rencontres de ta visite ne viendront que " +
     "d'elles." +
-    (mode === "paid"
-      ? `\nL'entrée se règle au clic : un Ticket Safari s'il t'en reste, sinon ` +
-        `**${config.entryPrice.toLocaleString("fr-FR")}** points.`
-      : "\nTon entrée est offerte.")
+    (mode === "paid" ? `\n${paidEntryCostLine(offer)}` : "\nTon entrée est offerte.")
   );
 }
 

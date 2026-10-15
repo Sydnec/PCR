@@ -2330,5 +2330,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Confirmation avant l'entrée payante du safari",
+      "description": "/pk safari demande confirmation avant de débiter : tu vois si l'entrée prend un Ticket Safari ou des points (et ce qu'il te restera), et tu peux annuler.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-15T12:00:00.000Z",
+      "branch": "claude/vibrant-brown-s7suxt"
+    }
+  ]
 }
