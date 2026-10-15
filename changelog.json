@@ -1,7 +1,34 @@
 {
-  "version": "1.18.3",
-  "lastUpdated": "2026-10-15T22:32:03.044Z",
+  "version": "1.18.4",
+  "lastUpdated": "2026-10-15T22:49:57.954Z",
   "releases": [
+    {
+      "version": "1.18.4",
+      "date": "2026-10-15",
+      "title": "Release 1.18.4",
+      "features": [
+        {
+          "type": "enhancement",
+          "name": "Safari en direct plus réactif",
+          "description": "Le message du safari en direct se met à jour dès ton action, même quand tu enchaînes les clics.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-10-15T23:00:00.000Z",
+          "branch": "dev/keen-knuth-lcd8tu"
+        },
+        {
+          "type": "enhancement",
+          "name": "Safari en direct plus compact",
+          "description": "Le message du safari en direct va à l'essentiel : le Pokémon en vignette, sa lignée sur une ligne, les dernières actions et les prises.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-10-15T23:30:00.000Z",
+          "branch": "dev/keen-knuth-lcd8tu"
+        }
+      ]
+    },
     {
       "version": "1.18.3",
       "date": "2026-10-15",
@@ -2364,26 +2391,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "enhancement",
-      "name": "Safari en direct plus réactif",
-      "description": "Le message du safari en direct se met à jour dès ton action, même quand tu enchaînes les clics.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-10-15T23:00:00.000Z",
-      "branch": "dev/keen-knuth-lcd8tu"
-    },
-    {
-      "type": "enhancement",
-      "name": "Safari en direct plus compact",
-      "description": "Le message du safari en direct va à l'essentiel : le Pokémon en vignette, sa lignée sur une ligne, les dernières actions et les prises.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-10-15T23:30:00.000Z",
-      "branch": "dev/keen-knuth-lcd8tu"
-    }
-  ]
+  "pending": []
 }
