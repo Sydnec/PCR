@@ -338,7 +338,7 @@ function chainLine(species, counts, { current = false, focusShiny = false } = {}
 // Partagé par la fiche d'espèce et la rencontre du parc safari : « où en suis-je
 // dans cette lignée ? » n'a qu'une réponse, et deux mises en forme auraient fini
 // par diverger.
-function lineageFields(species, chain, owned, { isShiny = false, them = false } = {}) {
+function lineageFields(species, chain, owned, { isShiny = false } = {}) {
   const stages = new Map();
   for (const link of chain) {
     const lines = stages.get(link.stage) ?? [];
@@ -357,7 +357,7 @@ function lineageFields(species, chain, owned, { isShiny = false, them = false } 
     .map(([stage, lines]) => ({
       // Sans lignée, « Forme de base » ne veut rien dire : le champ ne répond
       // plus qu'à une question, celle de la collection.
-      name: solo ? (them ? "Son Pokédex" : "Ton Pokédex") : STAGE_LABELS[stage - 1] ?? `Stade ${stage - 1}`,
+      name: solo ? "Ton Pokédex" : STAGE_LABELS[stage - 1] ?? `Stade ${stage - 1}`,
       value: lines.join("\n"),
       inline: true,
     }));
@@ -1615,17 +1615,12 @@ function ownedLine(owned, isShiny, { them = false } = {}) {
     : "\u{1F195} Shiny inédit, et l'espèce te manque !";
 }
 
-// `live` bascule la rencontre en version publique, pour le partage en direct :
-// la même fiche, signée, racontée à la troisième personne, avec les dernières
-// actions et les prises. Une seconde fonction aurait divergé de l'éphémère au
-// premier champ ajouté.
 function buildEncounterEmbed(
   session,
   species,
   config,
-  { intro = null, owned = null, lineage = null, live = null } = {}
+  { intro = null, owned = null, lineage = null } = {}
 ) {
-  const them = Boolean(live);
   const isShiny = Boolean(session.encounter_is_shiny);
   const rarity = RARITIES[rarityOf(species)];
   const probability = safariCatchProbability(
@@ -1645,20 +1640,20 @@ function buildEncounterEmbed(
   // Une collection illisible (`lineage` null) l'omet plutôt que d'annoncer zéro.
   const chain = evolutionChain(species);
   const lineageRows =
-    lineage && chain.length > 1 ? lineageFields(species, chain, lineage, { isShiny, them }) : [];
+    lineage && chain.length > 1 ? lineageFields(species, chain, lineage, { isShiny }) : [];
 
   // « Ton Pokédex » ne sert que sans lignée : avec elle, le Pokémon rencontré y
   // figure déjà (▸, avec ses compteurs), et le dire deux fois ne ferait que
   // doubler l'information. Collection illisible : on préfère une rencontre sans
   // pastille à un champ vide, que l'API refuserait.
-  const ownership = lineageRows.length ? null : ownedLine(owned, isShiny, { them });
+  const ownership = lineageRows.length ? null : ownedLine(owned, isShiny);
 
   const name = displayName(species, false, session.encounter_sex, session.encounter_form);
   const embed = new EmbedBuilder()
     .setTitle(
       isShiny
-        ? `\u2728 Un ${name} SHINY ${live ? "l'observe" : "vous observe"} ! \u2728`
-        : `Un ${name} sauvage ${live ? "l'observe" : "vous observe"}...`
+        ? `\u2728 Un ${name} SHINY vous observe ! \u2728`
+        : `Un ${name} sauvage vous observe...`
     )
     .setColor(embedColor(species, isShiny))
     .setImage(spriteUrl(species, isShiny, session.encounter_form))
@@ -1678,22 +1673,13 @@ function buildEncounterEmbed(
       // Trois champs par rangée : « Rareté | Type | Chances », puis la lignée (un
       // champ par stade, dans sa propre rangée), et les actions en dernier.
       ...lineageRows,
-      ...(ownership
-        ? [{ name: them ? "Son Pokédex" : "Ton Pokédex", value: ownership, inline: true }]
-        : []),
+      ...(ownership ? [{ name: "Ton Pokédex", value: ownership, inline: true }] : []),
       {
         name: "Actions restantes",
         value: `**${session.actions_left}** / ${config.actionsPerSession}`,
         inline: true,
-      },
-      ...(live ? liveFields(live, config) : [])
+      }
     );
-  if (live) {
-    embed.setAuthor({
-      name: `${live.author?.displayName ?? "Un dresseur"} · en direct du parc safari`,
-      ...(live.author?.avatarURL ? { iconURL: live.author.avatarURL } : {}),
-    });
-  }
 
   const legend = lineageRows.length ? lineageLegend(chain) : [];
   embed.setFooter({
@@ -1836,29 +1822,80 @@ export function safariEventLine(event, config) {
   }
 }
 
-// Les champs propres au direct, sous la rencontre : les dernières actions et
-// les prises. Les prises tiennent sur une ligne, noms seuls : vingt-cinq
-// pastilles de rareté feraient déborder le champ (1 024 caractères).
-function liveFields({ events = [], catches = [] }, config) {
+// La lignée en une ligne, pour les spectateurs : les stades se suivent par
+// des flèches, un embranchement (Évoli) se sépare par des barres, et seul ce
+// que le dresseur possède se marque. Les numéros et les compteurs de la fiche
+// privée ne servent qu'à qui décide d'un lancer.
+function compactLineage(species, chain, owned, { isShiny = false } = {}) {
+  const stages = new Map();
+  for (const link of chain) {
+    const counts = owned.get(link.id) ?? { normal: 0, shiny: 0 };
+    const has = isShiny ? counts.shiny > 0 : counts.normal + counts.shiny > 0;
+    const label = link.id === species.id ? `__**${link.name}**__` : link.name;
+    stages.set(link.stage, [...(stages.get(link.stage) ?? []), `${has ? "✅" : "❔"} ${label}`]);
+  }
+  return [...stages]
+    .sort((a, b) => a[0] - b[0])
+    .map(([, names]) => names.join(" / "))
+    .join(" → ");
+}
+
+// La rencontre telle que la voient les spectateurs : qui joue, le Pokémon, où
+// en est le dresseur dans sa lignée, et le fil de la visite. Les chances, le
+// risque de fuite, le type et la rareté ne servent qu'à qui lance, ou se
+// savent déjà : ils restent dans l'éphémère.
+function buildLiveEncounterEmbed(
+  session,
+  species,
+  config,
+  { author = null, events = [], catches = [], owned = null, lineage = null } = {}
+) {
+  const isShiny = Boolean(session.encounter_is_shiny);
+  const name = displayName(species, false, session.encounter_sex, session.encounter_form);
+
+  // Collection illisible : on omet la ligne plutôt que d'annoncer zéro.
+  const chain = evolutionChain(species);
+  const collection =
+    lineage && chain.length > 1
+      ? { name: "Sa lignée", value: compactLineage(species, chain, lineage, { isShiny }) }
+      : ownedLine(owned, isShiny, { them: true })
+        ? { name: "Son Pokédex", value: ownedLine(owned, isShiny, { them: true }) }
+        : null;
+
   const lines = events.map((event) => safariEventLine(event, config)).filter(Boolean);
+  // Noms seuls, sur une ligne : vingt-cinq pastilles de rareté feraient
+  // déborder le champ (1 024 caractères).
   const caught = catches
     .map((row) => {
-      const species = getSpecies(row.species_id);
-      return species ? displayName(species, Boolean(row.is_shiny), null, row.form) : null;
+      const caughtSpecies = getSpecies(row.species_id);
+      return caughtSpecies ? displayName(caughtSpecies, Boolean(row.is_shiny), null, row.form) : null;
     })
     .filter(Boolean);
-  return [
-    {
-      name: "Dernières actions",
-      value: lines.length ? lines.join("\n") : "*La visite commence.*",
-      inline: false,
-    },
-    {
-      name: `Prises (${caught.length.toLocaleString("fr-FR")})`,
-      value: caught.length ? caught.join(", ").slice(0, 1024) : "*Rien pour l'instant.*",
-      inline: false,
-    },
-  ];
+
+  return new EmbedBuilder()
+    .setAuthor({
+      name: `${author?.displayName ?? "Un dresseur"} · en direct du parc safari`,
+      ...(author?.avatarURL ? { iconURL: author.avatarURL } : {}),
+    })
+    .setTitle(isShiny ? `✨ Un ${name} SHINY ! ✨` : `Un ${name} sauvage`)
+    .setColor(embedColor(species, isShiny))
+    .setThumbnail(spriteUrl(species, isShiny, session.encounter_form))
+    .setDescription(
+      `**${session.actions_left}** / ${config.actionsPerSession} actions restantes`
+    )
+    .addFields(
+      ...(collection ? [{ ...collection, inline: false }] : []),
+      {
+        name: "Dernières actions",
+        value: lines.length ? lines.join("\n") : "*La visite commence.*",
+        inline: false,
+      },
+      {
+        name: `Prises (${caught.length.toLocaleString("fr-FR")})`,
+        value: caught.length ? caught.join(", ").slice(0, 1024) : "*Rien pour l'instant.*",
+        inline: false,
+      }
+    );
 }
 
 // Le message public d'une visite partagée en direct : la rencontre en cours
@@ -1894,10 +1931,12 @@ export function buildSafariLiveView(
   return {
     content: null,
     embeds: [
-      buildEncounterEmbed(session, species, config, {
+      buildLiveEncounterEmbed(session, species, config, {
+        author,
+        events,
+        catches,
         owned,
         lineage,
-        live: { author, events, catches },
       }),
     ],
     components: [],

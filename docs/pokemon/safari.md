@@ -65,9 +65,10 @@ visite. C'est le seul contenu Pokémon où les actions ne coûtent rien.
   échoue rend le droit de réessayer. Une visite finie **sur le site** se partage aussi, au clic,
   dans le salon des apparitions (voir [le site](../site.md#parc-safari)) — avec le même verrou.
 - **Partage en direct** : pendant la visite, le bouton **« 📡 Partager en direct »** publie la
-  partie dans le salon courant, signée du dresseur : le Pokémon en cours (chances, appâts, risque
-  qu'il détale, et ce que le dresseur en possède déjà), les 5 dernières actions, les actions
-  restantes et les prises. Le message se réécrit à chaque action, depuis Discord comme depuis le
+  partie dans le salon courant, signée du dresseur, en version compacte : le Pokémon en cours en
+  vignette, sa lignée sur une ligne avec ce que le dresseur en possède déjà, les 5 dernières
+  actions, les actions restantes et les prises. Type, rareté, chances et risque de fuite restent
+  dans la vue du dresseur : ils ne servent qu'à qui lance. Le message se réécrit à chaque action, depuis Discord comme depuis le
   site — tout de suite, puis au plus une fois par seconde pendant une salve de clics
   (`safari.liveRefreshMs`, sous la limite de Discord de 5 éditions par 5 secondes) —, puis devient le **bilan public** à la fin — y compris quand la visite expire avant, avec
   le nombre d'actions jamais jouées. Un direct ne s'arrête pas, et il tient lieu de partage du

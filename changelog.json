@@ -2374,6 +2374,16 @@
       "commit": "pending",
       "timestamp": "2026-10-15T23:00:00.000Z",
       "branch": "dev/keen-knuth-lcd8tu"
+    },
+    {
+      "type": "enhancement",
+      "name": "Safari en direct plus compact",
+      "description": "Le message du safari en direct va à l'essentiel : le Pokémon en vignette, sa lignée sur une ligne, les dernières actions et les prises.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-15T23:30:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
     }
   ]
 }

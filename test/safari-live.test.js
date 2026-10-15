@@ -164,7 +164,7 @@ describe("le message suit la visite", () => {
     safari.refreshLiveShare(fakeClient(channel), 1);
     await eventually(() => {
       const embed = embedOf(channel.edited.at(-1).payload);
-      assert.equal(embed.fields.find((field) => field.name === "Actions restantes").value, `**24** / ${getSafariConfig().actionsPerSession}`);
+      assert.match(embed.description, new RegExp(`\\*\\*24\\*\\* / ${getSafariConfig().actionsPerSession} actions restantes`));
       assert.match(embed.fields.find((field) => field.name === "Dernières actions").value, /Appât lancé/);
     });
     assert.equal(channel.edited.at(-1).messageId, "m1");
@@ -194,7 +194,7 @@ describe("le message suit la visite", () => {
       assert.equal(channel.edited.length, 1);
       await eventually(() => assert.equal(channel.edited.length, 2), { timeout: 1000 });
       const embed = embedOf(channel.edited[1].payload);
-      assert.equal(embed.fields.find((field) => field.name === "Actions restantes").value, `**22** / ${getSafariConfig().actionsPerSession}`);
+      assert.match(embed.description, new RegExp(`\\*\\*22\\*\\* / ${getSafariConfig().actionsPerSession} actions restantes`));
       await new Promise((resolve) => setTimeout(resolve, 400));
       assert.equal(channel.edited.length, 2, "pas de réécriture en trop");
     } finally {

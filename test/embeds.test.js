@@ -601,13 +601,33 @@ describe("parc safari : le partage en direct", () => {
     const embed = view.embeds[0].toJSON();
     assert.match(embed.author.name, /^Sacha · en direct du parc safari$/);
     assert.equal(embed.author.icon_url, author.avatarURL);
-    assert.match(embed.title, /Bulbizarre sauvage l'observe/);
-    assert.equal(field(embed, "Actions restantes").value, `**20** / ${safari().actionsPerSession}`);
+    assert.equal(embed.title, "Un Bulbizarre sauvage");
+    assert.equal(embed.description, `**20** / ${safari().actionsPerSession} actions restantes`);
     const recent = field(embed, "Dernières actions").value.split("\n");
     assert.equal(recent.length, 2);
     assert.match(recent[0], /Appât lancé à \*\*Bulbizarre\*\*/);
     assert.match(recent[1], /Roucool.*\*\* capturé !/);
     assert.match(field(embed, "Prises (1)").value, /Roucool/);
+  });
+
+  it("reste compact : ni type, ni rareté, ni chances, ni risque de fuite, et le sprite en vignette", () => {
+    const embed = live("Bulbizarre").embeds[0].toJSON();
+    assert.deepEqual(names(embed), ["Sa lignée", "Dernières actions", "Prises (0)"]);
+    assert.equal(embed.description, `**24** / ${safari().actionsPerSession} actions restantes`);
+    assert.equal(embed.image, undefined);
+    assert.ok(embed.thumbnail.url);
+    assert.equal(embed.footer, undefined);
+  });
+
+  it("montre la lignée en une ligne, avec ce que le dresseur en possède", () => {
+    const embed = live("Bulbizarre", {}, { lineage: lineageOf("Bulbizarre", { Herbizarre: { normal: 2, shiny: 0 } }) }).embeds[0].toJSON();
+    assert.equal(field(embed, "Sa lignée").value, "❔ __**Bulbizarre**__ → ✅ Herbizarre → ❔ Florizarre");
+    const evoli = live("Évoli", {}, { lineage: lineageOf("Évoli") }).embeds[0].toJSON();
+    assert.match(field(evoli, "Sa lignée").value, /^❔ __\*\*Évoli\*\*__ → ❔ Aquali \/ ❔ Voltali \/ ❔ Pyroli/);
+    const shiny = live("Bulbizarre", { encounter_is_shiny: 1 }, { lineage: lineageOf("Bulbizarre", { Bulbizarre: { normal: 1, shiny: 0 } }) }).embeds[0].toJSON();
+    assert.match(field(shiny, "Sa lignée").value, /^❔ __\*\*Bulbizarre/, "pour un shiny, c'est le shiny qui compte");
+    const unreadable = live("Bulbizarre", {}, { lineage: null, owned: null }).embeds[0].toJSON();
+    assert.equal(field(unreadable, "Sa lignée"), undefined);
   });
 
   it("raconte la collection du dresseur à la troisième personne", () => {
