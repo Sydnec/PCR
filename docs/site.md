@@ -64,6 +64,10 @@ qui poste, signé de ton pseudo et de ton avatar, comme avec le bouton Discord. 
 un bilan partagé d'un côté ne l'est plus de l'autre. Le bouton n'est là que sur l'écran de fin, un
 rechargement de la page le fait disparaître.
 
+Pendant la visite, **« Partager en direct »** (sur le côté) publie la partie dans le salon Pokémon et
+la fait suivre à chaque action, comme le bouton Discord : même message, même verrou que le bilan,
+qui finit par le remplacer.
+
 ## Boîte PC
 
 Des boîtes de `pokemon.pc.slotsPerBox` cases (30), sur `columns` colonnes (6). Il y en a au moins

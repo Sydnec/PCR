@@ -2347,5 +2347,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "feature",
+      "name": "Safari en direct",
+      "description": "Pendant une visite du parc safari, le bouton « Partager en direct » montre ta partie à tout le salon : le Pokémon en cours, tes dernières actions, celles qui te restent et tes prises. Le message suit chaque action, puis devient ton bilan.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-15T14:00:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
+    }
+  ]
 }

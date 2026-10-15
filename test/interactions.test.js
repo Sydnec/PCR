@@ -1255,6 +1255,59 @@ describe("le parc safari sur Discord", () => {
   });
 });
 
+describe("le partage en direct d'une visite de safari", () => {
+  async function ongoing(user) {
+    const parkId = await openPark();
+    await click(`poke_safari_enter|${parkId}`, { user });
+    const [{ id, actions_left: actions }] = await dbAll(points, "SELECT id, actions_left FROM pokemon_safari_sessions WHERE user_id = ?", [user]);
+    return { id, actions };
+  }
+  const liveRow = (id) => dbGet(points, "SELECT shared_at, live_channel_id, live_message_id FROM pokemon_safari_sessions WHERE id = ?", [id]);
+
+  it("publie la visite dans le salon, retire le bouton, et chaque action réécrit le message", async () => {
+    const user = newUser();
+    const { id, actions } = await ongoing(user);
+    const channel = fakeChannel();
+    const calls = await click(`poke_safari_live|${id}`, { user, channel });
+    assert.equal(channel.sent.length, 1);
+    assert.match(embedOf(channel.sent[0]).author.name, /^Membre .* · en direct du parc safari$/);
+    const reply = last(calls, "editReply");
+    assert.match(reply.content, /Ta visite est en direct dans <#c1>/);
+    assert.equal(reply.embeds, undefined, "l'embed de la rencontre reste en place");
+    assert.ok(!buttonIds(reply).some((custom) => custom.startsWith("poke_safari_live")));
+    assert.equal((await liveRow(id)).live_message_id, "m1");
+
+    const edits = channel.edited.length;
+    await withRandom(0.999, () => click(`poke_safari_bait|${id}|${actions}`, { user, channel }));
+    for (let waited = 0; waited < 5000 && channel.edited.length === edits; waited += 20) await sleep(20);
+    assert.ok(channel.edited.length > edits, "le message en direct a été réécrit");
+    assert.equal(channel.edited.at(-1).id, "m1");
+
+    const again = await click(`poke_safari_live|${id}`, { user, channel });
+    assert.match(last(again, "followUp").content, /déjà partagée/);
+    assert.equal(channel.sent.length, 1);
+  });
+
+  it("un salon où le bot ne peut pas publier, ou un message privé, est refusé sans rien consommer", async () => {
+    const user = newUser();
+    const { id } = await ongoing(user);
+    const denied = await click(`poke_safari_live|${id}`, { user, channel: fakeChannel({ allowed: false }) });
+    assert.match(only(denied, "reply").content, /Je ne peux pas publier d'embed dans <#c1>/);
+    const dm = await click(`poke_safari_live|${id}`, { user, channel: { ...fakeChannel(), isDMBased: () => true } });
+    assert.match(only(dm, "reply").content, /salon du serveur/);
+    assert.equal((await liveRow(id)).shared_at, null);
+  });
+
+  it("la visite d'un autre ne se met pas en direct", async () => {
+    const { id } = await ongoing(newUser());
+    const channel = fakeChannel();
+    const calls = await click(`poke_safari_live|${id}`, { user: newUser(), channel });
+    assert.match(last(calls, "followUp").content, /n'est pas la tienne/);
+    assert.equal(last(calls, "followUp").flags, EPHEMERAL);
+    assert.equal(channel.sent.length, 0);
+  });
+});
+
 describe("le partage du bilan de safari", () => {
   async function finishedSession(user) {
     const parkId = await openPark();

@@ -338,7 +338,7 @@ function chainLine(species, counts, { current = false, focusShiny = false } = {}
 // Partagé par la fiche d'espèce et la rencontre du parc safari : « où en suis-je
 // dans cette lignée ? » n'a qu'une réponse, et deux mises en forme auraient fini
 // par diverger.
-function lineageFields(species, chain, owned, { isShiny = false } = {}) {
+function lineageFields(species, chain, owned, { isShiny = false, them = false } = {}) {
   const stages = new Map();
   for (const link of chain) {
     const lines = stages.get(link.stage) ?? [];
@@ -357,7 +357,7 @@ function lineageFields(species, chain, owned, { isShiny = false } = {}) {
     .map(([stage, lines]) => ({
       // Sans lignée, « Forme de base » ne veut rien dire : le champ ne répond
       // plus qu'à une question, celle de la collection.
-      name: solo ? "Ton Pokédex" : STAGE_LABELS[stage - 1] ?? `Stade ${stage - 1}`,
+      name: solo ? (them ? "Son Pokédex" : "Ton Pokédex") : STAGE_LABELS[stage - 1] ?? `Stade ${stage - 1}`,
       value: lines.join("\n"),
       inline: true,
     }));
@@ -1592,7 +1592,8 @@ export function safariOutcomeLine(result, config) {
 // manque, et si la variante rencontrée est nouvelle — un premier shiny se
 // signale même quand l'entrée est déjà là.
 // Formulations courtes : le champ est affiché en colonne, à un tiers de largeur.
-function ownedLine(owned, isShiny) {
+// `them` : la même pastille racontée aux autres, dans le partage en direct.
+function ownedLine(owned, isShiny, { them = false } = {}) {
   if (!owned) return null;
   const mine = isShiny ? owned.shiny : owned.normal;
   const times = mine > 1 ? ` (\u00D7${mine})` : "";
@@ -1601,19 +1602,30 @@ function ownedLine(owned, isShiny) {
     return isShiny ? `\u2705 Déjà en shiny${times}` : `\u2705 Déjà capturé${times}`;
   }
   if (!isShiny) {
-    return owned.shiny > 0 ? "\u2705 Déjà capturé (en shiny)" : "\u{1F195} Il te manque !";
+    if (owned.shiny > 0) return "\u2705 Déjà capturé (en shiny)";
+    return them ? "\u{1F195} Il lui manque !" : "\u{1F195} Il te manque !";
   }
-  return owned.normal > 0
-    ? "\u{1F195} Shiny inédit ! (tu as la normale)"
+  if (owned.normal > 0) {
+    return them
+      ? "\u{1F195} Shiny inédit ! (la normale est déjà là)"
+      : "\u{1F195} Shiny inédit ! (tu as la normale)";
+  }
+  return them
+    ? "\u{1F195} Shiny inédit, et l'espèce lui manque !"
     : "\u{1F195} Shiny inédit, et l'espèce te manque !";
 }
 
+// `live` bascule la rencontre en version publique, pour le partage en direct :
+// la même fiche, signée, racontée à la troisième personne, avec les dernières
+// actions et les prises. Une seconde fonction aurait divergé de l'éphémère au
+// premier champ ajouté.
 function buildEncounterEmbed(
   session,
   species,
   config,
-  { intro = null, owned = null, lineage = null } = {}
+  { intro = null, owned = null, lineage = null, live = null } = {}
 ) {
+  const them = Boolean(live);
   const isShiny = Boolean(session.encounter_is_shiny);
   const rarity = RARITIES[rarityOf(species)];
   const probability = safariCatchProbability(
@@ -1633,20 +1645,20 @@ function buildEncounterEmbed(
   // Une collection illisible (`lineage` null) l'omet plutôt que d'annoncer zéro.
   const chain = evolutionChain(species);
   const lineageRows =
-    lineage && chain.length > 1 ? lineageFields(species, chain, lineage, { isShiny }) : [];
+    lineage && chain.length > 1 ? lineageFields(species, chain, lineage, { isShiny, them }) : [];
 
   // « Ton Pokédex » ne sert que sans lignée : avec elle, le Pokémon rencontré y
   // figure déjà (▸, avec ses compteurs), et le dire deux fois ne ferait que
   // doubler l'information. Collection illisible : on préfère une rencontre sans
   // pastille à un champ vide, que l'API refuserait.
-  const ownership = lineageRows.length ? null : ownedLine(owned, isShiny);
+  const ownership = lineageRows.length ? null : ownedLine(owned, isShiny, { them });
 
   const name = displayName(species, false, session.encounter_sex, session.encounter_form);
   const embed = new EmbedBuilder()
     .setTitle(
       isShiny
-        ? `\u2728 Un ${name} SHINY vous observe ! \u2728`
-        : `Un ${name} sauvage vous observe...`
+        ? `\u2728 Un ${name} SHINY ${live ? "l'observe" : "vous observe"} ! \u2728`
+        : `Un ${name} sauvage ${live ? "l'observe" : "vous observe"}...`
     )
     .setColor(embedColor(species, isShiny))
     .setImage(spriteUrl(species, isShiny, session.encounter_form))
@@ -1666,13 +1678,22 @@ function buildEncounterEmbed(
       // Trois champs par rangée : « Rareté | Type | Chances », puis la lignée (un
       // champ par stade, dans sa propre rangée), et les actions en dernier.
       ...lineageRows,
-      ...(ownership ? [{ name: "Ton Pokédex", value: ownership, inline: true }] : []),
+      ...(ownership
+        ? [{ name: them ? "Son Pokédex" : "Ton Pokédex", value: ownership, inline: true }]
+        : []),
       {
         name: "Actions restantes",
         value: `**${session.actions_left}** / ${config.actionsPerSession}`,
         inline: true,
-      }
+      },
+      ...(live ? liveFields(live, config) : [])
     );
+  if (live) {
+    embed.setAuthor({
+      name: `${live.author?.displayName ?? "Un dresseur"} · en direct du parc safari`,
+      ...(live.author?.avatarURL ? { iconURL: live.author.avatarURL } : {}),
+    });
+  }
 
   const legend = lineageRows.length ? lineageLegend(chain) : [];
   embed.setFooter({
@@ -1691,7 +1712,7 @@ function buildSafariRow(session, config) {
   // il identifie l'action de façon unique et un second clic sur le même bouton
   // n'a plus de correspondance en base.
   const token = `${session.id}|${session.actions_left}`;
-  return new ActionRowBuilder().addComponents(
+  const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`poke_safari_ball|${token}`)
       .setLabel(config.ball.label)
@@ -1711,6 +1732,18 @@ function buildSafariRow(session, config) {
       .setEmoji("\u{1F3C3}")
       .setStyle(ButtonStyle.Secondary)
   );
+  // Le partage en direct, tant que rien n'est publié : le même verrou que le
+  // bilan, et un direct ne s'arrête pas.
+  if (!session.shared_at) {
+    row.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`poke_safari_live|${session.id}`)
+        .setLabel("Partager en direct")
+        .setEmoji("\u{1F4E1}")
+        .setStyle(ButtonStyle.Secondary)
+    );
+  }
+  return row;
 }
 
 // Un éphémère se ferme d'un geste, et personne ne peut le rouvrir à la place de
@@ -1749,7 +1782,14 @@ export function buildSafariView(
   const intro = result ? safariOutcomeLine(result, config) : null;
   const finie = isSafariFinished(session);
   const species = finie ? null : getSpecies(session.encounter_species_id);
-  const content = resumed ? SAFARI_RESUMED : null;
+  // Un direct se clôt sur le bilan : on le dit, faute de quoi l'absence du
+  // bouton « Partager mon bilan » ressemblerait à un oubli. Un direct perdu
+  // (message supprimé) n'a plus d'identifiant, et son bilan redevient partageable.
+  const content = resumed
+    ? SAFARI_RESUMED
+    : finie && session.live_message_id
+      ? `\u{1F4E1} Ton bilan remplace le direct dans <#${session.live_channel_id}>.`
+      : null;
 
   if (!species) {
     // Le bouton n'apparaît que sur une visite réellement terminée et pas encore
@@ -1767,6 +1807,100 @@ export function buildSafariView(
     content,
     embeds: [buildEncounterEmbed(session, species, config, { intro, owned, lineage })],
     components: [buildSafariRow(session, config)],
+  };
+}
+
+// Une action passée, racontée au public. La troisième personne et le passé :
+// le message en direct est lu par d'autres, après coup.
+export function safariEventLine(event, config) {
+  const species = getSpecies(event.species_id);
+  if (!species) return null;
+  const name = displayName(species, Boolean(event.is_shiny), event.sex, event.form);
+  switch (event.outcome) {
+    case "CATCH":
+      return `\u{1F389} **${name}** capturé !`;
+    case "MISS":
+      return `❌ ${config.ball.label} ratée sur **${name}**`;
+    case "MISS_FLED":
+      return `❌ Raté, et **${name}** a détalé`;
+    case "BAIT":
+      return `\u{1F34E} Appât lancé à **${name}**`;
+    case "BAIT_FLED":
+      return `\u{1F34E} **${name}** a mangé l'appât et détalé`;
+    case "FLED":
+      return `\u{1F3C3} Fuite devant **${name}**`;
+    case "FLEE_FAILED":
+      return `\u{1F3C3} Fuite ratée, **${name}** barre la route`;
+    default:
+      return null;
+  }
+}
+
+// Les champs propres au direct, sous la rencontre : les dernières actions et
+// les prises. Les prises tiennent sur une ligne, noms seuls : vingt-cinq
+// pastilles de rareté feraient déborder le champ (1 024 caractères).
+function liveFields({ events = [], catches = [] }, config) {
+  const lines = events.map((event) => safariEventLine(event, config)).filter(Boolean);
+  const caught = catches
+    .map((row) => {
+      const species = getSpecies(row.species_id);
+      return species ? displayName(species, Boolean(row.is_shiny), null, row.form) : null;
+    })
+    .filter(Boolean);
+  return [
+    {
+      name: "Dernières actions",
+      value: lines.length ? lines.join("\n") : "*La visite commence.*",
+      inline: false,
+    },
+    {
+      name: `Prises (${caught.length.toLocaleString("fr-FR")})`,
+      value: caught.length ? caught.join(", ").slice(0, 1024) : "*Rien pour l'instant.*",
+      inline: false,
+    },
+  ];
+}
+
+// Le message public d'une visite partagée en direct : la rencontre en cours
+// tant qu'elle court, puis le bilan public signé, qui le remplace. Une visite
+// expirée avant la fin le dit, sans quoi un bilan à mi-parcours se lirait
+// comme 25 actions jouées.
+export function buildSafariLiveView(
+  session,
+  { author = null, events = [], catches = [], owned = null, lineage = null } = {}
+) {
+  const config = getSafariConfig();
+  const over = isSafariFinished(session) || session.expires_at <= Date.now();
+  const species = over ? null : getSpecies(session.encounter_species_id);
+  if (!species) {
+    const left = session.actions_left;
+    const intro =
+      left > 0
+        ? `⌛ Les grilles ont fermé avant la fin : **${left.toLocaleString("fr-FR")}** ` +
+          `action${left > 1 ? "s" : ""} jamais jouée${left > 1 ? "s" : ""}.`
+        : null;
+    return {
+      content: null,
+      embeds: [
+        buildSafariRecapEmbed(session, catches, {
+          intro,
+          config,
+          author: author ?? { displayName: "Un dresseur", avatarURL: null },
+        }),
+      ],
+      components: [],
+    };
+  }
+  return {
+    content: null,
+    embeds: [
+      buildEncounterEmbed(session, species, config, {
+        owned,
+        lineage,
+        live: { author, events, catches },
+      }),
+    ],
+    components: [],
   };
 }
 
@@ -1997,7 +2131,7 @@ export function buildSafariRecapEmbed(
     )
     .setFooter({ text: `Session #${session.id}` });
 
-  if (author) embed.setThumbnail(author.avatarURL);
+  if (author?.avatarURL) embed.setThumbnail(author.avatarURL);
   return embed;
 }
 

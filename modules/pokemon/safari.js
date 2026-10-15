@@ -31,7 +31,12 @@ import { consumeItem, getItem, getItemCount, grantItem } from "./items.js";
 import { resolveChannel } from "./spawn.js";
 import { getCharms } from "./charms.js";
 import { recordSafariCatch, recordSafariEntry } from "./stats.js";
-import { buildParkEmbed, buildParkRow, buildSafariRecapEmbed } from "./embeds.js";
+import {
+  buildParkEmbed,
+  buildParkRow,
+  buildSafariLiveView,
+  buildSafariRecapEmbed,
+} from "./embeds.js";
 
 const HOUR = 60 * 60 * 1000;
 
@@ -65,6 +70,21 @@ const refuse = (code, extra = {}) => ({
 // d'un même message à 5 par 5 secondes, et une salve d'entrées juste après le
 // ping les dépasserait. Même mécanique que refreshSpawnEmbed.
 const pendingParkRefreshes = new Map();
+
+// Même plafond pour le message d'une visite en direct, qu'un dresseur rapide
+// réécrirait à chaque clic. Seul le minuteur vit ici : ce qu'il affiche se relit
+// en base, et un redémarrage qui le perd est rattrapé par l'action suivante, ou
+// par le balayage pour le bilan final.
+const pendingLiveRefreshes = new Map();
+
+// Les réécritures d'un même direct passent l'une après l'autre : une édition
+// partie avant la dernière action, et revenue après le bilan, reposerait la
+// rencontre périmée par-dessus — et plus rien ne repasserait, le direct étant
+// clos.
+const liveFlushes = new Map();
+
+// Le message en direct a disparu : plus rien à suivre.
+const UNKNOWN_MESSAGE = 10008;
 
 // ====================== LECTURES ======================
 
@@ -237,6 +257,244 @@ export async function shareRecap(client, userId, sessionId, author) {
     log(`Partage de bilan safari #${prepared.session.id} par ${name} (site)`)
   );
   return { ok: true };
+}
+
+// ====================== PARTAGE EN DIRECT ======================
+
+// Ce que la base dit d'une mise en direct : la visite est celle de qui clique,
+// elle est encore en cours, et rien n'en a été publié. Ne revendique RIEN, pour
+// la même raison que prepareShare.
+function prepareLiveShare(userId, sessionId, cb) {
+  getSession(sessionId, (err, session) => {
+    if (err) return cb(err);
+    if (!session || session.user_id !== userId) {
+      return cb(null, { ok: false, reason: "Cette visite du parc n'est pas la tienne." });
+    }
+    if (isSafariFinished(session) || session.expires_at <= Date.now()) {
+      return cb(null, { ok: false, reason: "Ta visite du parc safari est terminée." });
+    }
+    if (session.shared_at) {
+      return cb(null, { ok: false, shared: true, reason: "Ta visite est déjà partagée." });
+    }
+    cb(null, { ok: true, session });
+  });
+}
+
+const liveAuthor = (session) => {
+  try {
+    return JSON.parse(session.live_author);
+  } catch {
+    return null;
+  }
+};
+
+// Le message public d'une visite, relu en base : la rencontre et les dernières
+// actions tant qu'elle court, son bilan signé ensuite. `author` : la signature,
+// figée à l'activation pour que le message ne change pas de nom en route.
+function buildLivePayload(session, author, cb) {
+  const config = getSafariConfig();
+  getSessionCatches(session.id, (err, catches) => {
+    if (err) return cb(err);
+    getRecentEvents(session.id, config.liveRecentActions, (err, events) => {
+      if (err) return cb(err);
+      withOwned({ session }, (err, { owned = null, lineage = null } = {}) => {
+        if (err) return cb(err);
+        try {
+          cb(null, buildSafariLiveView(session, { author, events, catches, owned, lineage }));
+        } catch (error) {
+          cb(error);
+        }
+      });
+    });
+  });
+}
+
+const asPromise = (run) =>
+  new Promise((resolve, reject) => run((err, value) => (err ? reject(err) : resolve(value))));
+
+// Met une visite en direct dans `channel` : le bot y publie la rencontre, puis
+// réécrit ce message à chaque action jusqu'à le remplacer par le bilan.
+//
+// Le verrou est celui du bilan (shared_at) : un direct se termine sur le bilan
+// public, le partager une seconde fois le publierait en double. Le message se
+// construit AVANT la revendication — une erreur de lecture ne doit pas coûter
+// le partage —, et la compensation suit celle de shareRecap : seul un échec
+// qui prouve que rien n'est parti rend le droit.
+//
+// Le dresseur peut jouer pendant l'envoi : le rafraîchissement lancé une fois
+// l'identifiant du message enregistré rattrape ce qui s'est passé entre-temps.
+export async function startLiveShare(client, userId, sessionId, channel, author) {
+  const prepared = await asPromise((cb) => prepareLiveShare(userId, sessionId, cb));
+  if (!prepared.ok) return prepared;
+
+  const payload = await asPromise((cb) => buildLivePayload(prepared.session, author, cb));
+  const claimed = await asPromise((cb) => claimShare(sessionId, cb));
+  if (!claimed) return { ok: false, shared: true, reason: "Ta visite est déjà partagée." };
+
+  let message;
+  try {
+    message = await channel.send({ ...payload, allowedMentions: { parse: [] } });
+  } catch (error) {
+    handleException("Partage en direct d'une visite du parc safari :", error);
+    if (!ENVOI_IMPOSSIBLE.has(error?.code)) {
+      return {
+        ok: false,
+        shared: true,
+        reason:
+          "L'envoi a échoué, mais il a peut-être abouti quand même. Je ne rouvre pas le " +
+          "partage pour ne pas risquer de publier ta visite deux fois — va voir le salon.",
+      };
+    }
+    const releaseError = await new Promise((resolve) => releaseShare(sessionId, resolve));
+    if (releaseError) {
+      handleException("Restitution du droit de partage :", releaseError);
+      return {
+        ok: false,
+        shared: true,
+        reason: "L'envoi a échoué et je n'ai pas pu rouvrir le partage.",
+      };
+    }
+    return { ok: false, reason: `Je n'ai pas pu publier dans ${channel}. Tu peux réessayer.` };
+  }
+
+  // Le message est parti : une écriture ratée ici ne se compense pas, elle le
+  // laisse seulement figé sur la rencontre où il a été publié.
+  const stored = await new Promise((resolve) =>
+    db.run(
+      `UPDATE pokemon_safari_sessions
+          SET live_channel_id = ?, live_message_id = ?, live_author = ?
+        WHERE id = ?`,
+      [channel.id, message.id, JSON.stringify(author), sessionId],
+      (err) => {
+        if (err) handleException("Enregistrement du message en direct du parc safari :", err);
+        resolve(!err);
+      }
+    )
+  );
+  if (stored) refreshLiveShare(client, sessionId);
+
+  pseudo(userId).then((name) =>
+    log(`Parc safari : visite #${sessionId} de ${name} en direct dans #${channel.name ?? channel.id}`)
+  );
+  // Le direct est publié et verrouillé : une relecture ratée ne doit pas le
+  // faire passer pour un échec, que le dresseur voudrait réessayer en vain.
+  const session = await asPromise((cb) => getSession(sessionId, cb)).catch((error) => {
+    handleException("Relecture d'une visite mise en direct :", error);
+    return { ...prepared.session, shared_at: Date.now() };
+  });
+  return { ok: true, session };
+}
+
+// Le direct depuis le site : dans le salon Pokémon, comme le partage du bilan,
+// faute de salon courant. Le salon se résout avant tout le reste, pour qu'un
+// identifiant faux ne consomme pas le droit de partager.
+export async function startLiveShareFromSite(client, userId, sessionId, author) {
+  let channel = null;
+  try {
+    channel = await resolveChannel(client);
+  } catch (error) {
+    handleException("Salon Pokémon introuvable pour le partage en direct :", error);
+  }
+  if (!channel?.isTextBased()) return { ok: false, reason: "Le salon Pokémon est introuvable." };
+  return startLiveShare(client, userId, sessionId, channel, author);
+}
+
+// Réécrit le message en direct d'après la base. Une visite finie ou expirée
+// reçoit son bilan, et le message cesse alors d'être suivi (live_closed_at) ;
+// l'édition passe avant cette marque, pour qu'un échec soit retenté au balayage
+// plutôt que de laisser le salon sur une rencontre périmée. Un message
+// supprimé, ou un salon devenu inaccessible, cesse lui aussi d'être suivi :
+// rien ne sert de réessayer à chaque clic — et le droit de partager le bilan
+// est rendu, puisque le direct qui devait le porter n'existe plus.
+export function flushLiveShare(client, sessionId) {
+  const previous = liveFlushes.get(sessionId) ?? Promise.resolve();
+  const next = previous.then(() => writeLiveShare(client, sessionId));
+  liveFlushes.set(sessionId, next);
+  return next.finally(() => {
+    if (liveFlushes.get(sessionId) === next) liveFlushes.delete(sessionId);
+  });
+}
+
+async function writeLiveShare(client, sessionId) {
+  const session = await asPromise((cb) => getSession(sessionId, cb)).catch((error) => {
+    handleException("Lecture d'une visite en direct du parc safari :", error);
+    return null;
+  });
+  if (!session?.live_message_id || session.live_closed_at) return;
+
+  const over = isSafariFinished(session) || session.expires_at <= Date.now();
+  const close = () =>
+    new Promise((resolve) =>
+      db.run(
+        `UPDATE pokemon_safari_sessions SET live_closed_at = ?
+          WHERE id = ? AND live_closed_at IS NULL`,
+        [Date.now(), sessionId],
+        (err) => {
+          if (err) handleException("Clôture du direct du parc safari :", err);
+          resolve();
+        }
+      )
+    );
+
+  try {
+    const payload = await asPromise((cb) => buildLivePayload(session, liveAuthor(session), cb));
+    const channel = await client.channels.fetch(session.live_channel_id);
+    await channel.messages.edit(session.live_message_id, payload);
+    if (over) await close();
+  } catch (error) {
+    if (error?.code === UNKNOWN_MESSAGE || ENVOI_IMPOSSIBLE.has(error?.code)) {
+      log(`Message en direct de la visite #${sessionId} introuvable, il n'est plus suivi`);
+      return new Promise((resolve) =>
+        db.run(
+          `UPDATE pokemon_safari_sessions
+              SET live_closed_at = ?, live_message_id = NULL, shared_at = NULL
+            WHERE id = ? AND live_closed_at IS NULL`,
+          [Date.now(), sessionId],
+          (err) => {
+            if (err) handleException("Abandon du direct du parc safari :", err);
+            resolve();
+          }
+        )
+      );
+    }
+    handleException("Rafraîchissement d'une visite en direct du parc safari :", error);
+  }
+}
+
+// Rafraîchissement différé, regroupé comme celui du message de parc : une
+// salve de clics ne fait qu'une édition, et le flush relit la base.
+export function refreshLiveShare(client, sessionId) {
+  if (!client) return;
+  const delay = getPokemonConfig().spawn.embedRefreshMs;
+  clearTimeout(pendingLiveRefreshes.get(sessionId));
+  pendingLiveRefreshes.delete(sessionId);
+
+  const flush = () => {
+    pendingLiveRefreshes.delete(sessionId);
+    return flushLiveShare(client, sessionId);
+  };
+  if (delay === 0) return void flush();
+  pendingLiveRefreshes.set(sessionId, setTimeout(flush, delay));
+}
+
+// Les directs dont la visite est finie ou expirée sans avoir reçu leur bilan :
+// une visite abandonnée ne clique plus, et un redémarrage a pu perdre le
+// dernier rafraîchissement.
+function finalizeLiveShares(client, cb) {
+  if (!client) return cb();
+  db.all(
+    `SELECT id FROM pokemon_safari_sessions
+      WHERE live_message_id IS NOT NULL AND live_closed_at IS NULL
+        AND (status != 'ACTIVE' OR actions_left <= 0 OR expires_at <= ?)`,
+    [Date.now()],
+    (err, rows) => {
+      if (err) {
+        handleException("Balayage des visites en direct du parc safari :", err);
+        return cb();
+      }
+      Promise.all((rows || []).map((row) => flushLiveShare(client, row.id))).finally(cb);
+    }
+  );
 }
 
 // ====================== RENCONTRES ======================
@@ -728,7 +986,9 @@ function resolveAction({ session, species, action, config }, cb) {
   const form = session.encounter_form ?? null;
   const base = { species, isShiny, sex, form, probability, baitStacks: session.encounter_bait };
   const done = (outcome, extra = {}) =>
-    finishOrContinue(session.id, { ...base, outcome, ...extra }, cb);
+    recordEvent(session, outcome, () =>
+      finishOrContinue(session.id, { ...base, outcome, ...extra }, cb)
+    );
 
   if (action === "BAIT") {
     return db.run(
@@ -805,6 +1065,41 @@ function resolveAction({ session, species, action, config }, cb) {
       }
     );
   });
+}
+
+// Une ligne au journal de la visite, pour le partage en direct. `session` est
+// celle d'AVANT l'action : la rencontre qu'elle porte est celle que l'action
+// visait, même quand un nouveau Pokémon a déjà été tiré derrière. Le journal ne
+// sert qu'à l'affichage : une écriture ratée se journalise et la partie continue.
+function recordEvent(session, outcome, next) {
+  db.run(
+    `INSERT INTO pokemon_safari_events
+       (session_id, outcome, species_id, is_shiny, sex, form, played_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      session.id,
+      outcome,
+      session.encounter_species_id,
+      session.encounter_is_shiny ? 1 : 0,
+      session.encounter_sex ?? null,
+      session.encounter_form ?? null,
+      Date.now(),
+    ],
+    (err) => {
+      if (err) handleException("Journal des actions du parc safari :", err);
+      next();
+    }
+  );
+}
+
+// Les dernières actions d'une visite, la plus récente en tête.
+export function getRecentEvents(sessionId, limit, cb) {
+  db.all(
+    `SELECT outcome, species_id, is_shiny, sex, form, played_at
+       FROM pokemon_safari_events WHERE session_id = ? ORDER BY id DESC LIMIT ?`,
+    [sessionId, limit],
+    (err, rows) => cb(err, rows || [])
+  );
 }
 
 // Relit la session après l'action et clôt la visite si les actions sont épuisées.
@@ -1098,6 +1393,6 @@ export function sweepSafari(client, cb = () => {}) {
     if (!err && changes) {
       log(`${changes} session(s) de parc safari expirée(s) close(s)`);
     }
-    closeExpiredParks(client, cb);
+    finalizeLiveShares(client, () => closeExpiredParks(client, cb));
   });
 }

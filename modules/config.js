@@ -518,6 +518,9 @@ const POKEMON = {
     // entrée payante, qui n'a pas de parc derrière elle.
     sessionMinDurationMinutes: 60,
     actionsPerSession: 25,
+    // Le partage en direct : combien d'actions récentes le message public
+    // rappelle, pour qui le découvre en cours de route.
+    liveRecentActions: 5,
     entryPrice: 5000,
     entryCooldownHours: 12,
     ball: { label: "Safari Ball", emoji: "<:safariball:1552972083909234811>", sprite: "safari-ball", multiplier: 1.5 },
