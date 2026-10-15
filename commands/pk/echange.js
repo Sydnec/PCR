@@ -1,110 +1,22 @@
 import { MessageFlags } from "discord.js";
 import { handleException } from "../../modules/utils.js";
-import { getBalance } from "../../modules/economy.js";
-import {
-  countBySpecies,
-  getIndividuals,
-  proposeTrade,
-  resolveIndividual,
-  resolveSpecies,
-  selectorOf,
-  setTradeMessage,
-  tradeCandidate,
-} from "../../modules/pokemon/collection.js";
-import { getSpecies, tradeEvolutionTarget } from "../../modules/pokemon/data.js";
-import { getInventory, getItem, getItemCount, isTradable } from "../../modules/pokemon/items.js";
+import { getIndividuals, proposeTrade, setTradeMessage } from "../../modules/pokemon/collection.js";
+import { getSpecies } from "../../modules/pokemon/data.js";
 import {
   buildTradeEmbed,
   buildTradeRow,
   HINT_VALUE,
-  describeGroup,
   individualChoices,
   respondHint as hint,
 } from "../../modules/pokemon/embeds.js";
-
-const promisify = (fn, ...args) =>
-  new Promise((resolve, reject) => fn(...args, (err, value) => (err ? reject(err) : resolve(value))));
-
-// Ce qu'une option de côté (`je_donne`, `je_recois`) peut valoir : une espèce, un
-// objet ou des points. Le préfixe dit de quoi il s'agit, pour que l'autocomplétion
-// mêle les trois sans qu'une clé d'objet se prenne pour un numéro d'espèce. Un nombre
-// tapé à la main vaut des points (« 3000 », « 3 000 points »), sans passer par la liste :
-// c'est ce qui évite une option de plus pour le montant.
-const speciesValue = (id) => `pk:${id}`;
-const pointsValue = (amount) => `pts:${amount}`;
-const itemValue = (key, quantity = null) =>
-  quantity === null ? `item:${key}` : `item:${key}:${quantity}`;
-
-function parseChoice(value) {
-  const text = String(value ?? "").trim();
-  const amount = text.match(/^(?:pts:)?(\d[\d\s]*?)\s*(?:pts?|points?)?$/i);
-  if (amount) {
-    const points = Number(amount[1].replace(/\s/g, ""));
-    return Number.isSafeInteger(points) ? { kind: "points", amount: points } : null;
-  }
-  if (/^rien$/i.test(text)) return { kind: "points", amount: 0 };
-  const species = text.match(/^pk:(\d+)$/);
-  if (species) return { kind: "pk", id: species[1] };
-  const item = text.match(/^item:([^:]+)(?::(\d+))?$/);
-  if (item) {
-    const quantity = item[2] ? Number(item[2]) : 1;
-    return Number.isSafeInteger(quantity) ? { kind: "item", id: item[1], quantity } : null;
-  }
-  return null;
-}
-
-// Ce que l'autocomplétion lit d'une saisie qui commence par un nombre : « 3000 » (ou
-// « 3 000 », « 3000 points ») est un montant, « 3 bonbon » ou « 3x bonbon » une quantité
-// d'un objet. null quand la saisie ne commence pas par un nombre.
-function readNumberQuery(query) {
-  const text = String(query ?? "").trim();
-  const digits = text.replace(/\s*(?:pts?|points?)$/i, "");
-  if (/^\d[\d\s]*$/.test(digits)) return { amount: Number(digits.replace(/\s/g, "")), rest: "" };
-  const found = text.match(/^(\d+)(?:[x×]|\s)\s*(\S.*)$/i);
-  return found ? { amount: Number(found[1]), rest: found[2].trim() } : null;
-}
-
-// Premier temps : les espèces dont `userId` a des Pokémon en trop, shiny ou
-// non — jamais le dernier de l'espèce, jamais un verrouillé.
-function speciesChoices(userId, needle) {
-  return promisify(getIndividuals, userId).then((rows) =>
-    [...countBySpecies(rows)]
-      .map(([speciesId, { spare }]) => {
-        const species = getSpecies(speciesId);
-        if (!species || spare < 1) return null;
-        // Les quatre évolutions par échange se disent ici plutôt que dans un
-        // message d'aide que personne ne lit : c'est l'instant exact où on choisit
-        // ce qu'on donne. Le filtre portant sur le libellé, taper « mackogneur »
-        // remonte le Machopeur qui y mène.
-        const evolved = tradeEvolutionTarget(species);
-        return {
-          name:
-            `${species.name} ×${spare} en trop` +
-            (evolved ? ` — évoluera gratuitement en ${evolved.name} chez l'autre` : ""),
-          value: speciesValue(speciesId),
-        };
-      })
-      .filter((choice) => choice && choice.name.toLowerCase().includes(needle))
-  );
-}
-
-// Les objets de `userId` qui s'échangent. Tous le sont, sauf les charmes
-// (isTradable). Avec `quantity` (« 3 bonbon »), chaque choix porte cette quantité, et dit
-// combien en a `userId` : le refus, lui, donne les chiffres.
-function itemChoices(userId, needle, quantity = null) {
-  return promisify(getInventory, userId).then((rows) =>
-    rows
-      .map((row) => ({ row, item: getItem(row.item_key) }))
-      .filter(({ item }) => item && isTradable(item) && item.label.toLowerCase().includes(needle))
-      .map(({ row, item }) => ({
-        // Pas d'emoji : ceux du serveur ne se rendent pas dans une proposition.
-        name: quantity !== null
-          ? `${quantity.toLocaleString("fr-FR")}× ${item.label} (sur ${row.count.toLocaleString("fr-FR")})`
-          : `${item.label} ×${row.count.toLocaleString("fr-FR")} (objet)`,
-        value: itemValue(item.key, quantity),
-      }))
-  );
-}
+import {
+  checkSide,
+  itemChoices,
+  parseChoice,
+  pointsValue,
+  readNumberQuery,
+  speciesChoices,
+} from "../../modules/pokemon/trade-side.js";
 
 // Une seule liste de 25 pour les trois sortes de choix : les entrées fixes d'abord, puis
 // les espèces et les objets se partagent la place, sans que l'un chasse l'autre — taper
@@ -194,7 +106,6 @@ const OPTIONS = {
 // si c'est celui qui propose : « tu » ou « <@id> ». Chaque valeur s'est
 // peut-être tapée à la main ou a vieilli depuis l'autocomplétion : tout se relit.
 async function readSide(interaction, names, owner, own) {
-  const who = own ? "Tu" : `<@${owner}>`;
   const raw = interaction.options.getString(names.choice);
   const individual = names.individual ? interaction.options.getString(names.individual) : null;
 
@@ -216,73 +127,7 @@ async function readSide(interaction, names, owner, own) {
     return { error: `\`${names.individual}\` ne va qu'avec un Pokémon (\`${names.choice}\`).` };
   }
 
-  if (choice.kind === "points") {
-    const amount = choice.amount;
-    const balance = await promisify(getBalance, owner);
-    if (amount > balance) {
-      return {
-        error:
-          `${who} ${own ? "n'as" : "n'a"} que **${balance.toLocaleString("fr-FR")}** points : ` +
-          `${own ? "il t'en faut" : "il lui en faut"} **${amount.toLocaleString("fr-FR")}**.`,
-      };
-    }
-    return { side: { points: amount } };
-  }
-
-  if (choice.kind === "item") {
-    const key = choice.id;
-    const item = getItem(key);
-    if (!item) return { error: "Objet inconnu : choisis-le dans la liste d'autocomplétion." };
-    if (!isTradable(item)) {
-      return { error: `**${item.label}** ne s'échange pas : un charme se gagne, il ne se transmet pas.` };
-    }
-    const quantity = choice.quantity;
-    if (quantity < 1) return { error: "La quantité doit être d'au moins 1." };
-    const held = await promisify(getItemCount, owner, key);
-    if (quantity > held) {
-      return {
-        error:
-          `${who} ${own ? "n'as" : "n'a"} que **${held.toLocaleString("fr-FR")}** ${item.label} : ` +
-          `${own ? "il t'en faut" : "il lui en faut"} **${quantity.toLocaleString("fr-FR")}**.`,
-      };
-    }
-    return { side: { item: key, quantity } };
-  }
-
-  // Un Pokémon. Celui qu'on donne se désigne (mon_individu), faute de quoi c'est le
-  // moins précieux, le plus récent à égalité (tradeCandidate) ; celui qu'on demande
-  // se choisit chez le destinataire, en acceptant : il faut seulement qu'il en ait un
-  // libre.
-  const { species: found, error } = resolveSpecies(choice.id);
-  if (error) return { error };
-  if (own && individual) {
-    const selector = await promisify(resolveIndividual, owner, choice.id, individual);
-    if (selector.error) return { error: selector.error };
-    if (selector.row.locked) {
-      return {
-        error:
-          `**${describeGroup(found, selector)}** est verrouillé 🛡️ : déverrouille-le avec ` +
-          `/pk verrou pour l'échanger.`,
-      };
-    }
-    if (selector.row.last) {
-      return {
-        error:
-          `**${describeGroup(found, selector)}** est ton dernier ${found.name} : il reste ` +
-          `toujours au moins un Pokémon de chaque espèce.`,
-      };
-    }
-    return { side: selector };
-  }
-  const candidate = await promisify(tradeCandidate, owner, found.id);
-  if (!candidate) {
-    return {
-      error:
-        `${who} ${own ? "n'as" : "n'a"} aucun ${found.name} à donner : ` +
-        `ils sont verrouillés, ou il ${own ? "ne t'en reste" : "ne lui en reste"} qu'un.`,
-    };
-  }
-  return { side: own ? selectorOf(candidate) : { speciesId: found.id } };
+  return checkSide(choice, individual, owner, own);
 }
 
 // Les descriptions des options sont volontairement courtes : /pk s'approche de la limite
