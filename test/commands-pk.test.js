@@ -22,6 +22,7 @@ const collection = await import("../modules/pokemon/collection.js");
 const { getPokemonConfig, getSafariConfig } = await import("../modules/pokemon/config.js");
 const pk = (await import("../commands/pk.js")).default;
 const sub = async (name) => (await import(`../commands/pk/${name}.js`)).default;
+const safariModule = await import("../modules/pokemon/safari.js");
 
 const GEN1 = { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } };
 const EPHEMERAL = MessageFlags.Ephemeral;
@@ -1112,24 +1113,59 @@ describe("/pk safari", () => {
     assert.match(payloadOf(await safari(), "reply").content, /parc safari est fermé/);
   });
 
-  it("l'entrée payante : débitée, et la visite s'affiche", async () => {
-    await setBalance(getSafariConfig().entryPrice + 10);
+  const buttonsOf = (reply) => reply.components.flatMap((row) => row.toJSON().components);
+  const startPaid = (user = "u1") => call(safariModule.startPaidSession, user, {});
+
+  it("l'entrée payante : la confirmation dit le prix et le solde restant, sans rien débiter", async () => {
+    const price = getSafariConfig().entryPrice;
+    await setBalance(price + 10);
     const calls = await safari();
     assert.deepEqual(payloadOf(calls, "deferReply"), { flags: EPHEMERAL });
-    assert.ok(payloadOf(calls, "editReply").embeds.length >= 1);
+    const reply = payloadOf(calls, "editReply");
+    assert.match(reply.content, new RegExp(`${price.toLocaleString("fr-FR")}\\*\\* points seront débités : il t'en restera \\*\\*10\\*\\*`));
+    assert.deepEqual(
+      buttonsOf(reply).map((button) => [button.custom_id, button.label]),
+      [
+        ["poke_safari_go|paid|0|1", `Payer ${price.toLocaleString("fr-FR")} points et entrer`],
+        ["poke_safari_cancel", "Annuler"],
+      ]
+    );
+    assert.equal(await balance(), price + 10, "rien n'est débité avant le clic");
+    assert.equal((await dbAll(points, "SELECT id FROM pokemon_safari_sessions")).length, 0);
+  });
+
+  it("avec un Ticket Safari, la confirmation annonce le ticket et aucun point", async () => {
+    await setBalance(10);
+    await grant("ticket_safari", 2);
+    const reply = payloadOf(await safari(), "editReply");
+    assert.match(reply.content, /Un \*\*Ticket Safari\*\* sera utilisé \(tu en as \*\*2\*\*\), aucun point débité/);
+    assert.equal(buttonsOf(reply)[0].label, "Utiliser mon Ticket et entrer");
+    assert.equal(await call(items.getItemCount, "u1", "ticket_safari"), 2, "le ticket n'est pas consommé avant le clic");
     assert.equal(await balance(), 10);
   });
 
-  it("sans assez de points : refus avec les chiffres, rien n'est débité", async () => {
+  it("sans assez de points : refus avec les chiffres avant toute question, rien n'est débité", async () => {
     await setBalance(50);
-    const reply = payloadOf(await safari(), "editReply").content;
-    assert.match(reply, /^❌ /);
+    const reply = payloadOf(await safari(), "editReply");
+    assert.match(reply.content, /^❌ L'entrée du parc safari coûte \*\*\d+\*\* points, tu en as \*\*50\*\*/);
+    assert.deepEqual(reply.components, [], "pas de bouton pour une entrée qui sera refusée");
     assert.equal(await balance(), 50);
+  });
+
+  it("le délai entre deux entrées payantes est annoncé avant la question", async () => {
+    await setBalance(getSafariConfig().entryPrice * 3);
+    await startPaid();
+    await dbRun(points, "UPDATE pokemon_safari_sessions SET status = 'FINISHED'");
+    const before = await balance();
+    const reply = payloadOf(await safari(), "editReply");
+    assert.match(reply.content, /^⏳ Tu as déjà visité le parc récemment\. Prochaine entrée possible <t:\d+:R>/);
+    assert.deepEqual(reply.components, []);
+    assert.equal(await balance(), before);
   });
 
   it("une visite en cours se rouvre, sans repayer", async () => {
     await setBalance(getSafariConfig().entryPrice * 3);
-    await safari();
+    await startPaid();
     const before = await balance();
     const again = payloadOf(await safari(), "editReply");
     assert.ok(again.embeds.length >= 1);

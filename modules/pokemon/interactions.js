@@ -24,6 +24,7 @@ import {
   claimShare,
   enterPark,
   findFreeParkFor,
+  getEntryOffer,
   playAction,
   prepareShare,
   refreshParkMessage,
@@ -70,6 +71,7 @@ import {
   buildSpeciesDuplicatesRow,
   buildNeedersEmbed,
   buildNeedersRow,
+  buildPaidEntryPrompt,
   buildPaidEntryReply,
   buildPartnersEmbed,
   buildPartnersRow,
@@ -991,6 +993,21 @@ function handleSafariGo(interaction, mode, parkId, generations) {
   });
 }
 
+// Le choix des générations d'une entrée payante se réécrit avec l'offre du
+// moment : le bouton qui paie porte son prix (ou le Ticket) dans son libellé, et
+// un menu resté ouvert a pu voir le solde ou les tickets changer depuis.
+function refreshPaidPicker(interaction, chosen) {
+  getEntryOffer(interaction.user.id, (err, offer) => {
+    if (err) {
+      handleException(err);
+      return interaction
+        .update({ content: "❌ Erreur base de données.", embeds: [], components: [] })
+        .catch(() => {});
+    }
+    interaction.update(buildPaidEntryPrompt(offer, chosen)).catch(() => {});
+  });
+}
+
 // Les menus du jeu : le choix des générations du parc, qui réécrit son message
 // avec le choix porté par le bouton d'entrée, les côtés d'une comparaison, et le
 // Pokémon que le destinataire d'un échange donne.
@@ -1000,6 +1017,7 @@ export async function handlePokemonSelect(interaction) {
     case "poke_safari_gens": {
       const [mode, parkId] = args;
       const chosen = interaction.values.map(Number).filter((value) => value >= 1);
+      if (mode === "paid") return refreshPaidPicker(interaction, chosen);
       return interaction
         .update({ components: buildSafariGenerationPicker(mode, Number(parkId) || 0, chosen) })
         .catch(() => {});
@@ -1398,6 +1416,17 @@ export async function handlePokemonButton(interaction) {
 
     case "poke_safari_go":
       return handleSafariGo(interaction, args[0], args[1], args[2]);
+
+    // Renoncer à l'entrée payante : rien n'a été débité avant le clic qui paie,
+    // il n'y a donc rien à rendre.
+    case "poke_safari_cancel":
+      return interaction
+        .update({
+          content: "↩️ Entrée annulée : rien n'a été débité.",
+          embeds: [],
+          components: [],
+        })
+        .catch(() => {});
 
     case "poke_safari_ball":
       return handleSafariAction(interaction, "BALL", args[0], args[1]);
