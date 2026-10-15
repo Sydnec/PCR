@@ -50,8 +50,13 @@ visite. C'est le seul contenu Pokémon où les actions ne coûtent rien.
   où elle en était, et `/pk safari` fait de même — y compris une fois le parc fermé, quand son message
   n'a plus de bouton mais que la session court encore. Aucune action perdue, aucun point débité.
 - **Entrée payante** : `/pk safari` ouvre une visite hors événement pour **5 000 points**, avec un
-  cooldown de 12 h. Si un parc gratuit attend le dresseur, la commande le lui dit au lieu de
-  débiter. Sans parc derrière elle, cette visite-là dure le plancher : une heure.
+  cooldown de 12 h. **La commande ne débite jamais : elle demande confirmation**, en disant ce que
+  l'entrée consomme — un Ticket Safari s'il en reste (aucun point), sinon le prix et le solde qu'il
+  restera — avec les boutons *« Payer … et entrer »* et *« Annuler »*. Dès la 2ᵉ génération, le
+  bouton du choix des générations est cette confirmation. Un refus prévisible (solde insuffisant,
+  cooldown) se dit tout de suite, avec les chiffres et sans bouton. Si un parc gratuit attend le
+  dresseur, la commande le lui dit au lieu de proposer de payer. Sans parc derrière elle, cette
+  visite-là dure le plancher : une heure.
 - **Partage du bilan** : la visite est privée de bout en bout, donc son bilan aussi. Un bouton
   **« 📤 Partager mon bilan »** le publie dans le salon courant, signé du dresseur et de son avatar.
   Une fois par visite — le verrou est en base, pas dans la disparition du bouton — et à la seule
