@@ -6,8 +6,8 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { createSandbox, openDatabases, dbRun, dbGet, dbAll, withRandom, speciesByName, eventually } from "./helpers.js";
 
-createSandbox({
-  config: { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" }, spawn: { embedRefreshMs: 0 } } },
+const sandbox = createSandbox({
+  config: { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" }, safari: { liveRefreshMs: 0 } } },
 });
 process.env.POKEMON_CHANNEL_ID = "pk";
 const { points } = await openDatabases();
@@ -164,10 +164,42 @@ describe("le message suit la visite", () => {
     safari.refreshLiveShare(fakeClient(channel), 1);
     await eventually(() => {
       const embed = embedOf(channel.edited.at(-1).payload);
-      assert.equal(embed.fields.find((field) => field.name === "Actions restantes").value, `**24** / ${getSafariConfig().actionsPerSession}`);
+      assert.match(embed.description, new RegExp(`\\*\\*24\\*\\* / ${getSafariConfig().actionsPerSession} actions restantes`));
       assert.match(embed.fields.find((field) => field.name === "Dernières actions").value, /Appât lancé/);
     });
     assert.equal(channel.edited.at(-1).messageId, "m1");
+  });
+
+  it("se réécrit tout de suite, puis au plus une fois par intervalle, sans perdre la dernière action", async () => {
+    sandbox.writeConfig({ pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" }, safari: { liveRefreshMs: 300 } } });
+    try {
+      const channel = fakeChannel();
+      await goLive(channel);
+      await eventually(() => assert.equal(channel.edited.length, 1), { timeout: 2000 });
+      channel.edited.length = 0;
+      await new Promise((resolve) => setTimeout(resolve, 350));
+
+      const client = fakeClient(channel);
+      await play("BAIT", 0.99);
+      safari.refreshLiveShare(client, 1);
+      await eventually(() => assert.equal(channel.edited.length, 1, "la première action se voit sans attendre"), { timeout: 100 });
+
+      // Une salve : rien de plus avant la fin de l'intervalle, puis une seule
+      // réécriture, qui montre la dernière action.
+      await play("FLEE", 0.99);
+      safari.refreshLiveShare(client, 1);
+      await play("FLEE", 0.99);
+      safari.refreshLiveShare(client, 1);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      assert.equal(channel.edited.length, 1);
+      await eventually(() => assert.equal(channel.edited.length, 2), { timeout: 1000 });
+      const embed = embedOf(channel.edited[1].payload);
+      assert.match(embed.description, new RegExp(`\\*\\*22\\*\\* / ${getSafariConfig().actionsPerSession} actions restantes`));
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      assert.equal(channel.edited.length, 2, "pas de réécriture en trop");
+    } finally {
+      sandbox.writeConfig({ pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" }, safari: { liveRefreshMs: 0 } } });
+    }
   });
 
   it("la dernière action le remplace par le bilan public, puis il n'est plus réécrit", async () => {

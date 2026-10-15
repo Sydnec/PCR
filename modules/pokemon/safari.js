@@ -71,11 +71,11 @@ const refuse = (code, extra = {}) => ({
 // ping les dépasserait. Même mécanique que refreshSpawnEmbed.
 const pendingParkRefreshes = new Map();
 
-// Même plafond pour le message d'une visite en direct, qu'un dresseur rapide
-// réécrirait à chaque clic. Seul le minuteur vit ici : ce qu'il affiche se relit
-// en base, et un redémarrage qui le perd est rattrapé par l'action suivante, ou
-// par le balayage pour le bilan final.
-const pendingLiveRefreshes = new Map();
+// Le rythme des réécritures d'un direct, par visite : la dernière, et celle qui
+// est prévue. Seul le minuteur vit ici : ce qu'il affiche se relit en base, et
+// un redémarrage qui le perd est rattrapé par l'action suivante, ou par le
+// balayage pour le bilan final.
+const liveRefreshes = new Map();
 
 // Les réécritures d'un même direct passent l'une après l'autre : une édition
 // partie avant la dernière action, et revenue après le bilan, reposerait la
@@ -461,20 +461,34 @@ async function writeLiveShare(client, sessionId) {
   }
 }
 
-// Rafraîchissement différé, regroupé comme celui du message de parc : une
-// salve de clics ne fait qu'une édition, et le flush relit la base.
+// Rafraîchissement cadencé : la première action après un temps calme se voit
+// tout de suite, une salve de clics donne au plus une réécriture par
+// `liveRefreshMs`, et la dernière part juste après le dernier clic. Attendre
+// que le dresseur s'arrête, comme le message de parc, figeait le direct tant
+// qu'il jouait vite. Discord plafonne les éditions d'un message à 5 par 5
+// secondes : une par seconde tient sous la limite.
 export function refreshLiveShare(client, sessionId) {
   if (!client) return;
-  const delay = getPokemonConfig().spawn.embedRefreshMs;
-  clearTimeout(pendingLiveRefreshes.get(sessionId));
-  pendingLiveRefreshes.delete(sessionId);
+  const interval = getSafariConfig().liveRefreshMs;
+  const state = liveRefreshes.get(sessionId) ?? { lastAt: 0, timer: null, cleanup: null };
+  liveRefreshes.set(sessionId, state);
+  // Déjà prévue : elle relira la base, cette action comprise.
+  if (state.timer) return;
 
-  const flush = () => {
-    pendingLiveRefreshes.delete(sessionId);
-    return flushLiveShare(client, sessionId);
+  const run = () => {
+    state.timer = null;
+    state.lastAt = Date.now();
+    flushLiveShare(client, sessionId);
+    // Une visite qui ne clique plus n'a plus besoin de son rythme.
+    clearTimeout(state.cleanup);
+    state.cleanup = setTimeout(() => {
+      if (!state.timer) liveRefreshes.delete(sessionId);
+    }, interval);
+    state.cleanup.unref?.();
   };
-  if (delay === 0) return void flush();
-  pendingLiveRefreshes.set(sessionId, setTimeout(flush, delay));
+  const wait = Math.max(0, state.lastAt + interval - Date.now());
+  if (wait === 0) return run();
+  state.timer = setTimeout(run, wait);
 }
 
 // Les directs dont la visite est finie ou expirée sans avoir reçu leur bilan :
