@@ -68,7 +68,8 @@ visite. C'est le seul contenu Pokémon où les actions ne coûtent rien.
   partie dans le salon courant, signée du dresseur : le Pokémon en cours (chances, appâts, risque
   qu'il détale, et ce que le dresseur en possède déjà), les 5 dernières actions, les actions
   restantes et les prises. Le message se réécrit à chaque action, depuis Discord comme depuis le
-  site, puis devient le **bilan public** à la fin — y compris quand la visite expire avant, avec
+  site — tout de suite, puis au plus une fois par seconde pendant une salve de clics
+  (`safari.liveRefreshMs`, sous la limite de Discord de 5 éditions par 5 secondes) —, puis devient le **bilan public** à la fin — y compris quand la visite expire avant, avec
   le nombre d'actions jamais jouées. Un direct ne s'arrête pas, et il tient lieu de partage du
   bilan : même verrou, donc plus de bouton « Partager mon bilan » ensuite. Impossible en message
   privé, et refusé sans rien consommer si le bot ne peut pas publier dans le salon.

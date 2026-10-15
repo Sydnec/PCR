@@ -2364,5 +2364,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Safari en direct plus réactif",
+      "description": "Le message du safari en direct se met à jour dès ton action, même quand tu enchaînes les clics.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-15T23:00:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
+    }
+  ]
 }

@@ -521,6 +521,9 @@ const POKEMON = {
     // Le partage en direct : combien d'actions récentes le message public
     // rappelle, pour qui le découvre en cours de route.
     liveRecentActions: 5,
+    // Au plus une réécriture du message en direct par intervalle (ms) : Discord
+    // n'accepte que 5 éditions d'un message par 5 secondes.
+    liveRefreshMs: 1000,
     entryPrice: 5000,
     entryCooldownHours: 12,
     ball: { label: "Safari Ball", emoji: "<:safariball:1552972083909234811>", sprite: "safari-ball", multiplier: 1.5 },
