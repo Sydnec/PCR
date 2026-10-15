@@ -17,6 +17,7 @@ import {
   readNumberQuery,
   speciesChoices,
 } from "../../modules/pokemon/trade-side.js";
+import { openDraft } from "../../modules/pokemon/trade-draft.js";
 
 // Une seule liste de 25 pour les trois sortes de choix : les entrées fixes d'abord, puis
 // les espèces et les objets se partagent la place, sans que l'un chasse l'autre — taper
@@ -209,6 +210,21 @@ export default {
 
       if (target.id === interaction.user.id) return refuse("Tu ne peux pas échanger avec toi-même.");
       if (target.bot) return refuse("Les bots ne collectionnent pas les Pokémon.");
+
+      // Ni ce qu'on donne ni ce qu'on demande : le brouillon, un écran privé où l'on
+      // choisit avec des menus. Une option seule reste une offre incomplète, refusée plus
+      // bas avec ce qu'il manque.
+      const empty = [OPTIONS.give.choice, OPTIONS.give.individual, OPTIONS.get.choice].every(
+        (name) => interaction.options.getString(name) === null
+      );
+      if (empty) {
+        try {
+          return await openDraft(interaction, target);
+        } catch (err) {
+          handleException("Ouverture du brouillon d'échange :", err);
+          return refuse("Erreur base de données.");
+        }
+      }
 
       let offer, request;
       try {

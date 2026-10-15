@@ -417,6 +417,27 @@ const db = new sqlite3.Database(dbPath, (err) => {
       }
     );
 
+    // Le brouillon d'un échange (/pk echange sans options) : ce que le dresseur a choisi
+    // de chaque côté, en attendant « Proposer ». Chaque côté est le choix tel que
+    // parseChoice le rend (JSON) et se revalide en entier à l'envoi : le brouillon ne
+    // promet rien, il retient. En base plutôt qu'en mémoire, pour que ses boutons
+    // répondent encore après un redémarrage.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_trade_drafts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        from_user_id TEXT NOT NULL,
+        to_user_id TEXT NOT NULL,
+        channel_id TEXT,
+        offer TEXT,
+        request TEXT,
+        created_at INTEGER NOT NULL,
+        expires_at INTEGER NOT NULL
+      )`,
+      (err) => {
+        if (err) handleException("Erreur création table pokemon_trade_drafts :", err);
+      }
+    );
+
     // Journal des évolutions (audit et statistiques). La table garde son nom
     // d'avant, quand on parlait de fusion ; `duplicates_spent` compte les
     // sacrifices.

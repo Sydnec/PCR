@@ -78,6 +78,11 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
   toujours un Métamorph. Il n'est jamais pris sans qu'on le demande, et le choix de la forme
   (Évoli) reste possible avec lui.
 - `/pk echange <membre>` + de quoi remplir **chaque côté** : un Pokémon, des points ou un objet.
+  - **Sans autre option**, `/pk echange membre:@x` ouvre un **brouillon privé** : « Ce que je donne »
+    et « Ce que je demande » proposent un Pokémon, un objet, des points ou rien, avec des menus et
+    des fenêtres de saisie (recherche d'une espèce ou d'un objet, montant, quantité, individu qu'on
+    donne). « Proposer » publie la même offre que la commande, après avoir revérifié les deux côtés.
+    Le brouillon est privé et dure 15 minutes (`pokemon.trade.draftMinutes`).
   - Chaque côté tient en une seule option, `je_donne` / `je_recois`, qui accepte une espèce, un objet
     ou des points. Un **nombre tapé** vaut des points : `je_donne: 3000`. Une quantité d'objet se
     tape devant son nom : `je_donne: 3 bonbon` (1 par défaut quand on choisit l'objet dans la

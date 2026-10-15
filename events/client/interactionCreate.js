@@ -2,7 +2,7 @@ import { handleException, log } from '../../modules/utils.js';
 import { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, MessageFlags, StringSelectMenuBuilder, StringSelectMenuOptionBuilder} from 'discord.js';
 import pointsDb from '../../modules/points-db.js';
 import { addPoints, getBalance, spendPoints } from '../../modules/economy.js';
-import { handlePokemonButton, handlePokemonSelect } from '../../modules/pokemon/interactions.js';
+import { handlePokemonButton, handlePokemonModal, handlePokemonSelect } from '../../modules/pokemon/interactions.js';
 import { pseudoOf } from '../../modules/pseudo.js';
 import { TRANSLATE_BUTTON, replyTweetTranslation } from '../../modules/links.js';
 
@@ -614,6 +614,16 @@ async function execute(interaction, bot) {
     }
 
     if (interaction.isModalSubmit()) {
+        // Système Pokémon : ses fenêtres de saisie vivent avec ses boutons.
+        if (interaction.customId.startsWith('poke_')) {
+            try {
+                await handlePokemonModal(interaction);
+            } catch (err) {
+                handleException(err);
+            }
+            return;
+        }
+
         if (interaction.customId.startsWith('bet_estimate_resolve_submit|')) {
             const [, betId, messageId] = interaction.customId.split('|');
             const resultValueStr = interaction.fields.getTextInputValue('result');
