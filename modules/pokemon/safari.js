@@ -482,6 +482,23 @@ export function enterPark(userId, parkId, { generations = null } = {}, cb) {
 // La clé de l'objet qui ouvre le parc, s'il en existe un au catalogue.
 const TICKET = "ticket_safari";
 
+// Les refus d'une entrée payante. startPaidSession les rend au moment de
+// débiter, getEntryOffer les annonce avant de demander la confirmation : le
+// même texte dans les deux cas, sinon la question promettrait une entrée que le
+// clic refuse en d'autres termes.
+const cooldownRefusal = (retryAt) => ({
+  ok: false,
+  code: "COOLDOWN",
+  retryAt,
+  reason: "Tu as déjà payé une entrée récemment.",
+});
+
+const balanceRefusal = (price, balance) => ({
+  ok: false,
+  code: "BALANCE",
+  reason: `L'entrée du parc safari coûte **${price}** points, tu en as **${balance}**.`,
+});
+
 // Entrée par /pk safari : un ticket s'il y en a un dans l'inventaire, des points
 // sinon.
 //
@@ -533,28 +550,14 @@ export function startPaidSession(userId, { generations = null } = {}, cb) {
       // Le refus prévisible passe avant le débit : l'index unique rattraperait
       // le cas, mais au prix d'un aller-retour débit/remboursement que le
       // joueur verrait passer sur son solde.
-      if (retryAt) {
-        return cb(null, {
-          ok: false,
-          code: "COOLDOWN",
-          retryAt,
-          reason: "Tu as déjà payé une entrée récemment.",
-        });
-      }
+      if (retryAt) return cb(null, cooldownRefusal(retryAt));
 
       // Débit atomique, comme pour un lancer de ball : refusé sans rien
       // prélever si le solde ne suffit pas.
       spendPoints(userId, price, (err, debited) => {
         if (err) return cb(err);
         if (!debited) {
-          return getBalance(userId, (err, balance) =>
-            cb(err, {
-              ok: false,
-              code: "BALANCE",
-              reason:
-                `L'entrée du parc safari coûte **${price}** points, tu en as **${balance}**.`,
-            })
-          );
+          return getBalance(userId, (err, balance) => cb(err, balanceRefusal(price, balance)));
         }
 
         startSession(userId, { entryCost: price, generations }, (err, result) => {
@@ -607,6 +610,9 @@ function paidEntryRetryAt(userId, cb) {
 // `blocked` annonce le refus que startPaidSession opposerait à un achat, pour
 // que le site grise son bouton : `cooldown` ou `balance`, et jamais avec un
 // ticket, qui passe outre les deux. startPaidSession garde le dernier mot.
+// `refusal` est ce même refus tel que startPaidSession le rendrait, pour que
+// Discord le dise avant de demander la confirmation ; `balance` sert à annoncer
+// ce qu'il restera après l'achat.
 export function getEntryOffer(userId, cb) {
   const config = getSafariConfig();
   const price = Math.max(0, Math.round(config.entryPrice));
@@ -633,10 +639,17 @@ export function getEntryOffer(userId, cb) {
               ongoing,
               freePark,
               price,
+              balance,
               actions: config.actionsPerSession,
               retryAt,
               tickets,
               blocked,
+              refusal:
+                blocked === "cooldown"
+                  ? cooldownRefusal(retryAt)
+                  : blocked === "balance"
+                    ? balanceRefusal(price, balance)
+                    : null,
             });
           });
         });
