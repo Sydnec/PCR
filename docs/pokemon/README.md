@@ -78,10 +78,17 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
   toujours un Métamorph. Il n'est jamais pris sans qu'on le demande, et le choix de la forme
   (Évoli) reste possible avec lui.
 - `/pk echange <membre>` + de quoi remplir **chaque côté** : un Pokémon, des points ou un objet.
-  - Ce que tu donnes : `je_donne` (+ `mon_individu`), `mes_points` ou `mon_objet`
-    (+ `mon_objet_quantite`). Ce que tu demandes : `je_recois`, `ses_points` ou `son_objet`
-    (+ `son_objet_quantite`). Un seul par côté, pas de mélange. `0` point fait un cadeau :
-    `mes_points: 0` pour demander sans rien donner, `ses_points: 0` pour offrir sans rien demander.
+  - **Sans autre option**, `/pk echange membre:@x` ouvre un **brouillon privé** : « Ce que je donne »
+    et « Ce que je demande » proposent un Pokémon, un objet, des points ou rien, avec des menus et
+    des fenêtres de saisie (recherche d'une espèce ou d'un objet, montant, quantité, individu qu'on
+    donne). « Proposer » publie la même offre que la commande, après avoir revérifié les deux côtés.
+    Le brouillon est privé et dure 15 minutes (`pokemon.trade.draftMinutes`).
+  - Chaque côté tient en une seule option, `je_donne` / `je_recois`, qui accepte une espèce, un objet
+    ou des points. Un **nombre tapé** vaut des points : `je_donne: 3000`. Une quantité d'objet se
+    tape devant son nom : `je_donne: 3 bonbon` (1 par défaut quand on choisit l'objet dans la
+    liste). `mon_individu` désigne un individu précis de l'espèce que tu donnes. Pas de mélange
+    dans un côté. `0` (ou « Rien ») fait un cadeau : `je_donne: 0` pour demander sans rien donner,
+    `je_recois: 0` pour offrir sans rien demander.
   - Sans `mon_individu`, c'est le moins précieux de l'espèce qui part, le plus récent à égalité.
     Le Pokémon demandé ne se désigne que par son espèce : **le destinataire choisit lequel**,
     parmi ses Pokémon libres, dans un menu privé qui s'ouvre quand il clique sur « Accepter ».
@@ -100,7 +107,8 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
   **Kadabra, Machopeur, Gravalanch et Spectrum** arrivent tels quels : l'échange ne les fait plus
   évoluer. Reçus en échange, ils évoluent ensuite **gratuitement** avec `/pk evolution` — ni points ni
   sacrifice, à condition qu'il en reste un derrière lui, comme pour toute évolution : l'entrée du
-  Pokédex n'est jamais perdue. Le dresseur choisit
+  Pokédex n'est jamais perdue. Sans individu choisi, `/pk evolution` prend d'abord un reçu en échange
+  (le moins précieux, jamais un verrouillé) : c'est lui qui évolue gratuitement. Le dresseur choisit
   donc s'il évolue, et quand. Un Pokémon jamais échangé garde l'évolution payante ordinaire. La
   proposition l'annonce avant le clic.
 - `/pk comparer [membre] [pokemon] [evolutions]` : cherche les échanges **qui servent aux deux** —

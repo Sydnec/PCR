@@ -205,7 +205,9 @@ const POKEMON = {
     // tiennent lieu d'un sacrifice manquant.
     dittosPerCopy: 1,
   },
-  trade: { expiryHours: 24 },
+  // `draftMinutes` : le brouillon d'échange de /pk echange, privé, ne vit pas plus longtemps
+  // que le message éphémère qui le porte (Discord le ferme après 15 minutes).
+  trade: { expiryHours: 24, draftMinutes: 15 },
   // Le verrou : un Pokémon verrouillé ne part jamais — ni revente, ni échange,
   // ni sacrifice —, mais peut évoluer, après confirmation, et pondre. Ce qui
   // arrive dans une boîte — capture, parc, œuf, échange — est verrouillé

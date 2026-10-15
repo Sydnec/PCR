@@ -35,6 +35,7 @@ import { activeGeneration, generationOrdinal, getSpecies } from "./data.js";
 import { chooseStarter, generationOfStarter } from "./starters.js";
 import { claimShowcaseShare, getShowcase, releaseShowcaseShare } from "./showcase.js";
 import { renderShowcaseImage } from "./showcase-image.js";
+import { handleDraftButton, handleDraftModal, handleDraftSelect } from "./trade-draft.js";
 import {
   DITTO_HELPER,
   acceptTrade,
@@ -1025,6 +1026,27 @@ export async function handlePokemonSelect(interaction) {
     case "poke_trade_pick":
       return handleTradePick(interaction, args[0]);
 
+    // Les menus du brouillon d'un échange.
+    case "poke_td_kind":
+    case "poke_td_pick":
+    case "poke_td_ind":
+      return handleDraftSelect(interaction, action.replace("poke_td_", ""), args).catch((error) =>
+        handleException("Brouillon d'échange :", error)
+      );
+
+    default:
+  }
+}
+
+// Les fenêtres de saisie du jeu : le montant et la recherche du brouillon d'un échange.
+export async function handlePokemonModal(interaction) {
+  const [action, ...args] = interaction.customId.split("|");
+  switch (action) {
+    case "poke_td_pts":
+    case "poke_td_find":
+      return handleDraftModal(interaction, action.replace("poke_td_", ""), args).catch((error) =>
+        handleException("Brouillon d'échange :", error)
+      );
     default:
   }
 }
@@ -1400,6 +1422,15 @@ export async function handlePokemonButton(interaction) {
       return handleTradeButton(interaction, "decline", args[0]);
     case "poke_trade_cancel":
       return handleTradeButton(interaction, "cancel", args[0]);
+
+    // Le brouillon d'un échange (/pk echange sans options) : ses boutons.
+    case "poke_td_side":
+    case "poke_td_back":
+    case "poke_td_go":
+    case "poke_td_cancel":
+      return handleDraftButton(interaction, action.replace("poke_td_", ""), args).catch((error) =>
+        handleException("Brouillon d'échange :", error)
+      );
 
     case "poke_starter_ok":
       return handleStarterChoice(interaction, args[0]);

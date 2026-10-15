@@ -2293,5 +2293,36 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "fix",
+      "name": "Évolution d'échange gratuite par défaut",
+      "description": "Sans choisir d'individu, /pk evolution fait évoluer en priorité un Pokémon reçu en échange (le moins précieux d'abord) : l'évolution d'échange est gratuite.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-15T09:00:00.000Z",
+      "branch": "fix/trade-evolution-autopick"
+    },
+    {
+      "type": "enhancement",
+      "name": "/pk echange plus simple",
+      "description": "Chaque côté d'un échange se remplit avec une seule option : un Pokémon, un objet, ou directement un nombre de points (je_donne: 3000).",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-15T10:00:00.000Z",
+      "branch": "refactor/echange-options"
+    },
+    {
+      "type": "feature",
+      "name": "Brouillon d'échange",
+      "description": "/pk echange @membre sans autre option ouvre un écran privé : on choisit avec des menus ce que chacun donne (Pokémon, objet, points ou rien), puis on propose.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-15T11:00:00.000Z",
+      "branch": "refactor/echange-options"
+    }
+  ]
 }

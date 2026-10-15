@@ -15,6 +15,8 @@ import {
   resolveIndividual,
   resolveSpecies,
   sacrificeFill,
+  selectorOf,
+  tradedEvolver,
   usableHelpers,
 } from "../../modules/pokemon/collection.js";
 import {
@@ -205,6 +207,16 @@ function itemFormsLine(species) {
   return lines.length ? `\n${lines.join("\n")}` : "";
 }
 
+// Sans individu choisi, l'écran désigne déjà celui qui évoluera quand il est
+// connu d'avance : un reçu en échange (tradedEvolver), dont l'évolution est
+// gratuite. Sinon, c'est le bot qui choisira au clic, parmi les moins précieux.
+const autoSelector = (userId, speciesId) =>
+  new Promise((resolve, reject) =>
+    tradedEvolver(userId, speciesId, (err, row) =>
+      err ? reject(err) : resolve(row ? selectorOf(row) : { speciesId, pokemonId: null })
+    )
+  );
+
 export default {
   describe: (sub) =>
     sub
@@ -304,7 +316,7 @@ export default {
           )
         : bySpecies.error
           ? bySpecies
-          : { speciesId: bySpecies.species.id, pokemonId: null };
+          : await autoSelector(interaction.user.id, bySpecies.species.id);
       if (selector.error) {
         return interaction.reply({
           content: `❌ ${selector.error}`,
@@ -374,7 +386,8 @@ export default {
                   : `**${species.name}** peut évoluer en **${plan.targets[0].name}**.`) +
                 itemFormsLine(species) +
                 (pokemonId
-                  ? `\nIl garde son sexe, sa ball et sa fertilité${isShiny ? ", et reste shiny" : ""}.`
+                  ? (chosen ? "" : "\nLe bot a pris un Pokémon reçu en échange : il évolue gratuitement.") +
+                    `\nIl garde son sexe, sa ball et sa fertilité${isShiny ? ", et reste shiny" : ""}.`
                   : `\nLe bot choisit : les sacrifices parmi les moins précieux, puis celui qui ` +
                     `évolue parmi les suivants — jamais un verrouillé. Pour en choisir un, ` +
                     `remplis l'option « individu ».`)
