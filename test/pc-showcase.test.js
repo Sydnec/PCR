@@ -84,7 +84,7 @@ describe("lire le PC (getPc)", () => {
   it("un dresseur sans Pokémon a ses huit boîtes vides, aux noms par défaut", async () => {
     const result = await call(pc.getPc, "u1");
     assert.equal(result.boxes.length, 8);
-    assert.deepEqual(result.boxes[0], { box: 0, name: "Boîte 1", custom: false, defaultName: "Boîte 1" });
+    assert.deepEqual(result.boxes[0], { box: 0, name: "Boîte 1", custom: false, defaultName: "Boîte 1", archived: false });
     assert.deepEqual(result.layout, []);
   });
 
@@ -106,7 +106,7 @@ describe("lire le PC (getPc)", () => {
   it("les boîtes renommées le disent", async () => {
     await call(pc.renameBox, "u1", 1, "Équipe");
     const result = await call(pc.getPc, "u1");
-    assert.deepEqual(result.boxes[1], { box: 1, name: "Équipe", custom: true, defaultName: "Boîte 2" });
+    assert.deepEqual(result.boxes[1], { box: 1, name: "Équipe", custom: true, defaultName: "Boîte 2", archived: false });
     assert.equal(result.boxes[0].custom, false);
   });
 
@@ -228,6 +228,100 @@ describe("noms de boîtes et surnoms", () => {
 });
 
 // ====================== VITRINE ======================
+
+describe("archiver une boîte (archiveBox)", () => {
+  const archive = (box, archived = true, user = "u1") => call(pc.archiveBox, user, box, archived);
+  const boxes = async () => (await call(pc.getPc, "u1")).boxes;
+  const settings = () => dbAll(points, "SELECT box, name, archived FROM pokemon_pc_boxes ORDER BY box");
+
+  it("archive une boîte occupée, et la rend aux autres", async () => {
+    await give({ pos: 31 });
+    assert.deepEqual(await archive(1), { ok: true, archived: true });
+    assert.equal((await boxes())[1].archived, true);
+    assert.equal((await boxes())[1].name, "Boîte 2", "sans nom à elle, le nom par défaut");
+    assert.deepEqual(await archive(1, false), { ok: true, archived: false });
+    assert.equal((await boxes())[1].archived, false);
+    assert.deepEqual(await settings(), [], "sans nom ni archivage, plus rien à retenir");
+  });
+
+  it("refuse une boîte vide, ou qui n'existe pas, sans rien écrire", async () => {
+    const empty = await archive(2);
+    assert.equal(empty.ok, false);
+    assert.match(empty.reason, /vide/);
+    for (const box of [-1, 60, 1.5]) assert.match((await archive(box)).reason, /n'existe pas/, String(box));
+    assert.deepEqual(await settings(), []);
+  });
+
+  it("l'archivage et le nom se gardent l'un l'autre", async () => {
+    await give({ pos: 0 });
+    await call(pc.renameBox, "u1", 0, "Vieux");
+    await archive(0);
+    assert.deepEqual(await settings(), [{ box: 0, name: "Vieux", archived: 1 }]);
+    await call(pc.renameBox, "u1", 0, "");
+    assert.deepEqual(await settings(), [{ box: 0, name: "", archived: 1 }], "renommer à vide ne désarchive pas");
+    await call(pc.renameBox, "u1", 0, "Neuf");
+    await archive(0, false);
+    assert.deepEqual(await settings(), [{ box: 0, name: "Neuf", archived: 0 }], "désarchiver garde le nom");
+  });
+
+  it("un nouveau Pokémon évite les boîtes archivées", async () => {
+    await give({ pos: 0 });
+    await archive(0);
+    const id = await give({ obtained: 2 });
+    const { layout } = await call(pc.getPc, "u1");
+    assert.equal(layout.find(({ row }) => row.id === id).pos, 30, "première case de la boîte 2");
+  });
+
+  it("un Pokémon chassé d'une case disputée ne part pas dans une boîte archivée", async () => {
+    await give({ pos: 0, obtained: 1 });
+    await archive(0);
+    const loser = await give({ pos: 0, obtained: 2 });
+    const { layout } = await call(pc.getPc, "u1");
+    assert.equal(layout.find(({ row }) => row.id === loser).pos, 30);
+  });
+
+  it("un PC plein jusqu'au plafond range dans une boîte archivée plutôt que de perdre un Pokémon", async () => {
+    config({ pc: { slotsPerBox: 2, minBoxes: 2, maxBoxes: 2 } });
+    await give({ pos: 0 });
+    await archive(0);
+    await give({ pos: 2 });
+    await give({ pos: 3 });
+    const id = await give({ obtained: 9 });
+    const { layout } = await call(pc.getPc, "u1");
+    assert.equal(layout.find(({ row }) => row.id === id).pos, 1, "la case libre de la boîte archivée");
+    const overflow = await give({ obtained: 10 });
+    const full = await call(pc.getPc, "u1");
+    assert.equal(full.layout.find(({ row }) => row.id === overflow).pos, 4, "au-delà du plafond, comme avant");
+  });
+
+  it("on peut ranger un Pokémon à la main dans une boîte archivée", async () => {
+    await give({ pos: 30 });
+    await archive(1);
+    const id = await give({ pos: 0 });
+    assert.deepEqual(await call(pc.movePokemon, "u1", id, 35), { ok: true });
+    assert.equal(await posOf(id), 35);
+  });
+
+  it("la boîte vide de la fin n'est jamais une archivée", async () => {
+    await give({ pos: 30 * 8 });
+    assert.equal((await boxes()).length, 10);
+    await archive(8);
+    // La 10e boîte reste vide et ordinaire : rien à ajouter.
+    assert.equal((await boxes()).length, 10);
+    const id = (await call(pc.getPc, "u1")).layout[0].row.id;
+    await call(pc.movePokemon, "u1", id, 30 * 9);
+    await archive(9);
+    const list = await boxes();
+    assert.equal(list.length, 11, "la dernière vide est archivée : il en vient une");
+    assert.equal(list.at(-1).archived, false);
+  });
+
+  it("chacun archive ses boîtes", async () => {
+    await give({ pos: 0, user: "u2" });
+    await archive(0, true, "u2");
+    assert.equal((await boxes())[0].archived, false);
+  });
+});
 
 describe("la vitrine : exposer et retirer", () => {
   it("six places de base, au moins une quoi qu'on règle", () => {

@@ -12,6 +12,10 @@
 // arrivé la garde, l'autre prend la première case libre), si bien qu'aucune
 // place n'a besoin d'être réservée et que rien ne peut se perdre. Un Pokémon qui
 // arrive sans place en reçoit une à la première lecture du PC.
+//
+// Une boîte archivée se range à part : elle passe en fin de liste sur le site,
+// hors des flèches, et le placement automatique l'évite. On peut toujours y
+// déposer un Pokémon à la main.
 import db from "../points-db.js";
 import { handleException } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
@@ -35,8 +39,11 @@ const validPos = (value) => Number.isInteger(value) && value >= 0;
 
 // La place de chaque individu. Ceux qui ont une place la gardent (le plus
 // ancien l'emporte sur une case disputée) ; les autres, dans l'ordre de leur
-// arrivée, prennent les premières cases libres.
-export function layoutPc(rows) {
+// arrivée, prennent les premières cases libres hors des boîtes archivées
+// (`archived`, avec `slotsPerBox` et `maxBoxes`). Un PC plein jusqu'au plafond
+// ne perd personne : le Pokémon prend alors une case libre d'une boîte
+// archivée, et à défaut une case au-delà du plafond, comme avant l'archivage.
+export function layoutPc(rows, { archived = new Set(), slotsPerBox = 1, maxBoxes = Infinity } = {}) {
   const taken = new Set();
   const placed = [];
   const waiting = [];
@@ -52,11 +59,21 @@ export function layoutPc(rows) {
     }
   }
   waiting.sort((a, b) => a.obtained_at - b.obtained_at || a.id - b.id);
+  const limit = maxBoxes * slotsPerBox;
+  const archivedPos = (pos) => archived.has(Math.floor(pos / slotsPerBox));
+  const freeFrom = (start, accept) => {
+    for (let pos = start; pos < limit; pos++) if (!taken.has(pos) && accept(pos)) return pos;
+    return null;
+  };
   let next = 0;
   for (const row of waiting) {
-    while (taken.has(next)) next++;
-    taken.add(next);
-    placed.push({ row, pos: next });
+    let pos = freeFrom(0, (candidate) => !archivedPos(candidate)) ?? freeFrom(0, archivedPos);
+    if (pos === null) {
+      while (taken.has(next) || next < limit) next++;
+      pos = next;
+    }
+    taken.add(pos);
+    placed.push({ row, pos });
   }
   return placed;
 }
@@ -76,40 +93,109 @@ function persistLayout(layout) {
   }
 }
 
-function boxNames(userId, cb) {
-  db.all("SELECT box, name FROM pokemon_pc_boxes WHERE user_id = ?", [userId], (err, rows) =>
-    cb(err, new Map((rows ?? []).map((row) => [row.box, row.name])))
+// Les boîtes réglées par le dresseur : leur nom (vide : celui par défaut) et
+// leur archivage.
+function boxSettings(userId, cb) {
+  db.all(
+    "SELECT box, name, archived FROM pokemon_pc_boxes WHERE user_id = ?",
+    [userId],
+    (err, rows) =>
+      cb(
+        err,
+        new Map(
+          (rows ?? []).map((row) => [row.box, { name: row.name || null, archived: Boolean(row.archived) }])
+        )
+      )
   );
+}
+
+const archivedBoxes = (settings) =>
+  new Set([...settings].filter(([, entry]) => entry.archived).map(([box]) => box));
+
+// Les individus d'un dresseur, ses réglages de boîtes et la disposition qui en
+// découle : la lecture du PC comme le déplacement partent de la même.
+function readPc(userId, config, cb) {
+  getIndividuals(userId, (err, rows) => {
+    if (err) return cb(err);
+    boxSettings(userId, (err, settings) => {
+      if (err) return cb(err);
+      const archived = archivedBoxes(settings);
+      cb(null, { settings, archived, layout: layoutPc(rows, { archived, ...config }) });
+    });
+  });
 }
 
 export const defaultBoxName = (box) => `Boîte ${box + 1}`;
 
 // Le PC d'un dresseur : ses boîtes (nom compris) et la place de chacun de ses
 // Pokémon. Autant de boîtes qu'il en faut, plus une vide pour pouvoir y ranger.
+// La boîte vide de la fin doit pouvoir recevoir : une boîte archivée n'en
+// tient pas lieu, il en vient une de plus.
 export function getPc(userId, cb) {
   const config = pcConfig();
-  getIndividuals(userId, (err, rows) => {
+  readPc(userId, config, (err, { settings, archived, layout } = {}) => {
     if (err) return cb(err);
-    boxNames(userId, (err, names) => {
-      if (err) return cb(err);
-      const layout = layoutPc(rows);
-      persistLayout(layout);
-      const lastBox = layout.reduce(
-        (max, { pos }) => Math.max(max, Math.floor(pos / config.slotsPerBox)),
-        -1
-      );
-      const count = Math.max(config.minBoxes, Math.min(config.maxBoxes, lastBox + 2), lastBox + 1);
-      cb(null, {
-        config,
-        boxes: Array.from({ length: count }, (_, box) => ({
+    persistLayout(layout);
+    const boxOf = (pos) => Math.floor(pos / config.slotsPerBox);
+    const occupied = new Set(layout.map(({ pos }) => boxOf(pos)));
+    const lastBox = Math.max(-1, ...occupied, ...archived);
+    let count = Math.max(config.minBoxes, Math.min(config.maxBoxes, lastBox + 2), lastBox + 1);
+    while (count < config.maxBoxes && (archived.has(count - 1) || occupied.has(count - 1))) count++;
+    cb(null, {
+      config,
+      boxes: Array.from({ length: count }, (_, box) => {
+        const entry = settings.get(box);
+        return {
           box,
-          name: names.get(box) ?? defaultBoxName(box),
-          custom: names.has(box),
+          name: entry?.name ?? defaultBoxName(box),
+          custom: Boolean(entry?.name),
           defaultName: defaultBoxName(box),
-        })),
-        layout,
-      });
+          archived: Boolean(entry?.archived),
+        };
+      }),
+      layout,
     });
+  });
+}
+
+// Archiver une boîte, ou la rendre aux autres. Une boîte vide ne s'archive
+// pas : c'est celle qui reçoit, et l'archiver en ferait apparaître une autre,
+// jusqu'au plafond.
+export function archiveBox(userId, box, archived, cb) {
+  const config = pcConfig();
+  if (!Number.isInteger(box) || box < 0 || box >= config.maxBoxes) {
+    return cb(null, { ok: false, reason: "Cette boîte n'existe pas." });
+  }
+  if (!archived) {
+    // Sans nom à elle, la ligne n'a plus rien à retenir.
+    return db.run(
+      "UPDATE pokemon_pc_boxes SET archived = 0 WHERE user_id = ? AND box = ?",
+      [userId, box],
+      (err) => {
+        if (err) return cb(err);
+        db.run(
+          "DELETE FROM pokemon_pc_boxes WHERE user_id = ? AND box = ? AND name = ''",
+          [userId, box],
+          (err) => (err ? cb(err) : cb(null, { ok: true, archived: false }))
+        );
+      }
+    );
+  }
+  readPc(userId, config, (err, { layout } = {}) => {
+    if (err) return cb(err);
+    const inBox = layout.filter(({ pos }) => Math.floor(pos / config.slotsPerBox) === box).length;
+    if (!inBox) {
+      return cb(null, {
+        ok: false,
+        reason: "Cette boîte est vide : range-y d'abord des Pokémon pour l'archiver.",
+      });
+    }
+    db.run(
+      `INSERT INTO pokemon_pc_boxes (user_id, box, name, archived) VALUES (?, ?, '', 1)
+       ON CONFLICT (user_id, box) DO UPDATE SET archived = 1`,
+      [userId, box],
+      (err) => (err ? cb(err) : cb(null, { ok: true, archived: true }))
+    );
   });
 }
 
@@ -120,9 +206,8 @@ export function movePokemon(userId, pokemonId, targetPos, cb) {
   if (!validPos(targetPos) || targetPos >= config.maxBoxes * config.slotsPerBox) {
     return cb(null, { ok: false, reason: "Cette case n'existe pas." });
   }
-  getIndividuals(userId, (err, rows) => {
+  readPc(userId, config, (err, { layout } = {}) => {
     if (err) return cb(err);
-    const layout = layoutPc(rows);
     const moving = layout.find(({ row }) => row.id === pokemonId);
     if (!moving)
       return cb(null, { ok: false, reason: `Le Pokémon #${pokemonId} n'est pas à toi.` });
@@ -172,12 +257,22 @@ export function renameBox(userId, box, name, cb) {
     return cb(null, { ok: false, reason: "Cette boîte n'existe pas." });
   }
   const clean = cleanName(name, config.boxNameLength);
-  // Un nom vide rend à la boîte son nom par défaut.
+  // Un nom vide rend à la boîte son nom par défaut ; archivée, elle garde sa
+  // ligne, et son archivage.
   if (!clean) {
+    const done = (err) =>
+      err ? cb(err) : cb(null, { ok: true, name: defaultBoxName(box), custom: false });
     return db.run(
-      "DELETE FROM pokemon_pc_boxes WHERE user_id = ? AND box = ?",
+      "UPDATE pokemon_pc_boxes SET name = '' WHERE user_id = ? AND box = ? AND archived = 1",
       [userId, box],
-      (err) => (err ? cb(err) : cb(null, { ok: true, name: defaultBoxName(box), custom: false }))
+      (err) => {
+        if (err) return done(err);
+        db.run(
+          "DELETE FROM pokemon_pc_boxes WHERE user_id = ? AND box = ? AND archived = 0",
+          [userId, box],
+          done
+        );
+      }
     );
   }
   db.run(

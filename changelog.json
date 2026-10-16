@@ -2391,5 +2391,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "feature",
+      "name": "Archiver une boîte PC",
+      "description": "Sur le site, une boîte PC s'archive : elle passe en fin de liste, les flèches la sautent et les nouveaux Pokémon n'y vont plus d'eux-mêmes. On peut toujours y ranger à la main.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-16T09:00:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
+    }
+  ]
 }

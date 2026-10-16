@@ -63,7 +63,7 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
 | `GET /api/shop` 🔒 | `{ balance, limit, balls: [{ key, label, emoji, image, price, effect, held }] }` — la boutique des balls spéciales, vide avant l'ouverture de la 2ᵉ génération |
 | `GET /api/spawn` 🔒 | `{ refreshSeconds, cooldownSeconds, pausedUntil, wallet, safari, spawn, fishing, last, drops }` — l'apparition du salon. `spawn.charm` (ou `null`) : elle ne brille que pour les porteurs du Charme Chroma de sa génération (`label`, `image`, `mine` : le visiteur en est un, et `spawn.shiny` est alors vrai pour lui) |
 | `GET /api/safari` 🔒 | `{ offer, visit }` — ce que le dresseur peut faire du parc, et sa visite en cours (`null` sinon) |
-| `GET /api/me/pc` 🔒 | `{ slotsPerBox, columns, maxBoxes, boxNameLength, nicknameLength, boxes, pokemon }` — la boîte PC |
+| `GET /api/me/pc` 🔒 | `{ slotsPerBox, columns, maxBoxes, boxNameLength, nicknameLength, boxes, pokemon }` — la boîte PC ; chaque boîte porte `archived` |
 | `GET /api/admin/config` 🔑 | `{ status, tree }` — la configuration en arbre |
 | `GET /api/admin/points?days` 🔑 | `{ from, to, times, trainers: [{ id, name, balance, values }] }` — la courbe des soldes : `values[i]` est le solde à `times[i]` (240 intervalles ; avant son premier mouvement, le solde d'avant, 0 pour un nouveau venu), du plus riche au plus pauvre. `days` (1 à 3650) borne la période ; sans lui, tout le journal |
 
@@ -142,6 +142,7 @@ ou par un groupe `{ "speciesId": 25, "isShiny": false, "sex": "F" }` — les deu
 | `POST /api/safari/live` | `{ sessionId }` | `{ live: true }` — met la visite en cours en direct dans le salon Pokémon ; `409` avec `shared` quand elle est déjà partagée. La visite porte alors `live` (et `shared`) |
 | `POST /api/me/pc/move` | `{ pokemonId, pos }` | la boîte PC relue — l'occupant de la case prend l'ancienne place |
 | `POST /api/me/pc/boxes/:box/name` | `{ name }` | `{ name, custom }` — vide : nom par défaut |
+| `POST /api/me/pc/boxes/:box/archive` | `{ archived }` | la boîte PC relue — `409` pour une boîte vide (à archiver) ou inexistante |
 | `POST /api/me/pokemon/:id/nickname` | `{ nickname }` | `{ nickname }` — vide : plus de surnom |
 | `POST /api/me/showcase` | `{ pokemonId, shown, place? }` | la vitrine (comme `GET …/showcase`) — `shown` vrai l'expose (au bout, ou à la place `place`), faux le retire ; 409 si la vitrine est pleine ou s'il n'y est pas |
 | `POST /api/me/showcase/order` | `{ order }` (identifiants, dans l'ordre voulu) | la vitrine — seuls les Pokémon encore exposés bougent |

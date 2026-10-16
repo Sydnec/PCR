@@ -79,7 +79,7 @@ import {
   removeFromShowcase,
   showcaseSlots,
 } from "../pokemon/showcase.js";
-import { getPc, movePokemon, renameBox, renamePokemon } from "../pokemon/pc.js";
+import { archiveBox, getPc, movePokemon, renameBox, renamePokemon } from "../pokemon/pc.js";
 import {
   enterPark,
   getEntryOffer,
@@ -1063,6 +1063,25 @@ export const routes = [
       );
       if (!result.ok) throw new HttpError(409, result.reason);
       return { name: result.name, custom: result.custom };
+    },
+  },
+
+  // Archiver une boîte, ou la rendre aux autres. La réponse est la boîte PC
+  // relue : archiver la dernière boîte en fait apparaître une vide.
+  {
+    method: "POST",
+    path: "/api/me/pc/boxes/:box/archive",
+    auth: true,
+    write: true,
+    handler: async (ctx) => {
+      if (typeof ctx.body.archived !== "boolean") {
+        throw new HttpError(400, "`archived` doit valoir true ou false.");
+      }
+      const result = await promise((cb) =>
+        archiveBox(ctx.user.id, Number(ctx.params.box), ctx.body.archived, cb)
+      );
+      if (!result.ok) throw new HttpError(409, result.reason);
+      return pcJson(ctx.user.id);
     },
   },
 
