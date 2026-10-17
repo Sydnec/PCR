@@ -31,7 +31,7 @@ const setCount = (user, n, key = MASTER) =>
 const value = () => items.itemOverflowValue(items.getItem(MASTER));
 
 beforeEach(async () => {
-  for (const table of ["pokemon_inventory", "pokemon_item_log", "points", "points_log", "pokemon_trades", "pokemon_migrations"]) {
+  for (const table of ["pokemon_inventory", "pokemon_item_log", "points", "points_log", "pokemon_trades", "pokemon_data_migrations"]) {
     await dbRun(points, `DELETE FROM ${table}`);
   }
 });
@@ -190,6 +190,17 @@ describe("le surplus d'avant la limite", () => {
     assert.equal(await count("u1"), 3);
   });
 
+  it("une ancienne table pokemon_migrations, d'un autre schéma, ne gêne pas la marque", async () => {
+    // L'état des bases de production : une table de ce nom, sans colonne done_at.
+    await dbRun(points, "DROP TABLE IF EXISTS pokemon_migrations");
+    await dbRun(points, "CREATE TABLE pokemon_migrations (name TEXT PRIMARY KEY, applied_at INTEGER NOT NULL)");
+    await setCount("u1", 2);
+    assert.deepEqual(await call(items.sellHeldOverCap), { sold: 1 });
+    assert.equal((await dbAll(points, "SELECT name FROM pokemon_data_migrations")).length, 1);
+    assert.deepEqual(await call(items.sellHeldOverCap), { sold: 0 });
+    await dbRun(points, "DROP TABLE pokemon_migrations");
+  });
+
   it("des points qui ne passent pas rendent le surplus, et la migration se rejouera", async () => {
     await setCount("u1", 2);
     const original = points.run;
@@ -206,7 +217,7 @@ describe("le surplus d'avant la limite", () => {
       points.run = original;
     }
     assert.equal(await count("u1"), 2, "rien ne se perd");
-    assert.equal((await dbAll(points, "SELECT * FROM pokemon_migrations")).length, 0);
+    assert.equal((await dbAll(points, "SELECT * FROM pokemon_data_migrations")).length, 0);
     assert.deepEqual(await call(items.sellHeldOverCap), { sold: 1 });
     assert.equal(await count("u1"), 1);
   });

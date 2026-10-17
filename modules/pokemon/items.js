@@ -540,7 +540,7 @@ export function migrateRetiredStones(cb = () => {}) {
 
 // La limite de détention arrive après coup : ce que les dresseurs gardent déjà
 // au-delà se vend d'office, au même prix qu'un gain de trop. Une seule fois — la
-// ligne de pokemon_migrations le retient —, sans quoi chaque redémarrage
+// ligne de pokemon_data_migrations le retient —, sans quoi chaque redémarrage
 // revendrait aussi ce qu'un administrateur a donné en passant outre.
 //
 // Chaque surplus se retire d'abord, gardé sur le compte lu, puis se paie ; si
@@ -550,7 +550,7 @@ export function migrateRetiredStones(cb = () => {}) {
 const CAP_MIGRATION = "plafond-detention";
 
 export function sellHeldOverCap(cb = () => {}) {
-  db.get("SELECT 1 FROM pokemon_migrations WHERE name = ?", [CAP_MIGRATION], (err, done) => {
+  db.get("SELECT 1 FROM pokemon_data_migrations WHERE name = ?", [CAP_MIGRATION], (err, done) => {
     if (err) return cb(err);
     if (done) return cb(null, { sold: 0 });
     const capped = getItems().filter((item) => itemCap(item));
@@ -593,7 +593,7 @@ export function sellHeldOverCap(cb = () => {}) {
       if (index >= capped.length) {
         if (failed) return cb(failed);
         return db.run(
-          "INSERT OR IGNORE INTO pokemon_migrations (name, done_at) VALUES (?, ?)",
+          "INSERT OR IGNORE INTO pokemon_data_migrations (name, done_at) VALUES (?, ?)",
           [CAP_MIGRATION, Date.now()],
           (err) => {
             if (err) return cb(err);

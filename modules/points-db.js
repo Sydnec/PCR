@@ -714,13 +714,15 @@ const db = new sqlite3.Database(dbPath, (err) => {
     );
 
     // Les migrations de données à ne jouer qu'une fois : la ligne en est la marque.
+    // Pas « pokemon_migrations » : une ancienne table de ce nom, d'un autre schéma,
+    // traîne dans les bases de production, et IF NOT EXISTS la garderait telle quelle.
     db.run(
-      `CREATE TABLE IF NOT EXISTS pokemon_migrations (
+      `CREATE TABLE IF NOT EXISTS pokemon_data_migrations (
         name TEXT PRIMARY KEY,
         done_at INTEGER NOT NULL
       )`,
       (err) => {
-        if (err) handleException("Erreur création table pokemon_migrations :", err);
+        if (err) handleException("Erreur création table pokemon_data_migrations :", err);
       }
     );
 
