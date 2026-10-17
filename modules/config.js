@@ -281,6 +281,8 @@ const POKEMON = {
   // `ball` fait pointer l'objet vers une ball de capture : il en emprunte le
   // libellé et l'icône, donc changer l'emoji d'une ball suffit, l'objet suit.
   // `sellValue` rend l'objet revendable, et rien d'autre ne le rend revendable.
+  // `maxHeld` plafonne ce qu'un dresseur en garde : au-delà, chaque exemplaire
+  // gagné se vend d'office `overflowValue` points.
   // `dropWeight` le fait tomber des Pokémon, et rien d'autre : un objet sans
   // poids ne se trouve pas. L'ordre des clés est celui de l'affichage, et les
   // poids vont du plus commun au plus rare.
@@ -412,6 +414,8 @@ const POKEMON = {
       ball: "master",
       description: "La capture garantie, offerte. Autant dire qu'elle ne se trouve pas.",
       dropWeight: 2,
+      maxHeld: 1,
+      overflowValue: 10000,
     },
     // Les cannes à pêche (`rod`) : /pk pecher lance la ligne pour `price` points, et la
     // canne choisit la table de pêche (`pool`, pokemon-fishing.json : old, good, super).

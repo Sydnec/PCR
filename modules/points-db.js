@@ -713,6 +713,17 @@ const db = new sqlite3.Database(dbPath, (err) => {
       }
     );
 
+    // Les migrations de données à ne jouer qu'une fois : la ligne en est la marque.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_migrations (
+        name TEXT PRIMARY KEY,
+        done_at INTEGER NOT NULL
+      )`,
+      (err) => {
+        if (err) handleException("Erreur création table pokemon_migrations :", err);
+      }
+    );
+
     // Les générations déjà annoncées. La ligne est la revendication : un INSERT
     // OR IGNORE dont this.changes dit qui annonce, si bien que deux passages du
     // minuteur — ou un redémarrage à l'heure dite — n'annoncent qu'une fois.

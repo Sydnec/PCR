@@ -153,6 +153,9 @@ function items(rules) {
         item.held > 0 ? `**${oneIn(item.held)}** Pokémon le tient` : null,
         item.lottery > 0 ? `loterie **${pct(item.lottery)}**${lot}` : null,
         item.sellValue > 0 ? `revente **${fmt(item.sellValue)} pts**` : null,
+        item.maxHeld
+          ? `**${fmt(item.maxHeld)}** en poche au plus, vendue **${fmt(item.overflowValue)} pts** au-delà`
+          : null,
       ].filter(Boolean);
       return h(
         "li",

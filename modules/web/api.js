@@ -107,6 +107,7 @@ import {
   getItem,
   getItems,
   itemSellValue,
+  overflowNotice,
   sortByCatalogue,
 } from "../pokemon/items.js";
 import { pokemonSellValue, sellItem, sellPokemon } from "../pokemon/sell.js";
@@ -1335,7 +1336,12 @@ export const routes = [
       if (!claimed.ok) throw new HttpError(claimed.captor ? 403 : 409, claimed.reason);
       announceDropClaim(ctx.bot, claimed.drop, claimed.item, ctx.user.id);
       const { key, label, emoji, sprite } = claimed.item;
-      return { item: { key, label, emoji, image: itemImageUrl(sprite) } };
+      // `sold` : la vente d'office d'un objet au-delà de la limite, la phrase de
+      // Discord, que le site affiche telle quelle.
+      return {
+        item: { key, label, emoji, image: itemImageUrl(sprite) },
+        sold: overflowNotice(claimed.item, claimed.granted),
+      };
     },
   },
 

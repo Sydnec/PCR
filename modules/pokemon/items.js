@@ -11,6 +11,7 @@
 // consommé deux fois par deux clics simultanés serait exactement le bug que
 // spendPoints évite déjà sur les points.
 import db from "../points-db.js";
+import { addPoints } from "../economy.js";
 import { handleException, log } from "../utils.js";
 import { getBall, getPokemonConfig } from "./config.js";
 import { activeGeneration } from "./data.js";
@@ -78,6 +79,20 @@ export const getCharmItem = (generation) =>
 // c'est le catalogue qui décide, pas la commande.
 export const itemSellValue = (item) => {
   const value = Math.round(Number(item?.sellValue) || 0);
+  return value > 0 ? value : 0;
+};
+
+// Combien un dresseur peut en garder (`maxHeld`), ou null sans limite. La
+// Master Ball n'en garde qu'une : en accumuler retirait toute tension aux
+// légendaires.
+export const itemCap = (item) => {
+  const cap = Math.round(Number(item?.maxHeld) || 0);
+  return cap > 0 ? cap : null;
+};
+
+// Ce que rapporte un exemplaire reçu au-delà de la limite (`overflowValue`).
+export const itemOverflowValue = (item) => {
+  const value = Math.round(Number(item?.overflowValue) || 0);
   return value > 0 ? value : 0;
 };
 
@@ -294,13 +309,11 @@ function check(key, quantity) {
   return null;
 }
 
-// Chemin unique de crédit — trésor, compensation d'administrateur, récompense
-// de visite : tout passe ici, sinon la règle « on garde la ligne à zéro » finit
-// par diverger entre les copies.
-export function grantItem(userId, key, quantity = 1, { source } = {}, cb = () => {}) {
-  const invalid = check(key, quantity);
-  if (invalid) return cb(invalid);
-
+// Le crédit lui-même. `cap` : la garde du plafond, dans la même instruction —
+// le compte après crédit ne doit pas le dépasser, et this.changes dit si c'est
+// passé. Deux gains simultanés, un seul sous la limite.
+function credit(userId, key, quantity, source, cap, cb) {
+  if (cap !== null && quantity > cap) return cb(null, false);
   const now = Date.now();
   db.run(
     `INSERT INTO pokemon_inventory (user_id, item_key, count, first_obtained_at, last_obtained_at)
@@ -308,13 +321,88 @@ export function grantItem(userId, key, quantity = 1, { source } = {}, cb = () =>
      ON CONFLICT(user_id, item_key) DO UPDATE SET
        count = count + excluded.count,
        first_obtained_at = COALESCE(first_obtained_at, excluded.first_obtained_at),
-       last_obtained_at = excluded.last_obtained_at`,
-    [userId, key, quantity, now, now],
-    (err) => {
-      if (err) return cb(err);
-      logMovement(userId, key, quantity, source);
-      cb(null, true);
+       last_obtained_at = excluded.last_obtained_at
+     ${cap === null ? "" : "WHERE count + excluded.count <= ?"}`,
+    [userId, key, quantity, now, now, ...(cap === null ? [] : [cap])],
+    function (err) {
+      if (err) return cb(err, false);
+      const credited = this.changes === 1;
+      if (credited) logMovement(userId, key, quantity, source);
+      cb(null, credited);
     }
+  );
+}
+
+// Chemin unique de crédit — trésor, compensation d'administrateur, récompense
+// de visite : tout passe ici, sinon la règle « on garde la ligne à zéro » finit
+// par diverger entre les copies.
+//
+// Un objet plafonné (`maxHeld`) se crédite à l'unité sous sa garde, et ce qui
+// dépasse se vend `overflowValue` points pièce : on ne refuse pas un butin. Si
+// ces points ne passent pas, l'exemplaire se garde au-delà de la limite plutôt
+// que de se perdre. `overflow` règle les autres cas :
+// - « ignore » : rendre ce qu'on vient de prendre (une compensation) ou ce
+//   qu'un administrateur donne — la limite ne joue pas ;
+// - « refuse » : tout ou rien, sans vente — l'échange, qui a vérifié avant et
+//   compense si une course l'a pris de vitesse.
+// `cb(err, { kept, sold, points })`, ou `cb(null, null)` pour un refus.
+export function grantItem(
+  userId,
+  key,
+  quantity = 1,
+  { source, overflow = "sell" } = {},
+  cb = () => {}
+) {
+  const invalid = check(key, quantity);
+  if (invalid) return cb(invalid);
+
+  const item = getItem(key);
+  const cap = overflow === "ignore" ? null : itemCap(item);
+  const whole = (err, credited) =>
+    err ? cb(err) : cb(null, credited ? { kept: quantity, sold: 0, points: 0 } : null);
+  if (cap === null || overflow === "refuse") {
+    return credit(userId, key, quantity, source, cap, whole);
+  }
+
+  const value = itemOverflowValue(item);
+  const result = { kept: 0, sold: 0, points: 0 };
+  const next = (remaining) => {
+    if (!remaining) return cb(null, result);
+    credit(userId, key, 1, source, cap, (err, credited) => {
+      if (err) return cb(err);
+      if (credited) {
+        result.kept++;
+        return next(remaining - 1);
+      }
+      addPoints(userId, value, (err) => {
+        if (!err) {
+          result.sold++;
+          result.points += value;
+          logMovement(userId, key, 0, `vente-auto:${source || SOURCE_INCONNUE}`);
+          return next(remaining - 1);
+        }
+        handleException(`Vente automatique d'un objet au-delà de la limite (${key}) :`, err);
+        credit(userId, key, 1, source, null, (err) => {
+          if (err) return cb(err);
+          result.kept++;
+          next(remaining - 1);
+        });
+      });
+    });
+  };
+  next(quantity);
+}
+
+// Ce que dit un gain dont une part a été vendue d'office : la même phrase sur
+// Discord et sur le site. null quand tout a été gardé.
+export function overflowNotice(item, granted) {
+  if (!granted?.sold) return null;
+  const cap = itemCap(item);
+  const label = item?.label ?? "cet objet";
+  return (
+    `Tu as déjà ${cap > 1 ? `${cap} ${label}` : `une ${label}`}, le maximum : ` +
+    `${granted.sold > 1 ? `les ${granted.sold} de plus sont vendues` : "celle-ci est vendue"} ` +
+    `**${granted.points.toLocaleString("fr-FR")}** points.`
   );
 }
 
@@ -447,4 +535,84 @@ export function migrateRetiredStones(cb = () => {}) {
       cb(error);
     }
   );
+}
+
+// La limite de détention arrive après coup : ce que les dresseurs gardent déjà
+// au-delà se vend d'office, au même prix qu'un gain de trop. Une seule fois — la
+// ligne de pokemon_migrations le retient —, sans quoi chaque redémarrage
+// revendrait aussi ce qu'un administrateur a donné en passant outre.
+//
+// Chaque surplus se retire d'abord, gardé sur le compte lu, puis se paie ; si
+// les points ne passent pas, il revient. La marque ne se pose qu'une fois tout
+// traité sans erreur : un passage interrompu se rejoue, et ne trouve plus que ce
+// qui reste au-delà.
+const CAP_MIGRATION = "plafond-detention";
+
+export function sellHeldOverCap(cb = () => {}) {
+  db.get("SELECT 1 FROM pokemon_migrations WHERE name = ?", [CAP_MIGRATION], (err, done) => {
+    if (err) return cb(err);
+    if (done) return cb(null, { sold: 0 });
+    const capped = getItems().filter((item) => itemCap(item));
+    let sold = 0;
+    let failed = null;
+
+    const sellRow = (item, row, next) => {
+      const extra = row.count - itemCap(item);
+      db.run(
+        `UPDATE pokemon_inventory SET count = count - ?
+          WHERE user_id = ? AND item_key = ? AND count = ?`,
+        [extra, row.user_id, item.key, row.count],
+        function (err) {
+          if (err) {
+            failed = err;
+            return next();
+          }
+          // Le compte a bougé entre-temps : le prochain passage le reprendra.
+          if (this.changes !== 1) {
+            failed = new Error(`Inventaire modifié pendant la limite : ${row.user_id}`);
+            return next();
+          }
+          addPoints(row.user_id, extra * itemOverflowValue(item), (err) => {
+            if (err) {
+              failed = err;
+              return credit(row.user_id, item.key, extra, "plafond-annule", null, (restoreError) => {
+                if (restoreError) handleException("Restitution d'un surplus :", restoreError);
+                next();
+              });
+            }
+            logMovement(row.user_id, item.key, -extra, `vente-auto:${CAP_MIGRATION}`);
+            sold += extra;
+            next();
+          });
+        }
+      );
+    };
+
+    const nextItem = (index) => {
+      if (index >= capped.length) {
+        if (failed) return cb(failed);
+        return db.run(
+          "INSERT OR IGNORE INTO pokemon_migrations (name, done_at) VALUES (?, ?)",
+          [CAP_MIGRATION, Date.now()],
+          (err) => {
+            if (err) return cb(err);
+            if (sold) log(`Limite de détention : ${sold} objet(s) au-delà vendu(s) d'office`);
+            cb(null, { sold });
+          }
+        );
+      }
+      const item = capped[index];
+      db.all(
+        "SELECT user_id, count FROM pokemon_inventory WHERE item_key = ? AND count > ?",
+        [item.key, itemCap(item)],
+        (err, rows) => {
+          if (err) return cb(err);
+          const nextRow = (i) =>
+            i >= rows.length ? nextItem(index + 1) : sellRow(item, rows[i], () => nextRow(i + 1));
+          nextRow(0);
+        }
+      );
+    };
+    nextItem(0);
+  });
 }

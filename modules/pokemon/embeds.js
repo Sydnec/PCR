@@ -21,7 +21,7 @@ import {
   getSpecialBalls,
   hasPersonalPrice,
 } from "./config.js";
-import { getCharmItem, getItem, sortByCatalogue } from "./items.js";
+import { getCharmItem, getItem, overflowNotice, sortByCatalogue } from "./items.js";
 import {
   RARITIES,
   allSpecies,
@@ -597,7 +597,8 @@ export function buildLotteryEmbed({ prize = null, nextAt, played = false } = {})
       .setDescription(`Rien cette fois.${quand}`);
   }
 
-  const { item, quantity } = prize;
+  const { item, quantity, granted } = prize;
+  const vendu = overflowNotice(item, granted);
   // Le gras enveloppe la quantité ET le nom d'un seul tenant : deux paires de
   // ** imbriquées se referment l'une l'autre et laissent les astérisques en
   // clair, ce qui est exactement ce qui arrivait au message de revente.
@@ -606,6 +607,7 @@ export function buildLotteryEmbed({ prize = null, nextAt, played = false } = {})
     .setColor(0xc27c0e)
     .setDescription(
       `${item.emoji} Tu gagnes **${quantity}\u00D7 ${item.label}** !` +
+        (vendu ? ` ${vendu}` : "") +
         (item.description ? `\n*${item.description}*` : "") +
         quand
     );

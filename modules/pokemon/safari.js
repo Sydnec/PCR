@@ -804,7 +804,7 @@ export function startPaidSession(userId, { generations = null } = {}, cb) {
         // la résolution de course rend une visite déjà en cours, qui n'est pas
         // celle qu'on vient de payer.
         if (err || !result.ok || result.resumed) {
-          grantItem(userId, TICKET, 1, { source: "safari-annule" }, (restoreError) => {
+          grantItem(userId, TICKET, 1, { source: "safari-annule", overflow: "ignore" }, (restoreError) => {
             if (restoreError) handleException("Restitution du Ticket Safari :", restoreError);
           });
           return err ? cb(err) : cb(null, { ...result, ticketRendu: true });

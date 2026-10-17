@@ -416,11 +416,11 @@ describe("la Master Ball et sa confirmation", () => {
   it("une Master Ball offerte se confirme aussi, avec le nombre qu'il en reste, et le customId porte la promesse", async () => {
     const user = newUser();
     const id = await spawnRow("Roucool");
-    await grant("ball_master", 2, user);
+    await grant("ball_master", 1, user);
     const calls = await click(`poke_master|${id}`, { user });
     const reply = only(calls, "reply");
     assert.match(reply.content, /Tu vas utiliser ta \*\*Master Ball\*\* offerte/);
-    assert.match(reply.content, /Il t'en reste \*\*2\*\*/);
+    assert.match(reply.content, /Il t'en reste \*\*1\*\*/);
     assert.deepEqual(buttonIds(reply), [`poke_master_ok|${id}|item`, `poke_master_cancel|${id}`]);
     assert.equal(labels(reply)[0], "Utiliser ma Master Ball");
   });
@@ -497,6 +497,21 @@ describe("la fiche et les objets au sol", () => {
     const late = await click(`poke_drop|${lastID}`, { user: newUser() });
     assert.equal(only(late, "reply").flags, EPHEMERAL, "les autres reçoivent un mot en privé");
     assert.equal((await dbAll(points, "SELECT SUM(count) AS total FROM pokemon_inventory"))[0].total, 1, "rien n'a été créé en plus");
+  });
+
+  it("une Master Ball ramassée par qui en a déjà une se vend d'office, et il est le seul à le lire", async () => {
+    const winner = newUser();
+    await grant("ball_master", 1, winner);
+    const spawnId = await spawnRow("Roucool");
+    await dbRun(points, "UPDATE pokemon_spawns SET status = 'FLED', ended_at = ? WHERE id = ?", [Date.now(), spawnId]);
+    const { lastID } = await dbRun(points, "INSERT INTO pokemon_drops (spawn_id, item_key, status, dropped_at, channel_id, message_id) VALUES (?, 'ball_master', 'OPEN', ?, '123', 'm9')", [spawnId, Date.now()]);
+    const calls = await click(`poke_drop|${lastID}`, { user: winner });
+    assert.deepEqual(only(calls, "update").components, []);
+    const notice = only(calls, "followUp");
+    assert.equal(notice.flags, EPHEMERAL);
+    assert.match(notice.content, /Tu as déjà une Master Ball, le maximum : celle-ci est vendue \*\*10\u202f000\*\* points/);
+    assert.equal(await count("ball_master", winner), 1);
+    assert.equal(await balance(winner), 10000);
   });
 });
 

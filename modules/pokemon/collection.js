@@ -33,6 +33,7 @@ import {
   getItems,
   grantItem,
   isTradable,
+  itemCap,
   itemOpen,
 } from "./items.js";
 import { recordFusion, recordTrade } from "./stats.js";
@@ -1091,7 +1092,7 @@ export function evolve(userId, group, chosenTargetId, helperKey, cb) {
       }
       payer(reserved, spent, (suite) =>
         // Compensation en cascade : l'aide revient, puis les exemplaires.
-        grantItem(userId, helper.item.key, helper.quantity, { source: "fusion-annulee" }, (err) => {
+        grantItem(userId, helper.item.key, helper.quantity, { source: "fusion-annulee", overflow: "ignore" }, (err) => {
           if (err) handleException("Restitution d'une aide d'évolution :", err);
           rendreExemplaires(suite);
         })
@@ -1530,8 +1531,15 @@ function takeSide(side, ownerId, cb) {
         );
       }
       done({
-        deliver: (toId, next) => grantItem(toId, key, quantity, source, (err) => next(err)),
-        restore: (next) => grantItem(ownerId, key, quantity, source, (err) => next(err)),
+        // Livré tout ou rien sous la limite du receveur, vérifiée avant l'échange :
+        // un refus ici est une course perdue, et la cascade rend l'objet. Rendu,
+        // il revient tel qu'il est parti.
+        deliver: (toId, next) =>
+          grantItem(toId, key, quantity, { ...source, overflow: "refuse" }, (err, granted) =>
+            next(err ?? (granted ? null : new Error("Limite de détention atteinte")))
+          ),
+        restore: (next) =>
+          grantItem(ownerId, key, quantity, { ...source, overflow: "ignore" }, (err) => next(err)),
         retract: (toId, next) =>
           consumeItem(toId, key, quantity, source, (err, ok) =>
             next(err ?? (ok ? null : new Error("Objet déjà consommé")))
@@ -1623,6 +1631,33 @@ function shortageReason(shortage, { mine }) {
     : "Le Pokémon proposé n'est plus disponible : il est parti, verrouillé, ou c'est le dernier de son espèce chez l'initiateur.";
 }
 
+// Un objet plafonné (la Master Ball) que l'échange ferait dépasser chez son
+// receveur, dit à celui qui accepte — ou null. Ce que le receveur donne de la même
+// clé dans l'autre côté part avant la livraison : il se déduit.
+function capReason(trade, offerSide, requestSide, cb) {
+  const checks = [
+    { side: offerSide, other: requestSide, to: trade.to_user_id, mine: true },
+    { side: requestSide, other: offerSide, to: trade.from_user_id, mine: false },
+  ].filter(({ side }) => side.kind === "item" && itemCap(getItem(side.key)));
+  const next = (index) => {
+    if (index >= checks.length) return cb(null, null);
+    const { side, other, to, mine } = checks[index];
+    const item = getItem(side.key);
+    const cap = itemCap(item);
+    getItemCount(to, side.key, (err, held) => {
+      if (err) return cb(err);
+      const leaving = other.kind === "item" && other.key === side.key ? other.quantity : 0;
+      if (held - leaving + side.quantity <= cap) return next(index + 1);
+      cb(
+        null,
+        `${mine ? "Tu as" : "L'initiateur a"} déjà ${held.toLocaleString("fr-FR")} ${item.label}, ` +
+          `et on n'en garde pas plus de ${cap.toLocaleString("fr-FR")} : l'échange ne passe pas.`
+      );
+    });
+  };
+  next(0);
+}
+
 // Acceptation d'un échange. La revendication gardée sert à la fois de verrou
 // anti-double-acceptation et de contrôle d'expiration : aucun cron n'est
 // nécessaire pour que l'expiration soit correcte.
@@ -1694,56 +1729,61 @@ export function acceptTrade(tradeId, options, cb) {
         // Retrait chez l'initiateur, puis chez la cible, avec compensation si le
         // second échoue (le Pokémon a pu évoluer entre-temps, les points être
         // dépensés). Aucun ne cède son dernier de l'espèce : reserveDuplicates le
-        // refuse, exactement comme pour une évolution ou une revente.
-        takeSide(offerSide, trade.from_user_id, (err, offered, offerShortage) => {
+        // refuse, exactement comme pour une évolution ou une revente. La limite
+        // de détention se vérifie avant tout retrait : rien à défaire.
+        capReason(trade, offerSide, requestSide, (err, capped) => {
           if (err) return reopen(true, err);
-          if (!offered) return fail(shortageReason(offerShortage, { mine: false }));
+          if (capped) return fail(capped);
+          takeSide(offerSide, trade.from_user_id, (err, offered, offerShortage) => {
+            if (err) return reopen(true, err);
+            if (!offered) return fail(shortageReason(offerShortage, { mine: false }));
 
-          takeSide(requestSide, trade.to_user_id, (err, requested, requestShortage) => {
-            if (err || !requested) {
-              // Compensation : on rend à l'initiateur ce qu'on lui a retiré.
-              return giveBack(offered, true, (cleanly) =>
-                err ? reopen(cleanly, err) : fail(shortageReason(requestShortage, { mine: true }))
-              );
-            }
+            takeSide(requestSide, trade.to_user_id, (err, requested, requestShortage) => {
+              if (err || !requested) {
+                // Compensation : on rend à l'initiateur ce qu'on lui a retiré.
+                return giveBack(offered, true, (cleanly) =>
+                  err ? reopen(cleanly, err) : fail(shortageReason(requestShortage, { mine: true }))
+                );
+              }
 
-            // Livraison : chacun reçoit ce que l'autre donnait. Si la seconde
-            // échoue, la première se reprend, puis chacun retrouve le sien. Au
-            // mieux : rendre ce qu'on peut vaut mieux que le perdre.
-            //
-            // Quand ce qui a été livré ne se reprend pas — les points sont déjà
-            // dépensés —, l'initiateur ne récupère rien : lui rendre sa part en plus
-            // créerait de la valeur. Le destinataire retrouve ce qu'il donnait, et
-            // l'offre reste fermée.
-            const rollBack = (err, deliveredOffer) => {
-              handleException("Livraison d'un échange :", err);
-              const restoreRequested = (cleanly) =>
-                giveBack(requested, cleanly, (clean) => reopen(clean, err));
-              if (!deliveredOffer) return giveBack(offered, true, restoreRequested);
-              offered.retract(trade.to_user_id, (retractError) => {
-                if (!retractError) return giveBack(offered, true, restoreRequested);
-                handleException("Reprise d'un échange :", retractError);
-                restoreRequested(false);
-              });
-            };
+              // Livraison : chacun reçoit ce que l'autre donnait. Si la seconde
+              // échoue, la première se reprend, puis chacun retrouve le sien. Au
+              // mieux : rendre ce qu'on peut vaut mieux que le perdre.
+              //
+              // Quand ce qui a été livré ne se reprend pas — les points sont déjà
+              // dépensés —, l'initiateur ne récupère rien : lui rendre sa part en plus
+              // créerait de la valeur. Le destinataire retrouve ce qu'il donnait, et
+              // l'offre reste fermée.
+              const rollBack = (err, deliveredOffer) => {
+                handleException("Livraison d'un échange :", err);
+                const restoreRequested = (cleanly) =>
+                  giveBack(requested, cleanly, (clean) => reopen(clean, err));
+                if (!deliveredOffer) return giveBack(offered, true, restoreRequested);
+                offered.retract(trade.to_user_id, (retractError) => {
+                  if (!retractError) return giveBack(offered, true, restoreRequested);
+                  handleException("Reprise d'un échange :", retractError);
+                  restoreRequested(false);
+                });
+              };
 
-            offered.deliver(trade.to_user_id, (err) => {
-              if (err) return rollBack(err, false);
-              requested.deliver(trade.from_user_id, (err) => {
-                if (err) return rollBack(err, true);
-                recordTrade({ fromUserId: trade.from_user_id, toUserId: trade.to_user_id });
-                // L'offre garde l'individu qui a vraiment changé de main quand elle
-                // ne le désignait pas : le message final dit lequel, plutôt que
-                // « un Roucool ».
-                recordGiven(trade, "offer", offered);
-                recordGiven(trade, "request", requested);
-                cb(null, {
-                  ok: true,
-                  trade,
-                  received: {
-                    byTarget: offered.arrival?.(trade.to_user_id) ?? null,
-                    byInitiator: requested.arrival?.(trade.from_user_id) ?? null,
-                  },
+              offered.deliver(trade.to_user_id, (err) => {
+                if (err) return rollBack(err, false);
+                requested.deliver(trade.from_user_id, (err) => {
+                  if (err) return rollBack(err, true);
+                  recordTrade({ fromUserId: trade.from_user_id, toUserId: trade.to_user_id });
+                  // L'offre garde l'individu qui a vraiment changé de main quand elle
+                  // ne le désignait pas : le message final dit lequel, plutôt que
+                  // « un Roucool ».
+                  recordGiven(trade, "offer", offered);
+                  recordGiven(trade, "request", requested);
+                  cb(null, {
+                    ok: true,
+                    trade,
+                    received: {
+                      byTarget: offered.arrival?.(trade.to_user_id) ?? null,
+                      byInitiator: requested.arrival?.(trade.from_user_id) ?? null,
+                    },
+                  });
                 });
               });
             });

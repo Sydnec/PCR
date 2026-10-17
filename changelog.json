@@ -2401,6 +2401,16 @@
       "commit": "pending",
       "timestamp": "2026-10-16T09:00:00.000Z",
       "branch": "dev/keen-knuth-lcd8tu"
+    },
+    {
+      "type": "feature",
+      "name": "Une seule Master Ball en poche",
+      "description": "On ne garde plus qu'une Master Ball à la fois : toute Master Ball gagnée en plus est vendue d'office 10 000 points. Les Master Balls déjà en trop sont vendues au même prix.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-17T10:00:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
     }
   ]
 }
