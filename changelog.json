@@ -1,7 +1,24 @@
 {
-  "version": "1.18.5",
-  "lastUpdated": "2026-10-17T13:32:35.832Z",
+  "version": "1.18.6",
+  "lastUpdated": "2026-10-17T21:30:11.067Z",
   "releases": [
+    {
+      "version": "1.18.6",
+      "date": "2026-10-17",
+      "title": "Release 1.18.6",
+      "features": [
+        {
+          "type": "fix",
+          "name": "Démarrage du bot",
+          "description": "Corrige une erreur répétée au démarrage du bot après l'arrivée de la limite de Master Ball.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-10-17T16:00:00.000Z",
+          "branch": "dev/keen-knuth-lcd8tu"
+        }
+      ]
+    },
     {
       "version": "1.18.5",
       "date": "2026-10-17",
@@ -2418,16 +2435,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "fix",
-      "name": "Démarrage du bot",
-      "description": "Corrige une erreur répétée au démarrage du bot après l'arrivée de la limite de Master Ball.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-10-17T16:00:00.000Z",
-      "branch": "dev/keen-knuth-lcd8tu"
-    }
-  ]
+  "pending": []
 }
