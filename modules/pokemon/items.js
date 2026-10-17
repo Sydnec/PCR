@@ -82,18 +82,19 @@ export const itemSellValue = (item) => {
   return value > 0 ? value : 0;
 };
 
-// Combien un dresseur peut en garder (`maxHeld`), ou null sans limite. La
-// Master Ball n'en garde qu'une : en accumuler retirait toute tension aux
-// légendaires.
-export const itemCap = (item) => {
-  const cap = Math.round(Number(item?.maxHeld) || 0);
-  return cap > 0 ? cap : null;
-};
-
 // Ce que rapporte un exemplaire reçu au-delà de la limite (`overflowValue`).
 export const itemOverflowValue = (item) => {
   const value = Math.round(Number(item?.overflowValue) || 0);
   return value > 0 ? value : 0;
+};
+
+// Combien un dresseur peut en garder (`maxHeld`), ou null sans limite. La
+// Master Ball n'en garde qu'une : en accumuler retirait toute tension aux
+// légendaires. Une limite sans prix de revente ne joue pas : elle détruirait
+// chaque exemplaire de trop contre rien.
+export const itemCap = (item) => {
+  const cap = Math.round(Number(item?.maxHeld) || 0);
+  return cap > 0 && itemOverflowValue(item) > 0 ? cap : null;
 };
 
 // Trie des lignes d'inventaire dans l'ordre du catalogue. La base rend un tri

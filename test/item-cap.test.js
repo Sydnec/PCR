@@ -44,6 +44,12 @@ describe("la limite de détention", () => {
     assert.equal(items.itemCap(items.getItem("super_bonbon")), null);
   });
 
+  it("une limite sans prix de revente ne joue pas : rien ne se détruit contre zéro", () => {
+    assert.equal(items.itemCap({ maxHeld: 1, overflowValue: 0 }), null);
+    assert.equal(items.itemCap({ maxHeld: 1 }), null);
+    assert.equal(items.itemCap({ maxHeld: 1, overflowValue: 5 }), 1);
+  });
+
   it("la première se garde, la seconde se vend d'office", async () => {
     assert.deepEqual(await grant("u1"), { kept: 1, sold: 0, points: 0 });
     assert.deepEqual(await grant("u1"), { kept: 0, sold: 1, points: 10000 });

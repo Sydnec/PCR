@@ -72,13 +72,15 @@ async function execute(bot) {
     });
 
     // Ce qui dépasse déjà la limite de détention (une Master Ball) se vend
-    // d'office, une seule fois. Un passage incomplet se rejoue une minute après.
-    sellHeldOverCap((err) => {
-        if (err) {
+    // d'office, une seule fois. Un passage incomplet se rejoue une minute après,
+    // jusqu'à ce qu'il passe : la marque n'est posée qu'à la fin.
+    const sellOverCap = () =>
+        sellHeldOverCap((err) => {
+            if (!err) return;
             handleException("Vente du surplus au-delà de la limite :", err);
-            setTimeout(() => sellHeldOverCap(), 60_000);
-        }
-    });
+            setTimeout(sellOverCap, 60_000);
+        });
+    sellOverCap();
 
     // L'API de l'interface web, si WEB_PORT est défini. Elle démarre une fois
     // le bot prêt : c'est lui qui vérifie qu'un visiteur est membre du serveur.
