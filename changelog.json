@@ -2418,5 +2418,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "fix",
+      "name": "Démarrage du bot",
+      "description": "Corrige une erreur répétée au démarrage du bot après l'arrivée de la limite de Master Ball.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-17T16:00:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
+    }
+  ]
 }
