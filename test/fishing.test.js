@@ -224,10 +224,17 @@ describe("la capture d'une pêche", () => {
     await hook();
     const before = await balance();
     const original = points.run;
-    // Entre le contrôle et l'écriture de la capture, l'échéance tombe.
-    points.run = function (sql, ...rest) {
-      if (/SET status = 'CAUGHT'/.test(sql)) original.call(this, "UPDATE pokemon_spawns SET flees_at = ? WHERE id = 1", [Date.now() - 1]);
-      return original.call(this, sql, ...rest);
+    // Entre le contrôle et l'écriture de la capture, l'échéance tombe : pile à l'instant de la
+    // réclamation (son dernier paramètre), et non à Date.now() - 1, qui la remettait dans le
+    // futur dès que 2 ms passaient sous charge. Et la réclamation ne part qu'une fois l'échéance
+    // écrite : la connexion n'est pas sérialisée, deux requêtes lancées d'affilée peuvent
+    // s'exécuter dans le désordre.
+    points.run = function (sql, params, done) {
+      if (!/SET status = 'CAUGHT'/.test(sql)) return original.call(this, sql, params, done);
+      original.call(this, "UPDATE pokemon_spawns SET flees_at = ? WHERE id = 1", [params.at(-1)], (err) =>
+        err ? done(err) : original.call(this, sql, params, done)
+      );
+      return this;
     };
     let outcome;
     try {
