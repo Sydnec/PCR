@@ -12,7 +12,7 @@ import {
   tradeCandidate,
 } from "./collection.js";
 import { getSpecies, tradeEvolutionTarget } from "./data.js";
-import { getInventory, getItem, getItemCount, isTradable } from "./items.js";
+import { getInventory, getItem, getItemCount, isTradable, itemCap } from "./items.js";
 import { describeGroup } from "./embeds.js";
 
 const promisify = (fn, ...args) =>
@@ -103,8 +103,10 @@ export function itemChoices(userId, needle, quantity = null) {
 // rédigé pour celui qui propose. `choice` vient de parseChoice (ou d'un brouillon),
 // `individual` désigne l'individu qu'on donne ("#123", sinon le moins précieux), `owner`
 // est le dresseur chez qui le côté se retire et `own` dit si c'est celui qui propose :
-// « tu » ou « <@id> ». Tout se relit en base : une valeur a pu vieillir depuis le menu.
-export async function checkSide(choice, individual, owner, own) {
+// « tu » ou « <@id> ». `receiver` reçoit le côté : un objet plafonné (la Master Ball)
+// ne s'offre pas à qui en a déjà le maximum. Tout se relit en base : une valeur a pu
+// vieillir depuis le menu.
+export async function checkSide(choice, individual, owner, own, receiver = null) {
   const who = own ? "Tu" : `<@${owner}>`;
   if (choice.kind === "points") {
     const amount = choice.amount;
@@ -135,6 +137,19 @@ export async function checkSide(choice, individual, owner, own) {
           `${who} ${own ? "n'as" : "n'a"} que **${held.toLocaleString("fr-FR")}** ${item.label} : ` +
           `${own ? "il t'en faut" : "il lui en faut"} **${quantity.toLocaleString("fr-FR")}**.`,
       };
+    }
+    const cap = itemCap(item);
+    if (cap && receiver) {
+      const theirs = await promisify(getItemCount, receiver, key);
+      if (theirs + quantity > cap) {
+        // Le receveur est l'autre partie : la cible quand on donne, soi quand on demande.
+        const them = own ? `<@${receiver}> a` : "Tu as";
+        return {
+          error:
+            `${them} déjà **${theirs.toLocaleString("fr-FR")}** ${item.label}, et on n'en garde ` +
+            `pas plus de **${cap.toLocaleString("fr-FR")}** : l'échange ne passerait pas.`,
+        };
+      }
     }
     return { side: { item: key, quantity } };
   }

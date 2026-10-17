@@ -154,7 +154,7 @@ export function play(userId, cb) {
       return cb(null, { ok: true, prize: null, nextAt });
     }
 
-    grantItem(userId, prize.item.key, prize.quantity, { source: SOURCE }, (err) => {
+    grantItem(userId, prize.item.key, prize.quantity, { source: SOURCE }, (err, granted) => {
       // Le crédit a échoué : le tirage est rendu plutôt que perdu. Le lot, lui,
       // est oublié — il sera retiré au sort, et c'est bien une loterie.
       if (err) return releaseDraw(userId, day, () => cb(err));
@@ -169,7 +169,7 @@ export function play(userId, cb) {
       pseudo(userId).then((name) =>
         log(`Loterie : ${name} gagne ${prize.quantity}× ${prize.item.label}`)
       );
-      cb(null, { ok: true, prize, nextAt });
+      cb(null, { ok: true, prize: { ...prize, granted }, nextAt });
     });
   });
 }

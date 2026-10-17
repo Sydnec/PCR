@@ -573,11 +573,12 @@ export async function render(ctx) {
               onclick: async (event) => {
                 event.currentTarget.disabled = true;
                 try {
-                  const { item } = await api(`/api/drops/${drop.id}/claim`, {
+                  const { item, sold } = await api(`/api/drops/${drop.id}/claim`, {
                     method: "POST",
                     body: {},
                   });
-                  toast(`Tu ramasses **${item.label}** !`, "success");
+                  // Au-delà de la limite (la Master Ball), l'objet est vendu d'office.
+                  toast(`Tu ramasses **${item.label}** !${sold ? ` ${sold}` : ""}`, "success");
                 } catch (error) {
                   toast(error.message, "error");
                 }

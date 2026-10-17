@@ -104,9 +104,10 @@ const OPTIONS = {
 
 // Un côté lu dans les options : `{ side }`, ou `{ error }` rédigé pour celui qui a
 // tapé la commande. `owner` est le dresseur chez qui le côté se retire, `own` dit
-// si c'est celui qui propose : « tu » ou « <@id> ». Chaque valeur s'est
-// peut-être tapée à la main ou a vieilli depuis l'autocomplétion : tout se relit.
-async function readSide(interaction, names, owner, own) {
+// si c'est celui qui propose : « tu » ou « <@id> », `receiver` celui qui reçoit le
+// côté. Chaque valeur s'est peut-être tapée à la main ou a vieilli depuis
+// l'autocomplétion : tout se relit.
+async function readSide(interaction, names, owner, own, receiver) {
   const raw = interaction.options.getString(names.choice);
   const individual = names.individual ? interaction.options.getString(names.individual) : null;
 
@@ -128,7 +129,7 @@ async function readSide(interaction, names, owner, own) {
     return { error: `\`${names.individual}\` ne va qu'avec un Pokémon (\`${names.choice}\`).` };
   }
 
-  return checkSide(choice, individual, owner, own);
+  return checkSide(choice, individual, owner, own, receiver);
 }
 
 // Les descriptions des options sont volontairement courtes : /pk s'approche de la limite
@@ -229,8 +230,8 @@ export default {
       let offer, request;
       try {
         [offer, request] = await Promise.all([
-          readSide(interaction, OPTIONS.give, interaction.user.id, true),
-          readSide(interaction, OPTIONS.get, target.id, false),
+          readSide(interaction, OPTIONS.give, interaction.user.id, true, target.id),
+          readSide(interaction, OPTIONS.get, target.id, false, interaction.user.id),
         ]);
       } catch (err) {
         handleException("Lecture des côtés pour /pk echange :", err);

@@ -1426,6 +1426,10 @@ input[type="number"] {
   height: 1.4em;
 }
 
+.pc-archived {
+  color: var(--accent);
+}
+
 .pc-name,
 .pc-name-form {
   flex: 1 1 0;

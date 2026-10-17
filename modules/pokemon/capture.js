@@ -24,6 +24,7 @@ import {
   getInventory,
   getItem,
   grantItem,
+  overflowNotice,
 } from "./items.js";
 import { dropItem, leavesItemBehind } from "./drops.js";
 import { ballMultiplier, catchProbability, charmFactor, getSpecies } from "./data.js";
@@ -281,7 +282,7 @@ function refundThrow(userId, spawnId, ball, probability, payment, cb) {
   // Une ball spéciale revient dans la poche avec sa date d'achat : elle servira à
   // la prochaine apparition comme avant.
   if (payment?.unit) return restoreUnit(payment.unit, done);
-  if (gratuit) return grantItem(userId, payment.item, 1, { source: "lancer-annule" }, done);
+  if (gratuit) return grantItem(userId, payment.item, 1, { source: "lancer-annule", overflow: "ignore" }, done);
   addPoints(userId, payment.points, done);
 }
 
@@ -521,15 +522,18 @@ export function resolveThrow(
                 return caughtOutcome({ item: held, dropped: true });
               }
 
-              grantItem(userId, held.key, 1, { source: `capture:${spawnId}` }, (err) => {
+              grantItem(userId, held.key, 1, { source: `capture:${spawnId}` }, (err, granted) => {
                 if (err) {
                   handleException("Remise de l'objet tenu :", err);
                   return caughtOutcome(null);
                 }
                 pseudo(userId).then((name) =>
-                  log(`Butin : ${name} récupère ${held.label} (spawn #${spawnId})`)
+                  log(
+                    `Butin : ${name} récupère ${held.label} (spawn #${spawnId})` +
+                      (granted?.sold ? `, vendu d'office ${granted.points} pts` : "")
+                  )
                 );
-                caughtOutcome({ item: held, dropped: false });
+                caughtOutcome({ item: held, dropped: false, granted });
               });
             });
           }));
@@ -598,12 +602,13 @@ export function throwMessage(outcome) {
       );
     }
     case "catch": {
-      const { item, dropped } = outcome.held ?? {};
+      const { item, dropped, granted } = outcome.held ?? {};
+      const vendu = overflowNotice(item, granted);
       const butin = !item
         ? ""
         : dropped
           ? `\n${item.emoji} Il a lâché **${item.label}** en partant : il revient aux autres.`
-          : `\n${item.emoji} Il tenait **${item.label}** !`;
+          : `\n${item.emoji} Il tenait **${item.label}** !${vendu ? ` ${vendu}` : ""}`;
       // Un shiny du Charme Chroma : normal pour le salon, shiny pour lui.
       const charm = outcome.charmed ? getCharmItem(outcome.species.generation) : null;
       const name = displayName(

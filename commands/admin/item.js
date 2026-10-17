@@ -21,7 +21,11 @@ const lire = (userId, key) =>
   );
 const donner = (userId, key, quantity, source) =>
   new Promise((resolve, reject) =>
-    grantItem(userId, key, quantity, { source }, (err) => (err ? reject(err) : resolve(true)))
+    // L'administrateur passe outre la limite de détention : il dédommage ou
+    // teste, et sait ce qu'il donne.
+    grantItem(userId, key, quantity, { source, overflow: "ignore" }, (err) =>
+      err ? reject(err) : resolve(true)
+    )
   );
 const retirer = (userId, key, quantity, source) =>
   new Promise((resolve, reject) =>

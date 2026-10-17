@@ -706,6 +706,19 @@ describe("le PC (/api/me/pc)", () => {
     await failure(name("abc", "x"), 409);
   });
 
+  it("archive une boîte et rend le PC relu ; refuse une entrée invalide (400) et une boîte vide (409)", async () => {
+    const archive = (box, body) => call("POST", "/api/me/pc/boxes/:box/archive", { params: { box: String(box) }, body });
+    await ownMany("Rattata", 1, { pos: 0 });
+    const pc = await archive(0, { archived: true });
+    assert.equal(pc.boxes[0].archived, true);
+    assert.equal(pc.boxes[1].archived, false);
+    assert.equal((await archive(0, { archived: false })).boxes[0].archived, false);
+    await failure(archive(0, {}), 400);
+    await failure(archive(0, { archived: "oui" }), 400);
+    await failure(archive(5, { archived: true }), 409);
+    await failure(archive(999, { archived: true }), 409);
+  });
+
   it("donne un surnom, et refuse celui d'un autre", async () => {
     const [id] = await ownMany("Rattata", 1);
     const stranger = await own("Rattata", { user: OTHER });

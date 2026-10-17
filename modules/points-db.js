@@ -320,10 +320,15 @@ const db = new sqlite3.Database(dbPath, (err) => {
         user_id TEXT NOT NULL,
         box INTEGER NOT NULL,
         name TEXT NOT NULL,
+        archived INTEGER NOT NULL DEFAULT 0,
         PRIMARY KEY (user_id, box)
       )`,
       (err) => {
-        if (err) handleException("Erreur création table pokemon_pc_boxes :", err);
+        if (err) return handleException("Erreur création table pokemon_pc_boxes :", err);
+        // Une boîte archivée sans nom à elle garde sa ligne, avec un nom vide :
+        // la colonne est NOT NULL depuis le début, et SQLite ne sait pas la
+        // rendre facultative.
+        addColumn("pokemon_pc_boxes", "archived", "INTEGER NOT NULL DEFAULT 0");
       }
     );
 
@@ -705,6 +710,17 @@ const db = new sqlite3.Database(dbPath, (err) => {
       )`,
       (err) => {
         if (err) handleException("Erreur création table pokemon_showcase_shares :", err);
+      }
+    );
+
+    // Les migrations de données à ne jouer qu'une fois : la ligne en est la marque.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_migrations (
+        name TEXT PRIMARY KEY,
+        done_at INTEGER NOT NULL
+      )`,
+      (err) => {
+        if (err) handleException("Erreur création table pokemon_migrations :", err);
       }
     );
 

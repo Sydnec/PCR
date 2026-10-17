@@ -1,4 +1,4 @@
-import { log } from '../../modules/utils.js';
+import { handleException, log } from '../../modules/utils.js';
 import { checkAndAnnounceNewRelease } from '../../modules/changelog-notifier.js';
 import db from '../../modules/db.js';
 import { rehydratePokemon } from '../../modules/pokemon/spawn.js';
@@ -7,7 +7,7 @@ import { startWebServer } from '../../modules/web/server.js';
 import { setPseudoClient } from '../../modules/pseudo.js';
 import { repairCharms } from '../../modules/pokemon/charms.js';
 import { repairStarters } from '../../modules/pokemon/starters.js';
-import { migrateRetiredStones } from '../../modules/pokemon/items.js';
+import { migrateRetiredStones, sellHeldOverCap } from '../../modules/pokemon/items.js';
 
 const name = 'clientReady';
 const once = true;
@@ -70,6 +70,17 @@ async function execute(bot) {
     migrateRetiredStones((err) => {
         if (err) setTimeout(() => migrateRetiredStones(), 60_000);
     });
+
+    // Ce qui dépasse déjà la limite de détention (une Master Ball) se vend
+    // d'office, une seule fois. Un passage incomplet se rejoue une minute après,
+    // jusqu'à ce qu'il passe : la marque n'est posée qu'à la fin.
+    const sellOverCap = () =>
+        sellHeldOverCap((err) => {
+            if (!err) return;
+            handleException("Vente du surplus au-delà de la limite :", err);
+            setTimeout(sellOverCap, 60_000);
+        });
+    sellOverCap();
 
     // L'API de l'interface web, si WEB_PORT est défini. Elle démarre une fois
     // le bot prêt : c'est lui qui vérifie qu'un visiteur est membre du serveur.

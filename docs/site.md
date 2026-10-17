@@ -71,7 +71,7 @@ qui finit par le remplacer.
 ## Boîte PC
 
 Des boîtes de `pokemon.pc.slotsPerBox` cases (30), sur `columns` colonnes (6). Il y en a au moins
-`minBoxes` (8), et toujours une vide après la dernière occupée, jusqu'à `maxBoxes` (60).
+`minBoxes` (8), et toujours une vide, non archivée, après la dernière occupée, jusqu'à `maxBoxes` (60).
 
 La fiche d'un Pokémon réunit ses actions en haut, sous son nom : le champ du surnom, l'interrupteur
 du verrou, puis des boutons à icône (déplacer, revendre, faire évoluer, nommés dans leur bulle).
@@ -85,6 +85,12 @@ parce que le Pokémon est le dernier de son espèce, ou verrouillé : la note so
   deux échangent leur place. Glisser sur une flèche change de boîte.
 - **Nommer une boîte** : un clic sur son nom (`boxNameLength` caractères, 20) ; vide, elle reprend
   son nom par défaut.
+- **Archiver une boîte** : le bouton au carton, à côté de son nom, la range à part. Elle passe en
+  fin de liste, dans le groupe « Archivées » du menu, qui est le seul chemin vers elle : les flèches
+  passent d'une boîte ordinaire à l'autre, et d'une archivée à l'autre. Les nouveaux Pokémon n'y
+  arrivent pas d'eux-mêmes — sauf si toutes les autres cases sont prises jusqu'au plafond, plutôt
+  que d'en perdre un —, mais on peut toujours y en ranger. Une boîte vide ne s'archive pas, et une
+  archivée garde son nom et ses Pokémon ; elle compte dans le plafond de `maxBoxes`.
 - **Surnommer un Pokémon** depuis sa fiche (`nicknameLength` caractères, 20) ; vide, il reprend le
   nom de son espèce.
 - Surnom comme nom de boîte s'enregistrent **en sortant du champ**, ou sur Entrée, sans bouton ;
@@ -98,8 +104,9 @@ possède en couleur, les autres en silhouette. Chaque Zarbi a son image, dans sa
 fiche.
 
 Un Pokémon garde sa place et son surnom quand il évolue. Reçu en échange, il garde son surnom et
-prend la première case libre ; une capture ou une éclosion aussi. Le Pokédex ouvre la boîte sur
-une espèce (`/boite?species=25`) et en surligne les exemplaires.
+prend la première case libre hors des boîtes archivées ; une capture ou une éclosion aussi. Le
+Pokédex ouvre la boîte sur une espèce (`/boite?species=25`) et en surligne les exemplaires, en
+signalant ceux qui dorment dans une boîte archivée.
 
 ## Administration
 

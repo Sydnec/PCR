@@ -61,6 +61,8 @@ const PATHS = {
   ],
   // Deux chevrons qui montent : l'évolution.
   evolve: [["path", { d: "M6 13l6-6 6 6M6 19l6-6 6 6" }]],
+  // Un carton à couvercle : une boîte PC archivée.
+  archive: [["path", { d: "M3 4h18v4H3zM5 8v12h14V8M10 12h4" }]],
 };
 
 const SVG = "http://www.w3.org/2000/svg";

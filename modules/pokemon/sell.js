@@ -159,7 +159,7 @@ export function sellItem(userId, key, quantity, cb) {
 
     addPoints(userId, points, (err) => {
       if (err) {
-        grantItem(userId, key, quantity, { source: "vente-annulee" }, (restoreError) => {
+        grantItem(userId, key, quantity, { source: "vente-annulee", overflow: "ignore" }, (restoreError) => {
           if (restoreError) handleException("Restitution d'objets revendus :", restoreError);
         });
         return cb(err);

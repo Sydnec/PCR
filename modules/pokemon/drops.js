@@ -176,7 +176,7 @@ export function claimDrop(userId, dropId, cb) {
           );
         }
 
-        grantItem(userId, drop.item_key, 1, { source: `sol:${dropId}` }, (err) => {
+        grantItem(userId, drop.item_key, 1, { source: `sol:${dropId}` }, (err, granted) => {
           if (err) {
             // Le crédit a échoué : l'objet retourne par terre, sans quoi il
             // serait perdu pour tout le monde.
@@ -185,7 +185,7 @@ export function claimDrop(userId, dropId, cb) {
           pseudo(userId).then((name) =>
             log(`Objet au sol #${dropId} ramassé par ${name} (${item.label})`)
           );
-          cb(null, { ok: true, drop, item });
+          cb(null, { ok: true, drop, item, granted });
         });
       });
     }

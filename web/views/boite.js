@@ -85,7 +85,17 @@ export async function render(ctx) {
     body.replaceChildren(...[head(), banner(), grid(), summary(), stash].filter(Boolean));
   }
 
+  // La boîte voisine dans le même rang : les flèches passent d'une boîte
+  // ordinaire à l'autre, et ne vont dans les archivées que depuis l'une d'elles.
+  // null au bout du rang.
+  function step(direction) {
+    const archived = Boolean(pc.boxes[box]?.archived);
+    const row = pc.boxes.filter((entry) => entry.archived === archived).map((entry) => entry.box);
+    return row[row.indexOf(box) + direction] ?? null;
+  }
+
   function goTo(next) {
+    if (next === null) return;
     const target = Math.max(0, Math.min(pc.boxes.length - 1, next));
     if (target === box) return;
     box = target;
@@ -134,8 +144,8 @@ export async function render(ctx) {
           class: "button ghost pc-arrow",
           "aria-label": label,
           title: label,
-          disabled: direction < 0 ? box === 0 : box === pc.boxes.length - 1,
-          onclick: () => goTo(box + direction),
+          disabled: step(direction) === null,
+          onclick: () => goTo(step(direction)),
           // Glisser un Pokémon sur la flèche : on change de boîte sans le lâcher.
           ondragover: (event) => {
             if (!dragging) return;
@@ -144,7 +154,7 @@ export async function render(ctx) {
             if (flip.direction !== direction) flip = { direction, since: now, last: 0 };
             if (now - flip.since >= FLIP_DELAY_MS && now - flip.last >= FLIP_DELAY_MS) {
               flip.last = now;
-              goTo(box + direction);
+              goTo(step(direction));
             }
           },
           ondragleave: () => {
@@ -159,6 +169,7 @@ export async function render(ctx) {
       arrow(-1, "chevronLeft", "Boîte précédente"),
       renaming ? nameForm(current) : nameButton(current),
       arrow(1, "chevronRight", "Boîte suivante"),
+      archiveButton(current),
       h(
         "select",
         {
@@ -166,16 +177,66 @@ export async function render(ctx) {
           "aria-label": "Aller à la boîte",
           onchange: (event) => goTo(Number(event.target.value)),
         },
-        pc.boxes.map((entry) => {
-          const count = pc.pokemon.filter((mon) => boxOf(mon.pos) === entry.box).length;
-          return h(
-            "option",
-            { value: entry.box, selected: entry.box === box },
-            `${entry.name} (${fmt(count)})`
-          );
-        })
+        // Les archivées en fin de liste, à part : c'est le seul chemin vers elles.
+        pc.boxes.filter((entry) => !entry.archived).map(jumpOption),
+        archivedBoxes().length
+          ? h("optgroup", { label: "Archivées" }, archivedBoxes().map(jumpOption))
+          : null
       )
     );
+  }
+
+  const archivedBoxes = () => pc.boxes.filter((entry) => entry.archived);
+
+  function jumpOption(entry) {
+    const count = pc.pokemon.filter((mon) => boxOf(mon.pos) === entry.box).length;
+    return h(
+      "option",
+      { value: entry.box, selected: entry.box === box },
+      `${entry.name} (${fmt(count)})`
+    );
+  }
+
+  // Une boîte vide ne s'archive pas : c'est elle qui reçoit les nouveaux venus.
+  function archiveButton(current) {
+    const empty = !pc.pokemon.some((mon) => boxOf(mon.pos) === current.box);
+    const label = current.archived
+      ? "Désarchiver la boîte"
+      : empty
+        ? "Une boîte vide ne s'archive pas"
+        : "Archiver la boîte";
+    return h(
+      "button",
+      {
+        class: `button ghost pc-arrow${current.archived ? " pc-archived" : ""}`,
+        "aria-label": label,
+        "aria-pressed": String(current.archived),
+        title: label,
+        disabled: !current.archived && empty,
+        onclick: () => archive(current, !current.archived),
+      },
+      icon("archive")
+    );
+  }
+
+  async function archive(current, archived) {
+    try {
+      pc = await api(`/api/me/pc/boxes/${current.box}/archive`, {
+        method: "POST",
+        body: { archived },
+      });
+      toast(
+        archived
+          ? `${current.name} est archivée : elle passe en fin de liste.`
+          : `${current.name} revient parmi tes boîtes.`,
+        "success"
+      );
+    } catch (error) {
+      toast(error.message, "error");
+      return reload();
+    }
+    box = Math.min(box, pc.boxes.length - 1);
+    draw();
   }
 
   function nameButton(current) {
@@ -274,7 +335,16 @@ export async function render(ctx) {
     const species = ctx.species.get(highlight);
     const name = species?.name ?? "Pokémon de cette espèce";
     const found = matches();
-    const where = [...new Set(found.map((mon) => pc.boxes[boxOf(mon.pos)].name))].join(", ");
+    // Une boîte archivée se dit : la page peut y ouvrir, hors des boîtes de
+    // tous les jours.
+    const where = [
+      ...new Set(
+        found.map((mon) => {
+          const entry = pc.boxes[boxOf(mon.pos)];
+          return entry.archived ? `${entry.name} (archivée)` : entry.name;
+        })
+      ),
+    ].join(", ");
     return h(
       "p",
       { class: "notice pc-banner" },
@@ -415,7 +485,9 @@ export async function render(ctx) {
       "p",
       { class: "muted small pc-summary" },
       `${fmt(inBox)} / ${fmt(pc.slotsPerBox)} dans cette boîte · ${fmt(pc.pokemon.length)} Pokémon en tout. `,
-      "Glisse un Pokémon pour le ranger, ou ouvre sa fiche et choisis « Déplacer »."
+      pc.boxes[box]?.archived
+        ? "Boîte archivée : les nouveaux Pokémon n'y arrivent pas d'eux-mêmes, mais tu peux y en ranger."
+        : "Glisse un Pokémon pour le ranger, ou ouvre sa fiche et choisis « Déplacer »."
     );
   }
 
@@ -460,7 +532,11 @@ function openPokemon(ctx, item, pc, { reload, startMove }) {
     "dl",
     { class: "facts" },
     h("dt", {}, "Rangé"),
-    h("dd", {}, `${pc.boxes[box].name}, case ${(item.pos % pc.slotsPerBox) + 1}`),
+    h(
+      "dd",
+      {},
+      `${pc.boxes[box].name}${pc.boxes[box].archived ? " (archivée)" : ""}, case ${(item.pos % pc.slotsPerBox) + 1}`
+    ),
     h("dt", {}, "Provenance"),
     h(
       "dd",

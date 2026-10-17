@@ -51,6 +51,8 @@ const MAX_OPTIONS = 25;
 const COLUMN = { give: "offer", get: "request" };
 const isSide = (which) => which === "give" || which === "get";
 const ownerOf = (draft, which) => (which === "give" ? draft.from_user_id : draft.to_user_id);
+// Celui qui reçoit le côté : l'autre partie.
+const receiverOf = (draft, which) => (which === "give" ? draft.to_user_id : draft.from_user_id);
 
 // ------------------------------- Base -------------------------------
 
@@ -271,7 +273,13 @@ const showDraft = async (interaction, draft, note = null) =>
 // Retient un choix après l'avoir contrôlé : un refus ne change rien et s'affiche sur
 // l'écran du brouillon, avec ses chiffres.
 async function chooseSide(interaction, draft, which, choice) {
-  const checked = await checkSide(choice, choice.individual ?? null, ownerOf(draft, which), which === "give");
+  const checked = await checkSide(
+    choice,
+    choice.individual ?? null,
+    ownerOf(draft, which),
+    which === "give",
+    receiverOf(draft, which)
+  );
   if (checked.error) return showDraft(interaction, draft, `❌ ${checked.error}`);
   await setSide(draft.id, which, choice);
   return showDraft(interaction, await getDraft(draft.id));
@@ -310,8 +318,8 @@ async function propose(interaction, draft) {
     return showDraft(interaction, draft, "❌ Il manque un côté : choisis ce que tu donnes et ce que tu demandes.");
   }
   const [offer, request] = await Promise.all([
-    checkSide(draft.give, draft.give.individual ?? null, draft.from_user_id, true),
-    checkSide(draft.get, null, draft.to_user_id, false),
+    checkSide(draft.give, draft.give.individual ?? null, draft.from_user_id, true, draft.to_user_id),
+    checkSide(draft.get, null, draft.to_user_id, false, draft.from_user_id),
   ]);
   if (offer.error || request.error) {
     return showDraft(interaction, draft, `❌ ${offer.error ?? request.error}`);

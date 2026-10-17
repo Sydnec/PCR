@@ -79,7 +79,7 @@ import {
   removeFromShowcase,
   showcaseSlots,
 } from "../pokemon/showcase.js";
-import { getPc, movePokemon, renameBox, renamePokemon } from "../pokemon/pc.js";
+import { archiveBox, getPc, movePokemon, renameBox, renamePokemon } from "../pokemon/pc.js";
 import {
   enterPark,
   getEntryOffer,
@@ -107,6 +107,7 @@ import {
   getItem,
   getItems,
   itemSellValue,
+  overflowNotice,
   sortByCatalogue,
 } from "../pokemon/items.js";
 import { pokemonSellValue, sellItem, sellPokemon } from "../pokemon/sell.js";
@@ -1066,6 +1067,25 @@ export const routes = [
     },
   },
 
+  // Archiver une boîte, ou la rendre aux autres. La réponse est la boîte PC
+  // relue : archiver la dernière boîte en fait apparaître une vide.
+  {
+    method: "POST",
+    path: "/api/me/pc/boxes/:box/archive",
+    auth: true,
+    write: true,
+    handler: async (ctx) => {
+      if (typeof ctx.body.archived !== "boolean") {
+        throw new HttpError(400, "`archived` doit valoir true ou false.");
+      }
+      const result = await promise((cb) =>
+        archiveBox(ctx.user.id, Number(ctx.params.box), ctx.body.archived, cb)
+      );
+      if (!result.ok) throw new HttpError(409, result.reason);
+      return pcJson(ctx.user.id);
+    },
+  },
+
   // Verrouiller ou déverrouiller un Pokémon, comme /pk verrou : par le même
   // chemin, gardé par le propriétaire. Verrouillé, il ne part jamais.
   {
@@ -1316,7 +1336,12 @@ export const routes = [
       if (!claimed.ok) throw new HttpError(claimed.captor ? 403 : 409, claimed.reason);
       announceDropClaim(ctx.bot, claimed.drop, claimed.item, ctx.user.id);
       const { key, label, emoji, sprite } = claimed.item;
-      return { item: { key, label, emoji, image: itemImageUrl(sprite) } };
+      // `sold` : la vente d'office d'un objet au-delà de la limite, la phrase de
+      // Discord, que le site affiche telle quelle.
+      return {
+        item: { key, label, emoji, image: itemImageUrl(sprite) },
+        sold: overflowNotice(claimed.item, claimed.granted),
+      };
     },
   },
 

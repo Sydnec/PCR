@@ -20,7 +20,7 @@ noieraient la table.
 | ⚙️ Catalyseur | 0,34 % (1 sur 297), dès la 2ᵉ gén. | le seul moyen de faire évoluer Onix, Insécateur, Hypocéan et Porygon ; tient lieu d'un sacrifice | 500 |
 | 💎 Pépite | 0,84 % (1 sur 119) | rien, sinon se revendre | 4 000 |
 | 🎟️ Ticket Safari | 0,34 % (1 sur 297) | une entrée du parc, sans passer par la caisse | — |
-| Master Ball | **0,03 % (1 sur 2 973)** | la capture garantie, offerte | — |
+| Master Ball | **0,03 % (1 sur 2 973)** | la capture garantie, offerte — **une seule en poche** | 10 000, d'office, au-delà de la première |
 
 `dropWeight` est un **poids**, pas un pourcentage : la part d'un objet vaut son poids divisé par la
 somme de tous (892 pour le butin). `/admin poids` fait la conversion pour les quatre tables de
@@ -51,6 +51,14 @@ par terre plutôt que de le faire disparaître.
   réservés : une Évolyte jetée sur un Chenipan est refusée, elle ne part pas. Un quatrième,
   `generation`, garde un objet hors du jeu tant que sa génération est fermée : il ne tombe pas, ne
   sort pas à la loterie et ne sert à rien avant.
+- **Une seule Master Ball en poche.** `maxHeld` plafonne ce qu'un dresseur garde d'un objet : au-delà,
+  chaque exemplaire gagné (tenu par un Pokémon, ramassé, tiré à la loterie) se vend d'office
+  `overflowValue` points — 10 000 pour la Master Ball —, et la réponse le dit. Deux gains simultanés
+  n'en laissent qu'une, et si les points ne passent pas, la ball se garde plutôt que de se perdre.
+  Un échange qui la ferait dépasser chez son receveur est refusé, à la proposition comme à
+  l'acceptation ; une Master Ball contre une Master Ball passe. Les remboursements rendent ce qu'ils
+  ont pris sans regarder la limite, et `/admin item` passe outre. Ce que les dresseurs gardaient au-delà
+  avant la limite s'est vendu une fois, au démarrage, au même prix.
 - **Les balls offertes partent d'elles-mêmes.** Lancer une Poké Ball en en ayant une dans son
   inventaire ne coûte rien : l'objet passe avant le solde, parce qu'un objet posé dans un sac ne
   doit pas dormir pendant qu'on prend la monnaie de son propriétaire. Le panneau de lancer, privé,

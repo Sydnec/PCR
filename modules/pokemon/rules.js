@@ -31,7 +31,9 @@ import {
   itemDropWeight,
   itemLot,
   itemLotteryWeight,
+  itemCap,
   itemOpen,
+  itemOverflowValue,
   itemSellValue,
   lotteryWinChance,
 } from "./items.js";
@@ -118,6 +120,9 @@ function itemTable() {
     lottery: lotteryTotal ? (winChance * itemLotteryWeight(item)) / lotteryTotal : 0,
     lot: itemLot(item),
     sellValue: itemSellValue(item),
+    // La limite de détention, et ce que rapporte un exemplaire au-delà.
+    maxHeld: itemCap(item),
+    overflowValue: itemOverflowValue(item),
   }));
 }
 

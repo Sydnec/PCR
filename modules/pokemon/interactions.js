@@ -16,7 +16,7 @@ import { pseudoOf, pseudos } from "../pseudo.js";
 import { getBall, getPokemonConfig, getSafariConfig } from "./config.js";
 import { answerThrow, ballPanelRow, getBallPrice, specialPanelRow, throwBall, trackPanel } from "./capture.js";
 import { getSpawn } from "./spawn.js";
-import { getBallItem, getBallStock, getItem, getItemCount } from "./items.js";
+import { getBallItem, getBallStock, getItem, getItemCount, overflowNotice } from "./items.js";
 import { claimDrop } from "./drops.js";
 
 import {
@@ -258,11 +258,18 @@ function handleDropClaim(interaction, dropId) {
     if (!claimed.ok) return ephemeral(interaction, claimed.reason);
 
     log(`Ramassage : ${pseudoOf(interaction)} prend ${claimed.item.label}`);
+    // Le message public dit qui l'a ramassé ; la vente d'office ne regarde que lui.
+    const vendu = overflowNotice(claimed.item, claimed.granted);
     interaction
       .update({
         embeds: [buildDropEmbed(claimed.item, { claimedBy: interaction.user.id })],
         components: [],
       })
+      .then(() =>
+        vendu
+          ? interaction.followUp({ content: `${claimed.item.emoji} ${vendu}`, flags: MessageFlags.Ephemeral })
+          : null
+      )
       .catch(() => {});
   });
 }
