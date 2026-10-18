@@ -13,7 +13,21 @@ import { repairParkMessages } from "../../modules/pokemon/safari.js";
 import { repairDropMessages } from "../../modules/pokemon/drops.js";
 
 export default (bot) => {
+  // Pendant une panne de Discord, un passage dure plus que l'intervalle (chaque
+  // message se réessaie) : les suivants s'empileraient sur lui. Ce n'est pas de
+  // l'état de jeu, seulement le rythme du minuteur : un redémarrage le remet à zéro.
+  let running = false;
   bot.handlePublicMessagesOnTimer = async () => {
+    if (running) return;
+    running = true;
+    try {
+      await sweep();
+    } finally {
+      running = false;
+    }
+  };
+
+  const sweep = async () => {
     // Chaque étape à part : une panne sur les offres ne doit pas priver les
     // apparitions de leur rattrapage.
     for (const [label, step] of [

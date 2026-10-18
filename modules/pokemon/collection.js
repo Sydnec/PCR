@@ -1727,7 +1727,7 @@ export function acceptTrade(tradeId, options, cb) {
         const reopen = (cleanly, error) => {
           if (!cleanly) return releaseTrade(tradeId, "FAILED", () => cb(error));
           db.run(
-            "UPDATE pokemon_trades SET status = 'PENDING', resolved_at = NULL WHERE id = ? AND status = 'ACCEPTED'",
+            "UPDATE pokemon_trades SET status = 'PENDING', resolved_at = NULL, message_closed_at = NULL WHERE id = ? AND status = 'ACCEPTED'",
             [tradeId],
             (reopenError) => {
               if (reopenError) handleException("Réouverture d'une offre :", reopenError);

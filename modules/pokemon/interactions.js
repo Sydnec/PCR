@@ -753,12 +753,13 @@ function finishTrade(interaction, trade, status, note) {
 function settleStale(trade, cb) {
   getTrade(trade.id, (err, fresh) => {
     if (err || !fresh) return cb({ handled: true });
-    const expired =
-      fresh.status === "EXPIRED" || (fresh.status === "PENDING" && fresh.expires_at <= Date.now());
-    if (!expired) return cb({ handled: true });
-    expireTrade(fresh.id, (err) => {
+    if (fresh.status === "EXPIRED") return cb({ expired: fresh });
+    if (fresh.status !== "PENDING" || fresh.expires_at > Date.now()) return cb({ handled: true });
+    // L'expiration n'est acquise que si c'est elle qui a changé la ligne : une
+    // acceptation passée au même instant a gagné, et « expiré » mentirait.
+    expireTrade(fresh.id, (err, expired) => {
       if (err) handleException("Expiration d'une offre :", err);
-      cb({ expired: fresh });
+      cb(expired ? { expired: fresh } : { handled: true });
     });
   });
 }
@@ -829,8 +830,14 @@ function handleTradeButton(interaction, action, tradeId) {
     // Échue mais encore ouverte en base : quel que soit le bouton, l'offre est
     // expirée, et son message le dit au lieu de proposer ce qui ne se fera plus.
     if (trade.expires_at <= Date.now()) {
-      return expireTrade(trade.id, (err) => {
-        if (err) handleException("Expiration d'une offre :", err);
+      return expireTrade(trade.id, (err, expired) => {
+        if (err) {
+          handleException("Expiration d'une offre :", err);
+          return ephemeral(interaction, "❌ Erreur base de données.");
+        }
+        // Une acceptation, un refus ou une annulation partis juste avant l'échéance
+        // ont conclu l'offre : son message est à eux, ce clic n'y touche pas.
+        if (!expired) return ephemeral(interaction, "❌ Cet échange a déjà été traité.");
         finishTrade(interaction, trade, "EXPIRED");
       });
     }
@@ -896,10 +903,11 @@ function handleTradePick(interaction, tradeId) {
             ? "⌛ Cette offre a expiré."
             : note;
       interaction.update({ content, components: [] }).catch(() => {});
-      // Le message public se réécrit d'après la base : son statut est celui que
-      // l'offre a vraiment, quel que soit le clic qui l'a conclue. Sans message
-      // (offre dont l'envoi a échoué), l'éphémère a déjà dit le résultat.
-      syncTradeMessage(interaction.client, trade.id, { note });
+      // Le message public se réécrit d'après la base, par le clic qui a conclu
+      // l'offre et par lui seul : le perdant lirait peut-être un état que le
+      // gagnant n'a pas fini d'écrire. Sans message (offre dont l'envoi a
+      // échoué), l'éphémère a déjà dit le résultat.
+      if (!handled) syncTradeMessage(interaction.client, trade.id, { note });
     });
   });
 }

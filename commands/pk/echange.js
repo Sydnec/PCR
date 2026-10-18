@@ -1,6 +1,6 @@
 import { MessageFlags } from "discord.js";
 import { handleException } from "../../modules/utils.js";
-import { getIndividuals, proposeTrade } from "../../modules/pokemon/collection.js";
+import { getIndividuals, proposeTrade, resolveTradeAs } from "../../modules/pokemon/collection.js";
 import { linkTradeMessage } from "../../modules/pokemon/trade-message.js";
 import { getSpecies } from "../../modules/pokemon/data.js";
 import {
@@ -265,11 +265,21 @@ export default {
               .catch(() => {});
           }
 
-          const message = await interaction.editReply({
-            content: `<@${target.id}>`,
-            embeds: [buildTradeEmbed(trade, "PENDING")],
-            components: [buildTradeRow(trade.id)],
-          });
+          // Une offre que personne ne verra n'a pas à rester ouverte : sans message,
+          // ses boutons n'existent pas.
+          let message;
+          try {
+            message = await interaction.editReply({
+              content: `<@${target.id}>`,
+              embeds: [buildTradeEmbed(trade, "PENDING")],
+              components: [buildTradeRow(trade.id)],
+            });
+          } catch (error) {
+            handleException("Publication d'une offre d'échange :", error);
+            return resolveTradeAs(trade.id, interaction.user.id, "CANCELLED", (err) => {
+              if (err) handleException("Annulation d'une offre non publiée :", err);
+            });
+          }
           await linkTradeMessage(interaction.client, trade.id, message.id);
         }
       );

@@ -1365,7 +1365,7 @@ function closeExpiredParks(client, cb = () => {}) {
 // fermeture ensuite. Une seule écriture à la fois : un compteur parti juste
 // avant la fermeture ne peut plus rouvrir le message. `refreshOnly` : ne rien
 // écrire d'un parc fermé — sa fermeture s'écrit par son propre chemin.
-export async function syncParkMessage(client, parkId, { refreshOnly = false } = {}) {
+export async function syncParkMessage(client, parkId, { refreshOnly = false, repair = false } = {}) {
   const park = await asPromise((cb) => getPark(parkId, cb)).catch((error) => {
     handleException("Lecture d'un parc à afficher :", error);
     return null;
@@ -1382,12 +1382,18 @@ export async function syncParkMessage(client, parkId, { refreshOnly = false } = 
       if (!fresh) return null;
       if (fresh.status === "OPEN") return { embeds: [buildParkEmbed(fresh)] };
       final = true;
-      if (refreshOnly) return null;
+      if (refreshOnly || (repair && fresh.message_closed_at)) return null;
       return { content: null, embeds: [buildParkEmbed(fresh, { closed: true })], components: [] };
     },
   });
+  // Un message disparu se constate parfois avant toute relecture : la base dit
+  // alors si le parc était fermé.
+  if (result === "gone" && !refreshOnly) {
+    const now = await asPromise((cb) => getPark(parkId, cb)).catch(() => null);
+    final = now?.status === "CLOSED";
+    if (final) log(`Message du parc safari #${parkId} introuvable, fermeture non affichée`);
+  }
   if (final && !refreshOnly && (result === "edited" || result === "gone")) {
-    if (result === "gone") log(`Message du parc safari #${parkId} introuvable, fermeture non affichée`);
     await new Promise((resolve) =>
       db.run(
         "UPDATE pokemon_safari_parks SET message_closed_at = ? WHERE id = ? AND message_closed_at IS NULL",
@@ -1440,7 +1446,7 @@ export async function repairParkMessages(client) {
   });
   let repaired = 0;
   for (const { id } of rows) {
-    if ((await syncParkMessage(client, id)) === "edited") repaired++;
+    if ((await syncParkMessage(client, id, { repair: true })) === "edited") repaired++;
   }
   if (repaired) log(`${repaired} message(s) de parc safari conclu(s) après coup`);
   return repaired;

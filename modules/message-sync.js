@@ -36,7 +36,9 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 // est demandé (pour en garder une partie), sinon rien — une requête de moins.
 //
 // Rend « edited », « skipped » (build a rendu null), « gone » (le message ne
-// se réécrira plus) ou « failed » (les réessais sont épuisés). Ne lève jamais.
+// se réécrira plus — parfois avant même que `build` ait été appelé : c'est à
+// l'appelant de relire la base pour savoir ce qui était à conclure) ou
+// « failed » (les réessais sont épuisés). Ne lève jamais.
 export function syncMessage(client, key, { channelId, messageId, build, read = false, label = key }) {
   const previous = queues.get(key) ?? Promise.resolve();
   const next = previous.then(() => write(client, { channelId, messageId, build, read, label }));
@@ -61,7 +63,11 @@ async function write(client, { channelId, messageId, build, read, label }) {
       return "edited";
     } catch (error) {
       if (MESSAGE_GONE.has(error?.code)) return "gone";
-      if (attempt >= retries) {
+      // Un autre refus 4xx (un embed que Discord juge invalide, par exemple) ne
+      // passera pas mieux au deuxième essai : c'est un bug à voir, pas une panne
+      // à attendre. Seule la limite de débit (429) vaut d'être réessayée.
+      const permanent = error?.status >= 400 && error?.status < 500 && error?.status !== 429;
+      if (permanent || attempt >= retries) {
         handleException(`Réécriture du message ${label} impossible :`, error);
         return "failed";
       }

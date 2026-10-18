@@ -242,7 +242,7 @@ describe("le rattrapage des messages publics (minuteur de cinq minutes)", () => 
     assert.notEqual((await dbGet(points, "SELECT message_closed_at FROM pokemon_spawns WHERE id = ?", [spawnId])).message_closed_at, null);
   });
 
-  it("une panne d'une étape n'empêche pas les suivantes", async () => {
+  it("une panne de la base sur les offres ne prive pas les apparitions de leur rattrapage", async () => {
     await dbRun(points, "ALTER TABLE pokemon_trades RENAME TO pokemon_trades_off");
     try {
       const { lastID } = await dbRun(

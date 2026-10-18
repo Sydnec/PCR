@@ -218,7 +218,7 @@ export function markDropMessageClosed(dropId) {
 // Le message d'un objet au sol, tel que la base le dit au moment de l'écrire :
 // ramassé, il dit par qui et perd son bouton. Encore au sol (un ramassage raté
 // l'y a reposé), il n'a rien à changer.
-export async function syncDropMessage(client, dropId) {
+export async function syncDropMessage(client, dropId, { repair = false } = {}) {
   const drop = await read((cb) => getDrop(dropId, cb)).catch((error) => {
     handleException("Lecture d'un objet au sol à afficher :", error);
     return null;
@@ -234,13 +234,18 @@ export async function syncDropMessage(client, dropId) {
       const fresh = await read((cb) => getDrop(dropId, cb));
       const item = fresh && getItem(fresh.item_key);
       final = fresh?.status === "CLAIMED" && Boolean(item);
-      return final ? { embeds: [buildDropEmbed(item, { claimedBy: fresh.claimed_by })], components: [] } : null;
+      if (!final || (repair && fresh.message_closed_at)) return null;
+      return { embeds: [buildDropEmbed(item, { claimedBy: fresh.claimed_by })], components: [] };
     },
   });
-  if (final && (result === "edited" || result === "gone")) {
-    if (result === "gone") log(`Message de l'objet au sol #${dropId} introuvable, ramassage non affiché`);
-    await markDropMessageClosed(dropId);
+  // Un message disparu se constate parfois avant toute relecture : la base dit
+  // alors si l'objet avait été ramassé.
+  if (result === "gone") {
+    const now = await read((cb) => getDrop(dropId, cb)).catch(() => null);
+    final = now?.status === "CLAIMED";
+    if (final) log(`Message de l'objet au sol #${dropId} introuvable, ramassage non affiché`);
   }
+  if (final && (result === "edited" || result === "gone")) await markDropMessageClosed(dropId);
   return result;
 }
 
@@ -271,7 +276,7 @@ export async function repairDropMessages(client) {
   });
   let repaired = 0;
   for (const { id } of rows) {
-    if ((await syncDropMessage(client, id)) === "edited") repaired++;
+    if ((await syncDropMessage(client, id, { repair: true })) === "edited") repaired++;
   }
   if (repaired) log(`${repaired} message(s) d'objet au sol conclu(s) après coup`);
   return repaired;

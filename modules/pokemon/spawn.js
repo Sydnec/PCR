@@ -448,12 +448,16 @@ const read = (run) => new Promise((resolve, reject) => run((err, value) => (err 
 // vient de décider ; sans eux (le rattrapage), ils se déduisent de la base :
 // l'objet au sol de cette apparition, et un shiny réservé aux porteurs du charme
 // devenu shiny à la capture. `refreshOnly` : ne rien écrire d'une apparition
-// terminée. La fin écrite (ou un message disparu) se retient en base, pour que
+// terminée. `repair` : ne rien écrire d'une fin déjà posée — le chemin de la
+// capture l'a écrite avec ce qu'il savait, une déduction ne doit pas la
+// recouvrir. La fin écrite (ou un message disparu) se retient en base, pour que
 // le rattrapage sache ce qui reste à faire.
+const isEnded = (spawn) => spawn?.status === "CAUGHT" || spawn?.status === "FLED";
+
 export async function syncSpawnMessage(
   client,
   spawnId,
-  { dropped = null, charmed = null, refreshOnly = false } = {}
+  { dropped = null, charmed = null, refreshOnly = false, repair = false } = {}
 ) {
   let row;
   try {
@@ -483,8 +487,8 @@ export async function syncSpawnMessage(
         const description = message?.embeds?.[0]?.description ?? null;
         return { embeds: [buildSpawnEmbed(spawn, species, throws, description)] };
       }
-      final = spawn.status === "CAUGHT" || spawn.status === "FLED";
-      if (!final || refreshOnly) return null;
+      final = isEnded(spawn);
+      if (!final || refreshOnly || (repair && spawn.message_closed_at)) return null;
 
       const spending = await new Promise((resolve) =>
         spendingBreakdown(spawnId, (err, value) => {
@@ -514,16 +518,27 @@ export async function syncSpawnMessage(
     },
   });
 
-  if (final && !refreshOnly && (result === "edited" || result === "gone")) {
-    if (result === "gone") log(`Message du spawn #${spawnId} introuvable, sa fin n'est pas affichée`);
+  // Un message disparu se constate parfois avant toute relecture (salon ou
+  // message introuvable) : la base dit alors s'il y avait une fin à poser.
+  if (result === "gone" && !refreshOnly) {
+    const now = await read((cb) => getSpawn(spawnId, cb)).catch(() => null);
+    if (isEnded(now)) {
+      log(`Message du spawn #${spawnId} introuvable, sa fin n'est pas affichée`);
+      await markSpawnMessageClosed(spawnId);
+    }
+  } else if (final && !refreshOnly && result === "edited") {
     await markSpawnMessageClosed(spawnId);
   }
   return result;
 }
 
+// Un objet perdu (aucun salon pour l'annoncer) n'est pas tombé : il est revenu
+// au capteur, et l'embed doit dire « il tenait ».
 function hasDrop(spawnId, cb) {
-  db.get("SELECT 1 AS found FROM pokemon_drops WHERE spawn_id = ? LIMIT 1", [spawnId], (err, row) =>
-    cb(err, Boolean(row))
+  db.get(
+    "SELECT 1 AS found FROM pokemon_drops WHERE spawn_id = ? AND status IN ('OPEN', 'CLAIMED') LIMIT 1",
+    [spawnId],
+    (err, row) => cb(err, Boolean(row))
   );
 }
 
@@ -563,7 +578,7 @@ export async function repairSpawnMessages(client) {
   }
   let repaired = 0;
   for (const { id } of rows) {
-    const result = await syncSpawnMessage(client, id);
+    const result = await syncSpawnMessage(client, id, { repair: true });
     if (result === "edited") repaired++;
   }
   if (repaired) log(`${repaired} message(s) d'apparition conclu(s) après coup`);

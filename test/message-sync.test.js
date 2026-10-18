@@ -79,6 +79,21 @@ describe("syncMessage", () => {
     assert.equal(channel.edits.length, 0);
   });
 
+  it("un autre refus 4xx ne se réessaie pas ; la limite de débit, si", async () => {
+    const invalid = fakeChannel({ failures: [Object.assign(new Error("Invalid Form Body"), { code: 50035, status: 400 })] });
+    let builds = 0;
+    const original = console.error;
+    console.error = () => {};
+    try {
+      assert.equal(await syncMessage(invalid.client, "k8", { ...target, build: () => ({ content: `${++builds}` }) }), "failed");
+    } finally {
+      console.error = original;
+    }
+    assert.equal(builds, 1);
+    const limited = fakeChannel({ failures: [Object.assign(new Error("Too Many Requests"), { status: 429 })] });
+    assert.equal(await syncMessage(limited.client, "k9", { ...target, build: () => ({ content: "x" }) }), "edited");
+  });
+
   it("un message supprimé ou interdit s'abandonne aussitôt, sans réessai", async () => {
     for (const code of MESSAGE_GONE) {
       const { client } = fakeChannel({ failures: [Object.assign(new Error("gone"), { code })] });

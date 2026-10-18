@@ -33,8 +33,9 @@ export function markTradeMessageClosed(tradeId) {
 }
 
 // Réécrit le message d'une offre conclue d'après son statut en base. Une offre
-// encore ouverte n'a rien à changer : ses boutons sont les bons.
-export async function syncTradeMessage(client, tradeId, { note = null } = {}) {
+// encore ouverte n'a rien à changer : ses boutons sont les bons. `repair` : ne
+// rien écrire d'une fin déjà posée, qui portait peut-être la raison d'un échec.
+export async function syncTradeMessage(client, tradeId, { note = null, repair = false } = {}) {
   let trade;
   try {
     trade = await read((cb) => getTrade(tradeId, cb));
@@ -52,11 +53,19 @@ export async function syncTradeMessage(client, tradeId, { note = null } = {}) {
     build: async () => {
       const fresh = await read((cb) => getTrade(tradeId, cb));
       final = Boolean(fresh) && fresh.status !== "PENDING";
+      if (!final || (repair && fresh.message_closed_at)) return null;
       // La raison d'un échec ne vaut que pour l'échec qui l'a produite.
-      return final ? tradeOutcome(fresh, fresh.status, fresh.status === "FAILED" ? note : null) : null;
+      return tradeOutcome(fresh, fresh.status, fresh.status === "FAILED" ? note : null);
     },
   });
-  if (final && (result === "edited" || result === "gone")) await markTradeMessageClosed(tradeId);
+  // Un salon ou un message introuvable se constate parfois avant toute relecture :
+  // la base dit alors si l'offre était à conclure.
+  if (result === "gone") {
+    const now = await read((cb) => getTrade(tradeId, cb)).catch(() => null);
+    if (now && now.status !== "PENDING") await markTradeMessageClosed(tradeId);
+  } else if (final && result === "edited") {
+    await markTradeMessageClosed(tradeId);
+  }
   return result;
 }
 
@@ -127,7 +136,7 @@ export async function repairTradeMessages(client) {
   }
   let repaired = 0;
   for (const { id } of rows) {
-    if ((await syncTradeMessage(client, id)) === "edited") repaired++;
+    if ((await syncTradeMessage(client, id, { repair: true })) === "edited") repaired++;
   }
   if (repaired) log(`${repaired} message(s) d'échange conclu(s) après coup`);
   return repaired;

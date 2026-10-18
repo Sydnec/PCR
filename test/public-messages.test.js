@@ -38,7 +38,7 @@ const quiet = async (work) => {
 
 // Un salon dont on règle la lenteur (la première lecture d'un message traîne)
 // et les pannes, et qui note chaque écriture, dans l'ordre où elle arrive.
-function fakeDiscord({ slowFirstFetch = 0, slowFirstWrite = 0, failures = [], onSend = null } = {}) {
+function fakeDiscord({ slowFirstFetch = 0, slowFirstWrite = 0, failures = [], fetchFailure = null, onSend = null } = {}) {
   const writes = [];
   let fetches = 0;
   let edits = 0;
@@ -57,6 +57,7 @@ function fakeDiscord({ slowFirstFetch = 0, slowFirstWrite = 0, failures = [], on
     },
     messages: {
       fetch: async (id) => {
+        if (fetchFailure) throw fetchFailure;
         if (fetches++ === 0 && slowFirstFetch) await sleep(slowFirstFetch);
         return { id, embeds: [{ description: null }], edit: (payload) => record(id, payload) };
       },
@@ -91,19 +92,33 @@ describe("l'annonce d'une apparition", () => {
     ["capturée", capture, (client) => spawn.finalizeCaughtSpawn(client, 1)],
     ["enfuie", flee, async (client) => spawn.endSpawnAsFled(client, await spawnRow())],
   ]) {
-    it(`${ending} : un rafraîchissement parti avant la fin n'écrase plus l'embed final`, async () => {
+    it(`${ending} : un rafraîchissement déjà en route n'écrase plus l'embed final`, async () => {
+      // Le rafraîchissement a lu l'apparition ACTIVE, et son envoi traîne : la
+      // fin arrive pendant ce temps. Sans file par message, elle partirait la
+      // première et l'embed « actif » repasserait par-dessus.
+      const discord = fakeDiscord({ slowFirstWrite: 120 });
+      spawn.refreshSpawnEmbed(discord.client, 1, { immediate: true });
+      await sleep(30);
+      await end();
+      await finish(discord.client);
+      await eventually(() => assert.equal(discord.writes.length, 2));
+      await sleep(80);
+      assert.equal(discord.writes.length, 2);
+      assert.ok(!isFinal(discord.writes[0]), "le rafraîchissement, d'abord");
+      assert.ok(isFinal(discord.writes[1]), "la fin, en dernier, boutons retirés");
+      assert.notEqual((await spawnRow()).message_closed_at, null);
+    });
+
+    it(`${ending} : un rafraîchissement qui lit la base après la fin se tait`, async () => {
       const discord = fakeDiscord({ slowFirstFetch: 120 });
       spawn.refreshSpawnEmbed(discord.client, 1, { immediate: true });
       await sleep(20);
       await end();
       await finish(discord.client);
-      // Le rafraîchissement relit la base au moment d'écrire : il voit la fin et
-      // se tait. Reste une seule écriture, la finale.
       await eventually(() => assert.equal(discord.writes.length, 1));
       await sleep(150);
       assert.equal(discord.writes.length, 1, "rien ne repasse par-dessus");
-      assert.ok(isFinal(discord.writes[0]), "c'est la fin, boutons retirés");
-      assert.notEqual((await spawnRow()).message_closed_at, null);
+      assert.ok(isFinal(discord.writes[0]));
     });
   }
 
@@ -146,6 +161,31 @@ describe("l'annonce d'une apparition", () => {
     await flee();
     assert.equal(await spawn.syncSpawnMessage(discord.client, 1), "gone");
     assert.notEqual((await spawnRow()).message_closed_at, null);
+  });
+
+  it("un message introuvable dès sa lecture n'est plus à conclure non plus", async () => {
+    // Le cas le plus courant : Discord dit 404 avant même que le contenu soit construit.
+    const discord = fakeDiscord({ fetchFailure: Object.assign(new Error("Unknown Message"), { code: 10008 }) });
+    await activeSpawn({ status: "FLED", endedAgo: 5 * MINUTE });
+    assert.equal(await spawn.repairSpawnMessages(discord.client), 0);
+    assert.notEqual((await spawnRow()).message_closed_at, null, "le rattrapage ne repassera pas toutes les cinq minutes");
+  });
+
+  it("un rattrapage ne recouvre pas une fin que le chemin de la capture vient d'écrire", async () => {
+    const discord = fakeDiscord();
+    await activeSpawn({ status: "CAUGHT", endedAgo: 5 * MINUTE, closed: true });
+    assert.equal(await spawn.syncSpawnMessage(discord.client, 1, { repair: true }), "skipped");
+    assert.deepEqual(discord.writes, []);
+  });
+
+  it("un objet perdu, faute de salon, n'est pas un objet lâché", async () => {
+    const discord = fakeDiscord();
+    await dbRun(points, "UPDATE pokemon_spawns SET held_item = 'pepite' WHERE id = 1");
+    await flee();
+    await dbRun(points, "INSERT INTO pokemon_drops (spawn_id, item_key, status, dropped_at) VALUES (1, 'pepite', 'LOST', 1)");
+    await spawn.syncSpawnMessage(discord.client, 1);
+    const fields = discord.writes[0].payload.embeds[0].toJSON().fields.map((field) => field.name);
+    assert.ok(!fields.includes("Il a lâché"), fields.join(", "));
   });
 
   it("l'objet lâché se déduit de la base quand le chemin de la fuite n'est plus là pour le dire", async () => {
@@ -276,6 +316,31 @@ describe("le message d'une offre d'échange", () => {
     await eventually(() => assert.equal(calls.length, 1));
     assert.deepEqual(titles(calls), ["⌛ Échange expiré"]);
     assert.equal((await tradeRow(id)).status, "EXPIRED");
+  });
+
+  it("une offre échue qu'une acceptation a gagnée au même instant n'est pas affichée « expirée »", async () => {
+    const id = await offer({ expiredAgo: 1000 });
+    // L'acceptation passe entre la lecture du clic et son expiration.
+    const original = points.run;
+    points.run = function (sql, ...rest) {
+      if (/SET status = 'EXPIRED'/.test(sql)) {
+        points.run = original;
+        return original.call(this, "UPDATE pokemon_trades SET status = 'ACCEPTED', resolved_at = ? WHERE id = ?", [Date.now(), id], () =>
+          original.call(this, sql, ...rest)
+        );
+      }
+      return original.call(this, sql, ...rest);
+    };
+    const { calls, run } = press(`poke_trade_decline|${id}`, "u2");
+    try {
+      await run();
+      await eventually(() => assert.equal(calls.length, 1));
+    } finally {
+      points.run = original;
+    }
+    assert.deepEqual(titles(calls), [], "le message est à l'acceptation, pas à ce clic");
+    assert.match(calls[0].payload.content, /déjà été traité/);
+    assert.equal((await tradeRow(id)).status, "ACCEPTED");
   });
 
   it("une offre conclue avant que son message soit connu reçoit sa fin dès qu'il l'est", async () => {
