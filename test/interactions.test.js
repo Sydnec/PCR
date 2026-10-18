@@ -5,7 +5,7 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { MessageFlags } from "discord.js";
-import { createSandbox, openDatabases, dbRun, dbAll, dbGet, sleep, withRandom, speciesByName } from "./helpers.js";
+import { createSandbox, openDatabases, dbRun, dbAll, dbGet, sleep, untilQuiet, withRandom, speciesByName } from "./helpers.js";
 
 const sandbox = createSandbox({ config: { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } } });
 process.env.POKEMON_CHANNEL_ID = "123";
@@ -53,7 +53,11 @@ function fakeChannel({ allowed = true, sendFails = null, thread = false, locked 
 
 // Un clic : la réponse du jeu, dans l'ordre. On attend une première réponse, puis
 // un court instant pour celles qui suivent (un éphémère différé, puis modifié).
-async function click(customId, { user = "u1", channel = fakeChannel(), values = undefined, run = handlePokemonButton, ...overrides } = {}) {
+// `silent` : le clic ne doit rien répondre. Il n'y a alors aucune réponse à
+// attendre, seulement un court instant pour laisser parler une réponse qui
+// arriverait quand même — sans quoi l'attente de la première réponse va jusqu'à
+// son délai de 3 s, pour rien.
+async function click(customId, { user = "u1", channel = fakeChannel(), values = undefined, run = handlePokemonButton, silent = false, ...overrides } = {}) {
   const calls = [];
   const record = (method) => async (payload) => {
     calls.push({ method, payload });
@@ -81,8 +85,10 @@ async function click(customId, { user = "u1", channel = fakeChannel(), values = 
   for (const method of ["reply", "update", "deferReply", "deferUpdate", "editReply", "followUp"]) interaction[method] = record(method);
   await run(interaction);
   const terminal = ["reply", "update", "editReply", "followUp"];
-  for (let waited = 0; waited < 3000 && !calls.some((entry) => terminal.includes(entry.method)); waited += 10) await sleep(10);
-  await sleep(60);
+  if (!silent) {
+    for (let waited = 0; waited < 3000 && !calls.some((entry) => terminal.includes(entry.method)); waited += 10) await sleep(10);
+  }
+  await untilQuiet(calls);
   return calls;
 }
 const last = (calls, method) => calls.filter((entry) => entry.method === method).at(-1)?.payload;
@@ -140,12 +146,12 @@ beforeEach(async () => {
 
 describe("le routeur", () => {
   it("un bouton qui n'est pas du jeu, ou périmé, ne fait rien", async () => {
-    assert.deepEqual(await click("autre_chose|1|2"), []);
-    assert.deepEqual(await click("poke_inconnu|1"), []);
-  }, { timeout: 8000 });
+    assert.deepEqual(await click("autre_chose|1|2", { silent: true }), []);
+    assert.deepEqual(await click("poke_inconnu|1", { silent: true }), []);
+  });
 
   it("un menu qui n'est pas celui du parc est ignoré", async () => {
-    const calls = await click("poke_autre|park|1", { values: ["1"], run: handlePokemonSelect });
+    const calls = await click("poke_autre|park|1", { values: ["1"], run: handlePokemonSelect, silent: true });
     assert.deepEqual(calls, []);
   });
 });

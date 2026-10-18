@@ -270,7 +270,8 @@ describe("fuite par expiration (balayage)", () => {
       return found;
     });
     assert.deepEqual(edit.components, []);
-    assert.match(JSON.stringify(edit.embeds[0].toJSON()), /enfui|s'est|Roucool/i);
+    // Le titre de l'embed de fuite, pas un mot qu'aurait aussi l'annonce d'origine.
+    assert.match(edit.embeds[0].toJSON().title, /s'est enfui/);
   });
 });
 

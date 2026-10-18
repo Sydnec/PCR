@@ -4,7 +4,7 @@
 // répondent par reply / deferReply / editReply / followUp : ce sont ces appels, et
 // eux seuls, qu'on enregistre.
 import { PermissionsBitField } from "discord.js";
-import { sleep } from "./helpers.js";
+import { sleep, untilQuiet } from "./helpers.js";
 
 const TERMINAL = ["reply", "editReply", "followUp", "update", "respond"];
 
@@ -142,7 +142,7 @@ export function slash({
 // Attend la première réponse, puis un court instant pour celles qui suivent.
 export async function settle(calls, { timeout = 3000 } = {}) {
   for (let waited = 0; waited < timeout && !calls.some((entry) => TERMINAL.includes(entry.method)); waited += 10) await sleep(10);
-  await sleep(60);
+  await untilQuiet(calls);
   return calls;
 }
 

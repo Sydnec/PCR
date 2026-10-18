@@ -211,10 +211,16 @@ const fakeDiscord = ({ members = new Map(), roleMembers = {} } = {}) => {
   };
 };
 
+// Une seule requête : une centaine d'INSERT à la suite coûtaient plus que tout
+// le reste de la suite du charme.
 const ownEverySpecies = async (user, generation) => {
-  for (const entry of charms.charmSpecies(generation)) {
-    await dbRun(points, "INSERT INTO pokemon_owned (user_id, species_id, is_shiny, sex, origin, obtained_at) VALUES (?, ?, 0, 'M', 'test', 1)", [user, entry.id]);
-  }
+  const species = charms.charmSpecies(generation);
+  if (!species.length) return;
+  await dbRun(
+    points,
+    `INSERT INTO pokemon_owned (user_id, species_id, is_shiny, sex, origin, obtained_at) VALUES ${species.map(() => "(?, ?, 0, 'M', 'test', 1)").join(", ")}`,
+    species.flatMap((entry) => [user, entry.id])
+  );
 };
 
 describe("compléter un Pokédex (checkCharms)", () => {

@@ -258,7 +258,7 @@ describe("l'administrateur", () => {
     assert.equal((await request("/api/admin/points")).status, 401);
   });
 
-  it("l'administration d'un membre qui perd l'accès se ferme aussitôt", async () => {
+  it("la courbe des points est réservée à l'administrateur, comme le reste de l'administration", async () => {
     assert.equal((await request("/api/admin/points", { cookie: cookieFor(ADMIN) })).status, 200);
     assert.equal((await request("/api/admin/points", { cookie: cookieFor(OTHER) })).status, 403);
   });
@@ -333,7 +333,9 @@ describe("les écritures", () => {
     const result = await read(await request("/api/me/pc/move", { method: "POST", cookie: cookieFor(MEMBER), json: { pokemonId: 999999, pos: 3 } }));
     assert.equal(result.status, 409);
     assert.match(result.body.error, /n'est pas à toi/);
-    assert.equal(JSON.stringify(result.body).includes("at "), false);
+    // Ni clé de pile, ni ligne « at fichier:ligne » d'une trace.
+    assert.equal("stack" in result.body, false);
+    assert.doesNotMatch(JSON.stringify(result.body), /\bat [^"]*:\d+/);
   });
 
   it("une panne interne est un 500 sobre : pas de pile, pas de détail", async () => {

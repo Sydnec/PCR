@@ -7,7 +7,7 @@ commandes `/pk` et `/admin`, les boutons Discord du jeu et les minuteurs. Elle u
 natif de Node (`node:test`) : aucune dépendance de plus, et la CI la lance à chaque pull request.
 
 ```bash
-npm test                                   # toute la suite (≈ 45 s)
+npm test                                   # toute la suite (≈ 50 s)
 node --test test/capture.test.js           # un seul fichier
 node --test --experimental-test-coverage "test/**/*.test.js"   # avec la couverture
 PCR_TEST_LOGS=1 npm test                   # rétablit le journal du bot, pour comprendre un échec
@@ -30,7 +30,11 @@ génération ouverte en cours de route.
 - `test/helpers.js` — `createSandbox`, `openDatabases` (attend la fin de la création des tables, lue
   dans le code qui les crée, et ferme les bases à la fin), `withRandom` (fige `Math.random`, une
   valeur ou une suite, y compris pendant une opération asynchrone), `dbRun` / `dbGet` / `dbAll`,
-  `speciesByName`, et `eventually` / `eventuallyStable` pour attendre un travail détaché (voir plus bas).
+  `speciesByName`, `eventually` / `eventuallyStable` pour attendre un travail détaché (voir plus bas), et
+  `untilQuiet` pour laisser arriver les réponses qui suivent la première (un éphémère différé, puis modifié) :
+  il sort dès que plus rien n'arrive pendant 30 ms, au lieu d'une attente fixe. Un clic ou une commande
+  qui ne doit RIEN répondre se déclare `silent` : sinon l'attente de la première réponse va jusqu'à
+  son délai de 3 s, pour rien.
 - `test/fake-discord.js` — de fausses interactions « slash » (options, sous-commande, membre,
   salon), un faux serveur et un faux salon, qui notent ce qu'on leur répond.
 - Génération : un test qui n'a pas besoin de la 2ᵉ génération la **ferme** (`generationOpenings` à
