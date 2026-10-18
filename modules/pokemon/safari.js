@@ -12,7 +12,9 @@
 // contrepartie du malus d'apparition infligé aux évolutions et aux légendaires.
 // Seule l'entrée payante (/pk safari) débite quelque chose.
 import db from "../points-db.js";
+import { getConfig } from "../config.js";
 import { addPoints, getBalance, spendPoints } from "../economy.js";
+import { syncMessage } from "../message-sync.js";
 import { handleException, log } from "../utils.js";
 import { pseudo } from "../pseudo.js";
 import { getPokemonConfig, getSafariConfig } from "./config.js";
@@ -76,15 +78,6 @@ const pendingParkRefreshes = new Map();
 // un redémarrage qui le perd est rattrapé par l'action suivante, ou par le
 // balayage pour le bilan final.
 const liveRefreshes = new Map();
-
-// Les réécritures d'un même direct passent l'une après l'autre : une édition
-// partie avant la dernière action, et revenue après le bilan, reposerait la
-// rencontre périmée par-dessus — et plus rien ne repasserait, le direct étant
-// clos.
-const liveFlushes = new Map();
-
-// Le message en direct a disparu : plus rien à suivre.
-const UNKNOWN_MESSAGE = 10008;
 
 // ====================== LECTURES ======================
 
@@ -406,16 +399,12 @@ export async function startLiveShareFromSite(client, userId, sessionId, author) 
 // supprimé, ou un salon devenu inaccessible, cesse lui aussi d'être suivi :
 // rien ne sert de réessayer à chaque clic — et le droit de partager le bilan
 // est rendu, puisque le direct qui devait le porter n'existe plus.
-export function flushLiveShare(client, sessionId) {
-  const previous = liveFlushes.get(sessionId) ?? Promise.resolve();
-  const next = previous.then(() => writeLiveShare(client, sessionId));
-  liveFlushes.set(sessionId, next);
-  return next.finally(() => {
-    if (liveFlushes.get(sessionId) === next) liveFlushes.delete(sessionId);
-  });
-}
-
-async function writeLiveShare(client, sessionId) {
+//
+// Les réécritures d'un même direct passent l'une après l'autre (syncMessage) :
+// une édition partie avant la dernière action, et revenue après le bilan,
+// reposerait la rencontre périmée par-dessus — et plus rien ne repasserait, le
+// direct étant clos.
+export async function flushLiveShare(client, sessionId) {
   const session = await asPromise((cb) => getSession(sessionId, cb)).catch((error) => {
     handleException("Lecture d'une visite en direct du parc safari :", error);
     return null;
@@ -426,9 +415,21 @@ async function writeLiveShare(client, sessionId) {
   // la dernière action, le décompte est déjà à zéro alors que la visite n'est
   // pas encore close ni la dernière capture enregistrée. Une réécriture qui lit
   // à ce moment-là poserait un bilan incomplet et fermerait la porte au vrai.
-  const over = session.status !== "ACTIVE" || session.expires_at <= Date.now();
-  const close = () =>
-    new Promise((resolve) =>
+  let over = false;
+  const result = await syncMessage(client, `safari-live:${sessionId}`, {
+    channelId: session.live_channel_id,
+    messageId: session.live_message_id,
+    label: `en direct de la visite #${sessionId}`,
+    build: async () => {
+      const fresh = await asPromise((cb) => getSession(sessionId, cb));
+      if (!fresh?.live_message_id || fresh.live_closed_at) return null;
+      over = fresh.status !== "ACTIVE" || fresh.expires_at <= Date.now();
+      return asPromise((cb) => buildLivePayload(fresh, liveAuthor(fresh), cb));
+    },
+  });
+
+  if (result === "edited" && over) {
+    return new Promise((resolve) =>
       db.run(
         `UPDATE pokemon_safari_sessions SET live_closed_at = ?
           WHERE id = ? AND live_closed_at IS NULL`,
@@ -439,29 +440,21 @@ async function writeLiveShare(client, sessionId) {
         }
       )
     );
-
-  try {
-    const payload = await asPromise((cb) => buildLivePayload(session, liveAuthor(session), cb));
-    const channel = await client.channels.fetch(session.live_channel_id);
-    await channel.messages.edit(session.live_message_id, payload);
-    if (over) await close();
-  } catch (error) {
-    if (error?.code === UNKNOWN_MESSAGE || ENVOI_IMPOSSIBLE.has(error?.code)) {
-      log(`Message en direct de la visite #${sessionId} introuvable, il n'est plus suivi`);
-      return new Promise((resolve) =>
-        db.run(
-          `UPDATE pokemon_safari_sessions
-              SET live_closed_at = ?, live_message_id = NULL, shared_at = NULL
-            WHERE id = ? AND live_closed_at IS NULL`,
-          [Date.now(), sessionId],
-          (err) => {
-            if (err) handleException("Abandon du direct du parc safari :", err);
-            resolve();
-          }
-        )
-      );
-    }
-    handleException("Rafraîchissement d'une visite en direct du parc safari :", error);
+  }
+  if (result === "gone") {
+    log(`Message en direct de la visite #${sessionId} introuvable, il n'est plus suivi`);
+    return new Promise((resolve) =>
+      db.run(
+        `UPDATE pokemon_safari_sessions
+            SET live_closed_at = ?, live_message_id = NULL, shared_at = NULL
+          WHERE id = ? AND live_closed_at IS NULL`,
+        [Date.now(), sessionId],
+        (err) => {
+          if (err) handleException("Abandon du direct du parc safari :", err);
+          resolve();
+        }
+      )
+    );
   }
 }
 
@@ -1367,23 +1360,57 @@ function closeExpiredParks(client, cb = () => {}) {
   );
 }
 
-async function closeParkMessage(client, park) {
-  if (!client || !park.channel_id || !park.message_id) return;
-  try {
-    const channel = await client.channels.fetch(park.channel_id);
-    const message = await channel.messages.fetch(park.message_id);
-    await message.edit({
-      content: null,
-      embeds: [buildParkEmbed(park, { closed: true })],
-      components: [],
-    });
-  } catch (error) {
-    log(`Message du parc safari #${park.id} introuvable, fermeture non affichée`);
+// Le message d'un parc, tel que la base le dit au moment de l'écrire : son
+// compteur d'entrées tant qu'il est ouvert (son bouton ne change pas), la
+// fermeture ensuite. Une seule écriture à la fois : un compteur parti juste
+// avant la fermeture ne peut plus rouvrir le message. `refreshOnly` : ne rien
+// écrire d'un parc fermé — sa fermeture s'écrit par son propre chemin.
+export async function syncParkMessage(client, parkId, { refreshOnly = false, repair = false } = {}) {
+  const park = await asPromise((cb) => getPark(parkId, cb)).catch((error) => {
+    handleException("Lecture d'un parc à afficher :", error);
+    return null;
+  });
+  if (!park?.channel_id || !park.message_id) return "skipped";
+
+  let final = false;
+  const result = await syncMessage(client, `park:${parkId}`, {
+    channelId: park.channel_id,
+    messageId: park.message_id,
+    label: `du parc safari #${parkId}`,
+    build: async () => {
+      const fresh = await asPromise((cb) => getPark(parkId, cb));
+      if (!fresh) return null;
+      if (fresh.status === "OPEN") return { embeds: [buildParkEmbed(fresh)] };
+      final = true;
+      if (refreshOnly || (repair && fresh.message_closed_at)) return null;
+      return { content: null, embeds: [buildParkEmbed(fresh, { closed: true })], components: [] };
+    },
+  });
+  // Un message disparu se constate parfois avant toute relecture : la base dit
+  // alors si le parc était fermé.
+  if (result === "gone" && !refreshOnly) {
+    const now = await asPromise((cb) => getPark(parkId, cb)).catch(() => null);
+    final = now?.status === "CLOSED";
+    if (final) log(`Message du parc safari #${parkId} introuvable, fermeture non affichée`);
   }
+  if (final && !refreshOnly && (result === "edited" || result === "gone")) {
+    await new Promise((resolve) =>
+      db.run(
+        "UPDATE pokemon_safari_parks SET message_closed_at = ? WHERE id = ? AND message_closed_at IS NULL",
+        [Date.now(), parkId],
+        (err) => {
+          if (err) handleException("Marque de fin du message d'un parc :", err);
+          resolve();
+        }
+      )
+    );
+  }
+  return result;
 }
 
-// Rafraîchissement différé du compteur d'entrées. Le flush relit la base, donc
-// les rafraîchissements concurrents convergent vers le bon état.
+const closeParkMessage = (client, park) => syncParkMessage(client, park.id);
+
+// Rafraîchissement différé du compteur d'entrées.
 export function refreshParkMessage(client, parkId) {
   const delay = getPokemonConfig().spawn.embedRefreshMs;
 
@@ -1394,20 +1421,35 @@ export function refreshParkMessage(client, parkId) {
 
   const flush = () => {
     pendingParkRefreshes.delete(parkId);
-    getPark(parkId, async (err, park) => {
-      if (err || !park || park.status !== "OPEN" || !park.message_id) return;
-      try {
-        const channel = await client.channels.fetch(park.channel_id);
-        const message = await channel.messages.fetch(park.message_id);
-        await message.edit({ embeds: [buildParkEmbed(park)] });
-      } catch (error) {
-        log(`Rafraîchissement du parc safari #${parkId} impossible`);
-      }
-    });
+    syncParkMessage(client, parkId, { refreshOnly: true });
   };
 
   if (delay === 0) return flush();
   pendingParkRefreshes.set(parkId, setTimeout(flush, delay));
+}
+
+// Les parcs fermés dont le message n'a jamais reçu sa fermeture.
+export async function repairParkMessages(client) {
+  const { repairGraceSeconds, repairWindowHours } = getConfig().publicMessages;
+  const now = Date.now();
+  const rows = await asPromise((cb) =>
+    db.all(
+      `SELECT id FROM pokemon_safari_parks
+        WHERE status = 'CLOSED' AND message_id IS NOT NULL AND message_closed_at IS NULL
+          AND closed_at <= ? AND closed_at > ?`,
+      [now - repairGraceSeconds * 1000, now - repairWindowHours * 3600 * 1000],
+      cb
+    )
+  ).catch((error) => {
+    handleException("Recherche des messages de parc à conclure :", error);
+    return [];
+  });
+  let repaired = 0;
+  for (const { id } of rows) {
+    if ((await syncParkMessage(client, id, { repair: true })) === "edited") repaired++;
+  }
+  if (repaired) log(`${repaired} message(s) de parc safari conclu(s) après coup`);
+  return repaired;
 }
 
 // ====================== MÉNAGE ======================

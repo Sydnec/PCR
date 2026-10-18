@@ -316,7 +316,7 @@ describe("le compteur de messages et le balayage", () => {
 
   it("chaque message de son propriétaire compte ; le dernier fait éclore, et l'annonce mentionne le dresseur", async () => {
     sandbox.writeConfig({ pokemon: { generation: 2, eggs: { hatchMessages: 3 } } });
-    const egg = await incubating();
+    await incubating();
     const client = fakeClient();
     eggs.countEggMessage(client, "u1");
     eggs.countEggMessage(client, "u1");
@@ -330,7 +330,6 @@ describe("le compteur de messages et le balayage", () => {
     });
     assert.equal(client.sent[0].content, "<@u1>");
     assert.match(JSON.stringify(client.sent[0].embeds[0].toJSON()), new RegExp(`<@u1> accueille \\*\\*Pichu`));
-    assert.equal(egg.status, "INCUBATING");
   });
 
   it("les messages de quelqu'un qui ne couve pas ne touchent rien", async () => {

@@ -25,12 +25,12 @@ import {
   proposeTrade,
   resolveTradeAs,
   selectorOf,
-  setTradeMessage,
 } from "./collection.js";
 import { getSpecies } from "./data.js";
 import { getItem } from "./items.js";
 import { buildTradeEmbed, buildTradeRow, describeGroup, individualChoices } from "./embeds.js";
 import { checkSide, itemChoices, parseChoice, speciesChoices } from "./trade-side.js";
+import { linkTradeMessage } from "./trade-message.js";
 
 const promisify = (fn, ...args) =>
   new Promise((resolve, reject) => fn(...args, (err, value) => (err ? reject(err) : resolve(value))));
@@ -367,7 +367,7 @@ async function propose(interaction, draft) {
     await promisify(resolveTradeAs, trade.trade.id, draft.from_user_id, "CANCELLED").catch(() => {});
     return showDraft(interaction, draft, "❌ Je ne peux pas publier l'offre dans ce salon.");
   }
-  setTradeMessage(trade.trade.id, message.id);
+  await linkTradeMessage(interaction.client, trade.trade.id, message.id);
   await deleteDraft(draft.id);
   return show(interaction, {
     content: `✅ Offre envoyée à <@${draft.to_user_id}>.`,

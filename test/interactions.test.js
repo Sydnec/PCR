@@ -5,7 +5,7 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { MessageFlags } from "discord.js";
-import { createSandbox, openDatabases, dbRun, dbAll, dbGet, sleep, withRandom, speciesByName } from "./helpers.js";
+import { createSandbox, openDatabases, dbRun, dbAll, dbGet, sleep, untilQuiet, eventually, withRandom, speciesByName } from "./helpers.js";
 
 const sandbox = createSandbox({ config: { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } } });
 process.env.POKEMON_CHANNEL_ID = "123";
@@ -53,7 +53,11 @@ function fakeChannel({ allowed = true, sendFails = null, thread = false, locked 
 
 // Un clic : la réponse du jeu, dans l'ordre. On attend une première réponse, puis
 // un court instant pour celles qui suivent (un éphémère différé, puis modifié).
-async function click(customId, { user = "u1", channel = fakeChannel(), values = undefined, run = handlePokemonButton, ...overrides } = {}) {
+// `silent` : le clic ne doit rien répondre. Il n'y a alors aucune réponse à
+// attendre, seulement un court instant pour laisser parler une réponse qui
+// arriverait quand même — sans quoi l'attente de la première réponse va jusqu'à
+// son délai de 3 s, pour rien.
+async function click(customId, { user = "u1", channel = fakeChannel(), values = undefined, run = handlePokemonButton, silent = false, ...overrides } = {}) {
   const calls = [];
   const record = (method) => async (payload) => {
     calls.push({ method, payload });
@@ -81,8 +85,10 @@ async function click(customId, { user = "u1", channel = fakeChannel(), values = 
   for (const method of ["reply", "update", "deferReply", "deferUpdate", "editReply", "followUp"]) interaction[method] = record(method);
   await run(interaction);
   const terminal = ["reply", "update", "editReply", "followUp"];
-  for (let waited = 0; waited < 3000 && !calls.some((entry) => terminal.includes(entry.method)); waited += 10) await sleep(10);
-  await sleep(60);
+  if (!silent) {
+    for (let waited = 0; waited < 3000 && !calls.some((entry) => terminal.includes(entry.method)); waited += 10) await sleep(10);
+  }
+  await untilQuiet(calls);
   return calls;
 }
 const last = (calls, method) => calls.filter((entry) => entry.method === method).at(-1)?.payload;
@@ -140,12 +146,12 @@ beforeEach(async () => {
 
 describe("le routeur", () => {
   it("un bouton qui n'est pas du jeu, ou périmé, ne fait rien", async () => {
-    assert.deepEqual(await click("autre_chose|1|2"), []);
-    assert.deepEqual(await click("poke_inconnu|1"), []);
-  }, { timeout: 8000 });
+    assert.deepEqual(await click("autre_chose|1|2", { silent: true }), []);
+    assert.deepEqual(await click("poke_inconnu|1", { silent: true }), []);
+  });
 
   it("un menu qui n'est pas celui du parc est ignoré", async () => {
-    const calls = await click("poke_autre|park|1", { values: ["1"], run: handlePokemonSelect });
+    const calls = await click("poke_autre|park|1", { values: ["1"], run: handlePokemonSelect, silent: true });
     assert.deepEqual(calls, []);
   });
 });
@@ -744,6 +750,23 @@ describe("les boutons d'échange", () => {
     assert.equal(channel.edited.length, 0, "message_id inconnu : l'éphémère a déjà tout dit");
   });
 
+  it("deux choix validés en même temps : seul celui qui conclut l'offre réécrit le message public", async () => {
+    const id = await trade({ from: "w-from", to: "w-to" });
+    await dbRun(points, "UPDATE pokemon_trades SET message_id = 'm9' WHERE id = ?", [id]);
+    const [, chosen] = await dbAll(points, "SELECT id FROM pokemon_owned WHERE user_id = 'w-to' AND species_id = ? ORDER BY id", [species("Roucool").id]);
+    const channel = fakeChannel();
+    const [first, second] = await Promise.all([
+      click(`poke_trade_pick|${id}`, { user: "w-to", values: [`#${chosen.id}`], run: handlePokemonSelect, channel }),
+      click(`poke_trade_pick|${id}`, { user: "w-to", values: [`#${chosen.id}`], run: handlePokemonSelect, channel }),
+    ]);
+    const contents = [first, second].map((calls) => last(calls, "update")?.content ?? last(calls, "reply")?.content);
+    assert.ok(contents.some((content) => /Échange effectué/.test(content)), contents.join(" | "));
+    await untilQuiet(channel.edited, { quiet: 80 });
+    assert.equal(channel.edited.length, 1, "le perdant ne touche pas au message public");
+    assert.equal(channel.edited[0].payload.embeds[0].toJSON().title, "✅ Échange effectué");
+    assert.equal(await status(id), "ACCEPTED");
+  });
+
   it("le menu réécrit le message public de l'offre quand on le connaît, avec le Pokémon choisi", async () => {
     const id = await trade({ from: "q-from", to: "q-to" });
     await dbRun(points, "UPDATE pokemon_trades SET message_id = 'm9' WHERE id = ?", [id]);
@@ -777,7 +800,7 @@ describe("les boutons d'échange", () => {
     assert.match(only(await pick("s-to", [`#${chosen.id}`]), "reply").content, /déjà été traité/);
   });
 
-  it("un menu ouvert sur une offre devenue expirée le dit en privé et ne réécrit pas le message public", async () => {
+  it("un menu ouvert sur une offre devenue expirée le dit en privé, et le message public passe en « expiré », jamais en « impossible »", async () => {
     const id = await trade({ from: "v-from", to: "v-to" });
     await dbRun(points, "UPDATE pokemon_trades SET message_id = 'm9' WHERE id = ?", [id]);
     const [, chosen] = await dbAll(points, "SELECT id FROM pokemon_owned WHERE user_id = 'v-to' AND species_id = ? ORDER BY id", [species("Roucool").id]);
@@ -785,7 +808,11 @@ describe("les boutons d'échange", () => {
     const channel = fakeChannel();
     const calls = await click(`poke_trade_pick|${id}`, { user: "v-to", values: [`#${chosen.id}`], run: handlePokemonSelect, channel });
     assert.match(only(calls, "update").content, /Cette offre a expiré/);
-    assert.equal(channel.edited.length, 0, "ce n'est pas un « Échange impossible » : rien n'a manqué");
+    assert.equal(await status(id), "EXPIRED");
+    await eventually(() => assert.equal(channel.edited.length, 1));
+    const [edit] = channel.edited;
+    assert.equal(edit.id, "m9");
+    assert.equal(edit.payload.embeds[0].toJSON().title, "⌛ Échange expiré", "ce n'est pas un « Échange impossible » : rien n'a manqué");
   });
 
   it("un choix périmé fait échouer l'offre avec le motif, sans rien déplacer", async () => {
@@ -826,10 +853,13 @@ describe("les boutons d'échange", () => {
     assert.match(only(await click("poke_trade_accept|99999", { user: "b3" }), "reply").content, /Échange introuvable/);
   });
 
-  it("une offre expirée échoue en le disant, sans rien échanger", async () => {
+  it("une offre expirée le dit sur son message, sans rien échanger", async () => {
     const id = await trade({ from: "a4", to: "b4", expired: true });
     const calls = await click(`poke_trade_accept|${id}`, { user: "b4" });
-    assert.match(only(calls, "update").content, /^❌ Cette offre a expiré/);
+    const update = only(calls, "update");
+    assert.equal(update.embeds[0].toJSON().title, "⌛ Échange expiré");
+    assert.ok(update.components[0].toJSON().components.every((button) => button.disabled), "plus aucun bouton actif");
+    assert.equal(await status(id), "EXPIRED");
     assert.equal((await dbAll(points, "SELECT id FROM pokemon_owned WHERE user_id = 'a4' AND species_id = ?", [species("Rattata").id])).length, 2);
   });
 

@@ -65,6 +65,13 @@
   possède déjà — suivie de
   **son solde de points et des balls qu'il a en poche**, l'autre question qu'on se pose devant une
   apparition. `/solde` affiche le même embed.
+- **L'annonce finit toujours sur ce que dit la base.** Ses réécritures passent une à une, le
+  contenu relu au moment d'écrire : un rafraîchissement parti juste avant la capture ne peut plus
+  reposer l'embed « actif » par-dessus celui de la victoire. Discord qui refuse une fois se
+  réessaie (`publicMessages.retries`) ; une panne qui dure, ou un redémarrage au mauvais moment,
+  se rattrape toutes les cinq minutes et au démarrage, pour tout ce qui s'est terminé dans les
+  `repairWindowHours` (24 h). Même chose pour les offres d'échange, les parcs safari, les objets
+  au sol et les directs du safari.
 - À la capture comme à la fuite, l'embed affiche les **participants** avec les balls que chacun a
   lancées — `🥇 @Hoolan (1×🟡 2×🔵)` — et le total des points brûlés part en pied de page. La
   capture s'annonce par la ball qui l'a emportée et nomme son vainqueur dans la même ligne. Cette

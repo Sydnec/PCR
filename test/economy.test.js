@@ -97,7 +97,7 @@ describe("points", () => {
     await call(economy.spendPoints, "u1", 200);
     const log = await dbAll(points, "SELECT * FROM points_log WHERE user_id = 'u1' ORDER BY id");
     assert.ok(log.length >= 2);
-    assert.equal(log.at(-1).balance_after ?? log.at(-1).balance, 300);
+    assert.equal(log.at(-1).balance, 300);
   });
 
   it("le solde se met en forme avec les séparateurs français", () => {

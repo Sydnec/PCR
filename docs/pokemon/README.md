@@ -97,6 +97,10 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
   - Rien ne bouge avant l'acceptation, et tout se revérifie à ce moment : points, objets et
     Pokémon doivent toujours être là, sinon l'offre échoue en disant ce qui manque (« tu en as 1,
     il en faut 2 »), sans rien perdre ni créer.
+  - Une offre sans réponse à son échéance (`trade.expiryHours`) passe en **« ⌛ Échange expiré »**,
+    boutons retirés, d'elle-même (un passage toutes les cinq minutes) ou au premier clic. Deux clics
+    simultanés sur « Accepter » n'en concluent qu'un : le second l'apprend en privé, sans toucher
+    au message.
   - Chaque Pokémon échangé garde son identité : même numéro, même sexe, même ball, même surnom.
     Qui reçoit sait exactement ce qu'il aura, fertilité comprise, quand l'offre le désigne.
   **Seuls les doublons s'échangent** : contrairement

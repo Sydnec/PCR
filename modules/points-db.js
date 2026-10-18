@@ -184,11 +184,13 @@ const db = new sqlite3.Database(dbPath, (err) => {
         charm_shiny INTEGER NOT NULL DEFAULT 0,
         form TEXT,
         fished INTEGER NOT NULL DEFAULT 0,
-        reserved_for TEXT
+        reserved_for TEXT,
+        message_closed_at INTEGER
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_spawns :", err);
         addColumn("pokemon_spawns", "form", "TEXT");
+        addMessageClosedAt("pokemon_spawns", ["CAUGHT", "FLED"]);
         // Le Pokémon vient d'une pêche : l'Appât Ball vaut alors son bonus.
         addColumn("pokemon_spawns", "fished", "INTEGER NOT NULL DEFAULT 0");
         // Une pêche est une apparition réservée au pêcheur, hors du salon : son statut
@@ -407,10 +409,12 @@ const db = new sqlite3.Database(dbPath, (err) => {
         offer_item TEXT,
         offer_item_qty INTEGER,
         request_item TEXT,
-        request_item_qty INTEGER
+        request_item_qty INTEGER,
+        message_closed_at INTEGER
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_trades :", err);
+        addMessageClosedAt("pokemon_trades", ["ACCEPTED", "DECLINED", "CANCELLED", "FAILED", "EXPIRED"]);
         addColumn("pokemon_trades", "offer_form", "TEXT");
         addColumn("pokemon_trades", "request_form", "TEXT");
         addColumn("pokemon_trades", "offer_points", "INTEGER");
@@ -557,10 +561,12 @@ const db = new sqlite3.Database(dbPath, (err) => {
         message_id TEXT,
         dropped_at INTEGER NOT NULL,
         claimed_by TEXT,
-        claimed_at INTEGER
+        claimed_at INTEGER,
+        message_closed_at INTEGER
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_drops :", err);
+        addMessageClosedAt("pokemon_drops", ["CLAIMED", "LOST"]);
         db.run(
           "CREATE INDEX IF NOT EXISTS idx_pokemon_drops_open ON pokemon_drops(status, id)",
           (err) => {
@@ -605,10 +611,12 @@ const db = new sqlite3.Database(dbPath, (err) => {
         channel_id TEXT,
         message_id TEXT,
         entries INTEGER NOT NULL DEFAULT 0,
-        closed_at INTEGER
+        closed_at INTEGER,
+        message_closed_at INTEGER
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_safari_parks :", err);
+        addMessageClosedAt("pokemon_safari_parks", ["CLOSED"]);
         // Jamais deux parcs PUBLICS ouverts à la fois, comme pour les spawns. Les
         // parcs réservés échappent à l'index : ils ne se marchent pas dessus,
         // chacun n'ayant qu'un seul ayant droit.
@@ -916,12 +924,34 @@ export function dropLegacyTables(done = () => {}) {
   }
 }
 
+// `done(added)` : `added` dit que la colonne vient d'apparaître, sur une base qui
+// ne l'avait pas — de quoi remplir l'historique une seule fois.
 function addColumn(table, column, type, done = () => {}) {
   db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`, (err) => {
     if (err && !/duplicate column/i.test(err.message)) {
       handleException(`Erreur ajout de la colonne ${table}.${column} :`, err);
     }
-    done();
+    done(!err);
+  });
+}
+
+// La fin d'un message public : posée quand il a reçu son état final (capture,
+// fuite, échange conclu, parc fermé, objet ramassé), ou qu'il n'existe plus. Le
+// rattrapage réécrit ce qui s'est terminé sans elle. Ajoutée à une base
+// existante, elle marque tout l'historique d'un coup : ses messages ont reçu
+// leur fin, ou ne la recevront plus — les réécrire par milliers au démarrage
+// suivant n'apporterait rien.
+function addMessageClosedAt(table, endedStatuses) {
+  addColumn(table, "message_closed_at", "INTEGER", (added) => {
+    if (!added) return;
+    db.run(
+      `UPDATE ${table} SET message_closed_at = ?
+        WHERE message_closed_at IS NULL AND status IN (${endedStatuses.map(() => "?").join(", ")})`,
+      [Date.now(), ...endedStatuses],
+      (err) => {
+        if (err) handleException(`Marque des messages déjà conclus (${table}) :`, err);
+      }
+    );
   });
 }
 

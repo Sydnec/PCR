@@ -581,6 +581,19 @@ export const DEFAULTS = {
     // chaque onglet ouvert.
     spawnRefreshSeconds: 3,
   },
+  // Les messages publics que le jeu réécrit (modules/message-sync.js) :
+  // apparitions, offres d'échange, parcs safari, objets au sol, directs.
+  publicMessages: {
+    // Une réécriture refusée par une panne passagère (coupure, limite de débit,
+    // 5xx) se retente autant de fois, après retryDelayMs, puis le double, etc.
+    retries: 2,
+    retryDelayMs: 1000,
+    // Le rattrapage réécrit la fin d'un message qui ne l'a jamais reçue : après
+    // ce répit, pour laisser le chemin ordinaire conclure, et seulement pour
+    // ce qui s'est terminé dans cette fenêtre — l'historique ne se retouche pas.
+    repairGraceSeconds: 120,
+    repairWindowHours: 24,
+  },
   // La réécriture des liens X et Instagram vers leurs miroirs (modules/links.js).
   links: {
     // Sous la copie d'un tweet qui n'est pas en français, un bouton « Traduire »
@@ -780,6 +793,12 @@ const BOUNDS = {
   "pokemon.pc.nicknameLength": { min: 1, max: 24 },
   // À 0, Métamorph comblerait une évolution sans être consommé.
   "pokemon.evolution.dittosPerCopy": { min: 1 },
+  // Une rafale de réessais martèlerait Discord ; au-delà de quelques-uns, la
+  // panne n'est plus passagère et le rattrapage prend le relais.
+  "publicMessages.retries": { min: 0, max: 5 },
+  "publicMessages.retryDelayMs": { min: 0, max: 60000 },
+  "publicMessages.repairGraceSeconds": { min: 0, max: 3600 },
+  "publicMessages.repairWindowHours": { min: 1, max: 168 },
   // À 0, chaque onglet ouvert relirait l'apparition en boucle.
   "web.spawnRefreshSeconds": { min: 2, max: 60 },
   "web.accessDenialCacheSeconds": { min: 0, max: 3600 },

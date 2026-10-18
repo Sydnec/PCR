@@ -4,7 +4,7 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { MessageFlags } from "discord.js";
-import { createSandbox, openDatabases, dbRun, dbAll, sleep, speciesByName } from "./helpers.js";
+import { createSandbox, openDatabases, dbRun, dbAll, untilQuiet, speciesByName } from "./helpers.js";
 import { fakeChannel, fakeUser, payloadOf, runCommand } from "./fake-discord.js";
 
 createSandbox({ config: { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } } });
@@ -55,7 +55,7 @@ async function interact(customId, { kind = "button", user = "u1", channel = fake
   for (const method of ["reply", "update", "showModal"]) interaction[method] = record(method);
   const handler = { button: handlePokemonButton, select: handlePokemonSelect, modal: handlePokemonModal }[kind];
   await handler(interaction);
-  await sleep(40);
+  await untilQuiet(calls);
   return { calls, channel };
 }
 const press = (customId, options) => interact(customId, options);

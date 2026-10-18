@@ -2465,6 +2465,36 @@
       "commit": "pending",
       "timestamp": "2026-10-18T11:00:00.000Z",
       "branch": "dev/keen-knuth-lcd8tu"
+    },
+    {
+      "type": "chore",
+      "name": "Tests plus rapides",
+      "description": "La suite de tests s'exécute plus vite, et quelques tests qui ne prouvaient rien sont corrigés.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-18T14:00:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
+    },
+    {
+      "type": "fix",
+      "name": "Messages toujours à jour",
+      "description": "Une apparition capturée ou enfuie, un échange conclu, un parc fermé ou un objet ramassé affichent toujours leur vrai résultat, même quand tout se joue à la seconde près ou que Discord a un raté.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-18T18:00:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
+    },
+    {
+      "type": "enhancement",
+      "name": "Offres d'échange expirées",
+      "description": "Une offre d'échange restée sans réponse s'affiche « Échange expiré » et perd ses boutons.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-18T18:00:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
     }
   ]
 }

@@ -1326,10 +1326,25 @@ export function getTrade(tradeId, cb) {
   db.get("SELECT * FROM pokemon_trades WHERE id = ?", [tradeId], cb);
 }
 
-export function setTradeMessage(tradeId, messageId) {
+export function setTradeMessage(tradeId, messageId, cb = () => {}) {
   db.run("UPDATE pokemon_trades SET message_id = ? WHERE id = ?", [messageId, tradeId], (err) => {
     if (err) handleException("Enregistrement du message d'échange :", err);
+    cb(err);
   });
+}
+
+// Une offre encore ouverte dont l'échéance est passée devient EXPIRED. La garde
+// tient en une instruction : une acceptation qui gagne la course au même moment
+// reste acceptée. `cb(err, expired)`.
+export function expireTrade(tradeId, cb = () => {}) {
+  db.run(
+    `UPDATE pokemon_trades SET status = 'EXPIRED', resolved_at = ?
+      WHERE id = ? AND status = 'PENDING' AND expires_at <= ?`,
+    [Date.now(), tradeId, Date.now()],
+    function (err) {
+      cb(err, this ? this.changes === 1 : false);
+    }
+  );
 }
 
 // Ce que promet un côté d'une offre, rangé dans les colonnes de createTrade :
@@ -1712,7 +1727,7 @@ export function acceptTrade(tradeId, options, cb) {
         const reopen = (cleanly, error) => {
           if (!cleanly) return releaseTrade(tradeId, "FAILED", () => cb(error));
           db.run(
-            "UPDATE pokemon_trades SET status = 'PENDING', resolved_at = NULL WHERE id = ? AND status = 'ACCEPTED'",
+            "UPDATE pokemon_trades SET status = 'PENDING', resolved_at = NULL, message_closed_at = NULL WHERE id = ? AND status = 'ACCEPTED'",
             [tradeId],
             (reopenError) => {
               if (reopenError) handleException("Réouverture d'une offre :", reopenError);

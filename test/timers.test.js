@@ -31,7 +31,7 @@ async function loadBot({ sendFails = false } = {}) {
       sent.push(payload);
       return { id: `m${sent.length}`, edit: async () => {} };
     },
-    messages: { fetch: async () => ({ edit: async () => {}, embeds: [] }) },
+    messages: { fetch: async () => ({ edit: async () => {}, embeds: [] }), edit: async () => {} },
   };
   const bot = {
     sent,
@@ -84,6 +84,7 @@ describe("chaque minuteur est planifié", () => {
     const cron = (label) => new RegExp(`schedule\\("([^"]+)", "${label}"`).exec(index)?.[1];
     for (const label of ["fuite des Pokémon", "éclosion des œufs", "ouverture des générations", "rappels"]) assert.equal(cron(label), "* * * * *", label);
     for (const label of ["parc safari", "pot commun"]) assert.equal(cron(label), "0 * * * *", label);
+    assert.equal(cron("messages publics"), "*/5 * * * *");
   });
 });
 
@@ -216,5 +217,45 @@ describe("le pot commun et les autres minuteurs ne propagent jamais une erreur",
       await bot.handleSafariParkOnTimer();
     });
     assert.deepEqual(await dbAll(points, "SELECT id FROM pokemon_spawns"), []);
+  });
+});
+
+describe("le rattrapage des messages publics (minuteur de cinq minutes)", () => {
+  it("expire les offres échues et pose la fin d'une apparition qui ne l'a jamais reçue", async () => {
+    await dbRun(points, "DELETE FROM pokemon_trades");
+    const { lastID: tradeId } = await dbRun(
+      points,
+      `INSERT INTO pokemon_trades (from_user_id, to_user_id, offer_species_id, request_species_id, status, created_at, expires_at, channel_id, message_id, offer_points, request_points)
+       VALUES ('u1', 'u2', 0, 0, 'PENDING', 1, ?, '123', 't1', 10, 0)`,
+      [Date.now() - 60_000]
+    );
+    const { lastID: spawnId } = await dbRun(
+      points,
+      `INSERT INTO pokemon_spawns (species_id, catch_rate, rarity, status, spawned_at, flees_at, message_id, channel_id, ended_at)
+       VALUES (?, 45, 'COMMUN', 'FLED', 1, 1, 'm1', '123', ?)`,
+      [species("Roucool").id, Date.now() - 10 * 60_000]
+    );
+    const bot = await loadBot();
+    await bot.handlePublicMessagesOnTimer();
+    assert.equal((await dbGet(points, "SELECT status FROM pokemon_trades WHERE id = ?", [tradeId])).status, "EXPIRED");
+    assert.notEqual((await dbGet(points, "SELECT message_closed_at FROM pokemon_trades WHERE id = ?", [tradeId])).message_closed_at, null);
+    assert.notEqual((await dbGet(points, "SELECT message_closed_at FROM pokemon_spawns WHERE id = ?", [spawnId])).message_closed_at, null);
+  });
+
+  it("une panne de la base sur les offres ne prive pas les apparitions de leur rattrapage", async () => {
+    await dbRun(points, "ALTER TABLE pokemon_trades RENAME TO pokemon_trades_off");
+    try {
+      const { lastID } = await dbRun(
+        points,
+        `INSERT INTO pokemon_spawns (species_id, catch_rate, rarity, status, spawned_at, flees_at, message_id, channel_id, ended_at)
+         VALUES (?, 45, 'COMMUN', 'FLED', 1, 1, 'm2', '123', ?)`,
+        [species("Roucool").id, Date.now() - 10 * 60_000]
+      );
+      const bot = await loadBot();
+      await quiet(() => bot.handlePublicMessagesOnTimer());
+      assert.notEqual((await dbGet(points, "SELECT message_closed_at FROM pokemon_spawns WHERE id = ?", [lastID])).message_closed_at, null);
+    } finally {
+      await dbRun(points, "ALTER TABLE pokemon_trades_off RENAME TO pokemon_trades");
+    }
   });
 });

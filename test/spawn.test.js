@@ -115,7 +115,7 @@ describe("revendication d'une apparition (registerMessageForSpawn)", () => {
       assert.ok((await readState()).message_count !== before || fetches > 0, "le message n'a encore eu aucun effet");
     });
     let last = JSON.stringify(await readState());
-    for (let since = Date.now(); Date.now() - since < 100; ) {
+    for (let since = Date.now(); Date.now() - since < 60; ) {
       await sleep(20);
       const now = JSON.stringify(await readState());
       if (now !== last) {

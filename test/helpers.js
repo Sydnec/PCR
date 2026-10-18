@@ -58,6 +58,24 @@ export const dbAll = (db, sql, params = []) =>
 
 export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// Attend que `calls` ne reçoive plus rien pendant `quiet` ms : les réponses qui
+// suivent la première (un éphémère différé, puis modifié) arrivent après un
+// travail en base, et une attente fixe à l'aveugle ne prouvait pas plus qu'elle.
+// Une réponse tardive repousse la fin ; sans elle, on sort au bout de `quiet`.
+export async function untilQuiet(calls, { quiet = 30 } = {}) {
+  let seen = calls.length;
+  let still = 0;
+  while (still < quiet) {
+    await sleep(5);
+    if (calls.length !== seen) {
+      seen = calls.length;
+      still = 0;
+    } else {
+      still += 5;
+    }
+  }
+}
+
 // Attend qu'un travail détaché (un rappel de base, une annonce, une éclosion) ait
 // abouti, sans durée magique : `check` est rejouée jusqu'à ce qu'elle passe, ou
 // que le délai soit écoulé — sa dernière erreur remonte alors. Un `sleep(100)`
