@@ -528,6 +528,10 @@ const POKEMON = {
     // Au plus une réécriture du message en direct par intervalle (ms) : Discord
     // n'accepte que 5 éditions d'un message par 5 secondes.
     liveRefreshMs: 1000,
+    // Une salve finie, le message en direct se relit encore une fois après ce
+    // délai (ms), pour rattraper ce qu'une course aurait laissé de travers. 0
+    // l'éteint.
+    liveSettleMs: 3000,
     entryPrice: 5000,
     entryCooldownHours: 12,
     ball: { label: "Safari Ball", emoji: "<:safariball:1552972083909234811>", sprite: "safari-ball", multiplier: 1.5 },

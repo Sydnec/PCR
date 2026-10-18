@@ -715,7 +715,9 @@ const db = new sqlite3.Database(dbPath, (err) => {
 
     // Les migrations de données à ne jouer qu'une fois : la ligne en est la marque.
     // Pas « pokemon_migrations » : une ancienne table de ce nom, d'un autre schéma,
-    // traîne dans les bases de production, et IF NOT EXISTS la garderait telle quelle.
+    // traînait dans les bases de production, et IF NOT EXISTS l'aurait gardée telle
+    // quelle. Plus rien ne la lit : elle part au démarrage.
+    dropLegacyTables();
     db.run(
       `CREATE TABLE IF NOT EXISTS pokemon_data_migrations (
         name TEXT PRIMARY KEY,
@@ -900,6 +902,20 @@ function createPointsLog() {
 // déployé.
 // `done` s'exécute une fois la colonne sûre d'exister : un index qui la porte ne peut
 // pas partir avant.
+// Les tables que plus aucun code ne lit, restes de fonctionnalités retirées.
+// Les noms sont écrits ici, jamais reçus : la liste est tout ce qui part.
+const LEGACY_TABLES = ["pokemon_migrations"];
+
+export function dropLegacyTables(done = () => {}) {
+  let remaining = LEGACY_TABLES.length;
+  for (const table of LEGACY_TABLES) {
+    db.run(`DROP TABLE IF EXISTS ${table}`, (err) => {
+      if (err) handleException(`Suppression de l'ancienne table ${table} :`, err);
+      if (--remaining === 0) done();
+    });
+  }
+}
+
 function addColumn(table, column, type, done = () => {}) {
   db.run(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`, (err) => {
     if (err && !/duplicate column/i.test(err.message)) {

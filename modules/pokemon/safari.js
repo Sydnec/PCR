@@ -422,7 +422,11 @@ async function writeLiveShare(client, sessionId) {
   });
   if (!session?.live_message_id || session.live_closed_at) return;
 
-  const over = isSafariFinished(session) || session.expires_at <= Date.now();
+  // Le direct ne se clôt que sur une visite close EN BASE (ou expirée) : pendant
+  // la dernière action, le décompte est déjà à zéro alors que la visite n'est
+  // pas encore close ni la dernière capture enregistrée. Une réécriture qui lit
+  // à ce moment-là poserait un bilan incomplet et fermerait la porte au vrai.
+  const over = session.status !== "ACTIVE" || session.expires_at <= Date.now();
   const close = () =>
     new Promise((resolve) =>
       db.run(
@@ -467,10 +471,15 @@ async function writeLiveShare(client, sessionId) {
 // que le dresseur s'arrête, comme le message de parc, figeait le direct tant
 // qu'il jouait vite. Discord plafonne les éditions d'un message à 5 par 5
 // secondes : une par seconde tient sous la limite.
+//
+// Une salve finie, le message se relit encore une fois `liveSettleMs` plus tard,
+// de lui-même : ce qu'une course entre deux réécritures aurait laissé de travers
+// (des actions enchaînées en moins d'une seconde) se rattrape sans attendre un
+// clic qui ne viendra plus.
 export function refreshLiveShare(client, sessionId) {
   if (!client) return;
-  const interval = getSafariConfig().liveRefreshMs;
-  const state = liveRefreshes.get(sessionId) ?? { lastAt: 0, timer: null, cleanup: null };
+  const { liveRefreshMs: interval, liveSettleMs: settle } = getSafariConfig();
+  const state = liveRefreshes.get(sessionId) ?? { lastAt: 0, timer: null, settle: null };
   liveRefreshes.set(sessionId, state);
   // Déjà prévue : elle relira la base, cette action comprise.
   if (state.timer) return;
@@ -479,12 +488,19 @@ export function refreshLiveShare(client, sessionId) {
     state.timer = null;
     state.lastAt = Date.now();
     flushLiveShare(client, sessionId);
-    // Une visite qui ne clique plus n'a plus besoin de son rythme.
-    clearTimeout(state.cleanup);
-    state.cleanup = setTimeout(() => {
-      if (!state.timer) liveRefreshes.delete(sessionId);
-    }, interval);
-    state.cleanup.unref?.();
+    // La relecture de rattrapage (à 0 : aucune), repoussée à chaque réécriture ;
+    // ensuite, une visite qui ne clique plus n'a plus besoin de son rythme.
+    clearTimeout(state.settle);
+    state.settle = setTimeout(
+      () => {
+        state.settle = null;
+        if (state.timer) return;
+        liveRefreshes.delete(sessionId);
+        if (settle > 0) flushLiveShare(client, sessionId);
+      },
+      settle > 0 ? Math.max(settle, interval) : interval
+    );
+    state.settle.unref?.();
   };
   const wait = Math.max(0, state.lastAt + interval - Date.now());
   if (wait === 0) return run();

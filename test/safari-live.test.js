@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { createSandbox, openDatabases, dbRun, dbGet, dbAll, withRandom, speciesByName, eventually } from "./helpers.js";
 
 const sandbox = createSandbox({
-  config: { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" }, safari: { liveRefreshMs: 0 } } },
+  config: { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" }, safari: { liveRefreshMs: 0, liveSettleMs: 0 } } },
 });
 process.env.POKEMON_CHANNEL_ID = "pk";
 const { points } = await openDatabases();
@@ -171,7 +171,7 @@ describe("le message suit la visite", () => {
   });
 
   it("se réécrit tout de suite, puis au plus une fois par intervalle, sans perdre la dernière action", async () => {
-    sandbox.writeConfig({ pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" }, safari: { liveRefreshMs: 300 } } });
+    sandbox.writeConfig({ pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" }, safari: { liveRefreshMs: 300, liveSettleMs: 600 } } });
     try {
       const channel = fakeChannel();
       await goLive(channel);
@@ -195,10 +195,48 @@ describe("le message suit la visite", () => {
       await eventually(() => assert.equal(channel.edited.length, 2), { timeout: 1000 });
       const embed = embedOf(channel.edited[1].payload);
       assert.match(embed.description, new RegExp(`\\*\\*22\\*\\* / ${getSafariConfig().actionsPerSession} actions restantes`));
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      await new Promise((resolve) => setTimeout(resolve, 200));
       assert.equal(channel.edited.length, 2, "pas de réécriture en trop");
+      // Puis, la salve finie, une relecture de rattrapage, d'elle-même, et rien après.
+      await eventually(() => assert.equal(channel.edited.length, 3), { timeout: 1500 });
+      await new Promise((resolve) => setTimeout(resolve, 900));
+      assert.equal(channel.edited.length, 3);
     } finally {
-      sandbox.writeConfig({ pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" }, safari: { liveRefreshMs: 0 } } });
+      sandbox.writeConfig({ pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" }, safari: { liveRefreshMs: 0, liveSettleMs: 0 } } });
+    }
+  });
+
+  it("une réécriture qui tombe au milieu de la dernière action ne clôt pas le direct avant le vrai bilan", async () => {
+    const channel = fakeChannel();
+    await goLive(channel);
+    // La dernière action a décompté, mais la visite n'est pas encore close ni la
+    // capture enregistrée : c'est ce qu'une réécriture voit si elle lit à ce moment.
+    await dbRun(points, "UPDATE pokemon_safari_sessions SET actions_left = 0 WHERE id = 1");
+    await safari.flushLiveShare(fakeClient(channel), 1);
+    assert.equal((await row()).live_closed_at, null, "la visite n'est pas encore close");
+
+    await dbRun(points, "INSERT INTO pokemon_safari_catches (session_id, species_id, is_shiny, caught_at) VALUES (1, ?, 0, 1)", [id("Roucool")]);
+    await dbRun(points, "UPDATE pokemon_safari_sessions SET status = 'FINISHED', catches = 1, ended_at = 1 WHERE id = 1");
+    await safari.flushLiveShare(fakeClient(channel), 1);
+    const embed = embedOf(channel.edited.at(-1).payload);
+    assert.match(embed.fields.find((field) => field.name === "Ses prises").value, /Roucool/, "le bilan porte la dernière capture");
+    assert.notEqual((await row()).live_closed_at, null);
+  });
+
+  it("le rattrapage pose le bilan qu'une course avait manqué, sans nouveau clic", async () => {
+    sandbox.writeConfig({ pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" }, safari: { liveRefreshMs: 50, liveSettleMs: 200 } } });
+    try {
+      const channel = fakeChannel();
+      await goLive(channel);
+      safari.refreshLiveShare(fakeClient(channel), 1);
+      await eventually(() => assert.ok(channel.edited.length >= 1));
+      // La visite se termine sans que personne ne demande de réécriture : c'est
+      // ce que laisse une réécriture partie trop tôt.
+      await dbRun(points, "UPDATE pokemon_safari_sessions SET actions_left = 0, status = 'FINISHED' WHERE id = 1");
+      await eventually(() => assert.equal(embedOf(channel.edited.at(-1).payload).title, "🏕️ Fin de la visite"), { timeout: 1500 });
+      assert.notEqual((await row()).live_closed_at, null);
+    } finally {
+      sandbox.writeConfig({ pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" }, safari: { liveRefreshMs: 0, liveSettleMs: 0 } } });
     }
   });
 

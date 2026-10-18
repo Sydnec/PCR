@@ -87,7 +87,8 @@ parce que le Pokémon est le dernier de son espèce, ou verrouillé : la note so
   son nom par défaut.
 - **Archiver une boîte** : le bouton au carton, à côté de son nom, la range à part. Elle passe en
   fin de liste, dans le groupe « Archivées » du menu, qui est le seul chemin vers elle : les flèches
-  passent d'une boîte ordinaire à l'autre, et d'une archivée à l'autre. Les nouveaux Pokémon n'y
+  passent d'une boîte ordinaire à l'autre, et d'une archivée à l'autre. Sans boîte dans l'adresse, la
+  page s'ouvre sur la première qui n'est pas archivée. Les nouveaux Pokémon n'y
   arrivent pas d'eux-mêmes — sauf si toutes les autres cases sont prises jusqu'au plafond, plutôt
   que d'en perdre un —, mais on peut toujours y en ranger. Une boîte vide ne s'archive pas, et une
   archivée garde son nom et ses Pokémon ; elle compte dans le plafond de `maxBoxes`.

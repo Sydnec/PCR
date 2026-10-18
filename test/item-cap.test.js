@@ -198,7 +198,14 @@ describe("le surplus d'avant la limite", () => {
     assert.deepEqual(await call(items.sellHeldOverCap), { sold: 1 });
     assert.equal((await dbAll(points, "SELECT name FROM pokemon_data_migrations")).length, 1);
     assert.deepEqual(await call(items.sellHeldOverCap), { sold: 0 });
-    await dbRun(points, "DROP TABLE pokemon_migrations");
+
+    // Et le démarrage la supprime, sans toucher à la marque.
+    const { dropLegacyTables } = await import("../modules/points-db.js");
+    await new Promise((resolve) => dropLegacyTables(resolve));
+    const tables = (await dbAll(points, "SELECT name FROM sqlite_master WHERE type = 'table'")).map((row) => row.name);
+    assert.ok(!tables.includes("pokemon_migrations"));
+    assert.ok(tables.includes("pokemon_data_migrations"));
+    assert.equal((await dbAll(points, "SELECT name FROM pokemon_data_migrations")).length, 1);
   });
 
   it("des points qui ne passent pas rendent le surplus, et la migration se rejouera", async () => {
