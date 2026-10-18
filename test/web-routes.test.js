@@ -45,6 +45,7 @@ const bot = {
       send: async () => ({ id: "m1", edit: async () => {} }),
       messages: {
         fetch: async (id) => ({ id, embeds: [], edit: async (next) => channelEdits.push({ id, ...next }) }),
+        edit: async (id, next) => channelEdits.push({ id, ...next }),
       },
     }),
   },

@@ -22,6 +22,8 @@ const { handlePokemonButton } = await import("../modules/pokemon/interactions.js
 const collection = await import("../modules/pokemon/collection.js");
 const tradeMessage = await import("../modules/pokemon/trade-message.js");
 const economy = await import("../modules/economy.js");
+const safari = await import("../modules/pokemon/safari.js");
+const drops = await import("../modules/pokemon/drops.js");
 
 const MINUTE = 60_000;
 const quiet = async (work) => {
@@ -36,10 +38,12 @@ const quiet = async (work) => {
 
 // Un salon dont on règle la lenteur (la première lecture d'un message traîne)
 // et les pannes, et qui note chaque écriture, dans l'ordre où elle arrive.
-function fakeDiscord({ slowFirstFetch = 0, failures = [] } = {}) {
+function fakeDiscord({ slowFirstFetch = 0, slowFirstWrite = 0, failures = [], onSend = null } = {}) {
   const writes = [];
   let fetches = 0;
+  let edits = 0;
   const record = async (id, payload) => {
+    if (edits++ === 0 && slowFirstWrite) await sleep(slowFirstWrite);
     const failure = failures.shift();
     if (failure) throw failure;
     writes.push({ id, payload });
@@ -47,6 +51,10 @@ function fakeDiscord({ slowFirstFetch = 0, failures = [] } = {}) {
   const channel = {
     id: "123",
     writes,
+    send: async (payload) => {
+      if (onSend) await onSend(payload);
+      return { id: "sent1" };
+    },
     messages: {
       fetch: async (id) => {
         if (fetches++ === 0 && slowFirstFetch) await sleep(slowFirstFetch);
@@ -288,5 +296,100 @@ describe("le message d'une offre d'échange", () => {
     assert.equal(await tradeMessage.repairTradeMessages(discord.client), 1);
     assert.equal(discord.writes[0].payload.embeds[0].toJSON().title, "❌ Échange refusé");
     assert.equal(await tradeMessage.repairTradeMessages(discord.client), 0);
+  });
+});
+
+describe("le message d'un parc safari", () => {
+  const parkRow = () => dbGet(points, "SELECT * FROM pokemon_safari_parks WHERE id = 1");
+  async function openPark({ closedAgo = null } = {}) {
+    await dbRun(points, "DELETE FROM pokemon_safari_parks");
+    await dbRun(
+      points,
+      `INSERT INTO pokemon_safari_parks (id, status, opened_at, expires_at, channel_id, message_id, entries, closed_at)
+       VALUES (1, ?, 1, ?, '123', 'p1', 2, ?)`,
+      [closedAgo === null ? "OPEN" : "CLOSED", Date.now() + 3_600_000, closedAgo === null ? null : Date.now() - closedAgo]
+    );
+  }
+  const close = () => dbRun(points, "UPDATE pokemon_safari_parks SET status = 'CLOSED', closed_at = ? WHERE id = 1", [Date.now()]);
+
+  it("un compteur d'entrées parti avant la fermeture ne rouvre pas le message", async () => {
+    await openPark();
+    const discord = fakeDiscord({ slowFirstWrite: 120 });
+    safari.refreshParkMessage(discord.client, 1);
+    await sleep(20);
+    await close();
+    await safari.syncParkMessage(discord.client, 1);
+    await eventually(() => assert.ok(discord.writes.length >= 1));
+    await sleep(150);
+    assert.ok(isFinal(discord.writes.at(-1)), "la fermeture est la dernière écriture");
+    assert.notEqual((await parkRow()).message_closed_at, null);
+  });
+
+  it("un compteur d'entrées ne touche ni aux boutons d'un parc ouvert, ni à un parc fermé", async () => {
+    await openPark();
+    const discord = fakeDiscord();
+    await safari.syncParkMessage(discord.client, 1, { refreshOnly: true });
+    assert.equal(discord.writes.length, 1);
+    assert.equal(discord.writes[0].payload.components, undefined, "le bouton d'entrée reste en place");
+    await close();
+    await safari.syncParkMessage(discord.client, 1, { refreshOnly: true });
+    assert.equal(discord.writes.length, 1);
+  });
+
+  it("le rattrapage pose la fermeture qu'un parc n'a jamais affichée", async () => {
+    await openPark({ closedAgo: 5 * MINUTE });
+    const discord = fakeDiscord();
+    assert.equal(await safari.repairParkMessages(discord.client), 1);
+    assert.ok(isFinal(discord.writes[0]));
+    assert.equal(await safari.repairParkMessages(discord.client), 0);
+  });
+});
+
+describe("le message d'un objet au sol", () => {
+  const dropRow = (id) => dbGet(points, "SELECT * FROM pokemon_drops WHERE id = ?", [id]);
+
+  it("ramassé avant que son message soit connu, il perd son bouton dès qu'il l'est", async () => {
+    await dbRun(points, "DELETE FROM pokemon_drops");
+    // Le ramassage (depuis le site) passe pendant l'envoi de l'annonce.
+    const discord = fakeDiscord({
+      onSend: () => dbRun(points, "UPDATE pokemon_drops SET status = 'CLAIMED', claimed_by = 'u9', claimed_at = ? WHERE status = 'OPEN'", [Date.now()]),
+    });
+    const dropId = await new Promise((resolve) =>
+      drops.dropItem(discord.client, { spawn: { id: 1, species_id: roucool.id, channel_id: "123" }, itemKey: "pepite" }, (err, id) => resolve(id))
+    );
+    await eventually(() => assert.equal(discord.writes.length, 1));
+    assert.equal(discord.writes[0].id, "sent1");
+    assert.ok(isFinal(discord.writes[0]));
+    await eventually(async () => assert.notEqual((await dropRow(dropId)).message_closed_at, null));
+  });
+
+  it("si Discord refuse la réponse au clic, le message se réécrit par le salon", async () => {
+    await dbRun(points, "DELETE FROM pokemon_drops");
+    await dbRun(points, "DELETE FROM pokemon_spawns");
+    const { lastID } = await dbRun(points, "INSERT INTO pokemon_drops (item_key, status, channel_id, message_id, dropped_at) VALUES ('pepite', 'OPEN', '123', 'd1', 1)");
+    const discord = fakeDiscord();
+    await handlePokemonButton({
+      customId: `poke_drop|${lastID}`,
+      user: { id: "u3" },
+      member: {},
+      client: discord.client,
+      reply: async () => {},
+      update: async () => {
+        throw new Error("Unknown interaction");
+      },
+      followUp: async () => {},
+    });
+    await eventually(() => assert.equal(discord.writes.length, 1));
+    assert.ok(isFinal(discord.writes[0]));
+    await eventually(async () => assert.notEqual((await dropRow(lastID)).message_closed_at, null));
+  });
+
+  it("le rattrapage retire le bouton d'un objet ramassé", async () => {
+    await dbRun(points, "DELETE FROM pokemon_drops");
+    const { lastID } = await dbRun(points, "INSERT INTO pokemon_drops (item_key, status, channel_id, message_id, dropped_at, claimed_by, claimed_at) VALUES ('pepite', 'CLAIMED', '123', 'd2', 1, 'u4', ?)", [Date.now() - 5 * MINUTE]);
+    const discord = fakeDiscord();
+    assert.equal(await drops.repairDropMessages(discord.client), 1);
+    assert.equal(discord.writes[0].id, "d2");
+    assert.notEqual((await dropRow(lastID)).message_closed_at, null);
   });
 });

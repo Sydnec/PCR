@@ -12,6 +12,8 @@
 // simultanés, un seul ramasseur — et le bouton répond encore après un
 // redémarrage du bot.
 import db from "../points-db.js";
+import { getConfig } from "../config.js";
+import { syncMessage } from "../message-sync.js";
 import { handleException, log } from "../utils.js";
 import { pseudo } from "../pseudo.js";
 import { getPokemonConfig } from "./config.js";
@@ -81,11 +83,17 @@ export function dropItem(client, { spawn, itemKey }, cb = () => {}) {
           embeds: [buildDropEmbed(item)],
           components: [buildDropRow(dropId)],
         });
+        // Le message existe avant que la base le connaisse : un ramassage depuis
+        // le site, dans l'intervalle, n'a pas pu en retirer le bouton. Une fois
+        // le message retenu, on le réécrit si l'objet n'est déjà plus au sol.
         db.run(
           "UPDATE pokemon_drops SET message_id = ? WHERE id = ?",
           [message.id, dropId],
           (err) => {
-            if (err) handleException("Enregistrement du message d'objet au sol :", err);
+            if (err) return handleException("Enregistrement du message d'objet au sol :", err);
+            getDrop(dropId, (err, row) => {
+              if (!err && row && row.status !== "OPEN") syncDropMessage(client, dropId);
+            });
           }
         );
         log(`Objet au sol #${dropId} : ${item.label} (spawn #${spawn.id ?? "—"})`);
@@ -192,17 +200,79 @@ export function claimDrop(userId, dropId, cb) {
   );
 }
 
+const read = (run) => new Promise((resolve, reject) => run((err, value) => (err ? reject(err) : resolve(value))));
+
+export function markDropMessageClosed(dropId) {
+  return new Promise((resolve) =>
+    db.run(
+      "UPDATE pokemon_drops SET message_closed_at = ? WHERE id = ? AND message_closed_at IS NULL",
+      [Date.now(), dropId],
+      (err) => {
+        if (err) handleException("Marque de fin du message d'un objet au sol :", err);
+        resolve();
+      }
+    )
+  );
+}
+
+// Le message d'un objet au sol, tel que la base le dit au moment de l'écrire :
+// ramassé, il dit par qui et perd son bouton. Encore au sol (un ramassage raté
+// l'y a reposé), il n'a rien à changer.
+export async function syncDropMessage(client, dropId) {
+  const drop = await read((cb) => getDrop(dropId, cb)).catch((error) => {
+    handleException("Lecture d'un objet au sol à afficher :", error);
+    return null;
+  });
+  if (!drop?.channel_id || !drop.message_id) return "skipped";
+
+  let final = false;
+  const result = await syncMessage(client, `drop:${dropId}`, {
+    channelId: drop.channel_id,
+    messageId: drop.message_id,
+    label: `de l'objet au sol #${dropId}`,
+    build: async () => {
+      const fresh = await read((cb) => getDrop(dropId, cb));
+      const item = fresh && getItem(fresh.item_key);
+      final = fresh?.status === "CLAIMED" && Boolean(item);
+      return final ? { embeds: [buildDropEmbed(item, { claimedBy: fresh.claimed_by })], components: [] } : null;
+    },
+  });
+  if (final && (result === "edited" || result === "gone")) {
+    if (result === "gone") log(`Message de l'objet au sol #${dropId} introuvable, ramassage non affiché`);
+    await markDropMessageClosed(dropId);
+  }
+  return result;
+}
+
 // Un objet ramassé ailleurs que par son bouton — depuis le site — doit quand
 // même disparaître du salon : sinon le bouton resterait là, et le premier qui
 // cliquerait apprendrait qu'il n'y a plus rien. Sur Discord, le clic réécrit
-// lui-même le message. Au mieux : un message supprimé n'annule pas le ramassage.
-export async function announceDropClaim(client, drop, item, userId) {
-  if (!client || !drop?.channel_id || !drop?.message_id) return;
-  try {
-    const channel = await client.channels.fetch(drop.channel_id);
-    const message = await channel.messages.fetch(drop.message_id);
-    await message.edit({ embeds: [buildDropEmbed(item, { claimedBy: userId })], components: [] });
-  } catch (error) {
-    log(`Message de l'objet au sol #${drop.id} introuvable, ramassage non affiché`);
+// lui-même le message. Un message supprimé n'annule pas le ramassage.
+export function announceDropClaim(client, drop) {
+  if (!client || !drop?.id) return Promise.resolve("skipped");
+  return syncDropMessage(client, drop.id);
+}
+
+// Les objets ramassés dont le message montre encore le bouton.
+export async function repairDropMessages(client) {
+  const { repairGraceSeconds, repairWindowHours } = getConfig().publicMessages;
+  const now = Date.now();
+  const rows = await read((cb) =>
+    db.all(
+      `SELECT id FROM pokemon_drops
+        WHERE status = 'CLAIMED' AND message_id IS NOT NULL AND message_closed_at IS NULL
+          AND claimed_at <= ? AND claimed_at > ?`,
+      [now - repairGraceSeconds * 1000, now - repairWindowHours * 3600 * 1000],
+      cb
+    )
+  ).catch((error) => {
+    handleException("Recherche des messages d'objet au sol à conclure :", error);
+    return [];
+  });
+  let repaired = 0;
+  for (const { id } of rows) {
+    if ((await syncDropMessage(client, id)) === "edited") repaired++;
   }
+  if (repaired) log(`${repaired} message(s) d'objet au sol conclu(s) après coup`);
+  return repaired;
 }

@@ -53,6 +53,10 @@ function fakeDiscord({ sendFails = false, messageGone = false } = {}) {
         const known = messages.get(id) ?? { id, embeds: [], edit: async (next) => edits.push({ id, ...next }) };
         return known;
       },
+      edit: async (id, next) => {
+        if (messageGone) throw Object.assign(new Error("Unknown Message"), { code: 10008 });
+        edits.push({ id, ...next });
+      },
     },
   };
   return { client: { channels: { fetch: async () => channel } }, sent, edits };
@@ -368,13 +372,16 @@ describe("objets au sol", () => {
     assert.match(second.reason, /Trop tard/);
   });
 
-  it("le ramassage depuis le site retire le bouton du salon", async () => {
+  it("le ramassage depuis le site retire le bouton du salon, d'après la base", async () => {
+    await dbRun(points, "DELETE FROM pokemon_drops");
+    const { lastID } = await dbRun(points, "INSERT INTO pokemon_drops (item_key, status, channel_id, message_id, dropped_at, claimed_by, claimed_at) VALUES ('pepite', 'CLAIMED', '123', 'm1', 1, ?, ?)", [user(1), Date.now()]);
     const discord = fakeDiscord();
-    await drops.announceDropClaim(discord.client, { id: 1, channel_id: "123", message_id: "m1" }, items.getItem("pepite"), user(1));
+    await drops.announceDropClaim(discord.client, { id: lastID });
     assert.equal(discord.edits.length, 1);
     assert.deepEqual(discord.edits[0].components, []);
-    await drops.announceDropClaim(null, { id: 1 }, items.getItem("pepite"), user(1));
-    await drops.announceDropClaim(fakeDiscord({ messageGone: true }).client, { id: 1, channel_id: "123", message_id: "m1" }, items.getItem("pepite"), user(1));
+    assert.notEqual((await dbGet(points, "SELECT message_closed_at FROM pokemon_drops WHERE id = ?", [lastID])).message_closed_at, null);
+    await drops.announceDropClaim(null, { id: lastID });
+    assert.equal(await drops.announceDropClaim(fakeDiscord({ messageGone: true }).client, { id: lastID }), "gone");
   });
 
   it("le tirage de lâcher suit la chance réglée", () => {

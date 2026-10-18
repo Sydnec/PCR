@@ -31,7 +31,7 @@ async function loadBot({ sendFails = false } = {}) {
       sent.push(payload);
       return { id: `m${sent.length}`, edit: async () => {} };
     },
-    messages: { fetch: async () => ({ edit: async () => {}, embeds: [] }) },
+    messages: { fetch: async () => ({ edit: async () => {}, embeds: [] }), edit: async () => {} },
   };
   const bot = {
     sent,

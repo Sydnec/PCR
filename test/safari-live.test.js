@@ -6,8 +6,11 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { createSandbox, openDatabases, dbRun, dbGet, dbAll, withRandom, speciesByName, eventually } from "./helpers.js";
 
+// Les réessais d'une réécriture refusée, raccourcis : une panne simulée ne doit
+// pas coûter les secondes d'une vraie.
+const FAST_RETRIES = { publicMessages: { retryDelayMs: 5 } };
 const sandbox = createSandbox({
-  config: { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" }, safari: { liveRefreshMs: 0, liveSettleMs: 0 } } },
+  config: { ...FAST_RETRIES, pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" }, safari: { liveRefreshMs: 0, liveSettleMs: 0 } } },
 });
 process.env.POKEMON_CHANNEL_ID = "pk";
 const { points } = await openDatabases();
@@ -171,7 +174,7 @@ describe("le message suit la visite", () => {
   });
 
   it("se réécrit tout de suite, puis au plus une fois par intervalle, sans perdre la dernière action", async () => {
-    sandbox.writeConfig({ pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" }, safari: { liveRefreshMs: 300, liveSettleMs: 600 } } });
+    sandbox.writeConfig({ ...FAST_RETRIES, pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" }, safari: { liveRefreshMs: 300, liveSettleMs: 600 } } });
     try {
       const channel = fakeChannel();
       await goLive(channel);
@@ -202,7 +205,7 @@ describe("le message suit la visite", () => {
       await new Promise((resolve) => setTimeout(resolve, 900));
       assert.equal(channel.edited.length, 3);
     } finally {
-      sandbox.writeConfig({ pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" }, safari: { liveRefreshMs: 0, liveSettleMs: 0 } } });
+      sandbox.writeConfig({ ...FAST_RETRIES, pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" }, safari: { liveRefreshMs: 0, liveSettleMs: 0 } } });
     }
   });
 
@@ -224,7 +227,7 @@ describe("le message suit la visite", () => {
   });
 
   it("le rattrapage pose le bilan qu'une course avait manqué, sans nouveau clic", async () => {
-    sandbox.writeConfig({ pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" }, safari: { liveRefreshMs: 50, liveSettleMs: 200 } } });
+    sandbox.writeConfig({ ...FAST_RETRIES, pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" }, safari: { liveRefreshMs: 50, liveSettleMs: 200 } } });
     try {
       const channel = fakeChannel();
       await goLive(channel);
@@ -236,7 +239,7 @@ describe("le message suit la visite", () => {
       await eventually(() => assert.equal(embedOf(channel.edited.at(-1).payload).title, "🏕️ Fin de la visite"), { timeout: 1500 });
       assert.notEqual((await row()).live_closed_at, null);
     } finally {
-      sandbox.writeConfig({ pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" }, safari: { liveRefreshMs: 0, liveSettleMs: 0 } } });
+      sandbox.writeConfig({ ...FAST_RETRIES, pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" }, safari: { liveRefreshMs: 0, liveSettleMs: 0 } } });
     }
   });
 

@@ -1334,7 +1334,7 @@ export const routes = [
       // Le capteur est refusé pour de bon (403) ; la course perdue, elle, est un
       // conflit (409).
       if (!claimed.ok) throw new HttpError(claimed.captor ? 403 : 409, claimed.reason);
-      announceDropClaim(ctx.bot, claimed.drop, claimed.item, ctx.user.id);
+      announceDropClaim(ctx.bot, claimed.drop);
       const { key, label, emoji, sprite } = claimed.item;
       // `sold` : la vente d'office d'un objet au-delà de la limite, la phrase de
       // Discord, que le site affiche telle quelle.

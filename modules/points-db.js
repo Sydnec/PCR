@@ -561,10 +561,12 @@ const db = new sqlite3.Database(dbPath, (err) => {
         message_id TEXT,
         dropped_at INTEGER NOT NULL,
         claimed_by TEXT,
-        claimed_at INTEGER
+        claimed_at INTEGER,
+        message_closed_at INTEGER
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_drops :", err);
+        addMessageClosedAt("pokemon_drops", ["CLAIMED", "LOST"]);
         db.run(
           "CREATE INDEX IF NOT EXISTS idx_pokemon_drops_open ON pokemon_drops(status, id)",
           (err) => {
@@ -609,10 +611,12 @@ const db = new sqlite3.Database(dbPath, (err) => {
         channel_id TEXT,
         message_id TEXT,
         entries INTEGER NOT NULL DEFAULT 0,
-        closed_at INTEGER
+        closed_at INTEGER,
+        message_closed_at INTEGER
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_safari_parks :", err);
+        addMessageClosedAt("pokemon_safari_parks", ["CLOSED"]);
         // Jamais deux parcs PUBLICS ouverts à la fois, comme pour les spawns. Les
         // parcs réservés échappent à l'index : ils ne se marchent pas dessus,
         // chacun n'ayant qu'un seul ayant droit.

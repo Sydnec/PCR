@@ -17,7 +17,7 @@ import { getBall, getPokemonConfig, getSafariConfig } from "./config.js";
 import { answerThrow, ballPanelRow, getBallPrice, specialPanelRow, throwBall, trackPanel } from "./capture.js";
 import { getSpawn } from "./spawn.js";
 import { getBallItem, getBallStock, getItem, getItemCount, overflowNotice } from "./items.js";
-import { claimDrop } from "./drops.js";
+import { claimDrop, markDropMessageClosed, syncDropMessage } from "./drops.js";
 
 import {
   ENVOI_IMPOSSIBLE,
@@ -266,11 +266,17 @@ function handleDropClaim(interaction, dropId) {
     log(`Ramassage : ${pseudoOf(interaction)} prend ${claimed.item.label}`);
     // Le message public dit qui l'a ramassé ; la vente d'office ne regarde que lui.
     const vendu = overflowNotice(claimed.item, claimed.granted);
+    // Le clic réécrit son propre message ; si Discord le refuse, le message se
+    // réécrit par le salon, et le rattrapage finit le travail au besoin.
     interaction
       .update({
         embeds: [buildDropEmbed(claimed.item, { claimedBy: interaction.user.id })],
         components: [],
       })
+      .then(
+        () => markDropMessageClosed(claimed.drop.id),
+        () => syncDropMessage(interaction.client, claimed.drop.id)
+      )
       .then(() =>
         vendu
           ? interaction.followUp({ content: `${claimed.item.emoji} ${vendu}`, flags: MessageFlags.Ephemeral })
