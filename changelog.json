@@ -2435,5 +2435,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "chore",
+      "name": "Ménage de la base",
+      "description": "Une ancienne table inutilisée est supprimée au démarrage du bot.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-18T10:00:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
+    }
+  ]
 }
