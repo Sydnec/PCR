@@ -56,6 +56,9 @@ async function execute(bot) {
     // un arrêt brutal bloqueraient leurs index uniques respectifs.
     sweepSafari(bot);
 
+    // Les messages publics qu'un arrêt brutal a laissés sans leur fin.
+    bot.handlePublicMessagesOnTimer();
+
     // Les Charmes Chroma : ceux qu'un Pokédex déjà complet n'a pas encore
     // donnés, et les rôles de leurs porteurs, remis d'accord avec l'inventaire.
     repairCharms(bot);

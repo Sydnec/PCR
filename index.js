@@ -118,6 +118,12 @@ try {
     bot.handlePokemonFleeOnTimer();
   });
 
+  // Les messages publics restés sans leur fin (capture, fuite, échange conclu
+  // ou échu, parc fermé, objet ramassé) : réécrits d'après la base.
+  schedule("*/5 * * * *", "messages publics", () => {
+    bot.handlePublicMessagesOnTimer();
+  });
+
   // Éclosion des œufs arrivés à échéance. Le seuil de messages, lui, se vérifie
   // au fil des messages de chaque propriétaire.
   schedule("* * * * *", "éclosion des œufs", () => {
