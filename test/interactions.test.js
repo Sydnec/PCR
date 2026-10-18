@@ -5,7 +5,7 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { MessageFlags } from "discord.js";
-import { createSandbox, openDatabases, dbRun, dbAll, dbGet, sleep, untilQuiet, withRandom, speciesByName } from "./helpers.js";
+import { createSandbox, openDatabases, dbRun, dbAll, dbGet, sleep, untilQuiet, eventually, withRandom, speciesByName } from "./helpers.js";
 
 const sandbox = createSandbox({ config: { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } } });
 process.env.POKEMON_CHANNEL_ID = "123";
@@ -783,7 +783,7 @@ describe("les boutons d'échange", () => {
     assert.match(only(await pick("s-to", [`#${chosen.id}`]), "reply").content, /déjà été traité/);
   });
 
-  it("un menu ouvert sur une offre devenue expirée le dit en privé et ne réécrit pas le message public", async () => {
+  it("un menu ouvert sur une offre devenue expirée le dit en privé, et le message public passe en « expiré », jamais en « impossible »", async () => {
     const id = await trade({ from: "v-from", to: "v-to" });
     await dbRun(points, "UPDATE pokemon_trades SET message_id = 'm9' WHERE id = ?", [id]);
     const [, chosen] = await dbAll(points, "SELECT id FROM pokemon_owned WHERE user_id = 'v-to' AND species_id = ? ORDER BY id", [species("Roucool").id]);
@@ -791,7 +791,11 @@ describe("les boutons d'échange", () => {
     const channel = fakeChannel();
     const calls = await click(`poke_trade_pick|${id}`, { user: "v-to", values: [`#${chosen.id}`], run: handlePokemonSelect, channel });
     assert.match(only(calls, "update").content, /Cette offre a expiré/);
-    assert.equal(channel.edited.length, 0, "ce n'est pas un « Échange impossible » : rien n'a manqué");
+    assert.equal(await status(id), "EXPIRED");
+    await eventually(() => assert.equal(channel.edited.length, 1));
+    const [edit] = channel.edited;
+    assert.equal(edit.id, "m9");
+    assert.equal(edit.payload.embeds[0].toJSON().title, "⌛ Échange expiré", "ce n'est pas un « Échange impossible » : rien n'a manqué");
   });
 
   it("un choix périmé fait échouer l'offre avec le motif, sans rien déplacer", async () => {
@@ -832,10 +836,13 @@ describe("les boutons d'échange", () => {
     assert.match(only(await click("poke_trade_accept|99999", { user: "b3" }), "reply").content, /Échange introuvable/);
   });
 
-  it("une offre expirée échoue en le disant, sans rien échanger", async () => {
+  it("une offre expirée le dit sur son message, sans rien échanger", async () => {
     const id = await trade({ from: "a4", to: "b4", expired: true });
     const calls = await click(`poke_trade_accept|${id}`, { user: "b4" });
-    assert.match(only(calls, "update").content, /^❌ Cette offre a expiré/);
+    const update = only(calls, "update");
+    assert.equal(update.embeds[0].toJSON().title, "⌛ Échange expiré");
+    assert.ok(update.components[0].toJSON().components.every((button) => button.disabled), "plus aucun bouton actif");
+    assert.equal(await status(id), "EXPIRED");
     assert.equal((await dbAll(points, "SELECT id FROM pokemon_owned WHERE user_id = 'a4' AND species_id = ?", [species("Rattata").id])).length, 2);
   });
 

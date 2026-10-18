@@ -47,7 +47,9 @@ function fakeDiscord({ sendFails = false, messageGone = false } = {}) {
     },
     messages: {
       fetch: async (id) => {
-        if (messageGone) throw new Error("message supprimé");
+        // L'erreur que Discord rend pour un message supprimé : son code dit qu'il
+        // ne reviendra pas, et rien ne se réessaie.
+        if (messageGone) throw Object.assign(new Error("Unknown Message"), { code: 10008 });
         const known = messages.get(id) ?? { id, embeds: [], edit: async (next) => edits.push({ id, ...next }) };
         return known;
       },

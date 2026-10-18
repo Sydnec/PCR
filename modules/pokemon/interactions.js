@@ -47,6 +47,7 @@ import {
   getCollection,
   getIndividuals,
   getSpeciesDuplicates,
+  expireTrade,
   getSpeciesNeeders,
   getSpeciesOwnership,
   getTrade,
@@ -57,9 +58,14 @@ import {
   resolveTradeAs,
   selectorOf,
   parseIndividual,
-  setTradeMessage,
   tradeCandidate,
 } from "./collection.js";
+import {
+  linkTradeMessage,
+  markTradeMessageClosed,
+  syncTradeMessage,
+  tradeOutcome,
+} from "./trade-message.js";
 import {
   buildDexEmbed,
   buildDexRow,
@@ -561,7 +567,7 @@ async function proposeFromComparison(interaction, state) {
         : "⚠️ L'envoi a échoué, mais il a peut-être abouti : va voir le salon avant de réessayer."
     );
   }
-  setTradeMessage(offerId, message.id);
+  await linkTradeMessage(interaction.client, offerId, message.id);
   await interaction
     .editReply({
       content: `✅ Offre envoyée à <@${state.partnerId}> dans ${channel}.`,
@@ -721,28 +727,52 @@ function showEvolutionChoices(interaction, speciesId, variant, helperKey = null)
 
 // ---------------------- Échanges ----------------------
 
-// Le message d'une offre, tel qu'il se réécrit à la fin : l'embed du résultat, et
-// plus aucun bouton actif.
-const tradeOutcome = (trade, status, note) => ({
-  content: note ?? null,
-  embeds: [buildTradeEmbed(trade, status)],
-  components: [buildTradeRow(trade.id, { disabled: true })],
-});
-
+// Le bouton qui conclut une offre réécrit son propre message. La fin se retient
+// en base une fois posée ; si Discord la refuse, le message se réécrit par le
+// salon, relu en base, et le rattrapage finira le travail au besoin.
 function finishTrade(interaction, trade, status, note) {
-  interaction.update(tradeOutcome(trade, status, note)).catch(() => {});
+  interaction
+    .update(tradeOutcome(trade, status, note))
+    .then(
+      () => markTradeMessageClosed(trade.id),
+      () => syncTradeMessage(interaction.client, trade.id, { note })
+    )
+    .catch(() => {});
 }
 
-// Accepte l'offre et en écrit le résultat avec `write(trade, status, note, { stale })`. Le
+// Une offre que l'acceptation n'a pas trouvée ouverte : soit elle a expiré — elle
+// le devient en base, et son message le dit —, soit un autre clic l'a déjà
+// conclue. Ce clic-là n'a alors rien à écrire : le gagnant s'en charge, et un
+// « Échange impossible » posé par le perdant recouvrirait un échange réussi.
+function settleStale(trade, cb) {
+  getTrade(trade.id, (err, fresh) => {
+    if (err || !fresh) return cb({ handled: true });
+    const expired =
+      fresh.status === "EXPIRED" || (fresh.status === "PENDING" && fresh.expires_at <= Date.now());
+    if (!expired) return cb({ handled: true });
+    expireTrade(fresh.id, (err) => {
+      if (err) handleException("Expiration d'une offre :", err);
+      cb({ expired: fresh });
+    });
+  });
+}
+
+// Accepte l'offre et en écrit le résultat avec `write(trade, status, note, { handled })`.
+// `handled` : un autre clic a déjà conclu l'offre, il n'y a rien à réécrire. Le
 // bouton écrit sur son propre message ; le menu du destinataire, lui, vit dans un
-// éphémère et réécrit le message public.
+// éphémère et fait réécrire le message public.
 function acceptAndSettle(interaction, trade, options, write) {
   acceptTrade(trade.id, options, (err, result) => {
     if (err) {
       handleException(err);
       return ephemeral(interaction, "❌ Erreur base de données.");
     }
-    if (!result.ok) return write(trade, "FAILED", `❌ ${result.reason}`, { stale: result.stale });
+    if (result.stale) {
+      return settleStale(trade, ({ expired, handled }) =>
+        handled ? write(trade, null, null, { handled }) : write(expired, "EXPIRED")
+      );
+    }
+    if (!result.ok) return write(trade, "FAILED", `❌ ${result.reason}`);
     pseudos(trade.from_user_id, trade.to_user_id).then(([from, to]) =>
       log(`Échange #${trade.id} accepté entre ${from} et ${to}`)
     );
@@ -790,6 +820,15 @@ function handleTradeButton(interaction, action, tradeId) {
       return ephemeral(interaction, "❌ Cet échange a déjà été traité.");
     }
 
+    // Échue mais encore ouverte en base : quel que soit le bouton, l'offre est
+    // expirée, et son message le dit au lieu de proposer ce qui ne se fera plus.
+    if (trade.expires_at <= Date.now()) {
+      return expireTrade(trade.id, (err) => {
+        if (err) handleException("Expiration d'une offre :", err);
+        finishTrade(interaction, trade, "EXPIRED");
+      });
+    }
+
     const userId = interaction.user.id;
     if (action === "cancel") {
       if (userId !== trade.from_user_id) {
@@ -818,8 +857,10 @@ function handleTradeButton(interaction, action, tradeId) {
     if (tradeNeedsChoice(trade) && trade.expires_at > Date.now()) {
       return askTradePick(interaction, trade);
     }
-    acceptAndSettle(interaction, trade, {}, (settled, status, note) =>
-      finishTrade(interaction, settled, status, note)
+    acceptAndSettle(interaction, trade, {}, (settled, status, note, { handled } = {}) =>
+      handled
+        ? ephemeral(interaction, "❌ Cet échange a déjà été traité.")
+        : finishTrade(interaction, settled, status, note)
     );
   });
 }
@@ -840,21 +881,19 @@ function handleTradePick(interaction, tradeId) {
     const requestPokemonId = parseIndividual(interaction.values?.[0]);
     if (!requestPokemonId) return ephemeral(interaction, "❌ Choisis un Pokémon dans la liste.");
 
-    acceptAndSettle(interaction, trade, { requestPokemonId }, (settled, status, note, meta) => {
-      interaction
-        .update({
-          content: status === "ACCEPTED" ? "✅ Échange effectué." : note,
-          components: [],
-        })
-        .catch(() => {});
-      // Le message public n'existe pas toujours (offre dont l'envoi a échoué) :
-      // sans lui, l'éphémère a déjà dit le résultat. Une offre expirée ou déjà
-      // traitée, elle, n'a pas échoué faute de Pokémon : son message dit déjà vrai, ou
-      // le dira à son tour — on ne le réécrit pas en « Échange impossible ».
-      if (!trade.message_id || meta?.stale) return;
-      interaction.channel?.messages
-        ?.edit(trade.message_id, tradeOutcome(settled, status, note))
-        .catch(() => {});
+    acceptAndSettle(interaction, trade, { requestPokemonId }, (settled, status, note, { handled } = {}) => {
+      const content = handled
+        ? "❌ Cet échange a déjà été traité."
+        : status === "ACCEPTED"
+          ? "✅ Échange effectué."
+          : status === "EXPIRED"
+            ? "⌛ Cette offre a expiré."
+            : note;
+      interaction.update({ content, components: [] }).catch(() => {});
+      // Le message public se réécrit d'après la base : son statut est celui que
+      // l'offre a vraiment, quel que soit le clic qui l'a conclue. Sans message
+      // (offre dont l'envoi a échoué), l'éphémère a déjà dit le résultat.
+      syncTradeMessage(interaction.client, trade.id, { note });
     });
   });
 }

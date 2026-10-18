@@ -478,7 +478,7 @@ export function resolveThrow(
             });
             creditSpecies(userId, spawn.species_id, shiny, options, (err, caught) => {
               if (err) handleException("Crédit de la collection :", err);
-              finalizeCaughtSpawn(client, spawnId, userId, ball.key, { dropped, charmed });
+              finalizeCaughtSpawn(client, spawnId, { dropped, charmed });
               pseudo(userId).then((name) =>
                 log(
                   `Capture : ${name} attrape ${species.name}` +

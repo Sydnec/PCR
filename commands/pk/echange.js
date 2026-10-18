@@ -1,6 +1,7 @@
 import { MessageFlags } from "discord.js";
 import { handleException } from "../../modules/utils.js";
-import { getIndividuals, proposeTrade, setTradeMessage } from "../../modules/pokemon/collection.js";
+import { getIndividuals, proposeTrade } from "../../modules/pokemon/collection.js";
+import { linkTradeMessage } from "../../modules/pokemon/trade-message.js";
 import { getSpecies } from "../../modules/pokemon/data.js";
 import {
   buildTradeEmbed,
@@ -269,7 +270,7 @@ export default {
             embeds: [buildTradeEmbed(trade, "PENDING")],
             components: [buildTradeRow(trade.id)],
           });
-          setTradeMessage(trade.id, message.id);
+          await linkTradeMessage(interaction.client, trade.id, message.id);
         }
       );
     } catch (error) {

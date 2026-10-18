@@ -5,6 +5,8 @@
 // suivant le remplace. Tout l'état est en base, donc les boutons continuent de
 // fonctionner après un redémarrage du bot.
 import db from "../points-db.js";
+import { getConfig } from "../config.js";
+import { syncMessage } from "../message-sync.js";
 import { handleException, log } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
 import {
@@ -29,6 +31,7 @@ import { recordSpawn, recordSpawnEnd } from "./stats.js";
 
 // Rafraîchissements différés par spawn. Discord limite les éditions d'un même
 // message à 5 par 5 secondes ; une salve de lancers les dépasserait largement.
+// Seul le minuteur vit ici : ce qui s'écrit se relit en base (syncSpawnMessage).
 const pendingRefreshes = new Map();
 
 export function getActiveSpawn(cb) {
@@ -382,8 +385,8 @@ function createSpawn(client, channel, species, { isShiny, charm }, announcement,
 // nouveau spawn, et l'expiration de la durée de vie — pour qu'il n'existe
 // qu'une seule façon de terminer un Pokémon.
 //
-// L'affichage est best-effort : le message a pu être supprimé entre-temps, ce
-// qui ne doit pas empêcher la fuite d'être comptabilisée.
+// `spawn` est la ligne lue avant la fuite : elle ne sert qu'aux statistiques et
+// au tirage de l'objet ; le message, lui, se relit en base.
 export function endSpawnAsFled(client, spawn) {
   const species = getSpecies(spawn.species_id);
   if (!species) return;
@@ -399,56 +402,25 @@ export function endSpawnAsFled(client, spawn) {
   const dropped = Boolean(spawn.held_item) && !spawn.fished && leavesItemBehind();
   if (dropped) dropItem(client, { spawn, itemKey: spawn.held_item });
 
-  if (!spawn.channel_id || !spawn.message_id) return;
-
-  spendingBreakdown(spawn.id, async (err, spending) => {
-    if (err) handleException("Répartition des dépenses :", err);
-    try {
-      const channel = await client.channels.fetch(spawn.channel_id);
-      const message = await channel.messages.fetch(spawn.message_id);
-      await message.edit({
-        content: null,
-        embeds: [buildFledEmbed(spawn, species, spending, { dropped })],
-        components: [],
-      });
-    } catch (error) {
-      log(`Message du spawn #${spawn.id} introuvable, fuite non affichée`);
-    }
-  });
+  cancelRefresh(spawn.id);
+  syncSpawnMessage(client, spawn.id, { dropped });
 }
 
-// Rafraîchissement différé de l'embed d'un spawn en cours.
-// Le flush relit toujours la base, donc les rafraîchissements concurrents
-// convergent vers le bon état.
+function cancelRefresh(spawnId) {
+  if (!pendingRefreshes.has(spawnId)) return;
+  clearTimeout(pendingRefreshes.get(spawnId));
+  pendingRefreshes.delete(spawnId);
+}
+
+// Rafraîchissement différé de l'embed d'un spawn en cours. Il ne touche qu'à
+// une apparition encore en cours : sa fin s'écrit par son propre chemin.
 export function refreshSpawnEmbed(client, spawnId, { immediate = false } = {}) {
   const delay = immediate ? 0 : getPokemonConfig().spawn.embedRefreshMs;
-
-  if (pendingRefreshes.has(spawnId)) {
-    clearTimeout(pendingRefreshes.get(spawnId));
-    pendingRefreshes.delete(spawnId);
-  }
+  cancelRefresh(spawnId);
 
   const flush = () => {
     pendingRefreshes.delete(spawnId);
-    getSpawn(spawnId, (err, spawn) => {
-      if (err || !spawn || spawn.status !== "ACTIVE" || !spawn.message_id) return;
-      const species = getSpecies(spawn.species_id);
-      if (!species) return;
-
-      recentThrows(spawnId, getPokemonConfig().spawn.throwLogSize, async (err, throws) => {
-        if (err) return handleException("Lecture du journal des lancers :", err);
-        try {
-          const channel = await client.channels.fetch(spawn.channel_id);
-          const message = await channel.messages.fetch(spawn.message_id);
-          const description = message.embeds[0]?.description ?? null;
-          await message.edit({
-            embeds: [buildSpawnEmbed(spawn, species, throws, description)],
-          });
-        } catch (error) {
-          log(`Rafraîchissement du spawn #${spawnId} impossible`);
-        }
-      });
-    });
+    syncSpawnMessage(client, spawnId, { refreshOnly: true });
   };
 
   if (delay === 0) return flush();
@@ -457,41 +429,145 @@ export function refreshSpawnEmbed(client, spawnId, { immediate = false } = {}) {
 
 // Édition finale après une capture : embed de victoire, boutons retirés.
 // `dropped` : il a lâché son objet en partant, au lieu de le céder. `charmed` :
-// il brillait pour son vainqueur, porteur du Charme Chroma.
-export function finalizeCaughtSpawn(
+// il brillait pour son vainqueur, porteur du Charme Chroma. Le vainqueur et sa
+// ball se relisent dans la ligne.
+export function finalizeCaughtSpawn(client, spawnId, { dropped = false, charmed = false } = {}) {
+  cancelRefresh(spawnId);
+  syncSpawnMessage(client, spawnId, { dropped, charmed });
+}
+
+const read = (run) => new Promise((resolve, reject) => run((err, value) => (err ? reject(err) : resolve(value))));
+
+// Le message d'une apparition, tel que la base le dit AU MOMENT de l'écrire :
+// l'embed en cours tant qu'elle est ACTIVE, sa capture ou sa fuite ensuite. Une
+// seule écriture à la fois par message (syncMessage) : un rafraîchissement
+// parti avant la capture ne peut plus reposer l'embed « actif » par-dessus
+// celui de la victoire.
+//
+// `dropped` et `charmed` sont ce que le chemin de la capture ou de la fuite
+// vient de décider ; sans eux (le rattrapage), ils se déduisent de la base :
+// l'objet au sol de cette apparition, et un shiny réservé aux porteurs du charme
+// devenu shiny à la capture. `refreshOnly` : ne rien écrire d'une apparition
+// terminée. La fin écrite (ou un message disparu) se retient en base, pour que
+// le rattrapage sache ce qui reste à faire.
+export async function syncSpawnMessage(
   client,
   spawnId,
-  winnerId,
-  ballKey,
-  { dropped = false, charmed = false } = {}
+  { dropped = null, charmed = null, refreshOnly = false } = {}
 ) {
-  if (pendingRefreshes.has(spawnId)) {
-    clearTimeout(pendingRefreshes.get(spawnId));
-    pendingRefreshes.delete(spawnId);
+  let row;
+  try {
+    row = await read((cb) => getSpawn(spawnId, cb));
+  } catch (error) {
+    handleException("Lecture d'une apparition à afficher :", error);
+    return "failed";
   }
+  if (!row?.channel_id || !row.message_id) return "skipped";
 
-  getSpawn(spawnId, (err, spawn) => {
-    if (err || !spawn || !spawn.message_id) return;
-    const species = getSpecies(spawn.species_id);
-    if (!species) return;
+  let final = false;
+  const result = await syncMessage(client, `spawn:${spawnId}`, {
+    channelId: row.channel_id,
+    messageId: row.message_id,
+    read: true,
+    label: `du spawn #${spawnId}`,
+    build: async (message) => {
+      const spawn = await read((cb) => getSpawn(spawnId, cb));
+      const species = spawn && getSpecies(spawn.species_id);
+      if (!species) return null;
+      if (spawn.status === "ACTIVE") {
+        const throws = await read((cb) =>
+          recentThrows(spawnId, getPokemonConfig().spawn.throwLogSize, cb)
+        );
+        // La description est celle de l'annonce (un ping, une annonce de
+        // l'administration) : on la garde telle quelle.
+        const description = message?.embeds?.[0]?.description ?? null;
+        return { embeds: [buildSpawnEmbed(spawn, species, throws, description)] };
+      }
+      final = spawn.status === "CAUGHT" || spawn.status === "FLED";
+      if (!final || refreshOnly) return null;
 
-    spendingBreakdown(spawnId, async (err, spending) => {
-      if (err) handleException("Répartition des dépenses :", err);
-      try {
-        const channel = await client.channels.fetch(spawn.channel_id);
-        const message = await channel.messages.fetch(spawn.message_id);
-        await message.edit({
+      const spending = await new Promise((resolve) =>
+        spendingBreakdown(spawnId, (err, value) => {
+          if (err) handleException("Répartition des dépenses :", err);
+          resolve(value);
+        })
+      );
+      const leftItem = dropped ?? (await read((cb) => hasDrop(spawnId, cb)));
+      if (spawn.status === "CAUGHT") {
+        const shinyForWinner = charmed ?? Boolean(spawn.charm_shiny && spawn.is_shiny);
+        return {
           content: null,
           embeds: [
-            buildCaughtEmbed(spawn, species, winnerId, ballKey, spending, { dropped, charmed }),
+            buildCaughtEmbed(spawn, species, spawn.caught_by, spawn.caught_ball, spending, {
+              dropped: leftItem,
+              charmed: shinyForWinner,
+            }),
           ],
           components: [],
-        });
-      } catch (error) {
-        log(`Message du spawn #${spawnId} introuvable, capture non affichée`);
+        };
       }
-    });
+      return {
+        content: null,
+        embeds: [buildFledEmbed(spawn, species, spending, { dropped: leftItem })],
+        components: [],
+      };
+    },
   });
+
+  if (final && !refreshOnly && (result === "edited" || result === "gone")) {
+    if (result === "gone") log(`Message du spawn #${spawnId} introuvable, sa fin n'est pas affichée`);
+    await markSpawnMessageClosed(spawnId);
+  }
+  return result;
+}
+
+function hasDrop(spawnId, cb) {
+  db.get("SELECT 1 AS found FROM pokemon_drops WHERE spawn_id = ? LIMIT 1", [spawnId], (err, row) =>
+    cb(err, Boolean(row))
+  );
+}
+
+function markSpawnMessageClosed(spawnId) {
+  return new Promise((resolve) =>
+    db.run(
+      "UPDATE pokemon_spawns SET message_closed_at = ? WHERE id = ? AND message_closed_at IS NULL",
+      [Date.now(), spawnId],
+      (err) => {
+        if (err) handleException("Marque de fin du message d'un spawn :", err);
+        resolve();
+      }
+    )
+  );
+}
+
+// Les apparitions terminées dont le message n'a jamais reçu sa fin (Discord a
+// refusé, le bot s'est arrêté entre-temps) : réécrites une à une. Le répit
+// laisse le chemin ordinaire conclure, la fenêtre laisse l'historique en paix.
+export async function repairSpawnMessages(client) {
+  const { repairGraceSeconds, repairWindowHours } = getConfig().publicMessages;
+  const now = Date.now();
+  let rows;
+  try {
+    rows = await read((cb) =>
+      db.all(
+        `SELECT id FROM pokemon_spawns
+          WHERE status IN ('CAUGHT', 'FLED') AND message_id IS NOT NULL
+            AND message_closed_at IS NULL AND ended_at <= ? AND ended_at > ?`,
+        [now - repairGraceSeconds * 1000, now - repairWindowHours * 3600 * 1000],
+        cb
+      )
+    );
+  } catch (error) {
+    handleException("Recherche des messages d'apparition à conclure :", error);
+    return 0;
+  }
+  let repaired = 0;
+  for (const { id } of rows) {
+    const result = await syncSpawnMessage(client, id);
+    if (result === "edited") repaired++;
+  }
+  if (repaired) log(`${repaired} message(s) d'apparition conclu(s) après coup`);
+  return repaired;
 }
 
 // Réparation au démarrage.
