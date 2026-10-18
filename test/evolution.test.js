@@ -262,7 +262,7 @@ describe("faire évoluer (evolve)", () => {
     assert.equal((await ofSpecies("Rattata")).length, 3);
   });
 
-  it("des points qui manquent rendent les sacrifices à l'identique", async () => {
+  it("des points qui manquent, ou aucun solde, rendent les sacrifices à l'identique", async () => {
     const ids = await giveMany("Rattata", 3);
     await setBalance(100);
     const before = await rows();
@@ -272,14 +272,16 @@ describe("faire évoluer (evolve)", () => {
     assert.deepEqual(await rows(), before, "mêmes identifiants, même espèce, rien en moins");
     assert.equal(await balance(), 100);
     assert.deepEqual(await fusions(), []);
-  });
 
-  it("un dresseur sans solde du tout est refusé sans rien perdre", async () => {
-    const ids = await giveMany("Rattata", 3);
-    const before = await rows();
-    const result = await evolve(byId("Rattata", ids[2]));
-    assert.equal(result.ok, false);
+    // Un dresseur sans ligne de solde : le débit ne trouve rien à entamer, c'est
+    // un autre état en base que « trop peu », et il doit être refusé de même.
+    await dbRun(points, "DELETE FROM points");
+    const broke = await evolve(byId("Rattata", ids[2]));
+    assert.equal(broke.ok, false);
+    assert.match(broke.reason, /Solde insuffisant/);
     assert.deepEqual(await rows(), before);
+    assert.equal(await balance(), 0);
+    assert.deepEqual(await fusions(), []);
   });
 
   it("un second clic sur un Pokémon qui vient d'évoluer est refusé", async () => {

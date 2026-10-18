@@ -204,11 +204,15 @@ describe("la majoration des générations récentes", () => {
     assert.equal(data.spawnWeight(species("Lugia"), spawn()), 2 * spawn().legendaryWeight);
   });
 
+  // Au facteur par défaut, les bébés et les formes d'objet ont déjà leur poids nul dans « apparitions » ;
+  // ici, le facteur change : une majoration ne ressuscite rien.
   it("ce qui n'apparaît jamais reste à zéro, quelle que soit la majoration", () => {
-    assert.equal(data.spawnWeight(species("Pichu"), spawn()), 0, "un bébé ne sort que d'un œuf");
-    for (const id of data.itemOnlySpecies()) {
-      assert.equal(data.spawnWeight(data.getSpecies(id), spawn()), 0, data.getSpecies(id).name);
-    }
+    withBoost(5, () => {
+      assert.equal(data.spawnWeight(species("Pichu"), spawn()), 0, "un bébé ne sort que d'un œuf");
+      for (const id of data.itemOnlySpecies()) {
+        assert.equal(data.spawnWeight(data.getSpecies(id), spawn()), 0, data.getSpecies(id).name);
+      }
+    });
   });
 
   it("le facteur se cumule : une 3ᵉ génération pèserait quatre fois la 1ʳᵉ", () => {
@@ -356,7 +360,7 @@ describe("parc safari", () => {
     assert.equal(onlySecond.components[0].custom_id, "poke_safari_go|paid|0|2");
   });
 
-  it("une rencontre de n'importe quelle espèce s'affiche, lignée comprise, dans les limites de Discord", () => {
+  it("une rencontre de n'importe quelle espèce s'affiche, lignée comprise, dans les limites de Discord : titre, champs, pied de page, boutons, et message public", () => {
     for (const entry of all()) {
       const lineage = new Map(data.evolutionChain(entry).map((link) => [link.id, { normal: 1, shiny: 0 }]));
       const session = {
@@ -365,10 +369,11 @@ describe("parc safari", () => {
       };
       const view = embeds.buildSafariView(session, { owned: { normal: 1, shiny: 0 }, lineage });
       const embed = view.embeds[0].toJSON();
+      assert.ok(embed.title.length <= 256, entry.name);
       assert.ok(embed.fields.length <= 25, entry.name);
       for (const field of embed.fields) assert.ok(field.value.length <= 1024, `${entry.name} / ${field.name}`);
       assert.ok(embed.footer.text.length <= 2048, entry.name);
-      assert.equal(view.components[0].toJSON().components.length, 4);
+      assert.ok(view.components[0].toJSON().components.length <= 5, `${entry.name} : une rangée de Discord tient 5 boutons`);
       // Le message public de la même rencontre, journal et prises pleins.
       const events = Array.from({ length: 5 }, () => ({ outcome: "MISS_FLED", species_id: entry.id, is_shiny: 1, sex: null, form: null }));
       const catches = Array.from({ length: 25 }, () => ({ species_id: entry.id, is_shiny: 1, form: null }));

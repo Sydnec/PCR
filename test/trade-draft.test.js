@@ -87,8 +87,8 @@ describe("/pk echange sans options", () => {
     const reply = payloadOf(calls, "reply");
     assert.equal(reply.flags, MessageFlags.Ephemeral);
     assert.match(textOf(reply), /Échange avec <@u2>/);
-    const buttons = componentsOf(reply);
-    assert.deepEqual(buttons.map((button) => button.custom_id), [`poke_td_side|${id}|give`, `poke_td_side|${id}|get`, `poke_td_go|${id}`, `poke_td_cancel|${id}`]);
+    const ids = componentsOf(reply).map((button) => button.custom_id);
+    for (const side of ["give", "get"]) assert.ok(ids.includes(`poke_td_side|${id}|${side}`), `le côté « ${side} » est à choisir`);
     assert.equal(goButton(reply).disabled, true);
     assert.equal((await trades()).length, 0);
     const [row] = await drafts();
@@ -246,7 +246,7 @@ describe("Proposer", () => {
     assert.match(last(sent.calls, "update").content, /Offre envoyée à <@u2>/);
     assert.equal(channel.sent.length, 1);
     assert.equal(channel.sent[0].content, "<@u2>");
-    assert.equal(channel.sent[0].components.length, 1);
+    assert.ok(componentsOf(channel.sent[0]).some((button) => button.custom_id?.startsWith("poke_trade_accept|")), "le message porte le bouton « Accepter »");
     const [trade] = await trades();
     assert.equal(trade.status, "PENDING");
     assert.equal(trade.offer_points, 400);

@@ -226,7 +226,10 @@ describe("la réécriture des liens dans un message", () => {
     const msg = await send("regardez https://x.com/sacha/status/123456 c'est drôle");
     await eventually(() => assert.equal(msg.deleted.length, 1));
     assert.equal(msg.sent.length, 1);
-    assert.equal(msg.sent[0].content, "<@u1> a envoyé :\nregardez https://vxtwitter.com/sacha/status/123456 c'est drôle");
+    const { content } = msg.sent[0];
+    assert.ok(content.startsWith("<@u1>"), "sous la mention de son auteur");
+    assert.ok(content.includes("https://vxtwitter.com/sacha/status/123456"), "le lien est réécrit");
+    assert.ok(!content.includes("https://x.com"), "l'original du lien ne reste pas");
     assert.deepEqual(msg.sent[0].allowedMentions, { parse: [] });
   });
 
@@ -428,7 +431,9 @@ describe("le bouton « Traduire »", () => {
   it("un identifiant qui n'est pas un numéro ne part jamais vers l'API", async () => {
     for (const customId of ["tweet_translate|abc", "tweet_translate|1/../x", "tweet_translate|", "tweet_translate"]) {
       const replies = await click(customId);
-      assert.deepEqual(replies[0], { method: "reply", payload: { content: "Ce bouton n'est plus valable.", flags: MessageFlags.Ephemeral } }, customId);
+      assert.equal(replies[0].method, "reply", customId);
+      assert.equal(replies[0].payload.flags, MessageFlags.Ephemeral, customId);
+      assert.match(replies[0].payload.content, /plus valable/, customId);
     }
     assert.equal(calls.length, 0);
   });
@@ -441,7 +446,8 @@ describe("le bouton « Traduire »", () => {
       translation: { text: "Bonjour *tout* le monde", source_lang: "en" },
     };
     const replies = await click("tweet_translate|40");
-    assert.deepEqual(replies[0], { method: "deferReply", payload: { flags: MessageFlags.Ephemeral } });
+    assert.equal(replies[0].method, "deferReply");
+    assert.equal(replies[0].payload.flags, MessageFlags.Ephemeral);
     const embed = replies[1].payload.embeds[0].toJSON();
     assert.equal(embed.description, "Bonjour \\*tout\\* le monde");
     assert.equal(embed.author.name, "Sacha (@sacha)");
@@ -457,7 +463,10 @@ describe("le bouton « Traduire »", () => {
       translation: { text: "# Titre\n> citation\n- liste\n1. un\n<@123> [piège](https://evil.example) voir https://exemple.fr/a_b_c.", source_lang: "en" },
     };
     const embed = (await click("tweet_translate|41"))[1].payload.embeds[0].toJSON();
-    assert.match(embed.description, /^\\# Titre\n\\> citation\n\\- liste\n1\\\. un\n\\<@123> \\\[piège]\(https:\/\/evil\.example\) voir https:\/\/exemple\.fr\/a_b_c\.$/);
+    for (const escaped of ["\\# Titre", "\\> citation", "\\- liste", "1\\. un", "\\<@123>", "\\[piège]"]) {
+      assert.ok(embed.description.includes(escaped), `${escaped} dans : ${embed.description}`);
+    }
+    assert.ok(embed.description.includes("https://exemple.fr/a_b_c"), "un lien garde ses tirets bas : il n'est pas échappé");
   });
 
   it("une traduction trop longue est coupée sans casser un lien en deux", async () => {

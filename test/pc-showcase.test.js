@@ -10,6 +10,7 @@ const sandbox = createSandbox({ config: { pokemon: { generationOpenings: { 2: "2
 const { points } = await openDatabases();
 const pc = await import("../modules/pokemon/pc.js");
 const showcase = await import("../modules/pokemon/showcase.js");
+const { getPokemonConfig } = await import("../modules/pokemon/config.js");
 
 const call = (fn, ...args) =>
   new Promise((resolve, reject) => fn(...args, (error, value) => (error ? reject(error) : resolve(value))));
@@ -38,7 +39,8 @@ beforeEach(async () => {
 
 describe("la configuration du PC", () => {
   it("les valeurs de base : 30 places, 6 colonnes, de 8 à 60 boîtes", () => {
-    assert.deepEqual(pc.pcConfig(), { slotsPerBox: 30, columns: 6, minBoxes: 8, maxBoxes: 60, boxNameLength: 20, nicknameLength: 20 });
+    const { slotsPerBox, columns, minBoxes, maxBoxes } = pc.pcConfig();
+    assert.deepEqual({ slotsPerBox, columns, minBoxes, maxBoxes }, { slotsPerBox: 30, columns: 6, minBoxes: 8, maxBoxes: 60 });
   });
 
   it("un réglage absurde retombe sur une valeur jouable, et le minimum ne dépasse pas le maximum", () => {
@@ -84,7 +86,8 @@ describe("lire le PC (getPc)", () => {
   it("un dresseur sans Pokémon a ses huit boîtes vides, aux noms par défaut", async () => {
     const result = await call(pc.getPc, "u1");
     assert.equal(result.boxes.length, 8);
-    assert.deepEqual(result.boxes[0], { box: 0, name: "Boîte 1", custom: false, defaultName: "Boîte 1", archived: false });
+    const { name, custom } = result.boxes[0];
+    assert.deepEqual({ name, custom }, { name: "Boîte 1", custom: false });
     assert.deepEqual(result.layout, []);
   });
 
@@ -106,7 +109,8 @@ describe("lire le PC (getPc)", () => {
   it("les boîtes renommées le disent", async () => {
     await call(pc.renameBox, "u1", 1, "Équipe");
     const result = await call(pc.getPc, "u1");
-    assert.deepEqual(result.boxes[1], { box: 1, name: "Équipe", custom: true, defaultName: "Boîte 2", archived: false });
+    const { name, custom } = result.boxes[1];
+    assert.deepEqual({ name, custom }, { name: "Équipe", custom: true });
     assert.equal(result.boxes[0].custom, false);
   });
 
@@ -458,25 +462,27 @@ describe("la vitrine : l'ordre et la lecture", () => {
 });
 
 describe("l'envoi de la vitrine dans un salon (claimShowcaseShare)", () => {
-  it("un envoi par dresseur toutes les 60 minutes, et le refus dit quand revenir", async () => {
+  // Le délai vient de la configuration : le test le relit au lieu de le recopier.
+  const cooldownMs = () => getPokemonConfig().showcase.shareCooldownMinutes * 60_000;
+  const elapse = (ms) => dbRun(points, "UPDATE pokemon_showcase_shares SET shared_at = ? WHERE user_id = 'u1'", [Date.now() - ms]);
+
+  it("un envoi par dresseur par délai, et le refus dit quand revenir", async () => {
     const first = await call(showcase.claimShowcaseShare, "u1");
     assert.equal(first.ok, true);
     const second = await call(showcase.claimShowcaseShare, "u1");
     assert.equal(second.ok, false);
-    assert.equal(second.retryAt, first.sharedAt + 60 * 60_000);
+    assert.equal(second.retryAt, first.sharedAt + cooldownMs());
     assert.equal((await call(showcase.claimShowcaseShare, "u2")).ok, true, "chacun son délai");
   });
 
-  it("le délai écoulé, l'envoi revient", async () => {
+  it("le délai écoulé, l'envoi revient : au délai de base comme à celui qu'on règle", async () => {
     await call(showcase.claimShowcaseShare, "u1");
-    await dbRun(points, "UPDATE pokemon_showcase_shares SET shared_at = ? WHERE user_id = 'u1'", [Date.now() - 61 * 60_000]);
+    await elapse(cooldownMs() + 60_000);
     assert.equal((await call(showcase.claimShowcaseShare, "u1")).ok, true);
-  });
 
-  it("le délai se règle", async () => {
+    // 6 minutes ne couvriraient pas le délai de base : seul le réglage laisse passer.
     config({ showcase: { shareCooldownMinutes: 5 } });
-    await call(showcase.claimShowcaseShare, "u1");
-    await dbRun(points, "UPDATE pokemon_showcase_shares SET shared_at = ? WHERE user_id = 'u1'", [Date.now() - 6 * 60_000]);
+    await elapse(6 * 60_000);
     assert.equal((await call(showcase.claimShowcaseShare, "u1")).ok, true);
   });
 

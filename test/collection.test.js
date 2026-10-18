@@ -821,7 +821,10 @@ describe("échanger des points, des objets, ou un Pokémon que le destinataire c
     );
   });
 
-  it("avec `unique`, deux offres de points identiques se retiennent, deux montants différents non", async () => {
+  // Le refus d'un doublon et la réouverture se jouent dans « proposer une offre » ;
+  // les colonnes de points et d'objets, que la comparaison des Pokémon ne touche pas,
+  // se jouent ici.
+  it("avec `unique`, un autre montant de points ou une autre quantité d'objet n'est pas un doublon", async () => {
     const args = {
       fromUserId: "u1",
       toUserId: "u2",
@@ -831,10 +834,6 @@ describe("échanger des points, des objets, ou un Pokémon que le destinataire c
       unique: true,
     };
     const first = await call(collection.proposeTrade, args);
-    const again = await new Promise((resolve) =>
-      collection.proposeTrade(args, (err, trade, info) => resolve({ err, trade, info }))
-    );
-    assert.deepEqual([again.err, again.trade, again.info], [null, null, { duplicate: true }]);
     const other = await call(collection.proposeTrade, { ...args, offer: { points: 11 } });
     assert.equal(other.status, "PENDING");
     assert.notEqual(other.id, first.id);
@@ -889,13 +888,13 @@ describe("les échanges possibles entre deux dresseurs (tradeMatches)", () => {
     assert.deepEqual(gifts.map((entry) => entry.spare), [1, 1], "le libre part, les verrouillés gardent l'entrée");
   });
 
-  it("la réserve d'évolution met de côté, de chaque côté, ce qu'il faut pour compléter le Pokédex", async () => {
+  // Le calcul de la réserve (Rattatac manquant, puis acquis) se joue en entier sur
+  // listDuplicates : ici, seulement que la comparaison la demande bien.
+  it("la comparaison honore la réserve d'évolution : les Rattata qui servent à évoluer ne se proposent pas", async () => {
     await giveMany("Rattata", 3);
     await giveMany("Chenipan", 2, { user: "u2" });
     assert.deepEqual(names((await matches("u1", "u2")).give), ["Rattata"]);
-    assert.deepEqual((await matches("u1", "u2", { reserve: true })).give, [], "il manque Rattatac : un Rattata évolue, un se sacrifie, un reste");
-    await give("Rattatac", { obtained: 9 });
-    assert.deepEqual(names((await matches("u1", "u2", { reserve: true })).give), ["Rattata"], "Rattatac au Pokédex : plus rien à garder");
+    assert.deepEqual((await matches("u1", "u2", { reserve: true })).give, [], "il manque Rattatac : trois Rattata sont gardés");
   });
 
   it("Machopeur se compte comme n'importe quelle espèce : l'échange ne le transforme plus", async () => {

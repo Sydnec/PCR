@@ -329,7 +329,7 @@ describe("le compteur de messages et le balayage", () => {
       assert.equal(client.sent.length, 1);
     });
     assert.equal(client.sent[0].content, "<@u1>");
-    assert.match(JSON.stringify(client.sent[0].embeds[0].toJSON()), new RegExp(`<@u1> accueille \\*\\*Pichu`));
+    assert.match(client.sent[0].embeds[0].toJSON().description, new RegExp(`<@u1> accueille \\*\\*Pichu`));
   });
 
   it("les messages de quelqu'un qui ne couve pas ne touchent rien", async () => {
@@ -353,7 +353,9 @@ describe("le compteur de messages et le balayage", () => {
     });
   });
 
-  it("des messages simultanés au seuil : un seul bébé", async () => {
+  // Qui gagne la course se joue sur hatchEgg (« deux éclosions simultanées ») : ici, que
+  // le chemin des messages y passe bien, un seul bébé et une seule annonce au seuil.
+  it("des messages simultanés au seuil : un seul bébé, une seule annonce", async () => {
     sandbox.writeConfig({ pokemon: { generation: 2, eggs: { hatchMessages: 1 } } });
     await incubating();
     const client = fakeClient();
@@ -404,7 +406,7 @@ describe("l'affichage de l'œuf (buildEggEmbed)", () => {
     shiny_parents: 0,
     ...extra,
   });
-  const text = (embed) => JSON.stringify(embed.toJSON());
+  const descriptionOf = (embed) => embed.toJSON().description;
 
   it("dit le bébé, les parents, l'échéance et les messages qui restent, au pluriel quand il faut", () => {
     const description = eggs.buildEggEmbed(egg()).toJSON().description;
@@ -415,11 +417,11 @@ describe("l'affichage de l'œuf (buildEggEmbed)", () => {
   });
 
   it("annonce les chances de shiny des parents et du charme", () => {
-    assert.match(text(eggs.buildEggEmbed(egg({ shiny_parents: 1 }))), /Un parent shiny : chances de shiny ×2/);
-    assert.match(text(eggs.buildEggEmbed(egg({ shiny_parents: 2 }))), /Ses deux parents sont shiny : chances de shiny ×4/);
-    assert.match(text(eggs.buildEggEmbed(egg(), { charm: 2 })), /Ton Charme Chroma : chances de shiny ×2\./);
-    assert.match(text(eggs.buildEggEmbed(egg({ shiny_parents: 2 }), { charm: 2 })), /×2, ×8 en tout/);
-    assert.doesNotMatch(text(eggs.buildEggEmbed(egg())), /shiny/);
+    assert.match(descriptionOf(eggs.buildEggEmbed(egg({ shiny_parents: 1 }))), /Un parent shiny : chances de shiny ×2/);
+    assert.match(descriptionOf(eggs.buildEggEmbed(egg({ shiny_parents: 2 }))), /Ses deux parents sont shiny : chances de shiny ×4/);
+    assert.match(descriptionOf(eggs.buildEggEmbed(egg(), { charm: 2 })), /Ton Charme Chroma : chances de shiny ×2\./);
+    assert.match(descriptionOf(eggs.buildEggEmbed(egg({ shiny_parents: 2 }), { charm: 2 })), /×2, ×8 en tout/);
+    assert.doesNotMatch(descriptionOf(eggs.buildEggEmbed(egg())), /shiny/);
   });
 
   it("un Métamorph parent s'affiche sans symbole de sexe", () => {

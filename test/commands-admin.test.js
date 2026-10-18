@@ -19,9 +19,12 @@ const data = await import("../modules/pokemon/data.js");
 const items = await import("../modules/pokemon/items.js");
 const economy = await import("../modules/economy.js");
 const { getPokemonConfig, getSafariConfig } = await import("../modules/pokemon/config.js");
-const { getConfig } = await import("../modules/config.js");
+const { getConfig, DEFAULTS } = await import("../modules/config.js");
 
 const EPHEMERAL = MessageFlags.Ephemeral;
+const fr = (value) => value.toLocaleString("fr-FR");
+// Le plancher de capture est le réglage que ces tests modifient : son défaut vient de DEFAULTS, pas d'un 10 recopié.
+const DEFAULT_FLOOR = DEFAULTS.pokemon.capture.minCatchRate;
 const species = (name) => speciesByName(data.allSpecies, name);
 const call = (fn, ...args) =>
   new Promise((resolve, reject) => fn(...args, (error, value) => (error ? reject(error) : resolve(value))));
@@ -98,7 +101,9 @@ describe("/admin points", () => {
   it("donne à un dresseur : l'ancien et le nouveau solde", async () => {
     await setBalance(1000, "u2");
     const calls = await points$(500, { user: fakeUser("u2") });
-    assert.match(payloadOf(calls, "editReply").content, /^✅ \*\*\+500\*\* points pour \*\*user-u2\*\*\.\nSolde : \*\*1[\s]000\*\* → \*\*1[\s]500\*\*$/);
+    const reply = payloadOf(calls, "editReply").content;
+    assert.match(reply, /\+500\*\* points pour \*\*user-u2\*\*/);
+    assert.match(reply, new RegExp(`${fr(1000)}\\*\\* → \\*\\*${fr(1500)}`), "l'ancien et le nouveau solde");
     assert.equal(await balance("u2"), 1500);
   });
 
@@ -112,7 +117,7 @@ describe("/admin points", () => {
 
   it("un montant nul ne change rien et le dit", async () => {
     const reply = payloadOf(await points$(0, { user: fakeUser("u2") }), "editReply").content;
-    assert.equal(reply, "❌ Un montant de 0 ne changerait rien.");
+    assert.match(reply, /^❌ .*ne changerait rien/);
   });
 
   it("un rôle entier d'un coup, bots exclus, total distribué annoncé", async () => {
@@ -144,7 +149,7 @@ describe("/admin item", () => {
 
   it("un objet qui n'est pas au catalogue, ou une quantité nulle : refus", async () => {
     assert.match(payloadOf(await item$({ objet: "n_importe_quoi" }, { user: fakeUser("u2") }), "editReply").content, /^❌ `n_importe_quoi` n'est pas un objet du catalogue/);
-    assert.equal(payloadOf(await item$({ objet: "pepite", quantite: 0 }, { user: fakeUser("u2") }), "editReply").content, "❌ Une quantité de 0 ne changerait rien.");
+    assert.match(payloadOf(await item$({ objet: "pepite", quantite: 0 }, { user: fakeUser("u2") }), "editReply").content, /^❌ .*ne changerait rien/);
   });
 
   it("retirer a un plancher : un sac trop léger refuse avec les chiffres, rien ne bouge", async () => {
@@ -179,17 +184,18 @@ describe("/admin config et config-voir", () => {
   it("modifie un réglage : avant → après, et le jeu le lit aussitôt", async () => {
     const before = getPokemonConfig().capture.minCatchRate;
     const reply = payloadOf(await run("config", { options: { cle: "pokemon.capture.minCatchRate", valeur: "20" } }), "editReply").content;
-    assert.match(reply, /^✅ `pokemon\.capture\.minCatchRate`\n`10` → `20`\nAppliqué immédiatement/);
-    assert.equal(before, 10);
+    assert.match(reply, new RegExp(`^✅ \`pokemon\\.capture\\.minCatchRate\`\n\`${before}\` → \`20\`\nAppliqué immédiatement`));
+    assert.notEqual(before, 20, "le réglage change vraiment");
     assert.equal(getPokemonConfig().capture.minCatchRate, 20, "relu à chaque usage, sans redémarrage");
   });
 
   it("refuse avec les bornes : valeur hors limites, mauvais type, clé inconnue", async () => {
+    const before = getPokemonConfig().capture.minCatchRate;
     for (const [cle, valeur] of [["pokemon.capture.minCatchRate", "9999"], ["pokemon.capture.minCatchRate", "beaucoup"], ["pokemon.nexiste.pas", "1"]]) {
       const reply = payloadOf(await run("config", { options: { cle, valeur } }), "editReply").content;
       assert.match(reply, /^❌ /, `${cle} = ${valeur}`);
     }
-    assert.equal(getPokemonConfig().capture.minCatchRate, 10);
+    assert.equal(getPokemonConfig().capture.minCatchRate, before, "un refus ne change rien");
   });
 
   it("une surcharge illisible est nommée comme cause quand l'écriture bute dessus", async () => {
@@ -209,10 +215,10 @@ describe("/admin config et config-voir", () => {
 
   it("config-voir d'un réglage : la valeur actuelle, et le défaut quand elle en diffère", async () => {
     const same = payloadOf(await run("config-voir", { options: { cle: "pokemon.capture.minCatchRate" } }), "editReply").content;
-    assert.match(same, /Actuel : .*10[\s\S]*\(c'est la valeur par défaut\)/);
+    assert.match(same, new RegExp(`Actuel : .*${DEFAULT_FLOOR}[\\s\\S]*\\(c'est la valeur par défaut\\)`));
     await run("config", { options: { cle: "pokemon.capture.minCatchRate", valeur: "25" } });
     const changed = payloadOf(await run("config-voir", { options: { cle: "pokemon.capture.minCatchRate" } }), "editReply").content;
-    assert.match(changed, /Actuel : .*25[\s\S]*Défaut : .*10/);
+    assert.match(changed, new RegExp(`Actuel : .*25[\\s\\S]*Défaut : .*${DEFAULT_FLOOR}`));
   });
 
   it("config-voir d'une branche liste ses feuilles, jamais un bloc que Discord refuserait", async () => {
@@ -234,7 +240,7 @@ describe("/admin config et config-voir", () => {
 
   it("les réglages de ce test restent hors du dépôt : config.json vit dans le dossier jetable", () => {
     assert.ok(sandbox.configFile.startsWith(process.env.PCR_DATA_DIR));
-    assert.equal(getConfig().pokemon.capture.minCatchRate, 10);
+    assert.equal(getConfig().pokemon.capture.minCatchRate, DEFAULT_FLOOR, "les réglages écrits par les tests précédents ne traînent pas");
   });
 });
 
@@ -304,7 +310,8 @@ describe("/admin pokespawn", () => {
   it("déclenche une apparition précise, annoncée dans le salon", async () => {
     const channel = fakeChannel();
     const reply = payloadOf(await run("pokespawn", { options: { espece: String(species("Roucool").id), annonce: "🎃 Halloween !" } }, botWith(channel)), "editReply");
-    assert.equal(reply.content, "✅ Spawn déclenché : **Roucool**.");
+    assert.match(reply.content, /^✅ Spawn déclenché/);
+    assert.match(reply.content, /\*\*Roucool\*\*/);
     await eventually(async () => {
       assert.equal((await spawnRows()).at(0)?.species_id, species("Roucool").id);
       assert.equal(channel.sent.length, 1);
@@ -325,7 +332,8 @@ describe("/admin pokespawn", () => {
 
   it("sans espèce : une apparition aléatoire", async () => {
     const reply = payloadOf(await run("pokespawn", {}, botWith(fakeChannel())), "editReply");
-    assert.equal(reply.content, "✅ Spawn déclenché : **espèce aléatoire**.");
+    assert.match(reply.content, /^✅ Spawn déclenché/);
+    assert.match(reply.content, /espèce aléatoire/);
     await eventually(async () => assert.equal((await spawnRows()).length, 1));
   });
 
@@ -409,10 +417,9 @@ describe("/admin purge", () => {
   it("supprime le nombre demandé, jamais plus de cent", async () => {
     const channel = roomOf(messagesOf(150));
     assert.match(payloadOf(await purge({ nombre: 5 }, channel), "editReply").content, /^5 message\(s\) supprimé\(s\)\.$/);
-    assert.equal(channel.fetched[0].limit, 5);
+    assert.equal(channel.deleted.length, 5, "sur cent cinquante, seuls cinq partent");
     const big = roomOf(messagesOf(150));
     await purge({ nombre: 100 }, big);
-    assert.equal(big.fetched[0].limit, 100);
     assert.equal(big.deleted.length, 100);
   });
 

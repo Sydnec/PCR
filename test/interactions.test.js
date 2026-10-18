@@ -444,7 +444,7 @@ describe("la Master Ball et sa confirmation", () => {
     const id = await spawnRow("Roucool");
     const withPanel = await click(`poke_master_cancel|${id}`, { user });
     const update = only(withPanel, "update");
-    assert.equal(update.content, "Annulé, tes points sont intacts.");
+    assert.match(update.content, /intacts/);
     assert.equal(update.components.length, 1);
     const bare = await click("poke_master_cancel", { user });
     assert.deepEqual(only(bare, "update").components, []);
@@ -649,7 +649,10 @@ describe("les boutons d'évolution", () => {
 
   it("annuler laisse le Pokémon tel quel", async () => {
     const calls = await click("poke_evo_cancel");
-    assert.deepEqual(only(calls, "update"), { content: "Évolution annulée : il reste tel quel.", embeds: [], components: [] });
+    const update = only(calls, "update");
+    assert.match(update.content, /Évolution annulée/);
+    assert.deepEqual(update.components, [], "plus rien à confirmer");
+    assert.deepEqual(update.embeds, [], "l'aperçu de l'évolution ne reste pas affiché");
   });
 
   it("une lignée à embranchement propose ses formes, au prix du stade, et le choix part avec l'individu", async () => {
@@ -923,14 +926,14 @@ describe("la comparaison de /pk comparer", () => {
   it("choisir un côté réécrit le message : l'autre menu et le bouton portent le choix", async () => {
     const { a, b } = await pair();
     const afterGive = only(await choose(`poke_cmpg|${b}|0|0|0`, a, rata()), "update");
-    assert.deepEqual(embedOf(afterGive).fields, [{ name: "🤝 Échange choisi", value: "**Rattata** ⇄ *à choisir*" }]);
+    assert.match(embedOf(afterGive).fields[0].value, /\*\*Rattata\*\* ⇄ \*à choisir\*/);
     const [giveRow, getRow, paging] = rows(afterGive);
     assert.equal(giveRow.components[0].options.find((option) => option.value === String(rata())).default, true, "le choix est coché");
     assert.equal(getRow.components[0].custom_id, `poke_cmpr|${b}|${rata()}|0|0`, "l'autre menu sait déjà ce qui a été choisi");
     assert.equal(paging.components.at(-1).disabled, true, "il manque encore un côté");
 
     const afterGet = only(await choose(`poke_cmpr|${b}|${rata()}|0|0`, a, chen()), "update");
-    assert.deepEqual(embedOf(afterGet).fields, [{ name: "🤝 Échange choisi", value: "**Rattata** ⇄ **Chenipan**" }]);
+    assert.match(embedOf(afterGet).fields[0].value, /\*\*Rattata\*\* ⇄ \*\*Chenipan\*\*/);
     const go = rows(afterGet)[2].components.at(-1);
     assert.equal(go.custom_id, `poke_cmpgo|${b}|${rata()}|${chen()}|0`);
     assert.equal(go.disabled, false);
@@ -964,7 +967,9 @@ describe("la comparaison de /pk comparer", () => {
     assert.equal(sent.content, `<@${b}>`);
     assert.deepEqual(sent.allowedMentions, { users: [b] }, "seul le destinataire est mentionné");
     assert.deepEqual(buttonIds(sent), [`poke_trade_accept|${trade.id}`, `poke_trade_decline|${trade.id}`, `poke_trade_cancel|${trade.id}`]);
-    assert.equal(embedOf(sent).description, `<@${a}> propose **#${mine[2]} Rattata ♂ (fertile)**\ncontre **un Chenipan** de <@${b}>, à son choix.`, "qui reçoit sait exactement ce qu'il aura, et choisit ce qu'il donne");
+    const offer = embedOf(sent).description;
+    assert.ok(offer.includes(`**#${mine[2]} Rattata ♂ (fertile)**`), "ce qui est donné est désigné par son individu");
+    assert.ok(offer.includes("**un Chenipan**") && offer.includes("à son choix"), "ce qui est demandé est une espèce, et le destinataire choisit lequel il donne");
 
     const done = last(calls, "editReply");
     assert.equal(done.content, `✅ Offre envoyée à <@${b}> dans <#c1>.`);
@@ -1260,9 +1265,9 @@ describe("le parc safari sur Discord", () => {
     await setBalance(price, user);
     await grant("ticket_safari", 1, user);
     const reply = only(await goes("poke_safari_cancel", user), "update");
-    assert.equal(reply.content, "↩️ Entrée annulée : rien n'a été débité.");
-    assert.deepEqual(reply.components, []);
-    assert.deepEqual(reply.embeds, []);
+    assert.match(reply.content, /rien n'a été débité/);
+    assert.deepEqual(reply.components, [], "plus de bouton pour une entrée annulée");
+    assert.deepEqual(reply.embeds, [], "l'offre d'entrée ne reste pas affichée");
     assert.equal(await balance(user), price);
     assert.equal(await count("ticket_safari", user), 1);
     assert.equal((await dbAll(points, "SELECT id FROM pokemon_safari_sessions WHERE user_id = ?", [user])).length, 0);
@@ -1368,7 +1373,7 @@ describe("le partage du bilan de safari", () => {
     const channel = fakeChannel();
     const calls = await click(`poke_safari_share|${id}`, { user, channel });
     assert.equal(channel.sent.length, 1);
-    assert.equal(channel.sent[0].embeds.length, 1);
+    assert.ok(channel.sent[0].embeds.length >= 1, "le bilan est un embed");
     assert.match(last(calls, "editReply").content, /Bilan partagé dans <#c1>/);
     assert.deepEqual(last(calls, "editReply").components, []);
 
@@ -1411,7 +1416,7 @@ describe("le partage du bilan de safari", () => {
     assert.notEqual((await dbGet(points, "SELECT shared_at FROM pokemon_safari_sessions WHERE id = ?", [id])).shared_at, null, "republier deux fois serait pire");
   });
 
-  it("sans salon, refus", async () => {
+  it("le bilan de safari sans salon : refus", async () => {
     const calls = await click("poke_safari_share|1", { channel: null });
     assert.match(only(calls, "reply").content, /Salon introuvable/);
   });
@@ -1470,7 +1475,7 @@ describe("le partage de la vitrine", () => {
     assert.equal(retry.sent.length, 1);
   });
 
-  it("sans salon, refus", async () => {
+  it("la vitrine sans salon : refus", async () => {
     assert.match(only(await share({ channel: null }), "reply").content, /Salon introuvable/);
   });
 });

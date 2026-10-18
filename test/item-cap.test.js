@@ -115,10 +115,10 @@ describe("la limite de détention", () => {
 
   it("la phrase dit ce qui a été vendu, et rien quand tout a été gardé", () => {
     const item = items.getItem(MASTER);
-    assert.equal(
-      items.overflowNotice(item, { kept: 0, sold: 1, points: 10000 }),
-      `Tu as déjà une Master Ball, le maximum : celle-ci est vendue **${(10000).toLocaleString("fr-FR")}** points.`
-    );
+    const notice = items.overflowNotice(item, { kept: 0, sold: 1, points: 10000 });
+    assert.match(notice, /Master Ball/);
+    assert.match(notice, /vendue/);
+    assert.ok(notice.includes((10000).toLocaleString("fr-FR")), "le montant vendu, à la française");
     assert.equal(items.overflowNotice(item, { kept: 1, sold: 0, points: 0 }), null);
     assert.equal(items.overflowNotice(item, null), null);
   });

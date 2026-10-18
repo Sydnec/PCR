@@ -2495,6 +2495,16 @@
       "commit": "pending",
       "timestamp": "2026-10-18T18:00:00.000Z",
       "branch": "dev/keen-knuth-lcd8tu"
+    },
+    {
+      "type": "chore",
+      "name": "Tests recentrés",
+      "description": "Les tests en double sont fusionnés, et chaque test ne vérifie plus que la règle qu'il annonce.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-18T21:30:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
     }
   ]
 }

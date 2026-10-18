@@ -82,23 +82,19 @@ describe("probabilité de capture", () => {
 });
 
 describe("plancher du taux de capture", () => {
-  it("relève un taux plus bas, sans toucher aux autres", () => {
+  it("relève un taux plus bas, sans toucher aux autres (Mew, à 45, reste tel quel), et la capture suit le taux relevé", () => {
     assert.equal(effectiveCatchRate(3), 10);
     assert.equal(effectiveCatchRate(9), 10);
     assert.equal(effectiveCatchRate(10), 10);
     assert.equal(effectiveCatchRate(45), 45);
     assert.equal(effectiveCatchRate(255), 255);
-  });
-
-  it("un légendaire à taux 3 est capturé comme un taux 10, jamais comme un taux 3", () => {
+    assert.equal(species("Mew").catchRate, 45);
+    assert.equal(effectiveCatchRate(species("Mew").catchRate), 45, "Mew est légendaire mais n'a jamais été difficile");
+    // La formule doit passer par le plancher elle aussi : relever le taux sans que le tirage le
+    // lise laisserait un légendaire à taux 3 capturé comme un taux 3.
     near(catchProbability(3, 1, 1), 10 / 765);
     near(catchProbability(3, 4, 1), 40 / 765);
     assert.equal(catchProbability(3, 1, 1), catchProbability(10, 1, 1));
-  });
-
-  it("Mew (taux 45) n'est pas relevé : il n'a jamais été difficile", () => {
-    assert.equal(species("Mew").catchRate, 45);
-    assert.equal(effectiveCatchRate(species("Mew").catchRate), 45);
   });
 
   it("une valeur illisible vaut le plancher, pas NaN", () => {
@@ -252,14 +248,6 @@ describe("poids d'apparition", () => {
       assert.equal(spawnWeight(species(name), spawn()), 0, name);
       assert.equal(isEvolutionOnly(species(name)), true, name);
       assert.equal(unobtainableMark(species(name)), "\u{1F512}", name);
-    }
-  });
-
-  it("une espèce qu'un objet est seul à donner est hors du pool, même quand la génération s'ouvre", () => {
-    const itemOnly = data.itemOnlySpecies();
-    for (const id of itemOnly) {
-      const target = data.getSpecies(id);
-      assert.equal(spawnWeight(target, spawn(), itemOnly), 0, target.name);
     }
   });
 

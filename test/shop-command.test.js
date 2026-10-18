@@ -8,6 +8,8 @@ import { runCommand, runAutocomplete, payloadOf, textOf } from "./fake-discord.j
 createSandbox({ config: { pokemon: { generationOpenings: { 2: "2000-01-01T00:00:00+01:00" } } } });
 const { points } = await openDatabases();
 const pk = (await import("../commands/pk.js")).default;
+const { getPokemonConfig, specialBallLimit } = await import("../modules/pokemon/config.js");
+const { getSpecies, speciesEvolvingWith } = await import("../modules/pokemon/data.js");
 const shop = (options = {}) => runCommand(pk, { sub: "boutique", options });
 const setBalance = (amount, user = "u1") =>
   dbRun(points, "INSERT INTO points (user_id, balance) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET balance = ?", [user, amount, amount]);
@@ -22,13 +24,31 @@ describe("/pk boutique", () => {
     await setBalance(1500);
     const reply = payloadOf(await shop(), "reply");
     assert.equal(reply.flags, MessageFlags.Ephemeral);
-    const text = textOf(reply);
-    assert.match(text, /Appât Ball.*230.*points.*tu en as 0\/10/s);
-    assert.match(text, /×3 sur les Pokémon pêchés, ×1 sur les autres/);
-    assert.match(text, /Catalyseur Ball.*300/s);
-    assert.match(text, /×4 sur les Pokémon qui évoluent avec le Catalyseur \(Onix, Hypocéan, Insécateur, Porygon\)/);
-    assert.match(text, /Ton solde : \*\*1\s?500\*\* points/);
-    assert.match(text, /après\*\* son achat/);
+    const { description } = reply.embeds[0].toJSON();
+    // Chaque ball tient sur deux lignes, prix et stock puis effet : on lit les siennes,
+    // pour qu'un chiffre ou un nom d'une autre ball ne fasse pas passer l'assertion.
+    const lines = description.split("\n");
+    const entry = (label) => {
+      const at = lines.findIndex((line) => line.includes(`**${label}**`));
+      assert.ok(at >= 0, `${label} est au catalogue`);
+      return { header: lines[at], effect: lines[at + 1] };
+    };
+    const priceAndStock = ({ price }) => new RegExp(`${price.toLocaleString("fr-FR")}.*points.*tu en as 0/${specialBallLimit()}`);
+    const { appat, catalyseur } = getPokemonConfig().capture.specialBalls;
+
+    const lure = entry("Appât Ball");
+    assert.match(lure.header, priceAndStock(appat));
+    assert.match(lure.effect, new RegExp(`×${appat.bonus.multiplier} sur les Pokémon pêchés, ×${appat.multiplier} sur les autres`));
+
+    const catalyst = entry("Catalyseur Ball");
+    assert.match(catalyst.header, priceAndStock(catalyseur));
+    assert.match(catalyst.effect, new RegExp(`×${catalyseur.bonus.multiplier} sur les Pokémon qui évoluent avec le Catalyseur`));
+    const evolvers = [...speciesEvolvingWith(catalyseur.bonus.item)].map((id) => getSpecies(id).name);
+    assert.ok(evolvers.length > 0, "le Catalyseur fait évoluer quelqu'un");
+    for (const name of evolvers) assert.ok(catalyst.effect.includes(name), `${name} est cité`);
+
+    assert.match(description, /Ton solde : \*\*1\s?500\*\* points/);
+    assert.match(description, /après\*\* son achat/);
   });
 
   it("acheter débite le prix et donne les balls, en le disant", async () => {

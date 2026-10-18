@@ -134,7 +134,12 @@ describe("les cookies", () => {
 
   it("le cookie de session est HttpOnly et SameSite=Lax, Secure en HTTPS", () => {
     const https = serializeCookie("pcr_session", "a b", { maxAgeSeconds: 3600.9, secure: true });
-    assert.match(https, /^pcr_session=a%20b; Path=\/; HttpOnly; SameSite=Lax; Max-Age=3600; Secure$/);
+    assert.match(https, /^pcr_session=a%20b;/, "la valeur est encodée");
+    assert.match(https, /; Path=\/(;|$)/, "valable sur tout le site");
+    assert.match(https, /; HttpOnly(;|$)/);
+    assert.match(https, /; SameSite=Lax(;|$)/);
+    assert.match(https, /; Max-Age=3600(;|$)/, "la durée est tronquée à la seconde");
+    assert.match(https, /; Secure(;|$)/);
     const local = serializeCookie("pcr_session", "x", { maxAgeSeconds: 10, secure: false });
     assert.doesNotMatch(local, /Secure/);
     assert.match(serializeCookie("c", "", { maxAgeSeconds: -5, secure: false }), /Max-Age=0/, "une durée négative efface");

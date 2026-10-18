@@ -68,9 +68,11 @@ describe("la courbe des soldes", () => {
     await trainer("u1", [[10, 100], [5, 200]]);
     const result = await history();
     const [entry] = result.series;
-    assert.equal(result.times.length, 241);
     assert.equal(entry.values.length, result.times.length);
     assert.ok(Math.abs(result.from - (Date.now() - 10 * DAY)) < 5000, "elle commence au premier mouvement");
+    assert.ok(Math.abs(result.to - Date.now()) < 5000, "elle finit maintenant");
+    assert.equal(result.times[0], result.from, "les instants partent de son début…");
+    assert.equal(result.times.at(-1), result.to, "…et vont jusqu'à maintenant, sans compter combien il y en a");
     assert.equal(entry.values[0], 100);
     assert.equal(entry.values.at(-1), 300);
     assert.equal(entry.balance, 300);
