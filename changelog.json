@@ -2445,6 +2445,26 @@
       "commit": "pending",
       "timestamp": "2026-10-18T10:00:00.000Z",
       "branch": "dev/keen-knuth-lcd8tu"
+    },
+    {
+      "type": "fix",
+      "name": "Bilan du safari en direct",
+      "description": "Le message du safari en direct affiche toujours le bon bilan, même quand les dernières actions s'enchaînent très vite.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-18T11:00:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
+    },
+    {
+      "type": "fix",
+      "name": "Boîte PC ouverte par défaut",
+      "description": "Sur le site, la Boîte PC s'ouvre sur la première boîte non archivée.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-18T11:00:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
     }
   ]
 }
