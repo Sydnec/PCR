@@ -60,6 +60,7 @@ génération ouverte en cours de route.
 | `interactions`                    | boutons et menus du jeu sur Discord : lancer, Master Ball, évolution, échange, parc safari, partages               |
 | `trade-draft`                     | brouillon de `/pk echange` : menus, fenêtres de saisie, « Proposer », refus chiffrés, expiration                   |
 | `commands-pk`, `commands-admin`   | déclaration de toutes les commandes (limites de Discord), sous-commandes `/pk` et `/admin`                         |
+| `message-sync`, `public-messages`, `message-closed-migration` | réécriture des messages publics : une à la fois, relue en base, réessais ; courses capture/fuite/échange/parc/objet, expiration des offres, rattrapage, marque de l'historique |
 | `messages`                        | points gagnés par message, statistiques, compteur du jeu, réécriture des liens X/Instagram et traduction           |
 | `timers`                          | chaque minuteur est planifié dans `index.js`, et fait son travail (ouverture de génération, éclosion, parc)        |
 | `generation2`                     | les 251 espèces, bébés, évolutions à objet, légendaires, charme, œufs, parc, annonce unique à l'ouverture          |
