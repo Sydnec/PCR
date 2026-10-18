@@ -42,7 +42,10 @@ export async function render(ctx) {
   const params = new URLSearchParams(location.search);
   let highlight = Number(params.get("species")) || null;
   let pc = await api("/api/me/pc");
-  let box = Math.max(0, Number(params.get("box") ?? 1) - 1) || 0;
+  // Sans boîte dans l'adresse, la première qui n'est pas archivée : une boîte
+  // rangée à part n'est pas celle qu'on vient voir.
+  const defaultBox = () => pc.boxes.find((entry) => !entry.archived)?.box ?? 0;
+  let box = params.has("box") ? Math.max(0, Number(params.get("box")) - 1) || 0 : defaultBox();
   if (highlight && !params.has("box")) {
     const first = matches()[0];
     if (first) box = boxOf(first.pos);
@@ -73,7 +76,7 @@ export async function render(ctx) {
 
   function writeUrl() {
     const query = new URLSearchParams();
-    if (box) query.set("box", String(box + 1));
+    if (box !== defaultBox()) query.set("box", String(box + 1));
     if (highlight) query.set("species", String(highlight));
     const text = query.toString();
     history.replaceState(null, "", `/boite${text ? `?${text}` : ""}`);
