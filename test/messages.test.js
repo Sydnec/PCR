@@ -228,8 +228,8 @@ describe("la réécriture des liens dans un message", () => {
     assert.equal(msg.sent.length, 1);
     const { content } = msg.sent[0];
     assert.ok(content.startsWith("<@u1>"), "sous la mention de son auteur");
-    assert.ok(content.includes("https://vxtwitter.com/sacha/status/123456"), "le lien est réécrit");
-    assert.ok(!content.includes("https://x.com"), "l'original du lien ne reste pas");
+    assert.match(content, / https:\/\/vxtwitter\.com\/sacha\/status\/123456 /, "le lien est réécrit");
+    assert.doesNotMatch(content, /https:\/\/x\.com\//, "l'original du lien ne reste pas");
     assert.deepEqual(msg.sent[0].allowedMentions, { parse: [] });
   });
 
@@ -466,7 +466,7 @@ describe("le bouton « Traduire »", () => {
     for (const escaped of ["\\# Titre", "\\> citation", "\\- liste", "1\\. un", "\\<@123>", "\\[piège]"]) {
       assert.ok(embed.description.includes(escaped), `${escaped} dans : ${embed.description}`);
     }
-    assert.ok(embed.description.includes("https://exemple.fr/a_b_c"), "un lien garde ses tirets bas : il n'est pas échappé");
+    assert.match(embed.description, / https:\/\/exemple\.fr\/a_b_c\.$/, "un lien garde ses tirets bas : il n'est pas échappé");
   });
 
   it("une traduction trop longue est coupée sans casser un lien en deux", async () => {
