@@ -1289,8 +1289,8 @@ export function createTrade(trade, cb) {
         request_species_id, request_is_shiny, request_sex, request_fertile,
         offer_pokemon_id, request_pokemon_id, created_at, expires_at, channel_id,
         offer_form, request_form, offer_points, request_points,
-        offer_item, offer_item_qty, request_item, request_item_qty)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        offer_item, offer_item_qty, request_item, request_item_qty, request_open, counter_of)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       trade.fromUserId,
       trade.toUserId,
@@ -1315,6 +1315,8 @@ export function createTrade(trade, cb) {
       trade.offerItemQty ?? null,
       trade.requestItem ?? null,
       trade.requestItemQty ?? null,
+      trade.requestOpen ? 1 : 0,
+      trade.counterOf ?? null,
     ],
     function (err) {
       cb(err, this ? this.lastID : null);
@@ -1353,6 +1355,13 @@ export function expireTrade(tradeId, cb = () => {}) {
 // côté valide : c'est ainsi qu'on offre ou qu'on demande « rien ». Un côté mal
 // formé échoue ici plutôt qu'à l'acceptation, où l'offre serait déjà publiée.
 function sideFields(side, prefix) {
+  // « À son choix » : le proposeur ne dit pas ce qu'il veut en retour. Seul le côté
+  // demandé peut rester ouvert, un côté offert doit être concret. L'espèce reste à 0,
+  // comme pour des points : c'est `request_open` qui distingue ce côté.
+  if (side?.open) {
+    if (prefix !== "request") throw new Error("Seul le côté demandé peut rester ouvert");
+    return { requestOpen: true };
+  }
   if (Number.isInteger(side?.points)) {
     if (side.points < 0) throw new Error(`Montant invalide : ${side.points}`);
     return { [`${prefix}Points`]: side.points };
@@ -1394,7 +1403,7 @@ function sideFields(side, prefix) {
 // ni vérifier est fermée aussi : l'appelant répond à un échec, personne ne la
 // verra, et ouverte elle bloquerait les essais suivants jusqu'à son expiration.
 export function proposeTrade(
-  { fromUserId, toUserId, offer, request, channelId, unique = false },
+  { fromUserId, toUserId, offer, request, channelId, unique = false, counterOf = null },
   cb
 ) {
   let fields;
@@ -1403,7 +1412,7 @@ export function proposeTrade(
   } catch (error) {
     return cb(error);
   }
-  createTrade({ fromUserId, toUserId, channelId, ...fields }, (err, tradeId) => {
+  createTrade({ fromUserId, toUserId, channelId, counterOf, ...fields }, (err, tradeId) => {
     if (err || !tradeId) return cb(err || new Error("Création d'échange impossible"));
     const abandon = (error, ...rest) =>
       resolveTradeAs(tradeId, fromUserId, "CANCELLED", (closeError) => {
@@ -1460,6 +1469,65 @@ export function isOldestOpenOffer(trade, cb) {
       Date.now(),
     ],
     (err, row) => cb(err, !err && row?.first === trade.id)
+  );
+}
+
+// Contre-offre : `fromUserId`, destinataire de l'offre `tradeId`, la remplace par la
+// sienne, dans l'autre sens et avec une échéance neuve. L'original passe PENDING →
+// COUNTERED en une instruction gardée, comme une acceptation : de deux clics
+// simultanés (accepter, contrer, refuser), un seul gagne, et l'autre lit « déjà
+// traitée ». On retire avant de créditer : l'original se ferme d'abord, la nouvelle
+// offre se crée ensuite, et si elle échoue (ou n'est qu'un doublon) l'original se
+// rouvre. Ni deux offres ouvertes ni aucune ne doivent survivre à une panne.
+//
+// `cb(err, trade, meta)` : `meta.stale` — l'original n'est plus ouvert (ou pas à
+// `fromUserId`, ou échu), rien n'est créé ; `meta.duplicate` — une offre identique est
+// déjà ouverte, rien n'est créé non plus. Les messages publics sont à l'appelant :
+// la nouvelle offre se publie, puis l'original se réécrit (syncTradeMessage).
+export function counterTrade({ tradeId, fromUserId, offer, request, channelId }, cb) {
+  getTrade(tradeId, (readError, original) => {
+    if (readError) return cb(readError);
+    if (!original || original.to_user_id !== fromUserId) return cb(null, null, { stale: true });
+    db.run(
+      `UPDATE pokemon_trades SET status = 'COUNTERED', resolved_at = ?
+        WHERE id = ? AND status = 'PENDING' AND to_user_id = ? AND expires_at > ?`,
+      [Date.now(), tradeId, fromUserId, Date.now()],
+      function (claimError) {
+        if (claimError) return cb(claimError);
+        if (this.changes === 0) return cb(null, null, { stale: true });
+        proposeTrade(
+          {
+            fromUserId,
+            toUserId: original.from_user_id,
+            offer,
+            request,
+            channelId,
+            unique: true,
+            counterOf: tradeId,
+          },
+          (err, trade, meta) => {
+            if (!err && trade) return cb(null, trade, meta);
+            reopenCountered(tradeId, (reopenError) => {
+              if (reopenError) handleException("Réouverture d'une offre contrée :", reopenError);
+              cb(err, null, meta);
+            });
+          }
+        );
+      }
+    );
+  });
+}
+
+// Rouvre une offre contrée dont la contre-offre n'a pas abouti (création ou
+// publication échouée). Gardée : une offre qui n'est plus COUNTERED n'est pas touchée.
+export function reopenCountered(tradeId, cb = () => {}) {
+  db.run(
+    `UPDATE pokemon_trades SET status = 'PENDING', resolved_at = NULL, message_closed_at = NULL
+      WHERE id = ? AND status = 'COUNTERED'`,
+    [tradeId],
+    function (err) {
+      cb(err, this ? this.changes === 1 : false);
+    }
   );
 }
 
@@ -1685,16 +1753,31 @@ export function acceptTrade(tradeId, options, cb) {
   if (typeof options === "function") [options, cb] = [{}, options];
   db.run(
     `UPDATE pokemon_trades SET status = 'ACCEPTED', resolved_at = ?
-      WHERE id = ? AND status = 'PENDING' AND expires_at > ?`,
+      WHERE id = ? AND status = 'PENDING' AND expires_at > ? AND request_open = 0`,
     [Date.now(), tradeId, Date.now()],
     function (err) {
       if (err) return cb(err);
       if (this.changes === 0) {
         // `stale` : l'offre n'était déjà plus ouverte, ce n'est pas un côté qui a manqué.
-        return cb(null, {
-          ok: false,
-          stale: true,
-          reason: "Cette offre a expiré ou a déjà été traitée.",
+        const stale = () =>
+          cb(null, {
+            ok: false,
+            stale: true,
+            reason: "Cette offre a expiré ou a déjà été traitée.",
+          });
+        // Une offre « à son choix » ne s'accepte pas telle quelle, même par un clic
+        // périmé ou forgé : le destinataire doit d'abord dire ce qu'il donne. Rien n'a
+        // bougé, et l'offre reste ouverte.
+        return getTrade(tradeId, (readError, open) => {
+          if (readError || !open) return stale();
+          if (open.request_open && open.status === "PENDING" && open.expires_at > Date.now()) {
+            return cb(null, {
+              ok: false,
+              open: true,
+              reason: "Cette offre est à ton choix : propose d'abord ce que tu donnes (« Faire une proposition »).",
+            });
+          }
+          stale();
         });
       }
 

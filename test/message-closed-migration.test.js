@@ -40,6 +40,22 @@ await new Promise((resolve, reject) => {
 
 const { points } = await openDatabases();
 
+describe("les colonnes des contre-offres, sur une base existante", () => {
+  it("s'ajoutent sans toucher aux offres déjà là : pas de contre-offre, côté demandé jamais ouvert", async () => {
+    await eventually(async () => {
+      const columns = (await dbAll(points, "PRAGMA table_info(pokemon_trades)")).map((column) => column.name);
+      assert.ok(columns.includes("counter_of") && columns.includes("request_open"));
+    });
+    const trades = await dbAll(points, "SELECT counter_of, request_open FROM pokemon_trades");
+    assert.equal(trades.length, 3);
+    assert.ok(trades.every((trade) => trade.counter_of === null && trade.request_open === 0));
+    await eventually(async () => {
+      const drafts = (await dbAll(points, "PRAGMA table_info(pokemon_trade_drafts)")).map((column) => column.name);
+      assert.ok(drafts.includes("counter_of"));
+    });
+  });
+});
+
 describe("la marque des messages conclus, sur une base existante", () => {
   it("marque l'historique terminé, et lui seul", async () => {
     await eventually(async () => {

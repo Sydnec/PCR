@@ -20,17 +20,28 @@ import db from "../points-db.js";
 import { handleException } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
 import {
+  counterTrade,
+  expireTrade,
   getIndividual,
   getIndividuals,
+  getTrade as getTradeRow,
   proposeTrade,
+  reopenCountered,
   resolveTradeAs,
   selectorOf,
 } from "./collection.js";
 import { getSpecies } from "./data.js";
 import { getItem } from "./items.js";
 import { buildTradeEmbed, buildTradeRow, describeGroup, individualChoices } from "./embeds.js";
-import { checkSide, itemChoices, parseChoice, speciesChoices } from "./trade-side.js";
-import { linkTradeMessage } from "./trade-message.js";
+import {
+  checkSide,
+  choiceOfTradeSide,
+  emptyTradeProblem,
+  itemChoices,
+  parseChoice,
+  speciesChoices,
+} from "./trade-side.js";
+import { linkTradeMessage, syncTradeMessage } from "./trade-message.js";
 
 const promisify = (fn, ...args) =>
   new Promise((resolve, reject) => fn(...args, (err, value) => (err ? reject(err) : resolve(value))));
@@ -66,14 +77,28 @@ const readSideJson = (text) => {
 
 // Les brouillons périmés se purgent à la création du suivant : aucun cron n'est
 // nécessaire, et un brouillon expiré est de toute façon refusé à la lecture.
-export async function createDraft({ fromUserId, toUserId, channelId }) {
+//
+// Le brouillon d'une contre-offre (`counterOf`) naît prérempli des côtés de l'offre
+// contrée, inversés : il retient l'offre qu'il remplace, et « Proposer » passe alors par
+// counterTrade.
+export async function createDraft({ fromUserId, toUserId, channelId, counterOf = null, give = null, get = null }) {
   const now = Date.now();
   await run("DELETE FROM pokemon_trade_drafts WHERE expires_at < ?", [now]);
   const expiresAt = now + getPokemonConfig().trade.draftMinutes * 60 * 1000;
   const { lastID } = await run(
-    `INSERT INTO pokemon_trade_drafts (from_user_id, to_user_id, channel_id, created_at, expires_at)
-     VALUES (?, ?, ?, ?, ?)`,
-    [fromUserId, toUserId, channelId ?? null, now, expiresAt]
+    `INSERT INTO pokemon_trade_drafts
+       (from_user_id, to_user_id, channel_id, created_at, expires_at, counter_of, offer, request)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      fromUserId,
+      toUserId,
+      channelId ?? null,
+      now,
+      expiresAt,
+      counterOf,
+      give ? JSON.stringify(give) : null,
+      get ? JSON.stringify(get) : null,
+    ]
   );
   return lastID;
 }
@@ -102,6 +127,7 @@ const deleteDraft = (draftId) => run("DELETE FROM pokemon_trade_drafts WHERE id 
 // est « le moins précieux » ; celui qu'on demande, le destinataire le choisira.
 async function describeChoice(choice, which) {
   if (!choice) return "*à choisir*";
+  if (choice.kind === "open") return "🎁 À son choix";
   if (choice.kind === "points") {
     return choice.amount === 0 ? "rien (0 point)" : `${choice.amount.toLocaleString("fr-FR")} points`;
   }
@@ -111,7 +137,7 @@ async function describeChoice(choice, which) {
   }
   const species = getSpecies(Number(choice.id));
   if (!species) return "*Pokémon inconnu*";
-  if (which === "get") return `un ${species.name}, au choix de l'autre`;
+  if (which === "get" && !choice.individual) return `un ${species.name}, au choix de l'autre`;
   if (!choice.individual) return `un ${species.name} (le moins précieux)`;
   const row = await promisify(getIndividual, Number(choice.individual.replace("#", "")));
   return row ? `**${describeGroup(species, selectorOf(row))}** #${row.id}` : `un ${species.name}`;
@@ -124,11 +150,15 @@ const button = (customId, label, style, disabled = false) =>
 // `note` dit ce qui vient de se passer (un refus, une erreur) sans quitter l'écran.
 export async function draftView(draft, note = null) {
   const embed = new EmbedBuilder()
-    .setTitle("Préparer un échange")
+    .setTitle(draft.counter_of ? "Préparer une contre-offre" : "Préparer un échange")
     .setColor(COLOR)
     .setDescription(
-      `Échange avec <@${draft.to_user_id}>. Choisis ce que chacun donne, puis propose : ` +
-        "rien ne bouge avant qu'il accepte."
+      draft.counter_of
+        ? `Contre-offre à l'échange #${draft.counter_of} de <@${draft.to_user_id}> : les côtés sont ` +
+            "inversés, change ce que tu veux avant de proposer. Son offre se ferme quand ta " +
+            "contre-offre part ; rien ne bouge avant qu'il accepte."
+        : `Échange avec <@${draft.to_user_id}>. Choisis ce que chacun donne, puis propose : ` +
+            "rien ne bouge avant qu'il accepte."
     )
     .addFields(
       { name: "Tu donnes", value: await describeChoice(draft.give, "give"), inline: true },
@@ -170,7 +200,9 @@ function kindView(draft, which, note = null) {
             { label: "Un Pokémon", value: "pk" },
             { label: "Un objet", value: "item" },
             { label: "Des points", value: "points" },
-            { label: "Rien (0 point)", value: "nothing" }
+            { label: "Rien (0 point)", value: "nothing" },
+            // Ce qu'on demande peut rester ouvert : l'autre dira ce qu'il donne.
+            ...(which === "get" ? [{ label: "🎁 À son choix", value: "open" }] : [])
           )
       ),
       backRow(draft.id),
@@ -246,7 +278,8 @@ const show = (interaction, payload) => {
 
 const gone = (interaction) =>
   show(interaction, {
-    content: "❌ Ce brouillon a expiré ou a été fermé : relance `/pk echange`.",
+    content: "❌ Ce brouillon a expiré ou a été fermé : relance `/pk echange`, ou reclique sur " +
+      "« Contre-offre » si l'offre est encore ouverte.",
     embeds: [],
     components: [],
   });
@@ -307,48 +340,105 @@ export async function openDraft(interaction, target) {
   return interaction.reply({ ...(await draftView(draft)), flags: MessageFlags.Ephemeral });
 }
 
+// ------------------------------- Contre-offre -------------------------------
+
+// Ouvre le brouillon d'une contre-offre à `trade`, depuis le bouton de son message public.
+// Côtés inversés : le destinataire donne ce qu'on lui demandait et demande ce qu'on lui
+// offrait. Une offre « à son choix » ne lui a rien demandé de précis : ce qu'il donne
+// est à choisir, et ce qu'on lui offrait est déjà rempli.
+export async function openCounterDraft(interaction, trade) {
+  const asked = choiceOfTradeSide(trade, "request");
+  const draftId = await createDraft({
+    fromUserId: trade.to_user_id,
+    toUserId: trade.from_user_id,
+    channelId: interaction.channelId ?? trade.channel_id,
+    counterOf: trade.id,
+    give: asked.kind === "open" ? null : asked,
+    get: choiceOfTradeSide(trade, "offer"),
+  });
+  const draft = await getDraft(draftId);
+  return interaction.reply({ ...(await draftView(draft)), flags: MessageFlags.Ephemeral });
+}
+
 // ------------------------------- Proposer -------------------------------
 
+// L'offre que `counterTrade` n'a pas trouvée ouverte : échue sans que personne ne l'ait
+// fermée (elle expire ici, et son message le dit), ou déjà conclue par un autre clic.
+async function counterIsStale(interaction, draft) {
+  const original = await new Promise((resolve) => getTradeRow(draft.counter_of, (err, row) => resolve(err ? null : row)));
+  if (original?.status === "PENDING" && original.expires_at <= Date.now()) {
+    const expired = await new Promise((resolve) => expireTrade(original.id, (err, done) => resolve(!err && done)));
+    if (expired) await syncTradeMessage(interaction.client, original.id);
+  }
+  // Deux clics rapprochés sur « Proposer » : le premier a contré l'offre, le second la
+  // trouve fermée. Seul son destinataire — l'auteur de ce brouillon — peut la contrer :
+  // COUNTERED veut donc dire que sa contre-offre part ou est partie. La ligne de la
+  // contre-offre peut ne pas être écrite encore (le premier clic est en plein milieu) :
+  // la chercher ferait annoncer une erreur à tort.
+  if (original?.status === "COUNTERED") {
+    await deleteDraft(draft.id);
+    return show(interaction, {
+      content: `✅ Ta contre-offre à <@${draft.to_user_id}> est déjà partie.`,
+      embeds: [],
+      components: [],
+    });
+  }
+  await deleteDraft(draft.id);
+  return show(interaction, {
+    content: "❌ Cette offre a expiré ou a déjà été traitée : ta contre-offre n'est pas partie.",
+    embeds: [],
+    components: [],
+  });
+}
+
 // « Proposer » : les deux côtés se contrôlent de nouveau (le solde ou le stock ont pu
-// bouger), l'offre est créée par proposeTrade comme pour la commande, puis publiée dans
-// le salon. L'offre identique encore ouverte (unique) fait de deux clics rapprochés une
-// seule offre.
+// bouger), l'offre est créée par proposeTrade comme pour la commande — ou, pour une
+// contre-offre, par counterTrade, qui ferme l'offre contrée dans le même geste —, puis
+// publiée dans le salon. L'offre identique encore ouverte (unique) fait de deux clics
+// rapprochés une seule offre.
 async function propose(interaction, draft) {
   if (!draft.give || !draft.get) {
     return showDraft(interaction, draft, "❌ Il manque un côté : choisis ce que tu donnes et ce que tu demandes.");
   }
   const [offer, request] = await Promise.all([
     checkSide(draft.give, draft.give.individual ?? null, draft.from_user_id, true, draft.to_user_id),
-    checkSide(draft.get, null, draft.to_user_id, false, draft.from_user_id),
+    checkSide(draft.get, draft.get.individual ?? null, draft.to_user_id, false, draft.from_user_id),
   ]);
   if (offer.error || request.error) {
     return showDraft(interaction, draft, `❌ ${offer.error ?? request.error}`);
   }
-  if (offer.side.points === 0 && request.side.points === 0) {
-    return showDraft(interaction, draft, "❌ Rien à échanger : les deux côtés sont à 0 point.");
-  }
+  const pointless = emptyTradeProblem(offer.side, request.side);
+  if (pointless) return showDraft(interaction, draft, `❌ ${pointless}`);
 
   const channel = interaction.channel;
   if (!channel?.send) {
     return showDraft(interaction, draft, "❌ Je ne peux pas publier l'offre dans ce salon.");
   }
 
-  const trade = await new Promise((resolve) =>
-    proposeTrade(
-      {
-        fromUserId: draft.from_user_id,
-        toUserId: draft.to_user_id,
-        offer: offer.side,
-        request: request.side,
-        channelId: draft.channel_id,
-        unique: true,
-      },
-      (err, created, meta) => {
-        if (err) handleException("Création d'échange depuis un brouillon :", err);
-        resolve(err ? { error: true } : meta?.duplicate ? { duplicate: true } : { trade: created });
-      }
-    )
-  );
+  const trade = await new Promise((resolve) => {
+    const settle = (err, created, meta) => {
+      if (err) handleException("Création d'échange depuis un brouillon :", err);
+      resolve(
+        err
+          ? { error: true }
+          : meta?.duplicate
+            ? { duplicate: true }
+            : meta?.stale
+              ? { stale: true }
+              : { trade: created }
+      );
+    };
+    const sides = { offer: offer.side, request: request.side, channelId: draft.channel_id };
+    if (draft.counter_of) {
+      counterTrade({ tradeId: draft.counter_of, fromUserId: draft.from_user_id, ...sides }, settle);
+    } else {
+      proposeTrade(
+        { fromUserId: draft.from_user_id, toUserId: draft.to_user_id, ...sides, unique: true },
+        settle
+      );
+    }
+  });
+  if (trade.stale) return counterIsStale(interaction, draft);
   if (trade.duplicate) {
     return showDraft(interaction, draft, "❌ Une offre identique est déjà ouverte avec ce dresseur.");
   }
@@ -359,18 +449,27 @@ async function propose(interaction, draft) {
     message = await channel.send({
       content: `<@${draft.to_user_id}>`,
       embeds: [buildTradeEmbed(trade.trade, "PENDING")],
-      components: [buildTradeRow(trade.trade.id)],
+      components: [buildTradeRow(trade.trade.id, { open: Boolean(trade.trade.request_open) })],
     });
   } catch (error) {
     // L'offre n'a pas de message, personne ne la verra : on la ferme, le brouillon reste.
+    // Une contre-offre rouvre aussi l'offre qu'elle avait fermée : sans cela, les deux
+    // disparaîtraient sans que personne ait rien décidé.
     handleException("Publication d'une offre d'échange :", error);
     await promisify(resolveTradeAs, trade.trade.id, draft.from_user_id, "CANCELLED").catch(() => {});
+    if (draft.counter_of) {
+      await promisify(reopenCountered, draft.counter_of).catch((reopenError) =>
+        handleException("Réouverture d'une offre contrée :", reopenError)
+      );
+    }
     return showDraft(interaction, draft, "❌ Je ne peux pas publier l'offre dans ce salon.");
   }
   await linkTradeMessage(interaction.client, trade.trade.id, message.id);
+  // Le message de l'offre contrée se réécrit d'après la base : « contre-offre », sans bouton.
+  if (draft.counter_of) await syncTradeMessage(interaction.client, draft.counter_of);
   await deleteDraft(draft.id);
   return show(interaction, {
-    content: `✅ Offre envoyée à <@${draft.to_user_id}>.`,
+    content: `✅ ${draft.counter_of ? "Contre-offre" : "Offre"} envoyée à <@${draft.to_user_id}>.`,
     embeds: [],
     components: [],
   });
@@ -409,6 +508,9 @@ export async function handleDraftSelect(interaction, action, args) {
     case "kind":
       if (value === "nothing") {
         return chooseSide(interaction, draft, which, { kind: "points", amount: 0 });
+      }
+      if (value === "open" && which === "get") {
+        return chooseSide(interaction, draft, which, { kind: "open" });
       }
       if (value === "points") return interaction.showModal(pointsModal(draft.id, which)).catch(() => {});
       if (value === "pk" || value === "item") {

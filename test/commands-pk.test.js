@@ -797,6 +797,28 @@ describe("/pk echange", () => {
     assert.equal(row.message_id, "reply-2", "le message de l'offre est retenu pour l'éditer plus tard");
   });
 
+  it("« À son choix » (`je_recois: open`) : offre ouverte, « Faire une proposition » sans « Accepter », rien d'autre demandé", async () => {
+    const [mine] = await ownMany("Rattata", 2);
+    const calls = await trade({ membre: "u2", je_donne: ids("Rattata"), mon_individu: `#${mine}`, je_recois: "open" });
+    const reply = payloadOf(calls, "editReply");
+    assert.equal(reply.content, "<@u2>");
+    assert.deepEqual(reply.components[0].toJSON().components.map((button) => button.label), ["Faire une proposition", "Refuser", "Annuler"]);
+    assert.match(reply.embeds[0].toJSON().description, /propose \*\*#\d+ Rattata[^*]*\*\* à <@u2>, contre ce qu'il voudra\./);
+    const [row] = await trades();
+    assert.deepEqual([row.request_open, row.request_species_id, row.request_points, row.request_item, row.offer_pokemon_id, row.status], [1, 0, null, null, mine, "PENDING"]);
+  });
+
+  it("« À son choix » refusé pour ce qu'on donne, et pour une offre où l'on ne donne rien", async () => {
+    await ownMany("Rattata", 2);
+    await setBalance(500);
+    const giveOpen = await trade({ membre: "u2", je_donne: "open", je_recois: "5" });
+    assert.match(refusal(giveOpen), /« À son choix » ne vaut que pour ce que tu demandes/);
+    const nothing = await trade({ membre: "u2", je_donne: "0", je_recois: "open" });
+    assert.match(refusal(nothing), /Rien à échanger : tu n'offres rien/);
+    assert.equal(payloadOf(giveOpen, "reply").flags, MessageFlags.Ephemeral);
+    assert.deepEqual(await trades(), [], "aucune offre créée");
+  });
+
   it("sans `mon_individu`, c'est le moins précieux qui part, le plus récent à égalité", async () => {
     await own("Rattata", { obtained: 1 });
     await own("Rattata", { obtained: 5, shiny: 1 });
@@ -936,9 +958,10 @@ describe("/pk echange", () => {
     assert.match(none[0].name, /Choisis d'abord le dresseur/);
     await ownMany("Roucool", 2, { user: "u2" });
     const theirs = payloadOf(await asked({ name: "je_recois", value: "" }, { membre: "u2" }), "respond");
-    assert.deepEqual(theirs.map((choice) => choice.value), ["—", "pts:0", ids("Roucool")]);
+    assert.deepEqual(theirs.map((choice) => choice.value), ["—", "pts:0", "open", ids("Roucool")]);
     assert.match(theirs[1].name, /un cadeau/, "côté destinataire, « rien » se dit comme un cadeau");
-    assert.match(theirs[2].name, /Roucool ×1 en trop/);
+    assert.match(theirs[2].name, /À son choix/, "ce qu'on demande peut rester ouvert, ce qu'on donne jamais");
+    assert.match(theirs[3].name, /Roucool ×1 en trop/);
     const noSpecies = payloadOf(await asked({ name: "mon_individu", value: "" }), "respond");
     assert.match(noSpecies[0].name, /Choisis d'abord l'espèce dans l'option « je_donne »/);
     const notSpecies = payloadOf(await asked({ name: "mon_individu", value: "" }, { je_donne: "300" }), "respond");

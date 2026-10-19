@@ -1337,6 +1337,7 @@ const TRADE_STATUS = {
   DECLINED: { color: 0xed4245, title: "❌ Échange refusé", note: null },
   CANCELLED: { color: 0x4f545c, title: "🚫 Échange annulé", note: null },
   EXPIRED: { color: 0x4f545c, title: "⌛ Échange expiré", note: null },
+  COUNTERED: { color: 0xfee75c, title: "↩️ Contre-offre", note: null },
   FAILED: {
     color: 0xed4245,
     title: "⚠️ Échange impossible",
@@ -1415,7 +1416,9 @@ export function buildTradeEmbed(trade, status = "PENDING") {
 
   // Un côté à zéro point est un cadeau : on le dit comme tel plutôt que de faire
   // lire « contre 0 point ».
-  const sentence = nothing("request")
+  const sentence = trade.request_open
+    ? `<@${trade.from_user_id}> propose **${given}** à <@${trade.to_user_id}>, contre ce qu'il voudra.`
+    : nothing("request")
     ? `<@${trade.from_user_id}> offre **${given}** à <@${trade.to_user_id}>.`
     : nothing("offer")
       ? `<@${trade.from_user_id}> demande **${asked}** à <@${trade.to_user_id}>` +
@@ -1428,7 +1431,11 @@ export function buildTradeEmbed(trade, status = "PENDING") {
   const embed = new EmbedBuilder()
     .setTitle(style.title)
     .setColor(style.color)
-    .setDescription(sentence);
+    .setDescription(
+      status === "COUNTERED"
+        ? `${sentence}\n\n↩️ Contre-offre de <@${trade.to_user_id}>.`
+        : sentence
+    );
   if (offered) {
     embed.setThumbnail(spriteUrl(offered, trade.offer_is_shiny, trade.offer_form));
   }
@@ -1448,7 +1455,11 @@ export function buildTradeEmbed(trade, status = "PENDING") {
   }
 
   if (status === "PENDING") {
-    embed.setFooter({ text: "Seul le destinataire peut accepter ou refuser." });
+    embed.setFooter({
+      text:
+        (trade.counter_of ? `Contre-offre à l'échange #${trade.counter_of}. ` : "") +
+        "Seul le destinataire peut répondre.",
+    });
   }
   return embed;
 }
@@ -1465,14 +1476,29 @@ export function buildTradePicker(tradeId, choices, species) {
   );
 }
 
-export function buildTradeRow(tradeId, { disabled = false } = {}) {
-  return new ActionRowBuilder().addComponents(
+// Une offre « à son choix » ne s'accepte pas telle quelle : « Faire une proposition »
+// prend la place d'« Accepter », et ouvre la même contre-offre que « Contre-offre ».
+export function buildTradeRow(tradeId, { disabled = false, open = false } = {}) {
+  const counter = (label, style) =>
     new ButtonBuilder()
-      .setCustomId(`poke_trade_accept|${tradeId}`)
-      .setLabel("Accepter")
-      .setEmoji("✅")
-      .setStyle(ButtonStyle.Success)
-      .setDisabled(disabled),
+      .setCustomId(`poke_trade_counter|${tradeId}`)
+      .setLabel(label)
+      .setEmoji("↩️")
+      .setStyle(style)
+      .setDisabled(disabled);
+  const answers = open
+    ? [counter("Faire une proposition", ButtonStyle.Success)]
+    : [
+        new ButtonBuilder()
+          .setCustomId(`poke_trade_accept|${tradeId}`)
+          .setLabel("Accepter")
+          .setEmoji("✅")
+          .setStyle(ButtonStyle.Success)
+          .setDisabled(disabled),
+        counter("Contre-offre", ButtonStyle.Primary),
+      ];
+  return new ActionRowBuilder().addComponents(
+    ...answers,
     new ButtonBuilder()
       .setCustomId(`poke_trade_decline|${tradeId}`)
       .setLabel("Refuser")

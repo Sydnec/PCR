@@ -4,7 +4,7 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { MessageFlags } from "discord.js";
-import { createSandbox, openDatabases, dbRun, dbAll, untilQuiet, speciesByName } from "./helpers.js";
+import { createSandbox, openDatabases, dbRun, dbAll, dbGet, untilQuiet, speciesByName } from "./helpers.js";
 import { fakeChannel, fakeUser, payloadOf, runCommand } from "./fake-discord.js";
 
 createSandbox({ config: { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } } });
@@ -12,6 +12,7 @@ const { points } = await openDatabases();
 const pk = (await import("../commands/pk.js")).default;
 const { handlePokemonButton, handlePokemonModal, handlePokemonSelect } = await import("../modules/pokemon/interactions.js");
 const items = await import("../modules/pokemon/items.js");
+const collection = await import("../modules/pokemon/collection.js");
 const data = await import("../modules/pokemon/data.js");
 const { getPokemonConfig } = await import("../modules/pokemon/config.js");
 
@@ -34,6 +35,7 @@ const ownMany = async (name, quantity, options = {}) => {
   for (let index = 0; index < quantity; index++) ids.push(await own(name, { obtained: index + 1, ...options }));
   return ids;
 };
+const balanceOf = async (user) => (await dbGet(points, "SELECT balance FROM points WHERE user_id = ?", [user]))?.balance ?? 0;
 const drafts = () => dbAll(points, "SELECT * FROM pokemon_trade_drafts ORDER BY id");
 const trades = () => dbAll(points, "SELECT * FROM pokemon_trades ORDER BY id");
 
@@ -49,6 +51,7 @@ async function interact(customId, { kind = "button", user = "u1", channel = fake
     user: fakeUser(user),
     channel,
     channelId: channel.id,
+    client: { channels: { fetch: async () => channel } },
     fields: { getTextInputValue: (id) => fields[id] ?? "" },
     isFromMessage: () => true,
   };
@@ -342,5 +345,297 @@ describe("la vie d'un brouillon", () => {
     const pick = await submit(`poke_td_pts|${id}|give`, { amount: "10" }, { user: "u3" });
     assert.match(last(pick.calls, "reply").content, /n'est pas à toi/);
     assert.equal((await drafts())[0].offer, null);
+  });
+});
+
+describe("la contre-offre depuis le brouillon", () => {
+  const propose = (offer, request, { from = "u1", to = "u2", messageId = "orig-msg" } = {}) =>
+    call(collection.proposeTrade, { fromUserId: from, toUserId: to, offer, request, channelId: "salon" }).then(async (trade) => {
+      await dbRun(points, "UPDATE pokemon_trades SET message_id = ? WHERE id = ?", [messageId, trade.id]);
+      return trade;
+    });
+  // Un salon qui note les réécritures de messages, comme Discord les recevrait.
+  const salon = () => {
+    const channel = fakeChannel({ id: "salon" });
+    channel.edits = [];
+    channel.messages.edit = async (id, payload) => channel.edits.push({ id, payload });
+    return channel;
+  };
+  const statuses = async () => (await trades()).map((row) => row.status);
+  const openCounter = async (tradeId, user = "u2") => {
+    await press(`poke_trade_counter|${tradeId}`, { user });
+    return (await drafts()).find((draft) => draft.counter_of === tradeId);
+  };
+
+  it("« Proposer » ferme l'offre contrée, publie la contre-offre pour l'ancien auteur et réécrit l'ancien message", async () => {
+    await setBalance(1000, "u1");
+    await setBalance(1000, "u2");
+    const original = await propose({ points: 100 }, { points: 300 });
+    const draft = await openCounter(original.id);
+    const channel = salon();
+    const sent = await press(`poke_td_go|${draft.id}`, { user: "u2", channel });
+
+    assert.match(last(sent.calls, "update").content, /Contre-offre envoyée à <@u1>/);
+    assert.equal(channel.sent.length, 1);
+    assert.equal(channel.sent[0].content, "<@u1>", "l'ancien auteur est mentionné");
+    assert.deepEqual(componentsOf(channel.sent[0]).map((button) => button.label), ["Accepter", "Contre-offre", "Refuser", "Annuler"]);
+    const [old, fresh] = await trades();
+    assert.deepEqual([old.status, fresh.status], ["COUNTERED", "PENDING"]);
+    assert.deepEqual([fresh.from_user_id, fresh.to_user_id, fresh.offer_points, fresh.request_points], ["u2", "u1", 300, 100], "les côtés sont inversés");
+    assert.equal(fresh.counter_of, original.id);
+    assert.equal(fresh.message_id, "msg-1", "la nouvelle offre est liée à son message");
+    assert.equal((await drafts()).length, 0);
+
+    assert.equal(channel.edits.length, 1, "l'ancien message est réécrit");
+    assert.equal(channel.edits[0].id, "orig-msg");
+    assert.match(textOf(channel.edits[0].payload), /Contre-offre de <@u2>/);
+    assert.deepEqual(channel.edits[0].payload.components, [], "plus aucun bouton");
+    assert.notEqual((await trades())[0].message_closed_at, null, "la fin du message est retenue");
+  });
+
+  it("les deux côtés se modifient avant l'envoi", async () => {
+    await setBalance(1000, "u1");
+    await setBalance(1000, "u2");
+    const original = await propose({ points: 100 }, { points: 300 });
+    const draft = await openCounter(original.id);
+    await submit(`poke_td_pts|${draft.id}|give`, { amount: "250" }, { user: "u2" });
+    await choose(`poke_td_kind|${draft.id}|get`, "nothing", { user: "u2" });
+    await press(`poke_td_go|${draft.id}`, { user: "u2", channel: salon() });
+    const fresh = (await trades())[1];
+    assert.deepEqual([fresh.offer_points, fresh.request_points], [250, 0], "ni la valeur du côté donné ni celle du côté demandé n'est figée");
+  });
+
+  // A offre son Rattata shiny #n contre des points ; B le redemande pour moins.
+  async function shinyCounter() {
+    await setBalance(1000, "u1");
+    await setBalance(1000, "u2");
+    const [plain, , shiny] = [await own("Rattata", { obtained: 1 }), await own("Rattata", { obtained: 2 }), await own("Rattata", { obtained: 3, shiny: 1 })];
+    const original = await propose(collection.selectorOf((await dbAll(points, "SELECT * FROM pokemon_owned WHERE id = ?", [shiny]))[0]), { points: 1000 });
+    const draft = await openCounter(original.id);
+    return { plain, shiny, original, draft };
+  }
+
+  it("la contre-offre redemande l'individu exact que l'offre désignait, et l'acceptation le déplace lui, pas un autre", async () => {
+    const { plain, shiny, draft } = await shinyCounter();
+    assert.deepEqual(JSON.parse(draft.request), { kind: "pk", id: String(species("Rattata").id), individual: `#${shiny}` });
+    await submit(`poke_td_pts|${draft.id}|give`, { amount: "800" }, { user: "u2" });
+    await press(`poke_td_go|${draft.id}`, { user: "u2", channel: salon() });
+    const fresh = (await trades())[1];
+    assert.deepEqual([fresh.request_pokemon_id, fresh.request_is_shiny, fresh.request_species_id], [shiny, 1, species("Rattata").id]);
+
+    await press(`poke_trade_accept|${fresh.id}`, { user: "u1", channel: salon() });
+    assert.equal((await trades())[1].status, "ACCEPTED");
+    const holders = Object.fromEntries((await dbAll(points, "SELECT id, user_id FROM pokemon_owned")).map((row) => [row.id, row.user_id]));
+    assert.equal(holders[shiny], "u2", "le shiny désigné a changé de main");
+    assert.equal(holders[plain], "u1", "le moins précieux reste chez lui");
+    assert.deepEqual([await balanceOf("u1"), await balanceOf("u2")], [1800, 200]);
+  });
+
+  it("si l'individu redemandé n'est plus disponible : refusé à l'envoi, ou à l'acceptation sans rien déplacer", async () => {
+    const { shiny, draft } = await shinyCounter();
+    await dbRun(points, "UPDATE pokemon_owned SET locked = 1 WHERE id = ?", [shiny]);
+    const refused = await press(`poke_td_go|${draft.id}`, { user: "u2", channel: salon() });
+    assert.match(last(refused.calls, "update").content, /est verrouillé chez <@u1>/);
+    assert.deepEqual(await statuses(), ["PENDING"], "l'offre d'origine reste ouverte");
+
+    await dbRun(points, "UPDATE pokemon_owned SET locked = 0 WHERE id = ?", [shiny]);
+    await press(`poke_td_go|${draft.id}`, { user: "u2", channel: salon() });
+    const fresh = (await trades())[1];
+    await dbRun(points, "UPDATE pokemon_owned SET user_id = 'u3' WHERE id = ?", [shiny]);
+    const before = await dbAll(points, "SELECT id, user_id FROM pokemon_owned ORDER BY id");
+    await press(`poke_trade_accept|${fresh.id}`, { user: "u1", channel: salon() });
+    assert.equal((await trades())[1].status, "FAILED");
+    assert.deepEqual(await dbAll(points, "SELECT id, user_id FROM pokemon_owned ORDER BY id"), before);
+    assert.deepEqual([await balanceOf("u1"), await balanceOf("u2")], [1000, 1000], "aucun point n'a bougé");
+  });
+
+  it("deux clics simultanés sur « Proposer » : une contre-offre, un message public, et aucun faux « elle n'est pas partie »", async () => {
+    await setBalance(1000, "u1");
+    await setBalance(1000, "u2");
+    const original = await propose({ points: 100 }, { points: 300 });
+    const draft = await openCounter(original.id);
+    const channel = salon();
+    const [first, second] = await Promise.all([
+      press(`poke_td_go|${draft.id}`, { user: "u2", channel }),
+      press(`poke_td_go|${draft.id}`, { user: "u2", channel }),
+    ]);
+    const texts = [first, second].map((result) => last(result.calls, "update")?.content ?? "");
+    assert.ok(texts.every((text) => text.startsWith("✅")), texts.join(" | "));
+    assert.equal(channel.sent.length, 1, "un seul message public");
+    assert.deepEqual(await statuses(), ["COUNTERED", "PENDING"]);
+    assert.equal((await drafts()).length, 0);
+  });
+
+  it("un brouillon de contre-offre périmé renvoie vers « Contre-offre »", async () => {
+    const { draft } = await shinyCounter();
+    await dbRun(points, "UPDATE pokemon_trade_drafts SET expires_at = 1 WHERE id = ?", [draft.id]);
+    const result = await press(`poke_td_go|${draft.id}`, { user: "u2" });
+    assert.match(last(result.calls, "update").content, /reclique sur « Contre-offre »/);
+  });
+
+  it("une offre conclue entre-temps refuse la contre-offre en privé : rien n'est créé, le brouillon est fermé", async () => {
+    await setBalance(1000, "u1");
+    await setBalance(1000, "u2");
+    for (const [label, end] of [
+      ["déjà acceptée", (id) => call(collection.acceptTrade, id, {})],
+      ["déjà refusée", (id) => call(collection.resolveTradeAs, id, "u2", "DECLINED")],
+      ["déjà annulée", (id) => call(collection.resolveTradeAs, id, "u1", "CANCELLED")],
+    ]) {
+      const original = await propose({ points: 100 }, { points: 300 });
+      const draft = await openCounter(original.id);
+      await end(original.id);
+      const before = (await trades()).length;
+      const channel = salon();
+      const result = await press(`poke_td_go|${draft.id}`, { user: "u2", channel });
+      assert.match(last(result.calls, "update").content, /Cette offre a expiré ou a déjà été traitée/, label);
+      assert.equal((await trades()).length, before, `${label} : aucune offre créée`);
+      assert.equal(channel.sent.length, 0, label);
+      assert.equal((await drafts()).length, 0, `${label} : le brouillon est fermé`);
+      await dbRun(points, "DELETE FROM pokemon_trades");
+    }
+  });
+
+  it("une offre échue mais encore ouverte en base expire à l'envoi, et son message le dit", async () => {
+    await setBalance(1000, "u2");
+    const original = await propose({ points: 0 }, { points: 300 });
+    const draft = await openCounter(original.id);
+    await dbRun(points, "UPDATE pokemon_trades SET expires_at = ? WHERE id = ?", [Date.now() - 1, original.id]);
+    const channel = salon();
+    const result = await press(`poke_td_go|${draft.id}`, { user: "u2", channel });
+    assert.match(last(result.calls, "update").content, /expiré ou a déjà été traitée/);
+    assert.deepEqual(await statuses(), ["EXPIRED"]);
+    assert.match(textOf(channel.edits[0].payload), /Échange expiré/);
+  });
+
+  it("les contrôles passent avant la fermeture : un solde trop bas est refusé avec les chiffres et l'offre reste ouverte", async () => {
+    await setBalance(1000, "u1");
+    await setBalance(50, "u2");
+    const original = await propose({ points: 100 }, { points: 300 });
+    const draft = await openCounter(original.id);
+    const result = await press(`poke_td_go|${draft.id}`, { user: "u2", channel: salon() });
+    assert.match(last(result.calls, "update").content, /Tu n'as que \*\*50\*\* points : il t'en faut \*\*300\*\*/);
+    assert.deepEqual(await statuses(), ["PENDING"]);
+    assert.equal((await drafts()).length, 1, "le brouillon reste, pour corriger");
+  });
+
+  it("un salon où le bot ne peut pas publier : la contre-offre est annulée et l'offre contrée redevient ouverte", async () => {
+    await setBalance(1000, "u1");
+    await setBalance(1000, "u2");
+    const original = await propose({ points: 100 }, { points: 300 });
+    const draft = await openCounter(original.id);
+    const channel = salon();
+    channel.send = async () => {
+      throw new Error("Missing Permissions");
+    };
+    const result = await press(`poke_td_go|${draft.id}`, { user: "u2", channel });
+    assert.match(last(result.calls, "update").content, /Je ne peux pas publier l'offre dans ce salon/);
+    assert.deepEqual(await statuses(), ["PENDING", "CANCELLED"]);
+    assert.equal((await trades())[0].resolved_at, null);
+    assert.equal(channel.edits.length, 0, "l'ancien message n'est pas touché");
+    assert.equal((await drafts()).length, 1);
+  });
+
+  it("une panne à la création laisse l'offre contrée ouverte et ne crée rien", async () => {
+    await setBalance(1000, "u1");
+    await setBalance(1000, "u2");
+    const original = await propose({ points: 100 }, { points: 300 });
+    const draft = await openCounter(original.id);
+    await dbRun(points, "CREATE TRIGGER panne BEFORE INSERT ON pokemon_trades WHEN NEW.counter_of IS NOT NULL BEGIN SELECT RAISE(ABORT, 'panne'); END");
+    let result;
+    try {
+      result = await press(`poke_td_go|${draft.id}`, { user: "u2", channel: salon() });
+    } finally {
+      await dbRun(points, "DROP TRIGGER panne");
+    }
+    assert.match(last(result.calls, "update").content, /Impossible de créer l'échange/);
+    assert.deepEqual(await statuses(), ["PENDING"]);
+  });
+});
+
+describe("« À son choix » depuis le brouillon", () => {
+  const openDraftWith = async (give) => {
+    const { id } = await openDraft();
+    if (give) await dbRun(points, "UPDATE pokemon_trade_drafts SET offer = ? WHERE id = ?", [JSON.stringify(give), id]);
+    return id;
+  };
+
+  it("se propose pour ce qu'on reçoit seulement, et se retient comme tel", async () => {
+    const id = await openDraftWith();
+    const give = componentsOf(last((await press(`poke_td_side|${id}|give`)).calls, "update"))[0].options.map((option) => option.value);
+    assert.deepEqual(give, ["pk", "item", "points", "nothing"], "ce qu'on donne reste concret");
+    const get = componentsOf(last((await press(`poke_td_side|${id}|get`)).calls, "update"))[0].options.map((option) => option.value);
+    assert.ok(get.includes("open"));
+
+    const forced = await choose(`poke_td_kind|${id}|give`, "open");
+    assert.equal(last(forced.calls, "update"), undefined, "un « à son choix » forcé sur ce qu'on donne est ignoré");
+    assert.equal((await drafts())[0].offer, null);
+
+    const chosen = await choose(`poke_td_kind|${id}|get`, "open");
+    assert.match(textOf(last(chosen.calls, "update")), /À son choix/);
+    assert.deepEqual(JSON.parse((await drafts())[0].request), { kind: "open" });
+  });
+
+  it("« Proposer » publie l'offre ouverte : « Faire une proposition » à la place d'« Accepter », phrase « contre ce qu'il voudra »", async () => {
+    await setBalance(900);
+    await setBalance(100, "u2");
+    const id = await openDraftWith({ kind: "points", amount: 400 });
+    await choose(`poke_td_kind|${id}|get`, "open");
+    const channel = fakeChannel({ id: "salon-4" });
+    await press(`poke_td_go|${id}`, { channel });
+
+    const [trade] = await trades();
+    assert.deepEqual([trade.request_open, trade.request_species_id, trade.offer_points, trade.status], [1, 0, 400, "PENDING"]);
+    const message = channel.sent[0];
+    assert.equal(message.content, "<@u2>");
+    assert.deepEqual(componentsOf(message).map((button) => button.label), ["Faire une proposition", "Refuser", "Annuler"]);
+    assert.match(textOf(message), /<@u1> propose \*\*400 points\*\* à <@u2>, contre ce qu'il voudra\./);
+  });
+
+  it("une offre où rien n'est offert n'a pas de sens : refusée à l'envoi, rien créé", async () => {
+    const id = await openDraftWith({ kind: "points", amount: 0 });
+    await choose(`poke_td_kind|${id}|get`, "open");
+    const result = await press(`poke_td_go|${id}`);
+    assert.match(last(result.calls, "update").content, /Rien à échanger : tu n'offres rien/);
+    assert.equal((await trades()).length, 0);
+  });
+
+  it("le destinataire répond par une proposition : ce qu'il donne est à choisir, puis l'auteur accepte et tout change de main", async () => {
+    await setBalance(900, "u1");
+    await setBalance(700, "u2");
+    await ownMany("Roucool", 2, { user: "u2" });
+    const offered = await ownMany("Rattata", 2);
+    const { id } = await openDraft();
+    await dbRun(points, "UPDATE pokemon_trade_drafts SET offer = ?, request = ? WHERE id = ?", [JSON.stringify({ kind: "pk", id: String(species("Rattata").id), individual: `#${offered[1]}` }), JSON.stringify({ kind: "open" }), id]);
+    const channel = fakeChannel({ id: "salon" });
+    channel.messages.edit = async () => {};
+    await press(`poke_td_go|${id}`, { channel });
+    const [open] = await trades();
+    await dbRun(points, "UPDATE pokemon_trades SET message_id = 'orig-msg' WHERE id = ?", [open.id]);
+
+    // L'accepter tel quel est refusé, même par un clic forgé.
+    const forged = await press(`poke_trade_accept|${open.id}`, { user: "u2" });
+    assert.match(last(forged.calls, "reply").content, /propose d'abord ce que tu donnes/);
+
+    const opened = await press(`poke_trade_counter|${open.id}`, { user: "u2", channel });
+    const draft = (await drafts()).find((entry) => entry.counter_of === open.id);
+    assert.equal(draft.offer, null, "ce qu'il donne n'est pas rempli");
+    assert.equal(goButton(last(opened.calls, "reply")).disabled, true, "« Proposer » reste grisé tant qu'il n'a pas choisi");
+    const early = await press(`poke_td_go|${draft.id}`, { user: "u2", channel });
+    assert.match(last(early.calls, "update").content, /Il manque un côté/);
+    assert.deepEqual((await trades()).map((row) => row.status), ["PENDING"]);
+
+    await submit(`poke_td_pts|${draft.id}|give`, { amount: "500" }, { user: "u2" });
+    await press(`poke_td_go|${draft.id}`, { user: "u2", channel });
+    const [, counter] = await trades();
+    assert.deepEqual((await trades()).map((row) => row.status), ["COUNTERED", "PENDING"]);
+    assert.deepEqual([counter.from_user_id, counter.to_user_id, counter.offer_points], ["u2", "u1", 500]);
+    assert.equal(counter.request_species_id, species("Rattata").id);
+
+    // u1 accepte : la contre-offre redemande le Rattata que son offre désignait, sans menu.
+    assert.equal(counter.request_pokemon_id, offered[1]);
+    await press(`poke_trade_accept|${counter.id}`, { user: "u1", channel });
+    assert.equal((await trades())[1].status, "ACCEPTED");
+    assert.deepEqual([await balanceOf("u1"), await balanceOf("u2")], [1400, 200]);
+    assert.equal((await dbAll(points, "SELECT user_id FROM pokemon_owned WHERE id = ?", [offered[1]]))[0].user_id, "u2");
   });
 });

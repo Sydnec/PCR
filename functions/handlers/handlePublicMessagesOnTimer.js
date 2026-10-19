@@ -8,7 +8,7 @@
 // ne les ferait bouger, personne ne cliquant plus dessus.
 import { handleException } from "../../modules/utils.js";
 import { repairSpawnMessages } from "../../modules/pokemon/spawn.js";
-import { expireTrades, repairTradeMessages } from "../../modules/pokemon/trade-message.js";
+import { expireTrades, recoverCounterOffers, repairTradeMessages } from "../../modules/pokemon/trade-message.js";
 import { repairParkMessages } from "../../modules/pokemon/safari.js";
 import { repairDropMessages } from "../../modules/pokemon/drops.js";
 
@@ -31,6 +31,9 @@ export default (bot) => {
     // Chaque étape à part : une panne sur les offres ne doit pas priver les
     // apparitions de leur rattrapage.
     for (const [label, step] of [
+      // Avant tout : une offre rouverte reprend ses boutons, et n'est pas « réparée » en
+      // contre-offre par le passage suivant.
+      ["contre-offres perdues", recoverCounterOffers],
       ["offres échues", expireTrades],
       ["messages d'échange", repairTradeMessages],
       ["messages d'apparition", repairSpawnMessages],

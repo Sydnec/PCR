@@ -873,6 +873,66 @@ describe("les boutons d'échange", () => {
     assert.match(only(calls, "update").content, /Le Pokémon proposé n'est plus disponible/);
     assert.equal(await status(id), "FAILED");
   });
+
+  describe("contre-offre et offre « à son choix »", () => {
+    const draftsOf = (counterOf) => dbAll(points, "SELECT * FROM pokemon_trade_drafts WHERE counter_of = ?", [counterOf]);
+    const propose = (from, to, offer, request) =>
+      call(collection.proposeTrade, { fromUserId: from, toUserId: to, offer, request, channelId: "123" });
+
+    it("« Contre-offre » n'est ouverte qu'au destinataire, et ouvre un brouillon privé aux côtés inversés", async () => {
+      const id = await trade({ from: "c-from", to: "c-to" });
+      for (const user of ["c-from", "intrus"]) {
+        const refused = await click(`poke_trade_counter|${id}`, { user });
+        assert.match(only(refused, "reply").content, /ne t'est pas destiné/, user);
+      }
+      assert.equal((await draftsOf(id)).length, 0, "aucun brouillon pour un autre que le destinataire");
+
+      const calls = await click(`poke_trade_counter|${id}`, { user: "c-to" });
+      const reply = only(calls, "reply");
+      assert.equal(reply.flags, MessageFlags.Ephemeral);
+      assert.match(embedOf(reply).title, /contre-offre/i);
+      const [draft] = await draftsOf(id);
+      assert.deepEqual([draft.from_user_id, draft.to_user_id], ["c-to", "c-from"], "l'auteur de la contre-offre est l'ancien destinataire");
+      assert.deepEqual(JSON.parse(draft.offer), { kind: "pk", id: String(species("Roucool").id), individual: null }, "il donne ce qu'on lui demandait");
+      assert.deepEqual(JSON.parse(draft.request), { kind: "pk", id: String(species("Rattata").id), individual: null }, "il demande ce qu'on lui offrait");
+      assert.equal(await status(id), "PENDING", "rien ne change avant « Proposer »");
+    });
+
+    it("sur une offre déjà traitée ou échue, « Contre-offre » ne crée aucun brouillon", async () => {
+      const done = await trade({ from: "c2-from", to: "c2-to" });
+      await click(`poke_trade_decline|${done}`, { user: "c2-to" });
+      assert.match(only(await click(`poke_trade_counter|${done}`, { user: "c2-to" }), "reply").content, /déjà été traité/);
+
+      const late = await trade({ from: "c3-from", to: "c3-to", expired: true });
+      const update = only(await click(`poke_trade_counter|${late}`, { user: "c3-to" }), "update");
+      assert.equal(embedOf(update).title, "⌛ Échange expiré", "la gestion d'expiration habituelle");
+      assert.equal(await status(late), "EXPIRED");
+      assert.equal((await draftsOf(done)).length + (await draftsOf(late)).length, 0);
+      assert.match(only(await click("poke_trade_counter|99999", { user: "c3-to" }), "reply").content, /Échange introuvable/);
+    });
+
+    it("une offre « à son choix » ne s'accepte pas, même par un clic forgé : refus privé, rien ne bouge, l'offre reste ouverte", async () => {
+      await setBalance(500, "o-from");
+      await setBalance(100, "o-to");
+      const open = await propose("o-from", "o-to", { points: 300 }, { open: true });
+      const calls = await click(`poke_trade_accept|${open.id}`, { user: "o-to" });
+      assert.match(only(calls, "reply").content, /propose d'abord ce que tu donnes/);
+      assert.equal(calls.some((entry) => entry.method === "update"), false, "le message public n'est pas réécrit");
+      assert.equal(await status(open.id), "PENDING");
+      assert.deepEqual([await balance("o-from"), await balance("o-to")], [500, 100]);
+    });
+
+    it("« Faire une proposition » ouvre le brouillon : ce qu'on offrait est demandé, ce qu'on donne est à choisir", async () => {
+      const mine = await own("Rattata", "p2-from");
+      await own("Rattata", "p2-from", { obtained: 2 });
+      const open = await propose("p2-from", "p2-to", collection.selectorOf((await dbAll(points, "SELECT * FROM pokemon_owned WHERE id = ?", [mine]))[0]), { open: true });
+      const calls = await click(`poke_trade_counter|${open.id}`, { user: "p2-to" });
+      only(calls, "reply");
+      const [draft] = await draftsOf(open.id);
+      assert.equal(draft.offer, null, "à lui de choisir ce qu'il donne");
+      assert.deepEqual(JSON.parse(draft.request), { kind: "pk", id: String(species("Rattata").id), individual: `#${mine}` }, "l'individu désigné reste désigné");
+    });
+  });
 });
 
 describe("la comparaison de /pk comparer", () => {
@@ -966,7 +1026,12 @@ describe("la comparaison de /pk comparer", () => {
     const [sent] = channel.sent;
     assert.equal(sent.content, `<@${b}>`);
     assert.deepEqual(sent.allowedMentions, { users: [b] }, "seul le destinataire est mentionné");
-    assert.deepEqual(buttonIds(sent), [`poke_trade_accept|${trade.id}`, `poke_trade_decline|${trade.id}`, `poke_trade_cancel|${trade.id}`]);
+    assert.deepEqual(buttonIds(sent), [
+      `poke_trade_accept|${trade.id}`,
+      `poke_trade_counter|${trade.id}`,
+      `poke_trade_decline|${trade.id}`,
+      `poke_trade_cancel|${trade.id}`,
+    ]);
     const offer = embedOf(sent).description;
     assert.ok(offer.includes(`**#${mine[2]} Rattata ♂ (fertile)**`), "ce qui est donné est désigné par son individu");
     assert.ok(offer.includes("**un Chenipan**") && offer.includes("à son choix"), "ce qui est demandé est une espèce, et le destinataire choisit lequel il donne");

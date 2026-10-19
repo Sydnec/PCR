@@ -362,6 +362,36 @@ describe("le message d'une offre d'échange", () => {
     assert.equal(discord.writes[0].payload.embeds[0].toJSON().title, "❌ Échange refusé");
     assert.equal(await tradeMessage.repairTradeMessages(discord.client), 0);
   });
+
+  it("une offre contrée se réécrit « Contre-offre de » son destinataire, sans aucun bouton, et la fin est retenue", async () => {
+    const id = await offer();
+    await call(economy.addPoints, "u2", 1000);
+    const countered = await new Promise((resolve) =>
+      collection.counterTrade({ tradeId: id, fromUserId: "u2", offer: { points: 10 }, request: { points: 500 }, channelId: "123" }, (err, trade) => resolve(err ? null : trade))
+    );
+    assert.ok(countered, "la contre-offre est créée");
+    const discord = fakeDiscord();
+    assert.equal(await tradeMessage.syncTradeMessage(discord.client, id), "edited");
+    const [write] = discord.writes;
+    assert.equal(write.id, "t1");
+    assert.equal(write.payload.embeds[0].toJSON().title, "↩️ Contre-offre");
+    assert.match(write.payload.embeds[0].toJSON().description, /Contre-offre de <@u2>/);
+    assert.deepEqual(write.payload.components, [], "plus aucun bouton");
+    assert.notEqual((await tradeRow(id)).message_closed_at, null);
+    assert.equal((await tradeRow(countered.id)).status, "PENDING", "la contre-offre, elle, reste ouverte");
+  });
+
+  it("le minuteur d'expiration ne touche pas une offre contrée, et le rattrapage lui donne sa fin", async () => {
+    const id = await offer({ expiredAgo: MINUTE });
+    await dbRun(points, "UPDATE pokemon_trades SET status = 'COUNTERED', resolved_at = ? WHERE id = ?", [Date.now() - 5 * MINUTE, id]);
+    const discord = fakeDiscord();
+    assert.equal(await tradeMessage.expireTrades(discord.client), 0);
+    assert.equal((await tradeRow(id)).status, "COUNTERED");
+    assert.equal(discord.writes.length, 0);
+    assert.equal(await tradeMessage.repairTradeMessages(discord.client), 1);
+    assert.equal(discord.writes[0].payload.embeds[0].toJSON().title, "↩️ Contre-offre");
+    assert.equal(await tradeMessage.repairTradeMessages(discord.client), 0);
+  });
 });
 
 describe("le message d'un parc safari", () => {

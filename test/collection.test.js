@@ -1259,3 +1259,200 @@ describe("l'offre la plus ancienne de ses semblables (isOldestOpenOffer)", () =>
     assert.equal(await oldest(shiny), true, "ni une autre variante");
   });
 });
+
+describe("contre-offres et offres « à son choix » (counterTrade)", () => {
+  const setBalance = (user, balance) =>
+    dbRun(points, "INSERT INTO points (user_id, balance) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET balance = ?", [user, balance, balance]);
+  const balance = async (user) => (await dbGet(points, "SELECT balance FROM points WHERE user_id = ?", [user]))?.balance ?? 0;
+  const setItem = (user, key, count) =>
+    dbRun(points, "INSERT INTO pokemon_inventory (user_id, item_key, count) VALUES (?, ?, ?) ON CONFLICT(user_id, item_key) DO UPDATE SET count = ?", [user, key, count, count]);
+  const itemCount = async (user, key) => (await dbGet(points, "SELECT count FROM pokemon_inventory WHERE user_id = ? AND item_key = ?", [user, key]))?.count ?? 0;
+  const rows = () => dbAll(points, "SELECT * FROM pokemon_trades ORDER BY id");
+  const row = (id) => dbGet(points, "SELECT * FROM pokemon_trades WHERE id = ?", [id]);
+  const propose = (offer, request, { from = "u1", to = "u2", ...rest } = {}) =>
+    call(collection.proposeTrade, { fromUserId: from, toUserId: to, offer, request, channelId: "salon", ...rest });
+  // counterTrade rend (err, trade, meta) : on garde les trois, sans l'aplatissement de `call`.
+  const counter = (tradeId, fromUserId, offer, request) =>
+    new Promise((resolve) => collection.counterTrade({ tradeId, fromUserId, offer, request, channelId: "salon" }, (err, trade, meta) => resolve({ err, trade, meta })));
+
+  beforeEach(async () => {
+    await dbRun(points, "DROP TRIGGER IF EXISTS panne");
+  });
+
+  it("la contre-offre ferme l'originale (COUNTERED) et crée l'offre dans l'autre sens, avec une échéance neuve", async () => {
+    await setBalance("u1", 1000);
+    await setBalance("u2", 800);
+    const original = await propose({ points: 400 }, { points: 300 });
+    await dbRun(points, "UPDATE pokemon_trades SET expires_at = ? WHERE id = ?", [Date.now() + 1000, original.id]);
+
+    const { err, trade, meta } = await counter(original.id, "u2", { points: 350 }, { points: 500 });
+    assert.equal(err, null);
+    assert.equal(meta, undefined);
+    assert.equal(trade.status, "PENDING");
+    assert.deepEqual([trade.from_user_id, trade.to_user_id], ["u2", "u1"], "dans l'autre sens");
+    assert.deepEqual([trade.offer_points, trade.request_points], [350, 500]);
+    assert.equal(trade.counter_of, original.id);
+    assert.equal(trade.expires_at - trade.created_at, getPokemonConfig().trade.expiryHours * 3600 * 1000, "échéance neuve");
+    assert.equal(trade.channel_id, "salon");
+
+    const closed = await row(original.id);
+    assert.equal(closed.status, "COUNTERED");
+    assert.notEqual(closed.resolved_at, null);
+    assert.equal(closed.counter_of, null, "l'originale n'est la contre-offre de personne");
+    assert.deepEqual([await balance("u1"), await balance("u2")], [1000, 800], "rien ne bouge avant l'acceptation");
+  });
+
+  it("les contre-offres s'enchaînent, et la dernière s'accepte comme une offre ordinaire", async () => {
+    await setBalance("u1", 1000);
+    await setBalance("u2", 1000);
+    const first = await propose({ points: 100 }, { points: 900 });
+    const second = (await counter(first.id, "u2", { points: 500 }, { points: 300 })).trade;
+    const third = (await counter(second.id, "u1", { points: 400 }, { points: 450 })).trade;
+    assert.equal(third.counter_of, second.id);
+    assert.deepEqual([third.from_user_id, third.to_user_id], ["u1", "u2"]);
+    assert.deepEqual((await rows()).map((entry) => entry.status), ["COUNTERED", "COUNTERED", "PENDING"]);
+
+    const result = await call(collection.acceptTrade, third.id, {});
+    assert.equal(result.ok, true, result.reason);
+    assert.deepEqual([await balance("u1"), await balance("u2")], [1050, 950]);
+  });
+
+  it("une offre qui n'est plus ouverte, échue ou pas à soi se refuse sans rien créer", async () => {
+    await setBalance("u1", 1000);
+    await setBalance("u2", 1000);
+    for (const status of ["ACCEPTED", "DECLINED", "CANCELLED", "EXPIRED", "FAILED", "COUNTERED"]) {
+      const original = await propose({ points: 100 }, { points: 100 });
+      await dbRun(points, "UPDATE pokemon_trades SET status = ? WHERE id = ?", [status, original.id]);
+      const before = (await rows()).length;
+      const result = await counter(original.id, "u2", { points: 50 }, { points: 50 });
+      assert.deepEqual([result.err, result.trade, result.meta], [null, null, { stale: true }], status);
+      assert.equal((await rows()).length, before, `${status} : aucune offre créée`);
+      assert.equal((await row(original.id)).status, status, `${status} : le statut n'a pas bougé`);
+    }
+
+    const overdue = await propose({ points: 100 }, { points: 100 });
+    await dbRun(points, "UPDATE pokemon_trades SET expires_at = ? WHERE id = ?", [Date.now() - 1, overdue.id]);
+    assert.equal((await counter(overdue.id, "u2", { points: 5 }, { points: 5 })).meta.stale, true, "échue, encore PENDING en base");
+    assert.equal((await row(overdue.id)).status, "PENDING");
+
+    const mine = await propose({ points: 100 }, { points: 100 });
+    for (const stranger of ["u1", "u3"]) {
+      assert.equal((await counter(mine.id, stranger, { points: 5 }, { points: 5 })).meta.stale, true, `${stranger} n'est pas le destinataire`);
+    }
+    assert.equal((await row(mine.id)).status, "PENDING");
+    assert.equal((await counter(99999, "u2", { points: 5 }, { points: 5 })).meta.stale, true, "offre inconnue");
+  });
+
+  it("accepter et contrer en même temps : un seul gagne, et l'état reste cohérent", async () => {
+    await setBalance("u1", 1000);
+    await setBalance("u2", 1000);
+    for (let round = 0; round < 8; round++) {
+      await dbRun(points, "DELETE FROM pokemon_trades");
+      await setBalance("u1", 1000);
+      await setBalance("u2", 1000);
+      const original = await propose({ points: 100 }, { points: 200 });
+      const [accepted, countered] = await Promise.all([
+        call(collection.acceptTrade, original.id, {}),
+        counter(original.id, "u2", { points: 10 }, { points: 20 }),
+      ]);
+      const all = await rows();
+      if (accepted.ok) {
+        assert.equal(countered.meta?.stale, true, "la contre-offre arrive trop tard");
+        assert.deepEqual(all.map((entry) => entry.status), ["ACCEPTED"]);
+        assert.deepEqual([await balance("u1"), await balance("u2")], [1100, 900]);
+      } else {
+        assert.equal(accepted.stale, true, "l'acceptation arrive trop tard");
+        assert.ok(countered.trade, "la contre-offre existe");
+        assert.deepEqual(all.map((entry) => entry.status), ["COUNTERED", "PENDING"]);
+        assert.deepEqual([await balance("u1"), await balance("u2")], [1000, 1000], "rien n'a bougé");
+      }
+    }
+  });
+
+  it("dix contre-offres simultanées : une seule offre naît, l'originale n'est contrée qu'une fois", async () => {
+    await setBalance("u2", 1000);
+    const original = await propose({ points: 100 }, { points: 200 });
+    const results = await Promise.all(Array.from({ length: 10 }, (_, index) => counter(original.id, "u2", { points: 10 + index }, { points: 20 })));
+    assert.equal(results.filter((result) => result.trade).length, 1);
+    assert.equal(results.filter((result) => result.meta?.stale).length, 9);
+    assert.deepEqual((await rows()).map((entry) => entry.status), ["COUNTERED", "PENDING"]);
+  });
+
+  it("si la création de la contre-offre échoue, l'originale redevient ouverte à l'identique et rien n'est créé", async () => {
+    await setBalance("u1", 1000);
+    await setBalance("u2", 1000);
+    const original = await propose({ points: 100 }, { points: 200 });
+    const before = await row(original.id);
+    await dbRun(points, "CREATE TRIGGER panne BEFORE INSERT ON pokemon_trades WHEN NEW.counter_of IS NOT NULL BEGIN SELECT RAISE(ABORT, 'panne'); END");
+    const result = await counter(original.id, "u2", { points: 10 }, { points: 20 });
+    await dbRun(points, "DROP TRIGGER panne");
+    assert.match(result.err.message, /panne/);
+    assert.deepEqual(await rows(), [before], "l'originale est intacte, sans seconde ligne");
+
+    const accepted = await call(collection.acceptTrade, original.id, {});
+    assert.equal(accepted.ok, true, "l'offre rouverte s'accepte encore");
+  });
+
+  it("une contre-offre identique à une offre déjà ouverte est refusée comme doublon, et l'originale reste ouverte", async () => {
+    await setBalance("u1", 1000);
+    await setBalance("u2", 1000);
+    const original = await propose({ points: 100 }, { points: 200 });
+    const existing = await propose({ points: 10 }, { points: 20 }, { from: "u2", to: "u1" });
+    const result = await counter(original.id, "u2", { points: 10 }, { points: 20 });
+    assert.deepEqual([result.err, result.trade, result.meta], [null, null, { duplicate: true }]);
+    assert.deepEqual((await rows()).filter((entry) => entry.status === "PENDING").map((entry) => entry.id), [original.id, existing.id], "la copie est retirée, l'originale reste ouverte");
+  });
+
+  it("expireTrade ne touche pas une offre contrée, même échue", async () => {
+    const original = await propose({ points: 0 }, { points: 0 });
+    await dbRun(points, "UPDATE pokemon_trades SET status = 'COUNTERED', expires_at = ? WHERE id = ?", [Date.now() - 1, original.id]);
+    assert.equal(await call(collection.expireTrade, original.id), false);
+    assert.equal((await row(original.id)).status, "COUNTERED");
+  });
+
+  it("une offre « à son choix » s'enregistre ouverte, et seul le côté demandé peut l'être", async () => {
+    await setBalance("u1", 500);
+    const open = await propose({ points: 300 }, { open: true });
+    assert.equal(open.request_open, 1);
+    assert.equal(open.request_species_id, 0);
+    assert.deepEqual([open.request_points, open.request_item], [null, null]);
+    assert.equal((await propose({ points: 300 }, { points: 0 })).request_open, 0);
+    await assert.rejects(() => propose({ open: true }, { points: 10 }), /Seul le côté demandé peut rester ouvert/);
+    assert.equal((await rows()).length, 2, "l'offre refusée n'a rien créé");
+  });
+
+  it("acceptTrade refuse une offre « à son choix », même forcée : rien ne bouge et l'offre reste ouverte", async () => {
+    await setBalance("u1", 500);
+    await setBalance("u2", 100);
+    const open = await propose({ points: 300 }, { open: true });
+    const result = await call(collection.acceptTrade, open.id, {});
+    assert.deepEqual([result.ok, result.open, result.stale], [false, true, undefined]);
+    assert.match(result.reason, /propose d'abord ce que tu donnes/);
+    assert.equal((await row(open.id)).status, "PENDING");
+    assert.deepEqual([await balance("u1"), await balance("u2")], [500, 100]);
+
+    await call(collection.resolveTradeAs, open.id, "u2", "DECLINED");
+    const closed = await call(collection.acceptTrade, open.id, {});
+    assert.equal(closed.stale, true, "une offre ouverte déjà conclue reste « déjà traitée »");
+  });
+
+  it("contrer une offre « à son choix » avec un Pokémon et un objet, puis l'accepter : tout change de main", async () => {
+    const offered = await give("Rattata", { obtained: 1 });
+    await give("Rattata", { obtained: 2 });
+    await give("Roucool", { user: "u2", obtained: 1 });
+    await give("Roucool", { user: "u2", obtained: 2 });
+    await setItem("u2", "super_bonbon", 3);
+    const open = await propose(collection.selectorOf((await owned("u1")).find((entry) => entry.id === offered)), { open: true });
+
+    const sent = await counter(open.id, "u2", { item: "super_bonbon", quantity: 2 }, { speciesId: species("Rattata").id });
+    assert.equal(sent.err, null);
+    assert.equal(sent.trade.counter_of, open.id);
+    assert.equal(sent.trade.request_open, 0);
+    assert.equal((await row(open.id)).status, "COUNTERED");
+
+    const result = await call(collection.acceptTrade, sent.trade.id, { requestPokemonId: offered });
+    assert.equal(result.ok, true, result.reason);
+    assert.deepEqual([await itemCount("u2", "super_bonbon"), await itemCount("u1", "super_bonbon")], [1, 2]);
+    assert.ok((await owned("u2")).some((entry) => entry.id === offered), "le Rattata offert est chez u2");
+  });
+});

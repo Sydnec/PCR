@@ -541,6 +541,37 @@ describe("l'embed d'une offre d'échange (buildTradeEmbed)", () => {
     assert.equal(embeds.tradeNeedsChoice({ ...base, request_item: "super_bonbon", request_item_qty: 1 }), false);
   });
 
+  it("une offre « à son choix » le dit, sans titre ni sentence d'un échange ordinaire", () => {
+    const open = { ...base, offer_points: 300, request_open: 1 };
+    assert.equal(text(open), "<@u1> propose **300 points** à <@u2>, contre ce qu'il voudra.");
+    assert.equal(embeds.tradeNeedsChoice(open), false, "rien à choisir en acceptant : on ne l'accepte pas");
+  });
+
+  it("une offre contrée se lit « Contre-offre de » son destinataire, et une contre-offre dit laquelle elle remplace", () => {
+    const trade = { ...base, offer_points: 100, request_points: 200 };
+    const embed = embeds.buildTradeEmbed(trade, "COUNTERED").toJSON();
+    assert.equal(embed.title, "↩️ Contre-offre");
+    assert.match(embed.description, /↩️ Contre-offre de <@u2>\.$/);
+    assert.doesNotMatch(embed.title, /<@|<:/, "ni mention ni emoji du serveur dans un titre");
+    assert.equal(embeds.buildTradeEmbed(trade).toJSON().footer.text, "Seul le destinataire peut répondre.");
+    assert.match(embeds.buildTradeEmbed({ ...trade, counter_of: 12 }).toJSON().footer.text, /^Contre-offre à l'échange #12\. /);
+  });
+
+  it("les boutons d'une offre : « Contre-offre » à côté d'« Accepter », et « Faire une proposition » à sa place pour une offre ouverte", () => {
+    const buttons = (options) => embeds.buildTradeRow(7, options).toJSON().components.map((button) => [button.label, button.custom_id, Boolean(button.disabled)]);
+    assert.deepEqual(buttons(), [
+      ["Accepter", "poke_trade_accept|7", false],
+      ["Contre-offre", "poke_trade_counter|7", false],
+      ["Refuser", "poke_trade_decline|7", false],
+      ["Annuler", "poke_trade_cancel|7", false],
+    ]);
+    assert.deepEqual(buttons({ open: true, disabled: true }), [
+      ["Faire une proposition", "poke_trade_counter|7", true],
+      ["Refuser", "poke_trade_decline|7", true],
+      ["Annuler", "poke_trade_cancel|7", true],
+    ]);
+  });
+
   it("le menu de choix porte l'offre et plafonne le libellé", () => {
     const row = embeds.buildTradePicker(5, [{ name: "x".repeat(150), value: "#9" }], species("Roucool")).toJSON();
     const menu = row.components[0];

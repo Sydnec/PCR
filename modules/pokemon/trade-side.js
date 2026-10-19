@@ -25,6 +25,8 @@ const promisify = (fn, ...args) =>
 // c'est ce qui évite une option de plus pour le montant.
 export const speciesValue = (id) => `pk:${id}`;
 export const pointsValue = (amount) => `pts:${amount}`;
+// « À son choix » : le côté demandé laissé ouvert, au destinataire de dire ce qu'il donne.
+export const OPEN_VALUE = "open";
 export const itemValue = (key, quantity = null) =>
   quantity === null ? `item:${key}` : `item:${key}:${quantity}`;
 
@@ -36,6 +38,7 @@ export function parseChoice(value) {
     return Number.isSafeInteger(points) ? { kind: "points", amount: points } : null;
   }
   if (/^rien$/i.test(text)) return { kind: "points", amount: 0 };
+  if (text === OPEN_VALUE) return { kind: "open" };
   const species = text.match(/^pk:(\d+)$/);
   if (species) return { kind: "pk", id: species[1] };
   const item = text.match(/^item:([^:]+)(?::(\d+))?$/);
@@ -108,6 +111,13 @@ export function itemChoices(userId, needle, quantity = null) {
 // vieillir depuis le menu.
 export async function checkSide(choice, individual, owner, own, receiver = null) {
   const who = own ? "Tu" : `<@${owner}>`;
+  // « À son choix » ne se dit que de ce qu'on demande : on ne promet pas « ce que je
+  // voudrai » en retour, l'offre doit être concrète.
+  if (choice.kind === "open") {
+    return own
+      ? { error: "« À son choix » ne vaut que pour ce que tu demandes : dis ce que tu donnes." }
+      : { side: { open: true } };
+  }
   if (choice.kind === "points") {
     const amount = choice.amount;
     const balance = await promisify(getBalance, owner);
@@ -160,21 +170,26 @@ export async function checkSide(choice, individual, owner, own, receiver = null)
   // libre.
   const { species: found, error } = resolveSpecies(choice.id);
   if (error) return { error };
-  if (own && individual) {
+  // Un individu désigné se contrôle des deux côtés : celui qu'on donne, et celui qu'une
+  // contre-offre redemande tel que l'offre d'origine le désignait (il a pu partir).
+  if (individual) {
     const selector = await promisify(resolveIndividual, owner, choice.id, individual);
     if (selector.error) return { error: selector.error };
     if (selector.row.locked) {
       return {
-        error:
-          `**${describeGroup(found, selector)}** est verrouillé 🛡️ : déverrouille-le avec ` +
-          `/pk verrou pour l'échanger.`,
+        error: own
+          ? `**${describeGroup(found, selector)}** est verrouillé 🛡️ : déverrouille-le avec ` +
+            `/pk verrou pour l'échanger.`
+          : `**${describeGroup(found, selector)}** est verrouillé chez <@${owner}> : il ne peut pas l'échanger.`,
       };
     }
     if (selector.row.last) {
       return {
-        error:
-          `**${describeGroup(found, selector)}** est ton dernier ${found.name} : il reste ` +
-          `toujours au moins un Pokémon de chaque espèce.`,
+        error: own
+          ? `**${describeGroup(found, selector)}** est ton dernier ${found.name} : il reste ` +
+            `toujours au moins un Pokémon de chaque espèce.`
+          : `**${describeGroup(found, selector)}** est le dernier ${found.name} de <@${owner}> : il ` +
+            `reste toujours au moins un Pokémon de chaque espèce.`,
       };
     }
     return { side: selector };
@@ -188,4 +203,34 @@ export async function checkSide(choice, individual, owner, own, receiver = null)
     };
   }
   return { side: own ? selectorOf(candidate) : { speciesId: found.id } };
+}
+
+// Ce qui rend une offre sans objet, une fois ses deux côtés validés : deux côtés à zéro
+// point, ou un cadeau « à son choix » (rien offert, rien demandé de précis). null si elle tient.
+export function emptyTradeProblem(offer, request) {
+  if (offer.points === 0 && request.open) {
+    return "Rien à échanger : tu n'offres rien, et « à son choix » ne demande rien de précis.";
+  }
+  if (offer.points === 0 && request.points === 0) {
+    return "Rien à échanger : les deux côtés sont à 0 point.";
+  }
+  return null;
+}
+
+// Un côté d'une offre en base, redit comme un choix de brouillon : c'est ce qui préremplit
+// une contre-offre. Un individu désigné le reste ; un côté ouvert reste ouvert.
+export function choiceOfTradeSide(trade, prefix) {
+  if (prefix === "request" && trade.request_open) return { kind: "open" };
+  const points = trade[`${prefix}_points`];
+  if (points !== null && points !== undefined) return { kind: "points", amount: points };
+  const item = trade[`${prefix}_item`];
+  if (item) return { kind: "item", id: item, quantity: trade[`${prefix}_item_qty`] };
+  const pokemonId = trade[`${prefix}_pokemon_id`];
+  return {
+    kind: "pk",
+    id: String(trade[`${prefix}_species_id`]),
+    // L'individu désigné reste désigné, des deux côtés : une contre-offre qui redemande
+    // le Pokémon offert redemande celui-là, pas un autre de l'espèce.
+    individual: pokemonId ? `#${pokemonId}` : null,
+  };
 }
