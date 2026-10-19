@@ -57,7 +57,7 @@ const quiet = async (work) => {
 };
 
 beforeEach(async () => {
-  for (const table of ["pokemon_generations", "pokemon_eggs", "pokemon_owned", "pokemon_safari_parks", "pokemon_safari_sessions", "pokemon_spawns", "points", "pokemon_redistribution"]) {
+  for (const table of ["pokemon_generations", "pokemon_season_recaps", "pokemon_eggs", "pokemon_owned", "pokemon_safari_parks", "pokemon_safari_sessions", "pokemon_spawns", "points", "pokemon_redistribution"]) {
     await dbRun(points, `DELETE FROM ${table}`).catch(() => {});
   }
   sandbox.writeConfig(GEN1);
@@ -126,6 +126,47 @@ describe("l'ouverture d'une génération (minuteur d'une minute)", () => {
     await healthy.handleGenerationOpeningOnTimer();
     assert.equal(announcements(healthy).length, 0);
     assert.equal((await dbAll(points, "SELECT generation FROM pokemon_generations")).length, 1);
+  });
+
+  describe("le bilan de la saison qui se ferme", () => {
+    const recaps = (bot) => bot.sent.filter((payload) => payload.content?.includes("Bilan de la saison"));
+    const seedSeason = () =>
+      dbRun(points, "INSERT INTO pokemon_spawns (species_id, catch_rate, rarity, status, spawned_at) VALUES (?, 45, 'COMMUN', 'FLED', ?)", [species("Roucool").id, Date.now() - 3_600_000]);
+
+    it("part derrière l'annonce de l'ouverture, une seule fois, sans réveiller personne", async () => {
+      sandbox.writeConfig({ pokemon: { generationOpenings: { 2: new Date(Date.now() - 60_000).toISOString() } } });
+      await seedSeason();
+      const bot = await loadBot();
+      await bot.handleGenerationOpeningOnTimer();
+      await bot.handleGenerationOpeningOnTimer();
+      await bot.handleGenerationOpeningOnTimer();
+      assert.equal(bot.sent.length, 2, "l'annonce et le bilan, rien de plus");
+      assert.match(bot.sent[0].embeds[0].toJSON().title, /génération est ouverte/);
+      assert.match(bot.sent[1].content, /Bilan de la saison 1/);
+      assert.deepEqual(bot.sent[1].allowedMentions, { parse: [] });
+      assert.equal(bot.sent[1].content.includes("role-pokemon"), false);
+    });
+
+    it("rien tant que la génération 2 est fermée", async () => {
+      await seedSeason();
+      const bot = await loadBot();
+      await bot.handleGenerationOpeningOnTimer();
+      assert.deepEqual(bot.sent, []);
+      assert.deepEqual(await dbAll(points, "SELECT * FROM pokemon_season_recaps"), []);
+    });
+
+    it("un salon qui refuse n'arrête pas le minuteur : l'annonce est revendiquée, le bilan sera retenté", async () => {
+      sandbox.writeConfig({ pokemon: { generationOpenings: { 2: new Date(Date.now() - 1000).toISOString() } } });
+      await seedSeason();
+      const broken = await loadBot({ sendFails: true });
+      await quiet(() => broken.handleGenerationOpeningOnTimer());
+      assert.equal((await dbAll(points, "SELECT generation FROM pokemon_generations")).length, 1);
+      const [row] = await dbAll(points, "SELECT posted_at, attempts FROM pokemon_season_recaps");
+      assert.deepEqual([row.posted_at, row.attempts], [null, 1]);
+      const healthy = await loadBot();
+      await healthy.handleGenerationOpeningOnTimer();
+      assert.equal(recaps(healthy).length, 0, "pas avant l'attente : le journal ne se remplit pas chaque minute");
+    });
   });
 
   it("le jeu désactivé n'annonce rien", async () => {

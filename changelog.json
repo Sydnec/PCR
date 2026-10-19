@@ -2522,6 +2522,16 @@
       "commit": "pending",
       "timestamp": "2026-10-19T08:46:28.000Z",
       "branch": "dev/keen-knuth-lcd8tu"
+    },
+    {
+      "type": "feature",
+      "name": "Bilan de saison",
+      "description": "À chaque ouverture de génération, le salon des apparitions reçoit le bilan de la saison qui se ferme : apparitions, captures, records et podiums des dresseurs.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-19T14:34:19.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
     }
   ]
 }

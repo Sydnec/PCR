@@ -119,8 +119,10 @@ export const isDitto = (species) => species?.slug === "ditto";
 // Les espèces jouables, dans l'ordre du Pokédex. C'est la porte de tout ce qui
 // énumère — apparitions, recherche, Pokédex, tables de poids — donc aucune
 // espèce d'une génération fermée ne peut s'y glisser.
-export function allSpecies() {
-  const generation = activeGeneration();
+//
+// `generation` : le Pokédex tel qu'il était à cette génération. Le bilan d'une saison
+// close lit celui de SA génération, alors que la suivante est déjà ouverte.
+export function allSpecies(generation = activeGeneration()) {
   return dataset.species.filter((species) => isAvailable(species, generation));
 }
 export const dexSize = () => allSpecies().length;
@@ -320,15 +322,18 @@ export function spawnWeight(
 // Le facteur de rareté des espèces pêchables (`fishing.wildRarityFactor`), ou 1 tant que
 // la pêche est fermée : elle s'ouvre avec sa génération, et rien ne change avant. Lu une
 // fois par tirage et passé à spawnWeight, plutôt que relu pour chacune des 251 espèces.
-export function fishingRarity() {
+// `generation` : la pêche telle qu'elle était à cette génération (le bilan d'une saison
+// close ne compte pas la rareté d'une pêche qui n'existait pas encore).
+export function fishingRarity(generation = activeGeneration()) {
   const config = getPokemonConfig().fishing ?? {};
   const factor = Number(config.wildRarityFactor);
-  const open = fishingOpen();
+  const open = fishingOpen(generation);
   return { factor: open && Number.isFinite(factor) && factor > 0 ? factor : 1 };
 }
 
 // La pêche est-elle ouverte : sa génération l'est.
-export const fishingOpen = () => activeGeneration() >= Number(getPokemonConfig().fishing?.generation);
+export const fishingOpen = (generation = activeGeneration()) =>
+  generation >= Number(getPokemonConfig().fishing?.generation);
 
 // La table d'une canne (`old`, `good`, `super`) : les espèces ouvertes et leur poids.
 export function fishingPool(poolKey) {

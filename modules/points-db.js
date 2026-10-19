@@ -185,7 +185,8 @@ const db = new sqlite3.Database(dbPath, (err) => {
         form TEXT,
         fished INTEGER NOT NULL DEFAULT 0,
         reserved_for TEXT,
-        message_closed_at INTEGER
+        message_closed_at INTEGER,
+        cast_cost INTEGER
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_spawns :", err);
@@ -193,6 +194,9 @@ const db = new sqlite3.Database(dbPath, (err) => {
         addMessageClosedAt("pokemon_spawns", ["CAUGHT", "FLED"]);
         // Le Pokémon vient d'une pêche : l'Appât Ball vaut alors son bonus.
         addColumn("pokemon_spawns", "fished", "INTEGER NOT NULL DEFAULT 0");
+        // Ce que la canne a coûté pour que la touche morde (le bilan de saison compte les
+        // points dépensés à la pêche). NULL pour une pêche d'avant ce suivi, ou une apparition.
+        addColumn("pokemon_spawns", "cast_cost", "INTEGER");
         // Une pêche est une apparition réservée au pêcheur, hors du salon : son statut
         // est FISHING tant qu'elle est ouverte (jamais ACTIVE : l'index ci-dessous ne
         // permet qu'une apparition du salon à la fois), et un dresseur n'en a qu'une.
@@ -607,6 +611,29 @@ const db = new sqlite3.Database(dbPath, (err) => {
       }
     );
 
+    // Un tirage par ligne. Les compteurs de pokemon_lottery sont cumulés depuis toujours et ne
+    // disent pas QUAND on a joué : le bilan d'une saison, lui, a besoin des tirages de sa
+    // fenêtre. Écrit au moment où le tirage du jour est revendiqué, marqué gagnant quand le lot
+    // est crédité, supprimé si le tirage est rendu (releaseDraw) : il raconte la même chose que
+    // `draws` et `wins`, daté.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_lottery_draws (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        won INTEGER NOT NULL DEFAULT 0,
+        drawn_at INTEGER NOT NULL
+      )`,
+      (err) => {
+        if (err) return handleException("Erreur création table pokemon_lottery_draws :", err);
+        db.run(
+          "CREATE INDEX IF NOT EXISTS idx_pokemon_lottery_draws_time ON pokemon_lottery_draws(drawn_at)",
+          (err) => {
+            if (err) handleException("Erreur création index pokemon_lottery_draws_time :", err);
+          }
+        );
+      }
+    );
+
     // ================== PARC SAFARI ==================
 
     // Un parc est l'événement public : le message à bouton, sa fenêtre
@@ -813,6 +840,54 @@ const db = new sqlite3.Database(dbPath, (err) => {
             if (err) handleException("Erreur création index pokemon_ball_units :", err);
           }
         );
+      }
+    );
+
+    // Le journal des achats de la boutique : une ligne par achat conclu, au prix réellement payé
+    // (ce qui a été remboursé n'y figure pas). Ne sert qu'au bilan de saison : un achat n'en
+    // dépend jamais, et une écriture ratée est signalée sans le défaire.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_shop_purchases (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        ball TEXT NOT NULL,
+        quantity INTEGER NOT NULL,
+        cost INTEGER NOT NULL,
+        bought_at INTEGER NOT NULL
+      )`,
+      (err) => {
+        if (err) return handleException("Erreur création table pokemon_shop_purchases :", err);
+        db.run(
+          "CREATE INDEX IF NOT EXISTS idx_pokemon_shop_purchases_time ON pokemon_shop_purchases(bought_at)",
+          (err) => {
+            if (err) handleException("Erreur création index pokemon_shop_purchases_time :", err);
+          }
+        );
+      }
+    );
+
+    // Les bilans de saison (modules/pokemon/season.js). Une ligne par saison, créée à la première
+    // tentative : la ligne est la revendication. `claimed_at` est un bail — un UPDATE gardé dont
+    // on inspecte this.changes, qui n'aboutit qu'une fois par tentative, et qui expire pour qu'un
+    // envoi interrompu par un arrêt soit retenté — et `attempts` allonge l'attente après chaque
+    // échec. `posted_at` ferme la saison ; `skipped_at` la ferme aussi, sans envoi (trop
+    // ancienne, ou rien à dire). `payload` garde les statistiques calculées (JSON), pour relire
+    // un bilan sans le recalculer.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_season_recaps (
+        season INTEGER PRIMARY KEY,
+        started_at INTEGER NOT NULL,
+        ended_at INTEGER NOT NULL,
+        claimed_at INTEGER,
+        attempts INTEGER NOT NULL DEFAULT 0,
+        posted_at INTEGER,
+        skipped_at INTEGER,
+        channel_id TEXT,
+        message_id TEXT,
+        payload TEXT
+      )`,
+      (err) => {
+        if (err) handleException("Erreur création table pokemon_season_recaps :", err);
       }
     );
 

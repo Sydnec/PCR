@@ -4,9 +4,8 @@ import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { createSandbox, openDatabases, dbRun, dbAll, dbGet, withRandom, speciesByName } from "./helpers.js";
 
-createSandbox({
-  config: { pokemon: { generationOpenings: { 2: "2000-01-01T00:00:00+01:00" }, spawn: { embedRefreshMs: 1 }, capture: { throwCooldownSeconds: 0 } } },
-});
+const BASE = { pokemon: { generationOpenings: { 2: "2000-01-01T00:00:00+01:00" }, spawn: { embedRefreshMs: 1 }, capture: { throwCooldownSeconds: 0 } } };
+const sandbox = createSandbox({ config: BASE });
 const { points } = await openDatabases();
 const fishing = await import("../modules/pokemon/fishing.js");
 const capture = await import("../modules/pokemon/capture.js");
@@ -66,6 +65,24 @@ describe("lancer la ligne", () => {
     assert.equal(row.channel_id, null, "pas de salon : la touche n'est qu'au pêcheur");
     const fleeMs = getPokemonConfig().fishing.fleeSeconds * 1000;
     assert.ok(Math.abs(row.flees_at - row.spawned_at - fleeMs) < 5);
+  });
+
+  it("la touche garde le prix de la canne réellement payé (lu par le bilan de saison)", async () => {
+    await setBalance(1000);
+    await give("super_canne");
+    sandbox.writeConfig({ pokemon: { ...BASE.pokemon, items: { super_canne: { rod: { price: 250 } } } } });
+    try {
+      const base = await cast("canne");
+      assert.equal(base.ok, true, base.reason);
+      await dbRun(points, "UPDATE pokemon_spawns SET status = 'FLED'");
+      const better = await cast("super_canne");
+      assert.equal(better.ok, true, better.reason);
+    } finally {
+      sandbox.writeConfig(BASE);
+    }
+    const rows = await spawns();
+    assert.deepEqual(rows.map((row) => row.cast_cost), [100, 250]);
+    assert.equal(await balance(), 1000 - 100 - 250, "ce que la touche garde est ce qui a été débité");
   });
 
   it("une touche à la fois : la suivante est refusée, rien n'est débité", async () => {

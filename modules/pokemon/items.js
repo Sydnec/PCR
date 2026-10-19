@@ -135,10 +135,16 @@ export function freeBallCount(inventory, ballKey) {
 export const itemGeneration = (item) =>
   Number(item?.rod ? getPokemonConfig().fishing?.generation : (item?.generation ?? 1));
 
-export const itemOpen = (item) => itemGeneration(item) <= activeGeneration();
+// Les variantes `…In` prennent la génération dont on veut la table : le bilan d'une saison
+// close compare un objet à ceux qui pouvaient tomber CETTE saison-là, pas à ceux que la
+// génération suivante vient d'ouvrir. Des fonctions à part plutôt qu'un paramètre à valeur
+// par défaut : `getItems().filter(itemOpen)` lui passerait l'indice du tableau.
+export const itemOpenIn = (item, generation) => itemGeneration(item) <= generation;
+export const itemOpen = (item) => itemOpenIn(item, activeGeneration());
 
-export const itemDropWeight = (item) =>
-  itemOpen(item) ? Math.max(0, Number(item?.dropWeight) || 0) : 0;
+export const itemDropWeightIn = (item, generation) =>
+  itemOpenIn(item, generation) ? Math.max(0, Number(item?.dropWeight) || 0) : 0;
+export const itemDropWeight = (item) => itemDropWeightIn(item, activeGeneration());
 
 // Le poids d'un objet à la loterie. Il retombe sur `dropWeight` tant que le
 // catalogue n'en dit rien, donc seuls les objets réellement retouchés portent la
@@ -150,11 +156,12 @@ export const itemDropWeight = (item) =>
 // les lots rares plus fréquents, alors qu'un Pokémon sur quinze tient toujours un
 // objet. On dilue donc la loterie avec du poids de balls, et le butin ne bouge
 // pas d'un cheveu.
-export const itemLotteryWeight = (item) => {
-  if (!itemOpen(item)) return 0;
+export const itemLotteryWeightIn = (item, generation) => {
+  if (!itemOpenIn(item, generation)) return 0;
   const weight = Number(item?.lotteryWeight);
-  return Number.isFinite(weight) && weight >= 0 ? weight : itemDropWeight(item);
+  return Number.isFinite(weight) && weight >= 0 ? weight : itemDropWeightIn(item, generation);
 };
+export const itemLotteryWeight = (item) => itemLotteryWeightIn(item, activeGeneration());
 
 // Tirage pondéré, même forme que pickWeightedSpecies : un cumul, un tirage, et
 // le dernier en filet si l'arrondi flottant passe juste au-dessus du total.

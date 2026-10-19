@@ -37,7 +37,7 @@ async function seedSpawn(name = "Roucool", { fished = 0, spawnedAt = 1000 } = {}
 }
 
 beforeEach(async () => {
-  for (const table of ["points", "pokemon_owned", "pokemon_inventory", "pokemon_throws", "pokemon_ball_units", "points_log"]) {
+  for (const table of ["points", "pokemon_owned", "pokemon_inventory", "pokemon_throws", "pokemon_ball_units", "points_log", "pokemon_shop_purchases"]) {
     await dbRun(points, `DELETE FROM ${table}`);
   }
   await seedSpawn();
@@ -114,6 +114,77 @@ describe("la boutique", () => {
       assert.match((await call(shop.buyBalls, "u1", "appat", 1)).reason, /pas en vente/);
     } finally {
       appat.generation = original;
+    }
+  });
+});
+
+describe("le journal des achats (lu par le bilan de saison)", () => {
+  const purchases = () => dbAll(points, "SELECT user_id, ball, quantity, cost, bought_at FROM pokemon_shop_purchases ORDER BY id");
+  const quiet = async (work) => {
+    const original = console.error;
+    const lines = [];
+    console.error = (...args) => lines.push(args.join(" "));
+    try {
+      return { result: await work(), errors: lines };
+    } finally {
+      console.error = original;
+    }
+  };
+
+  it("un achat conclu écrit une ligne : dresseur, ball, quantité, prix payé, date", async () => {
+    await setBalance(2000);
+    const before = Date.now();
+    await call(shop.buyBalls, "u1", "appat", 3);
+    await eventually(async () => {
+      const rows = await purchases();
+      assert.deepEqual(rows.map(({ user_id, ball, quantity, cost }) => ({ user_id, ball, quantity, cost })), [{ user_id: "u1", ball: "appat", quantity: 3, cost: 690 }]);
+      assert.ok(rows[0].bought_at >= before);
+    });
+  });
+
+  it("un refus n'écrit rien : ni solde insuffisant, ni plafond, ni ball hors vente", async () => {
+    await setBalance(100);
+    await call(shop.buyBalls, "u1", "appat", 1);
+    await call(shop.buyBalls, "u1", "poke", 1);
+    await call(shop.buyBalls, "u1", "appat", 0);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.deepEqual(await purchases(), []);
+  });
+
+  it("un achat livré en partie ne garde que ce qui l'a été, au prix payé", async () => {
+    await setBalance(1000);
+    await dbRun(points, "CREATE TRIGGER panne BEFORE INSERT ON pokemon_ball_units WHEN (SELECT COUNT(*) FROM pokemon_ball_units WHERE user_id = NEW.user_id) >= 1 BEGIN SELECT RAISE(ABORT, 'panne'); END");
+    const { result } = await quiet(() => call(shop.buyBalls, "u1", "appat", 3));
+    await dbRun(points, "DROP TRIGGER panne");
+    assert.equal(result.bought, 1);
+    await eventually(async () => assert.deepEqual((await purchases()).map((row) => [row.quantity, row.cost]), [[1, 230]]));
+  });
+
+  it("un achat tout remboursé n'écrit rien", async () => {
+    await setBalance(1000);
+    await dbRun(points, "CREATE TRIGGER panne BEFORE INSERT ON pokemon_ball_units BEGIN SELECT RAISE(ABORT, 'panne'); END");
+    await assert.rejects(() => call(shop.buyBalls, "u1", "appat", 2), /panne/);
+    await dbRun(points, "DROP TRIGGER panne");
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.deepEqual(await purchases(), []);
+  });
+
+  it("une écriture du journal qui échoue est signalée mais ne défait pas l'achat", async () => {
+    await setBalance(1000);
+    await dbRun(points, "CREATE TRIGGER panne BEFORE INSERT ON pokemon_shop_purchases BEGIN SELECT RAISE(ABORT, 'panne'); END");
+    const lines = [];
+    const original = console.error;
+    console.error = (...args) => lines.push(args.join(" "));
+    try {
+      const result = await call(shop.buyBalls, "u1", "appat", 2);
+      assert.deepEqual([result.ok, result.bought, result.cost], [true, 2, 460]);
+      await eventually(async () => assert.ok(lines.some((line) => line.includes("Journal des achats de la boutique") && line.includes("panne"))));
+      assert.equal(await balance(), 1000 - 460, "les points sont partis");
+      assert.equal((await units()).length, 2, "les balls sont là");
+      assert.deepEqual(await purchases(), []);
+    } finally {
+      console.error = original;
+      await dbRun(points, "DROP TRIGGER panne");
     }
   });
 });

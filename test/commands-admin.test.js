@@ -53,7 +53,7 @@ const community = (members) =>
 const roleTarget = (guild, id = "role-default") => ({ role: guild.roles.cache.get(id) ?? { id, name: "?" } });
 
 beforeEach(async () => {
-  for (const table of ["points", "pokemon_inventory", "pokemon_item_log", "pokemon_spawns", "pokemon_safari_parks", "pokemon_owned", "points_log", "pokemon_redistributions"]) {
+  for (const table of ["points", "pokemon_inventory", "pokemon_item_log", "pokemon_spawns", "pokemon_safari_parks", "pokemon_owned", "points_log", "pokemon_redistributions", "pokemon_season_recaps", "pokemon_generations"]) {
     await dbRun(points, `DELETE FROM ${table}`).catch(() => {});
   }
   await dbRun(points, "UPDATE pokemon_state SET spawning = 0, message_count = 0, spawn_paused_until = 0 WHERE id = 1");
@@ -449,6 +449,67 @@ describe("/admin purge", () => {
     const calls = await purge({ lien: link("2", "1000") }, channel);
     assert.match(payloadOf(calls, "editReply").content, /^100 message\(s\) supprimé\(s\) jusqu'au lien indiqué\.\n⚠️ Limite de 100 messages atteinte/);
     assert.equal(channel.deleted.length, 100);
+  });
+});
+
+describe("/admin saison", () => {
+  const seed = (speciesName = "Roucool") =>
+    dbRun(points, "INSERT INTO pokemon_spawns (species_id, catch_rate, rarity, status, spawned_at) VALUES (?, 45, 'COMMUN', 'FLED', ?)", [species(speciesName).id, Date.now() - 3_600_000]);
+  const tables = () => dbAll(points, "SELECT name FROM sqlite_master WHERE type = 'table'");
+  const counts = async () => {
+    const out = {};
+    for (const { name } of await tables()) out[name] = (await dbGet(points, `SELECT COUNT(*) AS n FROM ${name}`)).n;
+    delete out.sqlite_sequence;
+    return out;
+  };
+
+  it("l'aperçu de la saison en cours : éphémère, mis en forme comme le bilan, sans ping", async () => {
+    await seed();
+    const calls = await run("saison");
+    assert.equal(payloadOf(calls, "deferReply").flags, EPHEMERAL);
+    const reply = payloadOf(calls, "editReply");
+    assert.match(reply.content, /^🔎 \*\*Aperçu de la saison 1\*\* — rien n'est publié ni enregistré\.\nDepuis le début, jusqu'à maintenant\.$/);
+    assert.deepEqual(reply.embeds.map((embed) => embed.toJSON().title), ["Les Pokémon"]);
+    assert.match(textOf(reply), /Roucool/);
+    assert.deepEqual(reply.allowedMentions, { parse: [] });
+  });
+
+  it("ne publie rien et n'écrit rien : ni message dans le salon, ni ligne en base", async () => {
+    await seed();
+    const channel = fakeChannel();
+    const before = await counts();
+    await run("saison", { channel }, { channels: { fetch: async () => channel } });
+    assert.deepEqual(channel.sent, []);
+    assert.deepEqual(await counts(), before, "aucune table n'a bougé");
+    assert.equal(before.pokemon_season_recaps, 0);
+  });
+
+  it("sans rien à raconter, il le dit", async () => {
+    const reply = payloadOf(await run("saison"), "editReply");
+    assert.match(reply.content, /Rien à raconter pour l'instant\.$/);
+    assert.deepEqual(reply.embeds, []);
+  });
+
+  it("la saison en cours est celle de la génération ouverte, de son ouverture à maintenant", async () => {
+    const opened = Date.now() - 2 * 86_400_000;
+    sandbox.writeConfig({ pokemon: { generationOpenings: { 2: new Date(opened).toISOString() } } });
+    await seed();
+    const reply = payloadOf(await run("saison"), "editReply");
+    assert.match(reply.content, /Aperçu de la saison 2\*\*/);
+    assert.match(reply.content, /Du <t:\d+:D> à maintenant\./);
+    assert.match(reply.content, new RegExp(`<t:${Math.floor(opened / 1000)}:D>`), "elle commence à l'ouverture de la 2e génération");
+  });
+
+  it("une ouverture que le bot n'a pas encore enregistrée est un refus, pas une saison de 0 à maintenant", async () => {
+    sandbox.writeConfig({ pokemon: { generation: 2, generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } });
+    const reply = payloadOf(await run("saison"), "editReply");
+    assert.match(reply.content, /^❌ L'ouverture de la 2e génération n'est pas encore enregistrée/);
+  });
+
+  it("réservée aux administrateurs, comme le reste de /admin", async () => {
+    const calls = await runCommand(admin, { sub: "saison", admin: false });
+    assert.equal(payloadOf(calls, "reply").content, "❌ Cette commande est réservée aux administrateurs.");
+    assert.ok(!calls.some((entry) => entry.method === "deferReply"));
   });
 });
 

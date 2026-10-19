@@ -57,7 +57,7 @@ safari. Chaque semaine, un pot commun prélève un pourcentage des soldes et le 
 ### 🛡️ Modération & Administration
 
 - `/autodel`, `/edit`, et `/admin` pour tout le reste : points et objets, configuration à chaud,
-  apparitions et parcs à la demande, pot commun, purge, redémarrage. → [Détails](docs/administration.md)
+  apparitions et parcs à la demande, aperçu du bilan de saison, pot commun, purge, redémarrage. → [Détails](docs/administration.md)
 - Les valeurs de base vivent dans le code (`DEFAULTS`), les ajustements à chaud dans `config.json`
   (hors git) ; tout se modifie sans redémarrage. → [Configuration](docs/configuration.md)
 

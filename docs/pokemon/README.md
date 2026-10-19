@@ -172,6 +172,8 @@ les siens — facultatif pour l'évolution, l'échange et la revente. `/pk oeuf 
   d'annonce et mention de rôle.
 - `/admin safarispawn` *(Admin)* : ouvre un parc safari à la demande, pour un événement ou pour offrir
   une visite à un dresseur en particulier.
+- `/admin saison` *(Admin)* : l'aperçu du [bilan de saison](#bilan-de-saison) en cours, de l'ouverture de
+  la génération à maintenant. Réponse privée : rien n'est publié ni enregistré.
 
 ## Réglages
 
@@ -201,7 +203,7 @@ Pour avancer ou repousser l'ouverture, puis pour ouvrir tout de suite :
 À l'ouverture, le salon des apparitions reçoit **une annonce**, rôle Pokémon mentionné : les
 nouvelles espèces, les légendaires, les bébés, les objets et le Charme Chroma. Elle ne part qu'une
 fois (la base en garde la trace), même si le bot redémarre, et un bot éteint à l'heure dite
-l'envoie à son retour.
+l'envoie à son retour. Le [bilan de la saison](#bilan-de-saison) qui se ferme la suit.
 
 Apparitions, parc safari, Pokédex (251 espèces), recherche, fiches, évolutions et échanges la
 prennent en compte immédiatement. Ce qu'elle change :
@@ -231,6 +233,64 @@ prennent en compte immédiatement. Ce qu'elle change :
 
 Refermer une génération (`pokemon.generation 1`, avec une date d'ouverture repoussée) cache ses
 espèces sans les retirer des collections ; elles réapparaissent à la réouverture.
+
+## Bilan de saison
+
+Une **saison** court d'une ouverture de génération à la suivante : la saison 1 va du début du jeu à
+l'ouverture de la 2ᵉ génération, la saison 2 de là à l'ouverture de la 3ᵉ. Quand la génération
+suivante s'ouvre, le salon des apparitions reçoit, juste après l'annonce, le **« Bilan de la saison N »** :
+deux embeds, *Les Pokémon* et *Les dresseurs*. Les podiums citent les dresseurs sans en notifier aucun.
+Une rubrique sans donnée n'est pas affichée, et un classement n'est tenu que sur assez de matière.
+
+- **Les Pokémon** : apparitions (pêche comprise), lancers (dont ceux du safari), points dépensés par
+  source (lancers, évolutions, safari, pêche, boutique — les sources à zéro sont omises), évolutions ;
+  les espèces les plus apparues, **les plus timides** (celles qui pouvaient apparaître, légendaires
+  exclus, le zéro compte), les plus capturées, **les plus boudées** (taux de fuite, à partir de 5
+  apparitions) et les plus vendues ; les shiny et les légendaires capturés, et par qui ; la capture la
+  plus improbable, la série de ratés la plus improbable (« 1 chance sur X »), la plus longue résistance
+  et la ball préférée du serveur.
+- **Les dresseurs** : les **champions** (le plus d'espèces du Pokédex de la saison, légendaires exclus ;
+  chaque espèce est datée de son acquisition — capture, éclosion, starter, échange, évolution —, et le
+  plus rapide l'emporte à égalité), les plus et les moins chanceux à la capture (captures réelles sur
+  captures attendues, au moins 30 lancers : les plus chanceux sont au-dessus de ×1, les moins chanceux
+  en dessous, un podium sans personne est omis), les plus chanceux en objets (somme de la rareté de ce
+  qu'ils ont obtenu sur un Pokémon, au sol ou à la loterie), les moins chanceux à la loterie (au moins
+  5 tirages et un taux de victoires sous celui de la saison : qui n'a jamais perdu n'y est pas), puis
+  les meilleurs nettoyeurs, visiteurs du safari, pêcheurs et échangeurs.
+
+Les statistiques sont celles de la **génération qui se ferme** : le bilan de la saison 1 se calcule
+quand la 2ᵉ est ouverte, mais avec le Pokédex, les apparitions possibles et les objets de la 1ʳᵉ.
+
+Pour les administrateurs :
+
+- Le bilan part **exactement une fois**, même si deux passages du minuteur se croisent ou si le bot
+  redémarre : la table `pokemon_season_recaps` garde une ligne par saison (bornes, heure d'envoi,
+  message, statistiques en JSON). Un envoi qui échoue est retenté, après une attente qui grandit à
+  chaque essai (`retryMinutes` × le nombre d'essais) ; le bail d'un envoi interrompu par un arrêt
+  expire de la même façon. Une rubrique dont la lecture en base échoue est aussi une panne : le bilan
+  n'est ni publié amputé ni classé « rien à raconter », il est retenté de la même façon. Une fois le
+  message parti, l'écriture qui le note est retentée `recordRetries` fois (attente `recordRetryDelayMs`,
+  doublée à chaque essai) ; si elle échoue toujours, le journal le dit (« publié mais non
+  enregistré ») et le bilan sera renvoyé à l'expiration du bail.
+- Une visite au safari compte dans la saison où elle a **commencé** (`started_at`), telle qu'elle est au
+  moment où le bilan est calculé : ses balls et son entrée, y compris les balls lancées après la fin de
+  la saison par une visite encore en cours à l'ouverture de la génération.
+- Une touche de pêche dont l'échéance est passée à la fin de la saison compte comme une fuite (taux de
+  fuite, issue de la plus longue résistance), même si sa ligne n'a pas encore été refermée.
+- La saison 1 de la loterie lit les compteurs cumulés, dont on retire les tirages du journal datés de
+  la fin de la saison ou d'après : un bilan publié en retard ne compte pas la saison suivante.
+- Une saison finie depuis plus de `publishWithinHours` heures n'est plus publiée, ni une saison où il
+  n'y a rien à dire : elle est marquée sautée. Une installation neuve ne publie donc pas de vieilles
+  nouvelles.
+- Les réglages sont dans `pokemon.seasonRecap` : `enabled`, `topSize` (5), `podiumSize` (3),
+  `minThrowsForLuck` (30), `minLotteryDraws` (5), `minSpawnsForFleeRate` (5), `publishWithinHours`
+  (168), `retryMinutes` (10), `recordRetries` (3) et `recordRetryDelayMs` (500). `/admin saison` montre
+  le bilan de la saison en cours avec les réglages du moment, et signale les rubriques qu'il n'a pas pu
+  lire.
+- Trois choses sont suivies **à partir de la sortie de cette fonctionnalité** : les achats de la
+  boutique (`pokemon_shop_purchases`), le coût de chaque pêche (`pokemon_spawns.cast_cost`) et les
+  tirages de la loterie (`pokemon_lottery_draws`, un tirage rendu en est retiré). La saison 1 lit donc
+  les compteurs cumulés de la loterie, qui disent tout son historique ; les suivantes lisent le journal.
 
 ## Données
 

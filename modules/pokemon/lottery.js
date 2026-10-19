@@ -73,17 +73,41 @@ function claimDraw(userId, day, cb) {
   );
 }
 
+// Le journal daté des tirages (pokemon_lottery_draws), dont le bilan de saison lit les
+// victoires par période : les compteurs de pokemon_lottery sont cumulés depuis toujours. Une
+// ligne par tirage revendiqué, écrite au mieux — un journal qui échoue ne prive personne de son
+// tirage — ; rend l'identifiant de la ligne, ou null si elle n'a pas pu être écrite.
+function logDraw(userId, cb) {
+  db.run(
+    "INSERT INTO pokemon_lottery_draws (user_id, won, drawn_at) VALUES (?, 0, ?)",
+    [userId, Date.now()],
+    function (err) {
+      if (err) handleException("Journal des tirages de loterie :", err);
+      cb(err ? null : this.lastID);
+    }
+  );
+}
+
 // Compensation : le tirage revendiqué est rendu. La garde sur la journée en
 // cours évite de rendre celui d'un autre appel, et `draws` repart avec, sinon le
-// compteur raconterait des tirages qui n'ont pas eu lieu.
-function releaseDraw(userId, day, cb) {
+// compteur raconterait des tirages qui n'ont pas eu lieu. Sa ligne du journal part
+// avec lui, pour la même raison — mais seulement si le compteur, lui, a bien reculé :
+// les deux doivent continuer à raconter la même chose.
+function releaseDraw(userId, day, logged, cb) {
   db.run(
     `UPDATE pokemon_lottery SET last_day = ?, draws = MAX(0, draws - 1)
       WHERE user_id = ? AND last_day = ?`,
     [AUCUN_JOUR, userId, day],
-    (err) => {
+    function (err) {
       if (err) handleException("Restitution d'un tirage de loterie :", err);
-      cb();
+      const released = !err && this.changes === 1;
+      logged.then((logId) => {
+        if (!released || logId === null) return cb();
+        db.run("DELETE FROM pokemon_lottery_draws WHERE id = ?", [logId], (err) => {
+          if (err) handleException("Retrait d'un tirage rendu du journal :", err);
+          cb();
+        });
+      });
     }
   );
 }
@@ -148,6 +172,8 @@ export function play(userId, cb) {
       });
     }
 
+    // Écrit en parallèle du tirage : ses suites (gagné, rendu) attendent son identifiant.
+    const logged = new Promise((resolve) => logDraw(userId, resolve));
     const prize = rollLottery();
     if (!prize) {
       pseudo(userId).then((name) => log(`Loterie : ${name} repart les mains vides`));
@@ -157,7 +183,7 @@ export function play(userId, cb) {
     grantItem(userId, prize.item.key, prize.quantity, { source: SOURCE }, (err, granted) => {
       // Le crédit a échoué : le tirage est rendu plutôt que perdu. Le lot, lui,
       // est oublié — il sera retiré au sort, et c'est bien une loterie.
-      if (err) return releaseDraw(userId, day, () => cb(err));
+      if (err) return releaseDraw(userId, day, logged, () => cb(err));
 
       db.run(
         "UPDATE pokemon_lottery SET wins = wins + 1 WHERE user_id = ?",
@@ -166,6 +192,12 @@ export function play(userId, cb) {
           if (err) handleException("Comptage d'un gain de loterie :", err);
         }
       );
+      logged.then((logId) => {
+        if (logId === null) return;
+        db.run("UPDATE pokemon_lottery_draws SET won = 1 WHERE id = ?", [logId], (err) => {
+          if (err) handleException("Marque d'un tirage gagnant dans le journal :", err);
+        });
+      });
       pseudo(userId).then((name) =>
         log(`Loterie : ${name} gagne ${prize.quantity}× ${prize.item.label}`)
       );
