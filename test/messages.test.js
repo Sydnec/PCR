@@ -228,8 +228,9 @@ describe("la réécriture des liens dans un message", () => {
     assert.equal(msg.sent.length, 1);
     const { content } = msg.sent[0];
     assert.ok(content.startsWith("<@u1>"), "sous la mention de son auteur");
-    assert.match(content, / https:\/\/vxtwitter\.com\/sacha\/status\/123456 /, "le lien est réécrit");
-    assert.doesNotMatch(content, /https:\/\/x\.com\//, "l'original du lien ne reste pas");
+    // Les liens du message, comparés en entier : le lien réécrit, et plus l'original.
+    const links = content.split(/\s+/).filter((word) => word.startsWith("http"));
+    assert.deepEqual(links, ["https://vxtwitter.com/sacha/status/123456"]);
     assert.deepEqual(msg.sent[0].allowedMentions, { parse: [] });
   });
 
