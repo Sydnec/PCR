@@ -97,6 +97,20 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
   - Rien ne bouge avant l'acceptation, et tout se revérifie à ce moment : points, objets et
     Pokémon doivent toujours être là, sinon l'offre échoue en disant ce qui manque (« tu en as 1,
     il en faut 2 »), sans rien perdre ni créer.
+  - **Contre-offre** : le destinataire d'une offre en cours peut cliquer sur **« Contre-offre »**.
+    Un brouillon privé s'ouvre avec les côtés inversés (il donne ce qu'on lui demandait, il demande
+    ce qu'on lui offrait), et il change ce qu'il veut des deux côtés avant d'envoyer. L'offre
+    d'origine devient **« ↩️ Contre-offre »**, boutons retirés, et la nouvelle part dans l'autre sens,
+    avec son échéance neuve, en mentionnant l'ancien auteur. Il peut accepter, refuser ou contrer à
+    son tour, sans limite. Si l'offre d'origine a été acceptée, refusée, annulée ou a expiré entre-temps,
+    la contre-offre est refusée et rien n'est créé.
+  - **« 🎁 À son choix »** : pour ce qu'on reçoit (`je_recois`, ou « Ce que je demande » du brouillon),
+    on peut ne rien préciser. L'offre se lit « @A propose X à @B, contre ce qu'il voudra » et ne
+    s'accepte pas telle quelle : à la place d'« Accepter », le destinataire clique sur **« Faire une
+    proposition »**, ce qui ouvre la même contre-offre, avec ce qu'on lui offrait déjà demandé et ce
+    qu'il donne à choisir (Pokémon, objet ou points, avec les mêmes contrôles qu'un échange
+    ordinaire). L'auteur de l'offre accepte, refuse ou contre ensuite. Il faut offrir quelque chose :
+    « à son choix » contre rien n'a pas de sens.
   - Une offre sans réponse à son échéance (`trade.expiryHours`) passe en **« ⌛ Échange expiré »**,
     boutons retirés, d'elle-même (un passage toutes les cinq minutes) ou au premier clic. Deux clics
     simultanés sur « Accepter » n'en concluent qu'un : le second l'apprend en privé, sans toucher

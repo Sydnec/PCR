@@ -260,17 +260,20 @@ describe("ce que le dresseur peut faire du parc", () => {
   });
 
   it("annonce le refus avec les mots mêmes de l'achat, solde et délai", async () => {
+    // Ce que le joueur lit d'un refus : le motif, et pour le délai l'heure de retour (Discord l'affiche
+    // à la place de la phrase). Le reste de l'objet (ok, et ce qu'un chemin y ajoute) ne se lit pas.
+    const said = ({ code, reason, retryAt }) => ({ code, reason, retryAt });
     await setBalance(price() - 1);
     const offer = await call(safari.getEntryOffer, "u1");
     const refused = await call(safari.startPaidSession, "u1", {});
-    assert.deepEqual(offer.refusal, refused);
+    assert.deepEqual(said(offer.refusal), said(refused));
     assert.equal(offer.balance, price() - 1);
 
     await setBalance(price() * 2);
     await call(safari.startPaidSession, "u1", {});
     await dbRun(points, "UPDATE pokemon_safari_sessions SET status = 'FINISHED'");
     const cooling = await call(safari.getEntryOffer, "u1");
-    assert.deepEqual(cooling.refusal, await call(safari.startPaidSession, "u1", {}));
+    assert.deepEqual(said(cooling.refusal), said(await call(safari.startPaidSession, "u1", {})));
     assert.equal(cooling.refusal.code, "COOLDOWN");
   });
 

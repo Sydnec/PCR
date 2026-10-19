@@ -224,9 +224,14 @@ describe("la capture d'une pêche", () => {
     await hook();
     const before = await balance();
     const original = points.run;
-    // Entre le contrôle et l'écriture de la capture, l'échéance tombe.
+    // Entre le contrôle et l'écriture de la capture, l'échéance tombe. La capture ne part
+    // qu'une fois l'échéance écrite : lancées côte à côte, sqlite3 peut les passer dans
+    // l'ordre inverse sous charge, et la touche était prise (le test échouait par moments).
     points.run = function (sql, ...rest) {
-      if (/SET status = 'CAUGHT'/.test(sql)) original.call(this, "UPDATE pokemon_spawns SET flees_at = ? WHERE id = 1", [Date.now() - 1]);
+      if (/SET status = 'CAUGHT'/.test(sql)) {
+        points.run = original;
+        return original.call(this, "UPDATE pokemon_spawns SET flees_at = ? WHERE id = 1", [Date.now() - 1], () => original.call(this, sql, ...rest));
+      }
       return original.call(this, sql, ...rest);
     };
     let outcome;
@@ -238,15 +243,6 @@ describe("la capture d'une pêche", () => {
     assert.equal(outcome.status, "void", "annulé, comme battu à la course");
     assert.equal(await balance(), before, "la ball est remboursée");
     assert.equal((await spawns())[0].status, "FISHING", "elle n'a pas été capturée");
-  });
-
-  it("l'Appât Ball vaut ×3 sur une pêche : la touche porte le drapeau", async () => {
-    await hook();
-    await dbRun(points, "INSERT INTO pokemon_ball_units (user_id, ball, bought_at) VALUES ('u1', 'appat', 1)");
-    await dbRun(points, "UPDATE pokemon_spawns SET catch_rate = 45 WHERE id = 1");
-    const missed = await throwBall("u1", "appat", [0.9999]);
-    const expected = data.catchProbability(45, 3, getPokemonConfig().capture.globalMultiplier);
-    assert.ok(Math.abs(missed.probability - expected) < 1e-9);
   });
 
   it("une pêche n'est jamais « le dernier Pokémon » du salon, ni ne retarde le suivant", async () => {

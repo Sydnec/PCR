@@ -15,6 +15,18 @@ const HOUR = 3_600_000;
 const sum = (list, key) => list.reduce((total, entry) => total + entry[key], 0);
 const balances = (...amounts) => amounts.map((balance, index) => ({ userId: `u${index}`, balance }));
 
+// Générateur à graine (mulberry32) : un échec de la propriété se rejoue à
+// l'identique, ce que Math.random interdirait.
+function seeded(seed) {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let mixed = Math.imul(state ^ (state >>> 15), state | 1);
+    mixed ^= mixed + Math.imul(mixed ^ (mixed >>> 7), mixed | 61);
+    return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 describe("calcul du pot (planRedistribution)", () => {
   it("prélève le pourcentage, arrondi vers le bas, et redistribue en parts égales", () => {
     const plan = redistribution.planRedistribution(balances(1000, 500, 0, 0), 5);
@@ -42,10 +54,17 @@ describe("calcul du pot (planRedistribution)", () => {
   });
 
   it("le reste est tiré au sort : tout le monde peut le recevoir", () => {
+    // Une grille de tirages figés plutôt que 400 tirages au hasard : le résultat ne
+    // dépend plus de la chance, et chacun des quatre doit y recevoir le point du reste.
+    const steps = [0, 0.3, 0.6, 0.9];
     const lucky = new Set();
-    for (let i = 0; i < 400; i++) {
-      const plan = redistribution.planRedistribution(balances(1000, 1000, 1000, 1020), 5);
-      plan.entries.filter((entry) => entry.received > plan.share).forEach((entry) => lucky.add(entry.userId));
+    for (const first of steps) {
+      for (const second of steps) {
+        for (const third of steps) {
+          const plan = withRandom([first, second, third], () => redistribution.planRedistribution(balances(1000, 1000, 1000, 1020), 5));
+          plan.entries.filter((entry) => entry.received > plan.share).forEach((entry) => lucky.add(entry.userId));
+        }
+      }
     }
     assert.equal(lucky.size, 4);
   });
@@ -81,14 +100,18 @@ describe("calcul du pot (planRedistribution)", () => {
   });
 
   it("des soldes tirés au hasard : la conservation tient toujours (propriété)", () => {
+    // Les soldes et le pourcentage viennent d'une graine fixe, et le tirage des
+    // chanceux du reste est figé par withRandom : rien n'échappe au rejeu.
+    const random = seeded(20261018);
     for (let round = 0; round < 300; round++) {
-      const size = 1 + Math.floor(Math.random() * 40);
-      const list = Array.from({ length: size }, (_, index) => ({ userId: `p${index}`, balance: Math.floor(Math.random() * 20000) - 2000 }));
-      const percent = Math.floor(Math.random() * 101);
-      const plan = redistribution.planRedistribution(list, percent);
-      assert.equal(sum(plan.entries, "delta"), 0);
-      assert.equal(sum(plan.entries, "received"), plan.pot);
-      for (const entry of plan.entries) assert.ok(entry.balance <= 0 || entry.balance + entry.delta >= 0);
+      const size = 1 + Math.floor(random() * 40);
+      const list = Array.from({ length: size }, (_, index) => ({ userId: `p${index}`, balance: Math.floor(random() * 20000) - 2000 }));
+      const percent = Math.floor(random() * 101);
+      const draws = Array.from({ length: size }, random);
+      const plan = withRandom(draws, () => redistribution.planRedistribution(list, percent));
+      assert.equal(sum(plan.entries, "delta"), 0, `tour ${round}`);
+      assert.equal(sum(plan.entries, "received"), plan.pot, `tour ${round}`);
+      for (const entry of plan.entries) assert.ok(entry.balance <= 0 || entry.balance + entry.delta >= 0, `tour ${round}`);
     }
   });
 });
@@ -173,9 +196,7 @@ describe("exécution du pot (runRedistribution)", () => {
     const guild = fakeGuild(["a", "b"]);
     const results = await Promise.all([redistribution.runRedistribution(guild, {}), redistribution.runRedistribution(guild, {})]);
     assert.deepEqual(results.map((result) => result.ok).sort(), [false, true]);
-    const refused = results.find((result) => !result.ok);
-    assert.equal(refused.transient, true);
-    assert.match(refused.reason, /déjà en cours/);
+    assert.equal(results.find((result) => !result.ok).transient, true, "le perdant rend l'échéance au minuteur");
     assert.equal((await readBalances()).a, 9500, "un seul prélèvement de 10 % (1 000), dont la moitié lui revient");
   });
 
@@ -193,12 +214,17 @@ describe("exécution du pot (runRedistribution)", () => {
     assert.equal((await redistribution.runRedistribution(fakeGuild(["a", "b"]), {})).ok, true);
   });
 
-  it("un bail tout frais bloque", async () => {
+  // C'est ce refus que reçoit le perdant de la course ci-dessus : passager, pour que
+  // le minuteur rende l'échéance au lieu de sauter le pot de la semaine.
+  it("un bail tout frais bloque : refus passager, rien ne bouge", async () => {
     await setBalances({ a: 10_000, b: 0 });
     await dbRun(points, "UPDATE economy_state SET redistribution_since = ?", [Date.now() - 1000]);
     const result = await redistribution.runRedistribution(fakeGuild(["a", "b"]), {});
     assert.equal(result.ok, false);
     assert.equal(result.transient, true);
+    assert.match(result.reason, /déjà en cours/);
+    assert.deepEqual(await readBalances(), { a: 10_000, b: 0 });
+    assert.deepEqual(await dbAll(points, "SELECT * FROM points_redistributions"), []);
   });
 
   it("refuse un rôle introuvable ou vide, avec la raison", async () => {
@@ -213,7 +239,8 @@ describe("exécution du pot (runRedistribution)", () => {
     const result = await redistribution.runRedistribution(fakeGuild(["a", "b", "c"]), { dryRun: true });
     const embed = redistribution.buildRedistributionEmbed(result).toJSON();
     assert.match(embed.title, /simulation/);
-    assert.ok(JSON.stringify(embed).includes("150"), "le montant du pot");
+    const pot = embed.fields.find((field) => /Cagnotte/.test(field.name));
+    assert.match(pot.value, /\*\*150\*\*/, "le montant du pot");
   });
 });
 

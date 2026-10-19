@@ -222,7 +222,8 @@ describe("l'écran d'évolution (/api/species/:id/evolution)", () => {
     const random = await evolution(species("Évoli").id);
     assert.equal(random.branching, true);
     assert.equal(random.target, null);
-    assert.equal(random.targets.length, 5);
+    assert.ok(random.targets.length >= 2, "plusieurs formes au choix");
+    assert.ok(random.targets.includes(species("Aquali").id), "la cible choisie plus bas fait partie des cibles");
     const chosen = await evolution(species("Évoli").id, { query: { targetId: String(species("Aquali").id) } });
     assert.equal(chosen.target, species("Aquali").id);
     assert.equal(chosen.points, getPokemonConfig().evolution.branchChoicePoints);
@@ -350,7 +351,7 @@ describe("évoluer (/api/me/evolve)", () => {
     const ids = await ownMany("Rattata", 3);
     await setBalance(10);
     const refused = await failure(evolve({ pokemonId: ids[2], speciesId: species("Rattata").id }), 409);
-    assert.match(refused.message, /Solde insuffisant : cette évolution coûte \*\*1500\*\* points/);
+    assert.match(refused.message, new RegExp(`Solde insuffisant : cette évolution coûte \\*\\*${getPokemonConfig().evolution[2].points}\\*\\* points`));
     assert.equal((await dbAll(points, "SELECT id FROM pokemon_owned WHERE user_id = ?", [USER])).length, 3);
   });
 });
@@ -676,16 +677,18 @@ describe("le PC (/api/me/pc)", () => {
   it("rend les boîtes et la place de chacun, en rangeant les nouveaux arrivants", async () => {
     await ownMany("Rattata", 3);
     const pc = await call("GET", "/api/me/pc");
-    assert.equal(pc.slotsPerBox, 30);
-    assert.equal(pc.maxBoxes, 60);
+    assert.equal(pc.slotsPerBox, getPokemonConfig().pc.slotsPerBox);
+    assert.equal(pc.maxBoxes, getPokemonConfig().pc.maxBoxes);
     assert.ok(pc.boxes.length >= 8);
     assert.deepEqual(pc.pokemon.map((entry) => entry.pos).sort(), [0, 1, 2]);
   });
 
   it("déplace un Pokémon, et rend le PC relu", async () => {
     const [id] = await ownMany("Rattata", 1, { pos: 0 });
-    const pc = await pcMove({ pokemonId: id, pos: 31 });
-    assert.equal(pc.pokemon.find((entry) => entry.id === id).pos, 31);
+    // Dans la deuxième boîte : la case est calculée sur la taille d'une boîte, pas recopiée.
+    const target = getPokemonConfig().pc.slotsPerBox + 1;
+    const pc = await pcMove({ pokemonId: id, pos: target });
+    assert.equal(pc.pokemon.find((entry) => entry.id === id).pos, target);
     assert.ok(pc.boxes.length >= 3, "une boîte vide s'ajoute au bout");
   });
 
@@ -795,7 +798,7 @@ describe("la vitrine (/api/me/showcase)", () => {
     await failure(order({ order: "1,2" }), 400);
     await failure(order({ order: [1, "x"] }), 400);
     await failure(order({ order: [0] }), 400);
-    await failure(order({ order: Array.from({ length: 7 }, (_, index) => index + 1) }), 400);
+    await failure(order({ order: Array.from({ length: getPokemonConfig().showcase.slots + 1 }, (_, index) => index + 1) }), 400);
   });
 
   it("la vitrine d'un autre se lit, avec son dresseur", async () => {
@@ -838,16 +841,11 @@ describe("la lignée et les référentiels restants", () => {
     const unown = species("Zarbi");
     await dbRun(points, "INSERT INTO pokemon_owned (user_id, species_id, is_shiny, sex, origin, obtained_at, form) VALUES (?, ?, 0, NULL, 'test', 1, 'b')", [USER, unown.id]);
     const { forms } = await call("GET", "/api/me/lineage/:speciesId", { params: { speciesId: String(unown.id) } });
-    assert.equal(forms.length, 26);
+    assert.equal(forms.length, data.speciesForms(unown).length);
+    assert.ok(forms.length > 1, "plusieurs formes à lire");
     assert.deepEqual(forms.filter((form) => form.owned).map((form) => form.key), ["b"]);
     const plain = await call("GET", "/api/me/lineage/:speciesId", { params: { speciesId: String(species("Rattata").id) } });
     assert.equal(plain.forms, null);
-  });
-
-  it("l'inventaire d'un dresseur porte le prix de revente", async () => {
-    await grant("super_bonbon", 2);
-    const { items: list } = await call("GET", "/api/users/:userId/inventory", { params: { userId: "me" } });
-    assert.equal(list.find((item) => item.key === "super_bonbon").sellValue, 300);
   });
 });
 

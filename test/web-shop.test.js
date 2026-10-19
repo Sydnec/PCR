@@ -9,7 +9,9 @@ createSandbox({ config: { pokemon: { generationOpenings: { 2: "2000-01-01T00:00:
 const { points } = await openDatabases();
 const { routes, HttpError } = await import("../modules/web/api.js");
 const data = await import("../modules/pokemon/data.js");
+const { getBall, getPokemonConfig, specialBallLimit } = await import("../modules/pokemon/config.js");
 
+const fr = (value) => value.toLocaleString("fr-FR");
 const species = (name) => speciesByName(data.allSpecies, name);
 const route = (method, path) => routes.find((entry) => entry.method === method && entry.path === path);
 const call = (method, path, body = {}) =>
@@ -22,30 +24,36 @@ beforeEach(async () => {
 });
 
 describe("la boutique du site", () => {
-  it("les routes demandent une connexion, et l'achat une écriture", () => {
+  // Les routes POST (l'achat, la pêche) sont couvertes par le parcours de web-routes.test.js ;
+  // une lecture ne l'est pas, d'où cette seule déclaration.
+  it("la lecture de la boutique demande une connexion", () => {
     assert.equal(route("GET", "/api/shop").auth, true);
-    assert.equal(route("POST", "/api/shop/buy").auth, true);
-    assert.equal(route("POST", "/api/shop/buy").write, true);
   });
 
   it("le catalogue porte prix, effet, image et ce qu'on en a", async () => {
     await setBalance(900);
     const shop = await call("GET", "/api/shop");
     assert.equal(shop.balance, 900);
-    assert.equal(shop.limit, 10);
-    assert.deepEqual(shop.balls.map((ball) => [ball.key, ball.price, ball.held]), [["appat", 230, 0], ["catalyseur", 300, 0]]);
-    assert.match(shop.balls[0].effect, /×3 sur les Pokémon pêchés/);
+    assert.equal(shop.limit, specialBallLimit());
+    assert.deepEqual(shop.balls.map((ball) => [ball.key, ball.price, ball.held]), [
+      ["appat", getBall("appat").price, 0],
+      ["catalyseur", getBall("catalyseur").price, 0],
+    ]);
+    assert.match(shop.balls[0].effect, new RegExp(`×${getBall("appat").bonus.multiplier} sur les Pokémon pêchés`));
     assert.ok(shop.balls[0].image);
   });
 
   it("acheter rend la boutique à jour ; un refus dit pourquoi, avec les chiffres, sans rien débiter", async () => {
-    await setBalance(500);
+    // Deux balls payées, et il reste moins qu'une troisième ne coûte.
+    const price = getBall("appat").price;
+    const left = price - 1;
+    await setBalance(2 * price + left);
     const bought = await call("POST", "/api/shop/buy", { ball: "appat", quantity: 2 });
-    assert.deepEqual([bought.ok, bought.bought, bought.cost, bought.balance], [true, 2, 460, 40]);
+    assert.deepEqual([bought.ok, bought.bought, bought.cost, bought.balance], [true, 2, 2 * price, left]);
     assert.equal(bought.balls[0].held, 2);
     const refused = await call("POST", "/api/shop/buy", { ball: "appat", quantity: 1 });
     assert.equal(refused.ok, false);
-    assert.match(refused.message, /Il te faut 230 points, tu en as 40/);
+    assert.match(refused.message, new RegExp(`Il te faut ${fr(price)} points, tu en as ${fr(left)}`));
     assert.equal((await dbAll(points, "SELECT * FROM pokemon_ball_units")).length, 2);
   });
 
@@ -79,16 +87,14 @@ describe("les balls spéciales d'une apparition", () => {
     assert.deepEqual([appat.key, appat.held, appat.eligible], ["appat", 2, 1], "la seconde Appât Ball est postérieure");
     assert.deepEqual([catalyseur.key, catalyseur.held, catalyseur.eligible], ["catalyseur", 1, 1]);
     const base = data.catchProbability(species("Onix").catchRate, 1, 1);
-    assert.ok(Math.abs(appat.probability - Math.min(1, base * 3)) < 1e-9, "Onix pêché : ×3 pour l'Appât");
-    assert.ok(Math.abs(catalyseur.probability - Math.min(1, base * 4)) < 1e-9, "Onix évolue avec le Catalyseur : ×4");
+    assert.ok(Math.abs(appat.probability - Math.min(1, base * getBall("appat").bonus.multiplier)) < 1e-9, "Onix pêché : le bonus de l'Appât");
+    assert.ok(Math.abs(catalyseur.probability - Math.min(1, base * getBall("catalyseur").bonus.multiplier)) < 1e-9, "Onix évolue avec le Catalyseur : son bonus");
     assert.ok(spawn.balls.some((ball) => ball.key === "master"), "la Master Ball reste dans `balls`, que la vue range avec les spéciales");
   });
 });
 
 describe("la pêche sur le site", () => {
-  it("la route de lancer demande une connexion et une écriture, et refuse un corps sans canne", async () => {
-    assert.equal(route("POST", "/api/fishing/cast").auth, true);
-    assert.equal(route("POST", "/api/fishing/cast").write, true);
+  it("la route de lancer refuse un corps sans canne", async () => {
     await assert.rejects(() => call("POST", "/api/fishing/cast", {}), HttpError);
     await assert.rejects(() => call("POST", "/api/fishing/cast", { rod: 3 }), HttpError);
   });
@@ -97,14 +103,20 @@ describe("la pêche sur le site", () => {
     await setBalance(500);
     const { fishing } = await call("GET", "/api/spawn");
     assert.equal(fishing.open, true);
-    assert.deepEqual(fishing.rods.map((rod) => [rod.key, rod.price, rod.owned]), [["canne", 100, true], ["super_canne", 100, false], ["mega_canne", 100, false]]);
+    const rodPrice = (key) => getPokemonConfig().items[key].rod.price;
+    assert.deepEqual(fishing.rods.map((rod) => [rod.key, rod.price, rod.owned]), [
+      ["canne", rodPrice("canne"), true],
+      ["super_canne", rodPrice("super_canne"), false],
+      ["mega_canne", rodPrice("mega_canne"), false],
+    ]);
     assert.equal(fishing.spawn, null);
   });
 
   it("lancer la ligne débite la canne ; la touche arrive avec ses balls, ses balls spéciales et sa fuite", async () => {
-    await setBalance(500);
+    const price = getPokemonConfig().items.canne.rod.price;
+    await setBalance(price * 5);
     const result = await call("POST", "/api/fishing/cast", { rod: "canne" });
-    assert.deepEqual([result.ok, result.message, result.price], [true, null, 100]);
+    assert.deepEqual([result.ok, result.message, result.price], [true, null, price]);
     const { fishing } = await call("GET", "/api/spawn");
     const touch = fishing.spawn;
     assert.ok(touch.fished && touch.fleesAt > Date.now());
@@ -114,10 +126,12 @@ describe("la pêche sur le site", () => {
   });
 
   it("un refus est une issue : ok faux et le message, sans rien débiter", async () => {
-    await setBalance(20);
+    const price = getPokemonConfig().items.canne.rod.price;
+    const left = price - 1;
+    await setBalance(left);
     const refused = await call("POST", "/api/fishing/cast", { rod: "canne" });
     assert.equal(refused.ok, false);
-    assert.match(refused.message, /La Canne pêche à 100 points, tu en as 20/);
+    assert.match(refused.message, new RegExp(`La Canne pêche à ${fr(price)} points, tu en as ${fr(left)}`));
     assert.equal((await dbAll(points, "SELECT * FROM pokemon_spawns")).length, 0);
   });
 

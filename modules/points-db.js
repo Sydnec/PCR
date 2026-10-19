@@ -414,7 +414,14 @@ const db = new sqlite3.Database(dbPath, (err) => {
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_trades :", err);
-        addMessageClosedAt("pokemon_trades", ["ACCEPTED", "DECLINED", "CANCELLED", "FAILED", "EXPIRED"]);
+        addMessageClosedAt("pokemon_trades", [
+          "ACCEPTED",
+          "DECLINED",
+          "CANCELLED",
+          "FAILED",
+          "EXPIRED",
+          "COUNTERED",
+        ]);
         addColumn("pokemon_trades", "offer_form", "TEXT");
         addColumn("pokemon_trades", "request_form", "TEXT");
         addColumn("pokemon_trades", "offer_points", "INTEGER");
@@ -423,6 +430,11 @@ const db = new sqlite3.Database(dbPath, (err) => {
         addColumn("pokemon_trades", "offer_item_qty", "INTEGER");
         addColumn("pokemon_trades", "request_item", "TEXT");
         addColumn("pokemon_trades", "request_item_qty", "INTEGER");
+        // Contre-offre : l'offre qu'elle remplace (statut COUNTERED), et « à son choix » —
+        // un côté demandé laissé ouvert, que `request_species_id = 0` ne distinguerait
+        // pas d'un côté de points ou d'objet.
+        addColumn("pokemon_trades", "counter_of", "INTEGER");
+        addColumn("pokemon_trades", "request_open", "INTEGER NOT NULL DEFAULT 0");
       }
     );
 
@@ -443,7 +455,9 @@ const db = new sqlite3.Database(dbPath, (err) => {
         expires_at INTEGER NOT NULL
       )`,
       (err) => {
-        if (err) handleException("Erreur création table pokemon_trade_drafts :", err);
+        if (err) return handleException("Erreur création table pokemon_trade_drafts :", err);
+        // Le brouillon d'une contre-offre retient l'offre qu'il contre.
+        addColumn("pokemon_trade_drafts", "counter_of", "INTEGER");
       }
     );
 

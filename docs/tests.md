@@ -58,7 +58,7 @@ génération ouverte en cours de route.
 | `web-api`, `web-routes`           | toutes les routes de l'API du site : validation (400), droits (401/403/404), refus du jeu (409)                    |
 | `web-server`, `web-session`       | serveur HTTP réel : session, appartenance au serveur, administrateur, origine, taille, cadence, OAuth, fichiers    |
 | `interactions`                    | boutons et menus du jeu sur Discord : lancer, Master Ball, évolution, échange, parc safari, partages               |
-| `trade-draft`                     | brouillon de `/pk echange` : menus, fenêtres de saisie, « Proposer », refus chiffrés, expiration                   |
+| `trade-draft`                     | brouillon de `/pk echange` : menus, fenêtres de saisie, « Proposer », refus chiffrés, expiration, contre-offre, « à son choix »                   |
 | `commands-pk`, `commands-admin`   | déclaration de toutes les commandes (limites de Discord), sous-commandes `/pk` et `/admin`                         |
 | `message-sync`, `public-messages`, `message-closed-migration` | réécriture des messages publics : une à la fois, relue en base, réessais ; courses capture/fuite/échange/parc/objet, expiration des offres, rattrapage, marque de l'historique |
 | `messages`                        | points gagnés par message, statistiques, compteur du jeu, réécriture des liens X/Instagram et traduction           |

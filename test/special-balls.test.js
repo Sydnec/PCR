@@ -157,6 +157,7 @@ describe("le lancer d'une ball spéciale", () => {
     assert.equal(hit.status, "miss");
     assert.ok(Math.abs(hit.probability - probability("appat", "Ronflex", true)) < 1e-9);
     assert.ok(hit.probability > probability("appat", "Ronflex", false));
+    assert.equal(data.ballMultiplier(getBall("appat"), { fished: true, speciesId: species("Ronflex").id }), 3, "×3 sur une pêche");
     await addUnit(500);
     await seedSpawn("Ronflex", { fished: 0 });
     const plain = await throwBall("u1", "appat", [0.9999]);
@@ -192,7 +193,7 @@ describe("le lancer d'une ball spéciale", () => {
     const refused = await throwBall("u1", "appat");
     assert.equal(refused.status, "no-unit");
     assert.equal(refused.held, 1);
-    assert.match(capture.throwMessage(refused), /tu en as 1, mais une ball achetée ne sert qu'aux Pokémon qui apparaissent après son achat/);
+    assert.match(capture.throwMessage(refused), /tu en as 1\b.*après son achat/);
     assert.equal((await units()).length, 1);
     assert.equal((await dbAll(points, "SELECT * FROM pokemon_throws")).length, 0);
   });

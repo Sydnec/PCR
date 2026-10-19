@@ -110,7 +110,9 @@ describe("appâter", () => {
 describe("lancer la Safari Ball", () => {
   beforeEach(() => seed());
 
-  it("capture quand le tirage passe sous la probabilité, et crédite la boîte", async () => {
+  it("capture quand le tirage passe sous la probabilité, crédite la boîte, et ne tire pas de fuite derrière", async () => {
+    // Un hasard figé à 0 passerait aussi sous le seuil de fuite : l'issue reste CATCH parce que la
+    // fuite n'est tirée qu'après un raté.
     const result = await play("BALL", 0);
     assert.equal(result.outcome, "CATCH");
     const owned = await dbAll(points, "SELECT species_id, is_shiny, origin FROM pokemon_owned");
@@ -146,11 +148,6 @@ describe("lancer la Safari Ball", () => {
     assert.equal((await play("BALL", [0.999, 0.1])).outcome, "MISS_FLED");
     await seed({ bait: 2 });
     assert.equal((await play("BALL", [0.999, 0.12])).outcome, "MISS");
-  });
-
-  it("une capture ne déclenche jamais de fuite : le tirage de fuite n'a lieu qu'après un raté", async () => {
-    const result = await play("BALL", [0, 0]);
-    assert.equal(result.outcome, "CATCH");
   });
 
   it("le plancher de capture joue dans le vrai tirage : un taux 3 est capturé comme un taux 10", async () => {

@@ -12,7 +12,9 @@ import {
 } from "../../modules/pokemon/embeds.js";
 import {
   checkSide,
+  emptyTradeProblem,
   itemChoices,
+  OPEN_VALUE,
   parseChoice,
   pointsValue,
   readNumberQuery,
@@ -53,6 +55,8 @@ async function respondWithSide(interaction, userId, query, { giving, emptyLabel 
     const specials = [
       { name: "Pour des points, tape un nombre (ex. 3000)", value: HINT_VALUE },
       { name: giving ? "Rien (0 point)" : "Rien (0 point : un cadeau)", value: pointsValue(0) },
+      // Au destinataire de dire ce qu'il donne en retour : sa réponse est une contre-offre.
+      ...(giving ? [] : [{ name: "🎁 À son choix", value: OPEN_VALUE }]),
     ].filter((choice) => !needle || (choice.value !== HINT_VALUE && choice.name.toLowerCase().includes(needle)));
     const choices = mixedChoices(specials, species, items);
     // Une liste vide est indiscernable d'une commande cassée : on dit explicitement
@@ -239,9 +243,8 @@ export default {
         return refuse("Erreur base de données.");
       }
       if (offer.error || request.error) return refuse(offer.error ?? request.error);
-      if (offer.side.points === 0 && request.side.points === 0) {
-        return refuse("Rien à échanger : les deux côtés sont à 0 point.");
-      }
+      const pointless = emptyTradeProblem(offer.side, request.side);
+      if (pointless) return refuse(pointless);
 
       await interaction.deferReply();
 
@@ -272,7 +275,7 @@ export default {
             message = await interaction.editReply({
               content: `<@${target.id}>`,
               embeds: [buildTradeEmbed(trade, "PENDING")],
-              components: [buildTradeRow(trade.id)],
+              components: [buildTradeRow(trade.id, { open: Boolean(trade.request_open) })],
             });
           } catch (error) {
             handleException("Publication d'une offre d'échange :", error);

@@ -2502,5 +2502,26 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "chore",
+      "name": "Tests recentrés",
+      "description": "Les tests en double sont fusionnés, chaque test ne vérifie plus que la règle qu'il annonce, et un test qui échouait par moments est corrigé.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-18T21:30:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
+    },
+    {
+      "type": "feature",
+      "name": "Contre-offres et échanges à son choix",
+      "description": "Le destinataire d'une offre d'échange peut répondre par une contre-offre, et on peut proposer un Pokémon, un objet ou des points « à son choix » : l'autre dit alors ce qu'il donne en retour.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-19T08:46:28.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
+    }
+  ]
 }

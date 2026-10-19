@@ -25,16 +25,18 @@ const handlerFiles = fs.readdirSync(path.join(ROOT, "functions/handlers")).filte
 // Un bot qui garde ce que les gestionnaires y posent, et un salon qui note ce qu'on y publie.
 async function loadBot({ sendFails = false } = {}) {
   const sent = [];
+  const edits = [];
   const channel = {
     send: async (payload) => {
       if (sendFails) throw new Error("salon fermé");
       sent.push(payload);
       return { id: `m${sent.length}`, edit: async () => {} };
     },
-    messages: { fetch: async () => ({ edit: async () => {}, embeds: [] }), edit: async () => {} },
+    messages: { fetch: async () => ({ edit: async () => {}, embeds: [] }), edit: async (id, payload) => edits.push({ id, payload }) },
   };
   const bot = {
     sent,
+    edits,
     channels: { fetch: async () => channel },
     guilds: { fetch: async () => { throw new Error("Discord ne répond pas"); } },
   };
@@ -240,6 +242,70 @@ describe("le rattrapage des messages publics (minuteur de cinq minutes)", () => 
     assert.equal((await dbGet(points, "SELECT status FROM pokemon_trades WHERE id = ?", [tradeId])).status, "EXPIRED");
     assert.notEqual((await dbGet(points, "SELECT message_closed_at FROM pokemon_trades WHERE id = ?", [tradeId])).message_closed_at, null);
     assert.notEqual((await dbGet(points, "SELECT message_closed_at FROM pokemon_spawns WHERE id = ?", [spawnId])).message_closed_at, null);
+  });
+
+  describe("une contre-offre perdue au redémarrage", () => {
+    const MINUTE = 60_000;
+    const insert = async ({ from, to, status, createdAgo, counterOf = null, messageId = null, resolvedAgo = null }) => {
+      const { lastID } = await dbRun(
+        points,
+        `INSERT INTO pokemon_trades (from_user_id, to_user_id, offer_species_id, request_species_id, status, created_at, resolved_at, expires_at, channel_id, message_id, offer_points, request_points, counter_of)
+         VALUES (?, ?, 0, 0, ?, ?, ?, ?, '123', ?, 10, 20, ?)`,
+        [from, to, status, Date.now() - createdAgo, resolvedAgo === null ? null : Date.now() - resolvedAgo, Date.now() + 60 * MINUTE, messageId, counterOf]
+      );
+      return lastID;
+    };
+    const statusOf = async (id) => (await dbGet(points, "SELECT status FROM pokemon_trades WHERE id = ?", [id])).status;
+    const labels = (payload) => payload.components.flatMap((row) => row.toJSON().components.map((button) => button.label));
+    beforeEach(() => dbRun(points, "DELETE FROM pokemon_trades"));
+
+    it("(b) un original contré sans aucune contre-offre se rouvre, et son message retrouve ses boutons", async () => {
+      const original = await insert({ from: "u1", to: "u2", status: "COUNTERED", createdAgo: 20 * MINUTE, resolvedAgo: 10 * MINUTE, messageId: "orig" });
+      const bot = await loadBot();
+      await bot.handlePublicMessagesOnTimer();
+      assert.equal(await statusOf(original), "PENDING");
+      const row = await dbGet(points, "SELECT resolved_at, message_closed_at FROM pokemon_trades WHERE id = ?", [original]);
+      assert.deepEqual([row.resolved_at, row.message_closed_at], [null, null]);
+      const edit = bot.edits.find((entry) => entry.id === "orig");
+      assert.deepEqual(labels(edit.payload), ["Accepter", "Contre-offre", "Refuser", "Annuler"]);
+    });
+
+    it("(a) une contre-offre sans message est annulée, et l'original se rouvre avec ses boutons", async () => {
+      const original = await insert({ from: "u1", to: "u2", status: "COUNTERED", createdAgo: 20 * MINUTE, resolvedAgo: 10 * MINUTE, messageId: "orig" });
+      const counter = await insert({ from: "u2", to: "u1", status: "PENDING", createdAgo: 10 * MINUTE, counterOf: original });
+      const bot = await loadBot();
+      await bot.handlePublicMessagesOnTimer();
+      assert.deepEqual([await statusOf(original), await statusOf(counter)], ["PENDING", "CANCELLED"]);
+      assert.deepEqual(labels(bot.edits.find((entry) => entry.id === "orig").payload), ["Accepter", "Contre-offre", "Refuser", "Annuler"]);
+      // Le passage suivant ne touche plus à rien.
+      const again = await loadBot();
+      await again.handlePublicMessagesOnTimer();
+      assert.deepEqual([await statusOf(original), await statusOf(counter)], ["PENDING", "CANCELLED"]);
+      assert.equal(again.edits.length, 0);
+    });
+
+    it("une contre-offre refusée, annulée ou acceptée par quelqu'un est une réponse : l'original reste contré", async () => {
+      const kept = [];
+      for (const status of ["DECLINED", "CANCELLED", "ACCEPTED", "EXPIRED", "PENDING"]) {
+        const original = await insert({ from: "u1", to: "u2", status: "COUNTERED", createdAgo: 20 * MINUTE, resolvedAgo: 10 * MINUTE, messageId: `orig-${status}` });
+        // Un message publié : sans lui, PENDING serait une contre-offre jamais vue.
+        await insert({ from: "u2", to: "u1", status, createdAgo: 10 * MINUTE, counterOf: original, messageId: "visible" });
+        kept.push(original);
+      }
+      const bot = await loadBot();
+      await bot.handlePublicMessagesOnTimer();
+      for (const id of kept) assert.equal(await statusOf(id), "COUNTERED");
+      assert.equal(bot.edits.some((entry) => /orig-/.test(entry.id) && labels(entry.payload).includes("Accepter")), false);
+    });
+
+    it("pendant le délai de grâce, une contre-offre en cours de publication n'est pas touchée", async () => {
+      const original = await insert({ from: "u1", to: "u2", status: "COUNTERED", createdAgo: 20 * MINUTE, resolvedAgo: 5_000, messageId: "orig" });
+      const counter = await insert({ from: "u2", to: "u1", status: "PENDING", createdAgo: 4_000, counterOf: original });
+      const lonely = await insert({ from: "u3", to: "u4", status: "COUNTERED", createdAgo: 20 * MINUTE, resolvedAgo: 5_000, messageId: "lonely" });
+      const bot = await loadBot();
+      await bot.handlePublicMessagesOnTimer();
+      assert.deepEqual([await statusOf(original), await statusOf(counter), await statusOf(lonely)], ["COUNTERED", "PENDING", "COUNTERED"]);
+    });
   });
 
   it("une panne de la base sur les offres ne prive pas les apparitions de leur rattrapage", async () => {

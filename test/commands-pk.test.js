@@ -28,6 +28,12 @@ const GEN1 = { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" }
 const EPHEMERAL = MessageFlags.Ephemeral;
 const ROOT = path.join(path.dirname(new URL(import.meta.url).pathname), "..");
 const species = (name) => speciesByName(data.allSpecies, name);
+// Une liste vide s'explique par une seule proposition inerte (valeur « — »), jamais par du vide.
+const assertInert = (choices, explanation) => {
+  assert.equal(choices.length, 1);
+  assert.equal(choices[0].value, "—");
+  assert.match(choices[0].name, explanation);
+};
 const call = (fn, ...args) =>
   new Promise((resolve, reject) => fn(...args, (error, value) => (error ? reject(error) : resolve(value))));
 const setBalance = (amount, user = "u1") =>
@@ -78,20 +84,15 @@ function checkOption(option, where, problems) {
 }
 
 describe("la déclaration des commandes", () => {
-  it("chaque fichier de commands/ se charge, avec de quoi se déclarer et s'exécuter", async () => {
-    for (const file of commandFiles) {
-      const module = await import(`../commands/${file}`);
-      const command = module.default || module;
-      assert.ok(command.data?.toJSON, `${file} : pas de data`);
-      assert.equal(typeof command.execute, "function", `${file} : pas d'execute`);
-    }
-  });
-
-  it("aucun nom n'est pris deux fois, et Discord accepte chaque commande", async () => {
+  it("chaque fichier de commands/ se charge et s'exécute, aucun nom n'est pris deux fois, et Discord accepte chaque commande", async () => {
     const names = new Set();
     const problems = [];
     for (const file of commandFiles) {
-      const command = (await import(`../commands/${file}`)).default;
+      const module = await import(`../commands/${file}`);
+      const command = module.default || module;
+      // Contrôlés avant le toJSON, pour qu'un fichier sans `data` soit nommé au lieu de planter ici.
+      assert.ok(command.data?.toJSON, `${file} : pas de data`);
+      assert.equal(typeof command.execute, "function", `${file} : pas d'execute`);
       const json = command.data.toJSON();
       assert.ok(!names.has(json.name), `${json.name} est déclarée deux fois`);
       names.add(json.name);
@@ -105,7 +106,6 @@ describe("la déclaration des commandes", () => {
     const files = fs.readdirSync(path.join(ROOT, "commands/pk")).map((file) => file.replace(/\.js$/, "")).sort();
     const declared = pk.data.toJSON().options.map((option) => option.name).sort();
     assert.deepEqual(declared, files);
-    assert.equal(declared.length, 20);
   });
 
   it("toutes les commandes d'administration sont câblées au routeur /admin", async () => {
@@ -158,11 +158,6 @@ describe("le routeur /pk", () => {
     assert.equal(reply.flags, EPHEMERAL);
   });
 
-  it("un groupe se reconnaît à son nom de groupe", async () => {
-    const calls = await runCommand(pk, { group: "vitrine", sub: "voir", options: {} });
-    assert.match(payloadOf(calls, "reply").content, /Ta vitrine est vide/);
-  });
-
   it("l'autocomplétion d'une sous-commande qui n'en a pas rend une liste vide", async () => {
     const calls = await runAutocomplete(pk, { sub: "classement", focused: { name: "x", value: "" } });
     assert.deepEqual(payloadOf(calls, "respond"), []);
@@ -192,7 +187,7 @@ describe("/pk pokedex et /pk boite", () => {
   it("le Pokédex répond en privé : différé, puis l'embed avec ses boutons", async () => {
     await ownMany("Rattata", 2);
     const calls = await runCommand(pk, { sub: "pokedex" });
-    assert.deepEqual(payloadOf(calls, "deferReply"), { flags: EPHEMERAL });
+    assert.equal(payloadOf(calls, "deferReply")?.flags, EPHEMERAL);
     const reply = payloadOf(calls, "editReply");
     assert.match(textOf(reply), /Pokédex de user-u1/);
     assert.equal(reply.components.length, 1);
@@ -243,8 +238,9 @@ describe("/pk classement, info, inventaire, web", () => {
     await own("Roucool", { user: "u2", shiny: 1, obtained: 5 });
     await own("Rattata", { user: "u3" });
     const text = textOf(payloadOf(await runCommand(pk, { sub: "classement" }), "editReply"));
-    assert.match(text, /🥇 \*\*user-u2\*\* — 2\/151 espèces · ✨ 1 · 3 captures/);
-    assert.match(text, /🥈 \*\*user-u3\*\* — 1\/151 espèces · 1 captures/);
+    // Sur la taille du Pokédex ouvert : elle grandit à chaque génération.
+    assert.match(text, new RegExp(`🥇 \\*\\*user-u2\\*\\* — 2/${data.dexSize()} espèces · ✨ 1 · 3 captures`));
+    assert.match(text, new RegExp(`🥈 \\*\\*user-u3\\*\\* — 1/${data.dexSize()} espèces · 1 captures`));
   });
 
   it("la fiche d'une espèce est privée ; une espèce inconnue est refusée", async () => {
@@ -298,7 +294,7 @@ describe("/pk classement, info, inventaire, web", () => {
 describe("/pk loterie", () => {
   it("un gain s'affiche en privé, puis « déjà joué » avec l'heure du prochain tirage", async () => {
     const first = await withRandom([0, 0, 0], () => runCommand(pk, { sub: "loterie" }));
-    assert.deepEqual(payloadOf(first, "deferReply"), { flags: EPHEMERAL });
+    assert.equal(payloadOf(first, "deferReply")?.flags, EPHEMERAL);
     assert.ok(payloadOf(first, "editReply").embeds.length === 1);
     const second = payloadOf(await runCommand(pk, { sub: "loterie" }), "editReply");
     assert.match(textOf(second), /<t:\d+:[a-zA-Z]>/, "l'heure du prochain tirage");
@@ -320,7 +316,7 @@ describe("/pk doublons", () => {
   it("les doublons du dresseur : privés, avec leurs boutons", async () => {
     await ownMany("Rattata", 3);
     const calls = await runCommand(pk, { sub: "doublons" });
-    assert.deepEqual(payloadOf(calls, "deferReply"), { flags: EPHEMERAL });
+    assert.equal(payloadOf(calls, "deferReply")?.flags, EPHEMERAL);
     const reply = payloadOf(calls, "editReply");
     assert.match(textOf(reply), /Rattata/);
     assert.equal(reply.components.length, 1);
@@ -346,7 +342,7 @@ describe("/pk doublons", () => {
 
   it("l'autocomplétion dit explicitement quand rien ne correspond", async () => {
     const empty = payloadOf(await runAutocomplete(pk, { sub: "doublons", focused: { name: "pokemon", value: "zzzzzz" } }), "respond");
-    assert.deepEqual(empty, [{ name: "Aucune espèce ne correspond", value: "—" }]);
+    assertInert(empty, /ne correspond/);
   });
 });
 
@@ -391,14 +387,16 @@ describe("/pk revendre", () => {
   const sellPokemon = (options) => runCommand(pk, { group: "revendre", sub: "pokemon", options });
   const sellItem = (options) => runCommand(pk, { group: "revendre", sub: "objet", options });
 
-  it("des Pokémon d'une espèce : les normaux partent, un reste, le prix est crédité", async () => {
+  it("des Pokémon d'une espèce : les normaux partent, un reste, le prix s'ajoute au solde", async () => {
+    // Un solde de départ : le crédit doit s'y ajouter, pas le remplacer.
+    await setBalance(5000);
     await ownMany("Rattata", 3);
     const calls = await sellPokemon({ espece: String(species("Rattata").id), quantite: 2 });
-    assert.deepEqual(payloadOf(calls, "deferReply"), { flags: EPHEMERAL });
+    assert.equal(payloadOf(calls, "deferReply")?.flags, EPHEMERAL);
     const reply = payloadOf(calls, "editReply").content;
     assert.match(reply, /^✅ Tu revends \*\*2× Rattata[^*]*\*\* pour \*\*[\d\s]+\*\* points\.$/);
-    assert.ok((await balance()) > 0);
-    assert.equal((await dbAll(points, "SELECT id FROM pokemon_owned")).length, 1);
+    assert.ok((await balance()) > 5000);
+    assert.equal((await dbAll(points, "SELECT id FROM pokemon_owned")).length, 1, "trois reçus, deux vendus, aucun individu fabriqué");
   });
 
   it("le dernier de l'espèce ne part pas : refus avec les chiffres", async () => {
@@ -461,7 +459,7 @@ describe("/pk revendre", () => {
 
   it("l'autocomplétion des espèces : les doublons et le prix ; vide, une proposition qui l'explique", async () => {
     const empty = payloadOf(await runAutocomplete(pk, { group: "revendre", sub: "pokemon", focused: { name: "espece", value: "" } }), "respond");
-    assert.deepEqual(empty, [{ name: "Tu n'as rien à revendre pour le moment", value: "—" }]);
+    assertInert(empty, /rien à revendre/);
     await ownMany("Rattata", 3);
     const filled = payloadOf(await runAutocomplete(pk, { group: "revendre", sub: "pokemon", focused: { name: "espece", value: "" } }), "respond");
     assert.match(filled[0].name, /^Rattata — 2 en trop, [\d\s]+ pts pièce$/);
@@ -473,8 +471,10 @@ describe("/pk revendre", () => {
 describe("/pk vitrine", () => {
   const showcase = (subName, options = {}, extra = {}) => runCommand(pk, { group: "vitrine", sub: subName, options, ...extra });
 
-  it("une vitrine vide le dit, avec la commande pour l'emplir et le nombre de places", async () => {
+  it("une vitrine vide, atteinte par son groupe, le dit avec la commande pour l'emplir et le nombre de places", async () => {
+    // Le routeur reconnaît un groupe à son nom de groupe : sans ce routage, la sous-commande « voir » seule serait introuvable.
     const reply = payloadOf(await showcase("voir"), "reply");
+    assert.match(reply.content, /Ta vitrine est vide/);
     assert.match(reply.content, new RegExp(`jusqu'à ${getPokemonConfig().showcase.slots} Pokémon avec \`/pk vitrine ajouter\``));
     assert.equal(reply.flags, EPHEMERAL);
   });
@@ -525,7 +525,7 @@ describe("/pk vitrine", () => {
 
   it("l'autocomplétion de la vitrine propose les Pokémon exposés, ou dit qu'elle est vide", async () => {
     const empty = payloadOf(await runAutocomplete(pk, { group: "vitrine", sub: "retirer", focused: { name: "pokemon", value: "" } }), "respond");
-    assert.deepEqual(empty, [{ name: "Ta vitrine est vide", value: "—" }]);
+    assertInert(empty, /vitrine est vide/);
     const [id] = await ownMany("Rattata", 2);
     await showcase("ajouter", { espece: String(species("Rattata").id), individu: `#${id}` });
     const filled = payloadOf(await runAutocomplete(pk, { group: "vitrine", sub: "retirer", focused: { name: "pokemon", value: String(id) } }), "respond");
@@ -542,16 +542,19 @@ describe("/pk renommer", () => {
     const id = await own("Roucool");
     const reply = payloadOf(await rename(pick(id, "  Pipou  ")), "reply");
     assert.equal(reply.flags, EPHEMERAL);
-    assert.equal(reply.content, `✅ **#${id} Roucool ♂** s'appelle désormais **Pipou**.`);
+    assert.match(reply.content, /\*\*Pipou\*\*/);
     assert.equal(await nickname(id), "Pipou", "les espaces superflus sont retirés comme sur le site");
   });
 
   it("le renommage garde l'ancien surnom dans la réponse, pour pouvoir le remettre ; vide, il le retire", async () => {
     const id = await own("Roucool");
     await rename(pick(id, "Pipou"));
-    assert.match(payloadOf(await rename(pick(id, "Roupi")), "reply").content, /désormais \*\*Roupi\*\*\. \(avant : \*\*Pipou\*\*\)/);
+    const renamed = payloadOf(await rename(pick(id, "Roupi")), "reply").content;
+    assert.match(renamed, /\*\*Roupi\*\*/);
+    assert.match(renamed, /\(avant : \*\*Pipou\*\*\)/);
     const removed = payloadOf(await rename(pick(id)), "reply").content;
-    assert.equal(removed, `✅ **#${id} Roucool ♂** n'a plus de surnom. (avant : **Roupi**)`);
+    assert.match(removed, /n'a plus de surnom/);
+    assert.match(removed, /\(avant : \*\*Roupi\*\*\)/);
     assert.equal(await nickname(id), null);
   });
 
@@ -559,7 +562,8 @@ describe("/pk renommer", () => {
     sandbox.writeConfig({ pokemon: { ...GEN1.pokemon, pc: { nicknameLength: 5 } } });
     const id = await own("Roucool");
     const reply = payloadOf(await rename(pick(id, "Superpipou")), "reply").content;
-    assert.match(reply, /désormais \*\*Super\*\*\. ✂️ Rogné à 5 caractères\./);
+    assert.match(reply, /\*\*Super\*\*/);
+    assert.match(reply, /Rogné à 5 caractères/);
     assert.equal(await nickname(id), "Super");
     assert.doesNotMatch(payloadOf(await rename(pick(id, "Court")), "reply").content, /Rogné/);
   });
@@ -611,7 +615,7 @@ describe("/pk comparer", () => {
     await ownMany("Rattata", 2);
     await ownMany("Chenipan", 2, { user: "u2" });
     const calls = await compare({ evolutions: false }, partner());
-    assert.deepEqual(payloadOf(calls, "deferReply"), { flags: EPHEMERAL });
+    assert.equal(payloadOf(calls, "deferReply")?.flags, EPHEMERAL);
     const reply = payloadOf(calls, "editReply");
     const text = textOf(reply);
     assert.match(text, /Échanges avec Dresseur u2/);
@@ -699,7 +703,7 @@ describe("/pk comparer", () => {
     await own("Roucool", { user: "p-a" });
     await own("Rattata", { user: "p-c" });
     const calls = await compare({ evolutions: false });
-    assert.deepEqual(payloadOf(calls, "deferReply"), { flags: EPHEMERAL });
+    assert.equal(payloadOf(calls, "deferReply")?.flags, EPHEMERAL);
     const reply = payloadOf(calls, "editReply");
     const text = textOf(reply);
     assert.ok(text.indexOf("<@p-f>") < text.indexOf("<@p-a>"), "p-f permet deux échanges, p-a un seul");
@@ -730,7 +734,7 @@ describe("/pk comparer", () => {
     await own("Roucool", { user: "n-b" });
     await own("Rattata", { user: "n-c" });
     const calls = await compare({ pokemon: String(species("Rattata").id), evolutions: false });
-    assert.deepEqual(payloadOf(calls, "deferReply"), { flags: EPHEMERAL });
+    assert.equal(payloadOf(calls, "deferReply")?.flags, EPHEMERAL);
     const reply = payloadOf(calls, "editReply");
     const text = textOf(reply);
     assert.match(text, /Qui a besoin de Rattata/);
@@ -760,7 +764,7 @@ describe("/pk comparer", () => {
     assert.equal(all.length, 25, "aucun doublon, aucune collection : la liste est quand même pleine");
     const typed = async (value) => payloadOf(await runAutocomplete(pk, { sub: "comparer", focused: { name: "pokemon", value } }), "respond");
     assert.deepEqual(await typed("salameche"), [{ name: `#004 Salamèche`, value: String(species("Salamèche").id) }]);
-    assert.deepEqual(await typed("zzzzzz"), [{ name: "Aucune espèce ne correspond", value: "—" }]);
+    assertInert(await typed("zzzzzz"), /ne correspond/);
   });
 
 });
@@ -791,6 +795,28 @@ describe("/pk echange", () => {
     assert.equal(row.request_species_id, species("Roucool").id);
     assert.equal(row.request_pokemon_id, null, "le destinataire choisira lequel, en acceptant");
     assert.equal(row.message_id, "reply-2", "le message de l'offre est retenu pour l'éditer plus tard");
+  });
+
+  it("« À son choix » (`je_recois: open`) : offre ouverte, « Faire une proposition » sans « Accepter », rien d'autre demandé", async () => {
+    const [mine] = await ownMany("Rattata", 2);
+    const calls = await trade({ membre: "u2", je_donne: ids("Rattata"), mon_individu: `#${mine}`, je_recois: "open" });
+    const reply = payloadOf(calls, "editReply");
+    assert.equal(reply.content, "<@u2>");
+    assert.deepEqual(reply.components[0].toJSON().components.map((button) => button.label), ["Faire une proposition", "Refuser", "Annuler"]);
+    assert.match(reply.embeds[0].toJSON().description, /propose \*\*#\d+ Rattata[^*]*\*\* à <@u2>, contre ce qu'il voudra\./);
+    const [row] = await trades();
+    assert.deepEqual([row.request_open, row.request_species_id, row.request_points, row.request_item, row.offer_pokemon_id, row.status], [1, 0, null, null, mine, "PENDING"]);
+  });
+
+  it("« À son choix » refusé pour ce qu'on donne, et pour une offre où l'on ne donne rien", async () => {
+    await ownMany("Rattata", 2);
+    await setBalance(500);
+    const giveOpen = await trade({ membre: "u2", je_donne: "open", je_recois: "5" });
+    assert.match(refusal(giveOpen), /« À son choix » ne vaut que pour ce que tu demandes/);
+    const nothing = await trade({ membre: "u2", je_donne: "0", je_recois: "open" });
+    assert.match(refusal(nothing), /Rien à échanger : tu n'offres rien/);
+    assert.equal(payloadOf(giveOpen, "reply").flags, MessageFlags.Ephemeral);
+    assert.deepEqual(await trades(), [], "aucune offre créée");
   });
 
   it("sans `mon_individu`, c'est le moins précieux qui part, le plus récent à égalité", async () => {
@@ -921,19 +947,21 @@ describe("/pk echange", () => {
     await own("Rattata");
     const asked = (focused, options) => runAutocomplete(pk, { sub: "echange", options, focused });
     const mine = payloadOf(await asked({ name: "je_donne", value: "" }), "respond");
-    assert.deepEqual(mine.map((choice) => choice.name), [
-      "Pour des points, tape un nombre (ex. 3000)",
-      "Rien (0 point)",
-      "Machopeur ×1 en trop — évoluera gratuitement en Mackogneur chez l'autre",
-    ]);
     assert.deepEqual(mine.map((choice) => choice.value), ["—", "pts:0", ids("Machopeur")]);
+    assert.match(mine[0].name, /tape un nombre/);
+    assert.match(mine[1].name, /Rien \(0 point\)/);
+    assert.match(mine[2].name, /Machopeur ×1 en trop/);
+    assert.match(mine[2].name, /évoluera gratuitement en Mackogneur/);
     assert.deepEqual(payloadOf(await asked({ name: "je_donne", value: "mackogneur" }), "respond").map((choice) => choice.value), [ids("Machopeur")]);
     assert.deepEqual(payloadOf(await asked({ name: "je_donne", value: "zzz" }), "respond").map((choice) => choice.value), ["—"]);
     const none = payloadOf(await asked({ name: "je_recois", value: "" }), "respond");
     assert.match(none[0].name, /Choisis d'abord le dresseur/);
     await ownMany("Roucool", 2, { user: "u2" });
     const theirs = payloadOf(await asked({ name: "je_recois", value: "" }, { membre: "u2" }), "respond");
-    assert.deepEqual(theirs.map((choice) => choice.name), ["Pour des points, tape un nombre (ex. 3000)", "Rien (0 point : un cadeau)", "Roucool ×1 en trop"]);
+    assert.deepEqual(theirs.map((choice) => choice.value), ["—", "pts:0", "open", ids("Roucool")]);
+    assert.match(theirs[1].name, /un cadeau/, "côté destinataire, « rien » se dit comme un cadeau");
+    assert.match(theirs[2].name, /À son choix/, "ce qu'on demande peut rester ouvert, ce qu'on donne jamais");
+    assert.match(theirs[3].name, /Roucool ×1 en trop/);
     const noSpecies = payloadOf(await asked({ name: "mon_individu", value: "" }), "respond");
     assert.match(noSpecies[0].name, /Choisis d'abord l'espèce dans l'option « je_donne »/);
     const notSpecies = payloadOf(await asked({ name: "mon_individu", value: "" }, { je_donne: "300" }), "respond");
@@ -993,7 +1021,7 @@ describe("/pk evolution", () => {
   it("propose le bouton d'évolution avec le coût, quand on a de quoi payer", async () => {
     await ownMany("Rattata", 3);
     const calls = await evolution(evo("Rattata"));
-    assert.deepEqual(payloadOf(calls, "deferReply"), { flags: EPHEMERAL });
+    assert.equal(payloadOf(calls, "deferReply")?.flags, EPHEMERAL);
     const reply = payloadOf(calls, "editReply");
     assert.match(textOf(reply), /peut évoluer en \*\*Rattatac\*\*/);
     assert.match(textOf(reply), /Coût[\s\S]*1 \*\*?Rattata|\*\*1\*\* Rattata sacrifié/);
@@ -1038,8 +1066,10 @@ describe("/pk evolution", () => {
     await ownMany("Évoli", 3);
     const reply = payloadOf(await evolution(evo("Évoli")), "editReply");
     const labels = reply.components.flatMap((row) => row.toJSON().components.map((button) => button.label));
-    assert.match(labels[0], /Évolution aléatoire \(1\s500 pts\)/);
-    assert.match(labels[1], /Choisir l'évolution \(3\s000 pts\)/);
+    const fr = (value) => value.toLocaleString("fr-FR");
+    const { evolution: tariff } = getPokemonConfig();
+    assert.ok(labels[0].includes(`Évolution aléatoire (${fr(tariff[2].points)} pts)`), labels[0]);
+    assert.ok(labels[1].includes(`Choisir l'évolution (${fr(tariff.branchChoicePoints)} pts)`), labels[1]);
   });
 
   it("il manque des exemplaires : aucun bouton, et l'écran dit combien", async () => {
@@ -1072,7 +1102,7 @@ describe("/pk evolution", () => {
 
   it("l'autocomplétion : ce qui peut évoluer, ou ce qui manque, ou « rien »", async () => {
     const empty = payloadOf(await runAutocomplete(pk, { sub: "evolution", focused: { name: "espece", value: "" } }), "respond");
-    assert.deepEqual(empty, [{ name: "Aucun Pokémon de ta collection ne peut évoluer", value: "—" }]);
+    assertInert(empty, /ne peut évoluer/);
     await ownMany("Rattata", 2);
     const missing = payloadOf(await runAutocomplete(pk, { sub: "evolution", focused: { name: "espece", value: "" } }), "respond");
     assert.match(missing[0].name, /^⚠️ Rattata : 3 exemplaires requis, tu en as 2$/);
@@ -1120,7 +1150,7 @@ describe("/pk safari", () => {
     const price = getSafariConfig().entryPrice;
     await setBalance(price + 10);
     const calls = await safari();
-    assert.deepEqual(payloadOf(calls, "deferReply"), { flags: EPHEMERAL });
+    assert.equal(payloadOf(calls, "deferReply")?.flags, EPHEMERAL);
     const reply = payloadOf(calls, "editReply");
     assert.match(reply.content, new RegExp(`${price.toLocaleString("fr-FR")}\\*\\* points seront débités : il t'en restera \\*\\*10\\*\\*`));
     assert.deepEqual(
@@ -1179,20 +1209,5 @@ describe("/pk safari", () => {
     const reply = payloadOf(await safari(), "editReply").content;
     assert.match(reply, /ton entrée est offerte/);
     assert.equal(await balance(), 100000);
-  });
-});
-
-describe("les commandes ne fabriquent ni ne perdent rien", () => {
-  it("une série de commandes de jeu laisse le total de Pokémon et de points cohérent", async () => {
-    await setBalance(5000);
-    const before = {
-      owned: (await dbAll(points, "SELECT id FROM pokemon_owned")).length,
-      balance: await balance(),
-    };
-    await ownMany("Rattata", 4);
-    await runCommand(pk, { group: "revendre", sub: "pokemon", options: { espece: String(species("Rattata").id), quantite: 2 } });
-    const sold = (await dbAll(points, "SELECT id FROM pokemon_owned")).length;
-    assert.equal(sold, before.owned + 2, "quatre reçus, deux vendus");
-    assert.ok((await balance()) > before.balance, "la revente a crédité");
   });
 });

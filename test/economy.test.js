@@ -102,7 +102,7 @@ describe("points", () => {
 
   it("le solde se met en forme avec les séparateurs français", () => {
     const embed = economy.buildBalanceEmbed(12345).toJSON();
-    assert.match(JSON.stringify(embed), /12[\s\u202f\u00a0]345/);
+    assert.match(embed.description, /12[\s\u202f\u00a0]345/);
   });
 
   it("sans nextPointsAt, la ligne de délai n'apparaît pas", () => {
@@ -381,11 +381,13 @@ describe("revente d'un objet", () => {
     assert.equal(await balance(), 0);
   });
 
+  // Qui gagne la course se joue sur consumeItem (« deux clics simultanés ») :
+  // ici, seulement que la vente ne crédite pas deux fois ce qu'un seul a retiré.
   it("deux ventes simultanées du même objet ne le paient qu'une fois", async () => {
     await grant("pepite", 1);
-    const results = await Promise.all([call(sell.sellItem, "u1", "pepite", 1), call(sell.sellItem, "u1", "pepite", 1)]);
-    assert.equal(results.filter((result) => result.ok).length, 1);
+    await Promise.all([call(sell.sellItem, "u1", "pepite", 1), call(sell.sellItem, "u1", "pepite", 1)]);
     assert.equal(await balance(), items.itemSellValue(items.getItem("pepite")));
+    assert.equal(await count("pepite"), 0);
   });
 
   it("rend les objets si le crédit échoue : rien ne se perd, rien ne se crée", async () => {

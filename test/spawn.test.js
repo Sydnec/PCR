@@ -141,18 +141,12 @@ describe("revendication d'une apparition (registerMessageForSpawn)", () => {
     assert.equal(fetches, 1);
   });
 
-  it("un légendaire, lui, n'est jamais chassé par les messages", async () => {
-    await arrange({ active: "LEGENDAIRE" });
+  it("un légendaire, lui, n'est jamais chassé par les messages, même après des milliers", async () => {
+    await arrange({ active: "LEGENDAIRE", count: 50_000 });
     const state = await message();
     assert.equal(claimed(state), false);
     assert.equal(fetches, 0);
-    assert.ok(state.message_count >= 1000, "le compteur continue de monter");
-  });
-
-  it("même après des milliers de messages, un légendaire reste", async () => {
-    await arrange({ active: "LEGENDAIRE", count: 50_000 });
-    assert.equal(claimed(await message()), false);
-    assert.equal(fetches, 0);
+    assert.ok(state.message_count >= 50_000, "le compteur continue de monter");
   });
 
   it("le légendaire parti, le message suivant fait apparaître le prochain", async () => {

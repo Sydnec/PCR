@@ -38,7 +38,12 @@ import { activeGeneration, generationOrdinal, getSpecies } from "./data.js";
 import { chooseStarter, generationOfStarter } from "./starters.js";
 import { claimShowcaseShare, getShowcase, releaseShowcaseShare } from "./showcase.js";
 import { renderShowcaseImage } from "./showcase-image.js";
-import { handleDraftButton, handleDraftModal, handleDraftSelect } from "./trade-draft.js";
+import {
+  handleDraftButton,
+  handleDraftModal,
+  handleDraftSelect,
+  openCounterDraft,
+} from "./trade-draft.js";
 import {
   DITTO_HELPER,
   acceptTrade,
@@ -774,6 +779,8 @@ function acceptAndSettle(interaction, trade, options, write) {
       handleException(err);
       return ephemeral(interaction, "❌ Erreur base de données.");
     }
+    // Offre « à son choix » : refus personnel, l'offre reste ouverte et intacte.
+    if (result.open) return ephemeral(interaction, `❌ ${result.reason}`);
     if (result.stale) {
       return settleStale(trade, ({ expired, handled }) =>
         handled ? write(trade, null, null, { handled }) : write(expired, "EXPIRED")
@@ -856,6 +863,15 @@ function handleTradeButton(interaction, action, tradeId) {
 
     if (userId !== trade.to_user_id) {
       return ephemeral(interaction, "❌ Cet échange ne t'est pas destiné.");
+    }
+
+    // La contre-offre s'écrit dans un brouillon privé ; rien ne change avant « Proposer »,
+    // qui ferme alors l'offre (counterTrade) si elle est encore ouverte.
+    if (action === "counter") {
+      return openCounterDraft(interaction, trade).catch((error) => {
+        handleException("Ouverture d'une contre-offre :", error);
+        ephemeral(interaction, "❌ Erreur base de données.");
+      });
     }
 
     if (action === "decline") {
@@ -1558,6 +1574,8 @@ export async function handlePokemonButton(interaction) {
       return handleTradeButton(interaction, "decline", args[0]);
     case "poke_trade_cancel":
       return handleTradeButton(interaction, "cancel", args[0]);
+    case "poke_trade_counter":
+      return handleTradeButton(interaction, "counter", args[0]);
 
     // Le brouillon d'un échange (/pk echange sans options) : ses boutons.
     case "poke_td_side":

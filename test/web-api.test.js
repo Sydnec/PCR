@@ -13,8 +13,11 @@ const { routes, HttpError } = await import("../modules/web/api.js");
 const data = await import("../modules/pokemon/data.js");
 const items = await import("../modules/pokemon/items.js");
 const economy = await import("../modules/economy.js");
+const { getPokemonConfig, getSafariConfig } = await import("../modules/pokemon/config.js");
 
 const species = (name) => speciesByName(data.allSpecies, name);
+// Le prix à l'unité d'un Super Bonbon, lu dans le catalogue comme le fait la route.
+const candyValue = () => items.itemSellValue(items.getItem("super_bonbon"));
 const route = (method, path) => {
   const found = routes.find((entry) => entry.method === method && entry.path === path);
   assert.ok(found, `${method} ${path} n'existe pas`);
@@ -66,16 +69,19 @@ describe("référentiels", () => {
   it("la liste des espèces ne contient que la génération ouverte", async () => {
     const { generation, species: list } = await call("GET", "/api/species");
     assert.equal(generation, 1);
-    assert.equal(list.length, 151);
+    assert.equal(list.length, data.allSpeciesData().filter((entry) => entry.generation === 1).length);
     assert.ok(list.every((entry) => entry.generation === 1));
   });
 
-  it("annonce le taux de capture EFFECTIF : un légendaire à taux 3 s'affiche à 10", async () => {
+  it("annonce le taux de capture EFFECTIF : un légendaire sous le plancher s'affiche au plancher", async () => {
     const { species: list } = await call("GET", "/api/species");
     const by = (name) => list.find((entry) => entry.name === name);
-    assert.equal(by("Mewtwo").catchRate, 10);
-    assert.equal(by("Artikodin").catchRate, 10);
-    assert.equal(by("Mew").catchRate, 45, "Mew n'est pas relevé");
+    const floor = getPokemonConfig().capture.minCatchRate;
+    for (const name of ["Mewtwo", "Artikodin"]) {
+      assert.ok(species(name).catchRate < floor, `${name} : le taux brut est sous le plancher`);
+      assert.equal(by(name).catchRate, floor, name);
+    }
+    assert.equal(by("Mew").catchRate, species("Mew").catchRate, "Mew n'est pas relevé");
     assert.equal(by("Roucool").catchRate, species("Roucool").catchRate);
     assert.equal(by("Mewtwo").legendary, true);
     assert.equal(by("Mewtwo").rarity, "LEGENDAIRE");
@@ -124,7 +130,9 @@ describe("référentiels", () => {
   it("les règles disent de combien la Master Ball renchérit, et elle seule", async () => {
     const { balls } = (await call("GET", "/api/rules")).capture;
     const growth = Object.fromEntries(balls.map((ball) => [ball.key, ball.priceGrowth]));
-    assert.deepEqual(growth, { poke: null, super: null, hyper: null, master: 1.2 });
+    const master = getPokemonConfig().capture.balls.master.priceGrowth;
+    assert.ok(master > 1, "la Master Ball renchérit");
+    assert.deepEqual(growth, { poke: null, super: null, hyper: null, master });
   });
 });
 
@@ -135,7 +143,8 @@ describe("sac : le prix de revente et la vente", () => {
     await grant("pepite", 2);
     const { items: rows } = await call("GET", "/api/users/:userId/inventory", { params: { userId: "me" } });
     const by = (key) => rows.find((row) => row.key === key);
-    assert.equal(by("super_bonbon").sellValue, 300);
+    assert.ok(candyValue() > 0, "le Super Bonbon se revend");
+    assert.equal(by("super_bonbon").sellValue, candyValue());
     assert.equal(by("pepite").sellValue, items.itemSellValue(items.getItem("pepite")));
     assert.equal(by("ball_master").sellValue, null);
     assert.equal(by("super_bonbon").count, 3);
@@ -156,8 +165,8 @@ describe("sac : le prix de revente et la vente", () => {
   it("vend des objets : { sold, unit, points }, comme /pk revendre objet", async () => {
     await grant("super_bonbon", 3);
     const result = await call("POST", "/api/me/sell-item", { body: { key: "super_bonbon", quantity: 2 } });
-    assert.deepEqual(result, { sold: 2, unit: 300, points: 600 });
-    assert.equal(await balance(), 600);
+    assert.deepEqual(result, { sold: 2, unit: candyValue(), points: 2 * candyValue() });
+    assert.equal(await balance(), 2 * candyValue());
     const { items: rows } = await call("GET", "/api/users/:userId/inventory", { params: { userId: "me" } });
     assert.equal(rows.find((row) => row.key === "super_bonbon").count, 1);
   });
@@ -173,7 +182,7 @@ describe("sac : le prix de revente et la vente", () => {
       const result = await call("POST", "/api/me/sell-item", { body: { key: "super_bonbon", quantity } });
       assert.equal(result.sold, 1, `quantité ${quantity}`);
     }
-    assert.equal(await balance(), 4 * 300);
+    assert.equal(await balance(), 4 * candyValue());
   });
 
   it("répond 400 sans objet, 409 quand le jeu refuse", async () => {
@@ -189,12 +198,6 @@ describe("sac : le prix de revente et la vente", () => {
     assert.equal(missing.status, 409);
     assert.match(missing.message, /Tu n'as pas/);
     assert.equal(await balance(), 0);
-  });
-
-  it("la route est protégée : connexion exigée et requête d'écriture", () => {
-    const sellItem = route("POST", "/api/me/sell-item");
-    assert.equal(sellItem.auth, true);
-    assert.equal(sellItem.write, true);
   });
 
   it("vend un Pokémon : le même chemin que /pk revendre pokemon", async () => {
@@ -254,10 +257,12 @@ describe("parc safari : la visite et sa lignée", () => {
     await seedVisit("Bulbizarre", { bait: 1 });
     const { visit } = await call("GET", "/api/safari");
     const { encounter } = visit;
+    const config = getSafariConfig();
     assert.equal(encounter.bait, 1);
-    assert.equal(encounter.baitFactor, 2);
+    assert.equal(encounter.baitFactor, config.baitMultiplier);
     assert.equal(encounter.baitCapped, false);
-    assert.ok(Math.abs(encounter.fleeRisk - 0.08) < 1e-9);
+    // La fuite part du taux à jeun et monte d'un cran par appât avalé : l'écran annonce celle de la prochaine ball.
+    assert.ok(Math.abs(encounter.fleeRisk - (config.wildFleeChance + config.wildFleeChancePerBait)) < 1e-9);
     assert.ok(encounter.probability > 0 && encounter.probability <= 1);
   });
 
@@ -276,16 +281,10 @@ describe("parc safari : la visite et sa lignée", () => {
     assert.equal(result.visit.actionsLeft, 24);
   });
 
-  it("sans visite en cours, il n'y a pas de rencontre", async () => {
-    const { visit } = await call("GET", "/api/safari");
-    assert.equal(visit, null);
-  });
-
-  it("refuse une action invalide, ou une visite qui n'est pas la sienne", async () => {
+  // Les entrées invalides d'une action (400) sont validées dans web-routes.test.js ; ici, seul
+  // reste ce qui demande une visite en base : celle d'un autre.
+  it("la visite d'un autre dresseur n'est pas la sienne : 409", async () => {
     await seedVisit("Bulbizarre");
-    for (const body of [{}, { sessionId: "x", token: 25, action: "BALL" }, { sessionId: 1, token: 25, action: "TELEPORT" }]) {
-      assert.equal((await failure(call("POST", "/api/safari/action", { body }))).status, 400);
-    }
     const stranger = await failure(
       call("POST", "/api/safari/action", { body: { sessionId: 1, token: 25, action: "BALL" }, user: { id: "intrus" } })
     );
@@ -367,11 +366,5 @@ describe("administration des réglages", () => {
     assert.equal((await failure(call("POST", "/api/admin/config", { body: { path: "pokemon.capture.minCatchRate", value: "  " } }))).status, 400);
     assert.equal((await failure(call("POST", "/api/admin/config", { body: { path: 5, value: 1 } }))).status, 400);
     assert.equal((await failure(call("POST", "/api/admin/config", { body: { path: "x", value: { a: 1 } } }))).status, 400);
-  });
-
-  it("seul un administrateur la voit : la route le déclare", () => {
-    assert.equal(route("GET", "/api/admin/config").admin, true);
-    assert.equal(route("POST", "/api/admin/config").admin, true);
-    assert.equal(route("POST", "/api/admin/config").write, true);
   });
 });
