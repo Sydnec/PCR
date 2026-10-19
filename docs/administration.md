@@ -38,4 +38,7 @@
   - `/admin purge [lien] [nombre]` : suppression de messages en masse.
   - `/admin pokespawn [espece] [shiny] [annonce] [ping]` : déclenche une apparition (voir [Pokémon](pokemon/README.md)).
   - `/admin safarispawn [joueur] [pause]` : ouvre un parc safari (voir [Parc Safari](pokemon/safari.md)).
+  - `/admin saison` : l'aperçu du bilan de la saison en cours, tel que le bot le publiera à l'ouverture
+    de la génération suivante (voir [Bilan de saison](pokemon/README.md#bilan-de-saison)). Il ne publie
+    ni n'enregistre rien.
   - `/admin restart` : redémarre le bot.

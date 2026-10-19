@@ -3,10 +3,35 @@
 // La lecture du fichier, les valeurs par défaut et la fusion vivent dans
 // modules/config.js, qui en est le propriétaire unique : ce module n'en expose
 // que la tranche Pokémon et les commodités qui vont avec.
-import { getConfig } from "../config.js";
+import { DEFAULTS, getConfig } from "../config.js";
 
 export function getPokemonConfig() {
   return getConfig().pokemon;
+}
+
+// Les réglages du bilan de saison. config.json est un fichier qu'on retouche à la main : une
+// valeur qui n'est pas un entier positif retombe sur celle du code (DEFAULTS), plutôt que de
+// donner un classement de longueur NaN ou un bail d'un envoi qui n'expire jamais.
+export function getSeasonRecapConfig() {
+  const config = getPokemonConfig().seasonRecap ?? {};
+  const fallback = DEFAULTS.pokemon.seasonRecap;
+  const whole = (key, min = 1) => {
+    const value = Math.floor(Number(config[key]));
+    return Number.isFinite(value) && value >= min ? value : fallback[key];
+  };
+  return {
+    enabled: config.enabled !== false,
+    topSize: whole("topSize"),
+    podiumSize: whole("podiumSize"),
+    minThrowsForLuck: whole("minThrowsForLuck"),
+    minLotteryDraws: whole("minLotteryDraws"),
+    minSpawnsForFleeRate: whole("minSpawnsForFleeRate"),
+    publishWithinHours: whole("publishWithinHours"),
+    retryMinutes: whole("retryMinutes"),
+    // Zéro est une valeur valable : pas de retentative, ou pas d'attente.
+    recordRetries: whole("recordRetries", 0),
+    recordRetryDelayMs: whole("recordRetryDelayMs", 0),
+  };
 }
 
 // Renvoie la définition d'une ball, ou null si la clé est inconnue.

@@ -159,7 +159,7 @@ function pay(id, rod, species, cb) {
             })
       );
     }
-    insertFishingSpawn(id, species, (insertError, spawnId) => {
+    insertFishingSpawn(id, species, rod.rod.price, (insertError, spawnId) => {
       if (insertError) {
         return addPoints(id, rod.rod.price, (refundError) => {
           if (refundError) handleException("Remboursement d'une pêche :", refundError);
@@ -185,8 +185,10 @@ function pay(id, rod, species, cb) {
 }
 
 // Enregistre la touche : sexe, forme, objet tenu et shiny tirés ici, une fois, comme pour
-// une apparition du salon. `cb(err, id)` : l'identifiant de la ligne écrite.
-function insertFishingSpawn(userId, species, cb) {
+// une apparition du salon. `price` : ce que la canne a coûté, gardé dans la ligne pour que le
+// bilan de saison compte les points dépensés à la pêche. `cb(err, id)` : l'identifiant de la
+// ligne écrite.
+function insertFishingSpawn(userId, species, price, cb) {
   const config = getPokemonConfig();
   const now = Date.now();
   const fleeMs = Math.max(1, Number(config.fishing.fleeSeconds)) * 1000;
@@ -194,8 +196,8 @@ function insertFishingSpawn(userId, species, cb) {
   db.run(
     `INSERT INTO pokemon_spawns
        (species_id, is_shiny, catch_rate, rarity, status, spawned_at, flees_at, held_item, sex,
-        charm_shiny, form, fished, reserved_for)
-     VALUES (?, ?, ?, ?, 'FISHING', ?, ?, ?, ?, ?, ?, 1, ?)`,
+        charm_shiny, form, fished, reserved_for, cast_cost)
+     VALUES (?, ?, ?, ?, 'FISHING', ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
     [
       species.id,
       shiny ? 1 : 0,
@@ -208,6 +210,7 @@ function insertFishingSpawn(userId, species, cb) {
       charm ? 1 : 0,
       rollForm(species),
       userId,
+      price,
     ],
     function (err) {
       cb(err, this?.lastID);

@@ -10,6 +10,7 @@ import potcommun from "./admin/potcommun.js";
 import purge from "./admin/purge.js";
 import pokespawn from "./admin/pokespawn.js";
 import safarispawn from "./admin/safarispawn.js";
+import saison from "./admin/saison.js";
 import restart from "./admin/restart.js";
 
 // Routeur des commandes d'administration. Chaque sous-commande garde son propre
@@ -29,6 +30,7 @@ const SUBCOMMANDS = [
   purge,
   pokespawn,
   safarispawn,
+  saison,
   restart,
 ];
 

@@ -27,7 +27,7 @@ const ticket = (user = "u1") => call(lottery.getTicket, user);
 
 beforeEach(async () => {
   await dbRun(points, "DROP TRIGGER IF EXISTS panne");
-  for (const table of ["pokemon_lottery", "pokemon_inventory", "pokemon_item_log", "pokemon_owned"]) await dbRun(points, `DELETE FROM ${table}`);
+  for (const table of ["pokemon_lottery", "pokemon_lottery_draws", "pokemon_inventory", "pokemon_item_log", "pokemon_owned"]) await dbRun(points, `DELETE FROM ${table}`);
   sandbox.writeConfig(GEN1);
 });
 
@@ -167,6 +167,73 @@ describe("jouer (play)", () => {
     assert.equal(row.last_day, "");
     const retry = await win();
     assert.equal(retry.ok, true, "il peut retenter tout de suite");
+  });
+});
+
+describe("le journal daté des tirages (lu par le bilan de saison)", () => {
+  const play = (user = "u1") => call(lottery.play, user);
+  const draws = (user = "u1") => dbAll(points, "SELECT user_id, won, drawn_at FROM pokemon_lottery_draws WHERE user_id = ? ORDER BY id", [user]);
+
+  it("un gain écrit un tirage daté, marqué gagnant", async () => {
+    const before = Date.now();
+    assert.equal((await withRandom([0, 0, 0], () => play())).ok, true);
+    await eventually(async () => {
+      const rows = await draws();
+      assert.equal(rows.length, 1);
+      assert.equal(rows[0].won, 1);
+      assert.ok(rows[0].drawn_at >= before && rows[0].drawn_at <= Date.now());
+    });
+    assert.equal((await ticket()).draws, 1, "le journal raconte la même chose que le compteur");
+  });
+
+  it("des mains vides écrivent un tirage perdant", async () => {
+    await withRandom([0.999], () => play());
+    await eventually(async () => assert.deepEqual((await draws()).map((row) => row.won), [0]));
+  });
+
+  it("un tirage refusé (déjà joué aujourd'hui, loterie fermée) n'écrit rien", async () => {
+    await withRandom([0.999], () => play());
+    await eventually(async () => assert.equal((await draws()).length, 1));
+    assert.equal((await play()).played, true);
+    sandbox.writeConfig({ pokemon: { ...GEN1.pokemon, lottery: { enabled: false } } });
+    assert.equal((await play("u2")).ok, false);
+    await sleep(100);
+    assert.equal((await draws()).length, 1);
+    assert.deepEqual(await draws("u2"), []);
+  });
+
+  it("dix commandes simultanées : une seule ligne", async () => {
+    await withRandom([0, 0, 0], async () => Promise.all(Array.from({ length: 10 }, () => play())));
+    await eventuallyStable(async () => assert.equal((await draws()).length, 1));
+  });
+
+  it("un tirage rendu après une panne retire sa ligne, comme le compteur recule", async () => {
+    await dbRun(points, "CREATE TRIGGER panne BEFORE INSERT ON pokemon_inventory BEGIN SELECT RAISE(ABORT, 'panne'); END");
+    await assert.rejects(() => withRandom([0, 0, 0], () => play()), /panne/);
+    await dbRun(points, "DROP TRIGGER panne");
+    assert.equal((await ticket()).draws, 0);
+    assert.deepEqual(await draws(), [], "le tirage rendu n'a pas eu lieu");
+    // Retenté, il s'écrit une seule fois.
+    assert.equal((await withRandom([0, 0, 0], () => play())).ok, true);
+    await eventually(async () => assert.deepEqual((await draws()).map((row) => row.won), [1]));
+  });
+
+  it("un journal qui ne s'écrit pas ne prive pas du tirage : il est signalé, le lot est donné", async () => {
+    await dbRun(points, "CREATE TRIGGER panne BEFORE INSERT ON pokemon_lottery_draws BEGIN SELECT RAISE(ABORT, 'panne'); END");
+    const lines = [];
+    const original = console.error;
+    console.error = (...args) => lines.push(args.join(" "));
+    try {
+      const result = await withRandom([0, 0, 0], () => play());
+      assert.equal(result.ok, true);
+      assert.equal(await stock(result.prize.item.key), result.prize.quantity);
+      await eventually(async () => assert.ok(lines.some((line) => line.includes("Journal des tirages de loterie") && line.includes("panne"))));
+      assert.equal((await ticket()).draws, 1);
+      assert.deepEqual(await draws(), []);
+    } finally {
+      console.error = original;
+      await dbRun(points, "DROP TRIGGER panne");
+    }
   });
 });
 

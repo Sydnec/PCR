@@ -551,6 +551,31 @@ const POKEMON = {
     weightsByStage: { 1: 50, 2: 60, 3: 40 },
     legendaryWeight: 24,
   },
+  // Le bilan de saison : une saison court d'une ouverture de génération à la suivante, et son
+  // bilan part dans le salon des apparitions quand la suivante s'ouvre (modules/pokemon/season.js).
+  // `topSize` : la longueur des classements d'espèces ; `podiumSize` : celle des podiums de
+  // dresseurs. Un classement ne retient que ce que son échantillon rend parlant : `minThrowsForLuck`
+  // lancers pour juger la chance d'un dresseur, `minLotteryDraws` tirages pour la loterie,
+  // `minSpawnsForFleeRate` apparitions pour le taux de fuite d'une espèce : un taux calculé sur
+  // deux lancers ne dit rien. Un bilan dont la saison a fini il y a plus de `publishWithinHours`
+  // heures ne part plus : une installation neuve, ou un bot resté éteint, ne publie pas de vieilles
+  // nouvelles. `retryMinutes` : l'attente après un envoi raté, multipliée par le nombre d'essais
+  // (c'est aussi le bail d'un envoi interrompu par un arrêt). `recordRetries` : combien de fois
+  // on retente d'écrire que le bilan est parti quand cette écriture échoue, `recordRetryDelayMs`
+  // l'attente avant la première retentative, doublée à chacune — ne pas l'écrire ferait renvoyer
+  // le bilan en double une fois le bail expiré.
+  seasonRecap: {
+    enabled: true,
+    topSize: 5,
+    podiumSize: 3,
+    minThrowsForLuck: 30,
+    minLotteryDraws: 5,
+    minSpawnsForFleeRate: 5,
+    publishWithinHours: 168,
+    retryMinutes: 10,
+    recordRetries: 3,
+    recordRetryDelayMs: 500,
+  },
 };
 export const DEFAULTS = {
   // Points gagnés selon le rang du message dans la journée du dresseur.
@@ -822,6 +847,23 @@ const BOUNDS = {
   "pokemon.spawn.generationBoost": { min: 1 },
   // Sous 1, chaque Master Ball achetée coûterait MOINS que la précédente.
   "pokemon.capture.balls.master.priceGrowth": { min: 1 },
+  // Un classement vide ne dit rien, et au-delà de dix lignes le bilan dépasse ce qu'un message de
+  // Discord peut porter (6 000 caractères pour l'ensemble des embeds).
+  "pokemon.seasonRecap.topSize": { min: 1, max: 10 },
+  "pokemon.seasonRecap.podiumSize": { min: 1, max: 10 },
+  // Divisions par le nombre de lancers, de tirages ou d'apparitions : à 0, un dresseur ou une
+  // espèce sans la moindre donnée entrerait au classement avec un taux indéfini.
+  "pokemon.seasonRecap.minThrowsForLuck": { min: 1 },
+  "pokemon.seasonRecap.minLotteryDraws": { min: 1 },
+  "pokemon.seasonRecap.minSpawnsForFleeRate": { min: 1 },
+  // À 0, aucun bilan ne partirait jamais : la saison est déjà finie quand on le publie.
+  "pokemon.seasonRecap.publishWithinHours": { min: 1 },
+  // À 0, un envoi raté serait retenté à chaque passage du minuteur, jusqu'à saturer le journal.
+  "pokemon.seasonRecap.retryMinutes": { min: 1, max: 1440 },
+  // Zéro retentative est permis (une seule écriture). Au-delà de dix, ou d'une attente de dix
+  // secondes avant la première, le minuteur resterait suspendu sur une base qui ne répond pas.
+  "pokemon.seasonRecap.recordRetries": { min: 0, max: 10 },
+  "pokemon.seasonRecap.recordRetryDelayMs": { min: 0, max: 10000 },
   // On n'ouvre que ce que le jeu de données contient. Le plafond est lu dans le
   // fichier plutôt qu'écrit ici : préparer la génération suivante, c'est
   // régénérer ce fichier, et rien d'autre ne doit avoir à suivre.

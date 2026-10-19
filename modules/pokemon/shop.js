@@ -40,6 +40,20 @@ export function getUnitCounts(userId, cb, { spawnedAt = null } = {}) {
   );
 }
 
+// Le journal des achats, pour le bilan de saison : ce qui a été réellement payé, balls livrées.
+// Au mieux, comme le journal des objets (logMovement) : une écriture ratée est signalée mais ne
+// défait pas un achat dont les points sont partis et les balls arrivées.
+function logPurchase(userId, ballKey, quantity, cost) {
+  db.run(
+    `INSERT INTO pokemon_shop_purchases (user_id, ball, quantity, cost, bought_at)
+     VALUES (?, ?, ?, ?, ?)`,
+    [String(userId), ballKey, quantity, cost, Date.now()],
+    (err) => {
+      if (err) handleException("Journal des achats de la boutique :", err);
+    }
+  );
+}
+
 // Achète `quantity` exemplaires de `ballKey`. `cb(err, result)` avec
 // { ok: false, reason } pour un refus (chiffres compris), ou { ok: true, bought, cost }.
 // Chaque exemplaire s'insère sous la garde du plafond : deux achats simultanés ne le
@@ -100,6 +114,7 @@ export function buyBalls(userId, ballKey, quantity, cb) {
         const missing = quantity - bought;
         if (!missing) {
           recordPurchase({ userId: String(userId), cost });
+          logPurchase(userId, ball.key, bought, cost);
           return cb(null, { ok: true, bought, cost });
         }
         // Rendre ce qui n'a pas été livré, au prix payé.
@@ -109,7 +124,11 @@ export function buyBalls(userId, ballKey, quantity, cb) {
           // l'achat existe — des balls en poche, des points débités — et se dit tel.
           if (error && !bought) return cb(error);
           if (error) handleException("Achat de balls interrompu :", error);
-          if (bought) recordPurchase({ userId: String(userId), cost: unit * bought });
+          if (bought) {
+            recordPurchase({ userId: String(userId), cost: unit * bought });
+            // Seule la part livrée, au prix payé : le reste est rendu.
+            logPurchase(userId, ball.key, bought, unit * bought);
+          }
           cb(null, {
             ok: bought > 0,
             partial: bought > 0,

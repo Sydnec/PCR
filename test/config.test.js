@@ -17,6 +17,8 @@ const {
   previewConfigValue,
 } = await import("../modules/config.js");
 
+const { getSeasonRecapConfig } = await import("../modules/pokemon/config.js");
+
 const onDisk = () => JSON.parse(fs.readFileSync(sandbox.configFile, "utf8"));
 
 describe("lecture", () => {
@@ -188,6 +190,45 @@ describe("écriture (/admin config)", () => {
     assert.equal(writeConfigValue("pokemon.capture.balls.master.priceGrowth", "1").ok, true, "1 : prix fixe");
     assert.equal(writeConfigValue("pokemon.capture.balls.master.priceGrowth", "1,5").ok, true);
     assert.equal(getConfig().pokemon.capture.balls.master.priceGrowth, 1.5);
+  });
+
+  it("borne le bilan de saison : des classements non vides et de longueur raisonnable, des seuils jamais nuls", () => {
+    const { seasonRecap } = DEFAULTS.pokemon;
+    assert.deepEqual(
+      { ...seasonRecap },
+      { enabled: true, topSize: 5, podiumSize: 3, minThrowsForLuck: 30, minLotteryDraws: 5, minSpawnsForFleeRate: 5, publishWithinHours: 168, retryMinutes: 10, recordRetries: 3, recordRetryDelayMs: 500 }
+    );
+    for (const key of ["topSize", "podiumSize"]) {
+      assert.equal(writeConfigValue(`pokemon.seasonRecap.${key}`, "0").ok, false, `${key} à 0`);
+      assert.equal(writeConfigValue(`pokemon.seasonRecap.${key}`, "11").ok, false, `${key} à 11`);
+      assert.equal(writeConfigValue(`pokemon.seasonRecap.${key}`, "10").ok, true);
+      assert.equal(writeConfigValue(`pokemon.seasonRecap.${key}`, "1").ok, true);
+    }
+    for (const key of ["minThrowsForLuck", "minLotteryDraws", "minSpawnsForFleeRate", "publishWithinHours"]) {
+      const refused = writeConfigValue(`pokemon.seasonRecap.${key}`, "0");
+      assert.equal(refused.ok, false, `${key} à 0`);
+      assert.match(refused.reason, /en dessous du minimum autorisé \(1\)/);
+      assert.equal(writeConfigValue(`pokemon.seasonRecap.${key}`, "-3").ok, false);
+      assert.equal(writeConfigValue(`pokemon.seasonRecap.${key}`, "1").ok, true);
+    }
+    assert.equal(writeConfigValue("pokemon.seasonRecap.retryMinutes", "0").ok, false);
+    assert.equal(writeConfigValue("pokemon.seasonRecap.retryMinutes", "1441").ok, false);
+    // Les retentatives d'écriture : zéro est permis, un plafond protège le minuteur.
+    assert.equal(writeConfigValue("pokemon.seasonRecap.recordRetries", "0").ok, true);
+    assert.equal(writeConfigValue("pokemon.seasonRecap.recordRetries", "11").ok, false);
+    assert.equal(writeConfigValue("pokemon.seasonRecap.recordRetries", "-1").ok, false);
+    assert.equal(writeConfigValue("pokemon.seasonRecap.recordRetryDelayMs", "0").ok, true);
+    assert.equal(writeConfigValue("pokemon.seasonRecap.recordRetryDelayMs", "10001").ok, false);
+    assert.equal(writeConfigValue("pokemon.seasonRecap.enabled", "non").after, false);
+  });
+
+  it("un réglage du bilan de saison abîmé à la main retombe sur la valeur du code", () => {
+    sandbox.writeConfig({ pokemon: { seasonRecap: { topSize: "beaucoup", podiumSize: -2, minThrowsForLuck: 0, publishWithinHours: 36.9, enabled: false, recordRetries: 0, recordRetryDelayMs: -5 } } });
+    const config = getSeasonRecapConfig();
+    assert.deepEqual(
+      { ...config },
+      { enabled: false, topSize: 5, podiumSize: 3, minThrowsForLuck: 30, minLotteryDraws: 5, minSpawnsForFleeRate: 5, publishWithinHours: 36, retryMinutes: 10, recordRetries: 0, recordRetryDelayMs: 500 }
+    );
   });
 
   it("exige une date ISO complète, fuseau compris, pour ouvrir une génération", () => {

@@ -52,7 +52,7 @@ génération ouverte en cours de route.
 | `safari`, `safari-entry`, `safari-live` | tirage des rencontres, appâts et fuite, actions, entrée payante ou offerte, reprise d'une visite, partage en direct |
 | `economy`, `redistribution`       | points, objets, revente, compensation en cascade, pot commun (plan, bail, rattrapage, simultanéité)                |
 | `evolution`, `collection`         | coût d'une évolution, sacrifices, objets, Métamorph, compensation ; individus, verrous, doublons, échanges, échanges possibles |
-| `eggs`, `lottery-charms`          | ponte, éclosion, compteur de messages ; loterie quotidienne, Charme Chroma et ses rôles                            |
+| `eggs`, `lottery-charms`          | ponte, éclosion, compteur de messages ; loterie quotidienne et son journal daté, Charme Chroma et ses rôles       |
 | `pc-showcase`                     | boîtes PC, surnoms, vitrine, envoi de la vitrine                                                                   |
 | `embeds`                          | embeds Discord, lignée, formats                                                                                    |
 | `web-api`, `web-routes`           | toutes les routes de l'API du site : validation (400), droits (401/403/404), refus du jeu (409)                    |
@@ -62,8 +62,10 @@ génération ouverte en cours de route.
 | `commands-pk`, `commands-admin`   | déclaration de toutes les commandes (limites de Discord), sous-commandes `/pk` et `/admin`                         |
 | `message-sync`, `public-messages`, `message-closed-migration` | réécriture des messages publics : une à la fois, relue en base, réessais ; courses capture/fuite/échange/parc/objet, expiration des offres, rattrapage, marque de l'historique |
 | `messages`                        | points gagnés par message, statistiques, compteur du jeu, réécriture des liens X/Instagram et traduction           |
-| `timers`                          | chaque minuteur est planifié dans `index.js`, et fait son travail (ouverture de génération, éclosion, parc)        |
+| `timers`                          | chaque minuteur est planifié dans `index.js`, et fait son travail (ouverture de génération et bilan de saison, éclosion, parc) |
 | `generation2`                     | les 251 espèces, bébés, évolutions à objet, légendaires, charme, œufs, parc, annonce unique à l'ouverture          |
+| `season-recap`                    | bilan de saison : bornes, chaque statistique sur une base dedans/dehors de la fenêtre, sections vides omises, limites de Discord, publication unique, réessai, saison trop ancienne, aperçu |
+| `season-migration`                | base d'avant le bilan : colonne `cast_cost` et tables du suivi ajoutées sans toucher à l'historique                |
 | `utils`, `points-history`, `pseudo` | garde d'administration, rôles en libre-service, journal sur une ligne, courbe des soldes, pseudos                 |
 
 ## Ce que les tests n'essaient pas de couvrir
