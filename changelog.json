@@ -1,7 +1,74 @@
 {
-  "version": "1.18.6",
-  "lastUpdated": "2026-10-17T21:30:11.067Z",
+  "version": "1.18.7",
+  "lastUpdated": "2026-10-18T18:24:00.828Z",
   "releases": [
+    {
+      "version": "1.18.7",
+      "date": "2026-10-18",
+      "title": "Release 1.18.7",
+      "features": [
+        {
+          "type": "chore",
+          "name": "Ménage de la base",
+          "description": "Une ancienne table inutilisée est supprimée au démarrage du bot.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-10-18T10:00:00.000Z",
+          "branch": "dev/keen-knuth-lcd8tu"
+        },
+        {
+          "type": "fix",
+          "name": "Bilan du safari en direct",
+          "description": "Le message du safari en direct affiche toujours le bon bilan, même quand les dernières actions s'enchaînent très vite.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-10-18T11:00:00.000Z",
+          "branch": "dev/keen-knuth-lcd8tu"
+        },
+        {
+          "type": "fix",
+          "name": "Boîte PC ouverte par défaut",
+          "description": "Sur le site, la Boîte PC s'ouvre sur la première boîte non archivée.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-10-18T11:00:00.000Z",
+          "branch": "dev/keen-knuth-lcd8tu"
+        },
+        {
+          "type": "chore",
+          "name": "Tests plus rapides",
+          "description": "La suite de tests s'exécute plus vite, et quelques tests qui ne prouvaient rien sont corrigés.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-10-18T14:00:00.000Z",
+          "branch": "dev/keen-knuth-lcd8tu"
+        },
+        {
+          "type": "fix",
+          "name": "Messages toujours à jour",
+          "description": "Une apparition capturée ou enfuie, un échange conclu, un parc fermé ou un objet ramassé affichent toujours leur vrai résultat, même quand tout se joue à la seconde près ou que Discord a un raté.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-10-18T18:00:00.000Z",
+          "branch": "dev/keen-knuth-lcd8tu"
+        },
+        {
+          "type": "enhancement",
+          "name": "Offres d'échange expirées",
+          "description": "Une offre d'échange restée sans réponse s'affiche « Échange expiré » et perd ses boutons.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-10-18T18:00:00.000Z",
+          "branch": "dev/keen-knuth-lcd8tu"
+        }
+      ]
+    },
     {
       "version": "1.18.6",
       "date": "2026-10-17",
@@ -2436,66 +2503,6 @@
     }
   ],
   "pending": [
-    {
-      "type": "chore",
-      "name": "Ménage de la base",
-      "description": "Une ancienne table inutilisée est supprimée au démarrage du bot.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-10-18T10:00:00.000Z",
-      "branch": "dev/keen-knuth-lcd8tu"
-    },
-    {
-      "type": "fix",
-      "name": "Bilan du safari en direct",
-      "description": "Le message du safari en direct affiche toujours le bon bilan, même quand les dernières actions s'enchaînent très vite.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-10-18T11:00:00.000Z",
-      "branch": "dev/keen-knuth-lcd8tu"
-    },
-    {
-      "type": "fix",
-      "name": "Boîte PC ouverte par défaut",
-      "description": "Sur le site, la Boîte PC s'ouvre sur la première boîte non archivée.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-10-18T11:00:00.000Z",
-      "branch": "dev/keen-knuth-lcd8tu"
-    },
-    {
-      "type": "chore",
-      "name": "Tests plus rapides",
-      "description": "La suite de tests s'exécute plus vite, et quelques tests qui ne prouvaient rien sont corrigés.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-10-18T14:00:00.000Z",
-      "branch": "dev/keen-knuth-lcd8tu"
-    },
-    {
-      "type": "fix",
-      "name": "Messages toujours à jour",
-      "description": "Une apparition capturée ou enfuie, un échange conclu, un parc fermé ou un objet ramassé affichent toujours leur vrai résultat, même quand tout se joue à la seconde près ou que Discord a un raté.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-10-18T18:00:00.000Z",
-      "branch": "dev/keen-knuth-lcd8tu"
-    },
-    {
-      "type": "enhancement",
-      "name": "Offres d'échange expirées",
-      "description": "Une offre d'échange restée sans réponse s'affiche « Échange expiré » et perd ses boutons.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-10-18T18:00:00.000Z",
-      "branch": "dev/keen-knuth-lcd8tu"
-    },
     {
       "type": "chore",
       "name": "Tests recentrés",
