@@ -224,9 +224,14 @@ describe("la capture d'une pêche", () => {
     await hook();
     const before = await balance();
     const original = points.run;
-    // Entre le contrôle et l'écriture de la capture, l'échéance tombe.
+    // Entre le contrôle et l'écriture de la capture, l'échéance tombe. La capture ne part
+    // qu'une fois l'échéance écrite : lancées côte à côte, sqlite3 peut les passer dans
+    // l'ordre inverse sous charge, et la touche était prise (le test échouait par moments).
     points.run = function (sql, ...rest) {
-      if (/SET status = 'CAUGHT'/.test(sql)) original.call(this, "UPDATE pokemon_spawns SET flees_at = ? WHERE id = 1", [Date.now() - 1]);
+      if (/SET status = 'CAUGHT'/.test(sql)) {
+        points.run = original;
+        return original.call(this, "UPDATE pokemon_spawns SET flees_at = ? WHERE id = 1", [Date.now() - 1], () => original.call(this, sql, ...rest));
+      }
       return original.call(this, sql, ...rest);
     };
     let outcome;
