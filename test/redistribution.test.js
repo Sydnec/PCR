@@ -54,10 +54,17 @@ describe("calcul du pot (planRedistribution)", () => {
   });
 
   it("le reste est tiré au sort : tout le monde peut le recevoir", () => {
+    // Une grille de tirages figés plutôt que 400 tirages au hasard : le résultat ne
+    // dépend plus de la chance, et chacun des quatre doit y recevoir le point du reste.
+    const steps = [0, 0.3, 0.6, 0.9];
     const lucky = new Set();
-    for (let i = 0; i < 400; i++) {
-      const plan = redistribution.planRedistribution(balances(1000, 1000, 1000, 1020), 5);
-      plan.entries.filter((entry) => entry.received > plan.share).forEach((entry) => lucky.add(entry.userId));
+    for (const first of steps) {
+      for (const second of steps) {
+        for (const third of steps) {
+          const plan = withRandom([first, second, third], () => redistribution.planRedistribution(balances(1000, 1000, 1000, 1020), 5));
+          plan.entries.filter((entry) => entry.received > plan.share).forEach((entry) => lucky.add(entry.userId));
+        }
+      }
     }
     assert.equal(lucky.size, 4);
   });

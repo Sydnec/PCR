@@ -11,6 +11,9 @@ const pk = (await import("../commands/pk.js")).default;
 const { getPokemonConfig, specialBallLimit } = await import("../modules/pokemon/config.js");
 const { getSpecies, speciesEvolvingWith } = await import("../modules/pokemon/data.js");
 const shop = (options = {}) => runCommand(pk, { sub: "boutique", options });
+// Prix et plafond relus dans la configuration : un rééquilibrage ne casse pas ces tests.
+const fr = (value) => value.toLocaleString("fr-FR");
+const priceOf = (key) => getPokemonConfig().capture.specialBalls[key].price;
 const setBalance = (amount, user = "u1") =>
   dbRun(points, "INSERT INTO points (user_id, balance) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET balance = ?", [user, amount, amount]);
 const units = () => dbAll(points, "SELECT ball FROM pokemon_ball_units WHERE user_id = 'u1'");
@@ -52,22 +55,28 @@ describe("/pk boutique", () => {
   });
 
   it("acheter débite le prix et donne les balls, en le disant", async () => {
-    await setBalance(1000);
+    const price = priceOf("appat");
+    await setBalance(3 * price);
     const reply = payloadOf(await shop({ ball: "appat", quantite: 2 }), "reply");
-    assert.match(reply.content, /✅.*2× Appât Ball\*\* pour \*\*460\*\* points/);
+    assert.ok(reply.content.includes(`2× Appât Ball** pour **${fr(2 * price)}** points`), reply.content);
+    assert.match(reply.content, /^✅/);
     assert.match(reply.content, /pas à celui en cours/);
     assert.equal((await units()).length, 2);
-    assert.equal((await dbAll(points, "SELECT balance FROM points WHERE user_id = 'u1'"))[0].balance, 540);
+    assert.equal((await dbAll(points, "SELECT balance FROM points WHERE user_id = 'u1'"))[0].balance, price);
   });
 
   it("les refus donnent les chiffres : solde, plafond, ball inconnue", async () => {
-    await setBalance(100);
-    assert.match(payloadOf(await shop({ ball: "appat" }), "reply").content, /Il te faut 230 points, tu en as 100/);
-    await setBalance(100000);
-    await shop({ ball: "catalyseur", quantite: 9 });
-    assert.match(payloadOf(await shop({ ball: "catalyseur", quantite: 2 }), "reply").content, /Tu en as 9 sur 10 : tu peux encore en acheter 1, pas 2/);
+    const left = priceOf("appat") - 1;
+    await setBalance(left);
+    assert.ok(payloadOf(await shop({ ball: "appat" }), "reply").content.includes(`Il te faut ${fr(priceOf("appat"))} points, tu en as ${fr(left)}`));
+    const limit = specialBallLimit();
+    await setBalance(limit * priceOf("catalyseur") * 2);
+    await shop({ ball: "catalyseur", quantite: limit - 1 });
+    assert.ok(
+      payloadOf(await shop({ ball: "catalyseur", quantite: 2 }), "reply").content.includes(`Tu en as ${limit - 1} sur ${limit} : tu peux encore en acheter 1, pas 2`)
+    );
     assert.match(payloadOf(await shop({ ball: "poke" }), "reply").content, /pas en vente/);
-    assert.equal((await units()).length, 9, "les refus n'ont rien donné");
+    assert.equal((await units()).length, limit - 1, "les refus n'ont rien donné");
   });
 
   it("/pk inventaire montre les balls spéciales, et rien quand on n'en a pas", async () => {
@@ -84,7 +93,7 @@ describe("/pk boutique", () => {
   it("l'autocomplétion propose les balls en vente avec leur prix", async () => {
     const all = payloadOf(await runAutocomplete(pk, { sub: "boutique", focused: { name: "ball", value: "" } }), "respond");
     assert.deepEqual(all.map((choice) => choice.value), ["appat", "catalyseur"]);
-    assert.match(all[0].name, /Appât Ball — 230 points/);
+    assert.ok(all[0].name.includes(`Appât Ball — ${fr(priceOf("appat"))} points`), all[0].name);
     const none = payloadOf(await runAutocomplete(pk, { sub: "boutique", focused: { name: "ball", value: "zzz" } }), "respond");
     assert.match(none[0].name, /Aucune ball spéciale en vente/);
   });

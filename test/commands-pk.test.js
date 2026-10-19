@@ -238,8 +238,9 @@ describe("/pk classement, info, inventaire, web", () => {
     await own("Roucool", { user: "u2", shiny: 1, obtained: 5 });
     await own("Rattata", { user: "u3" });
     const text = textOf(payloadOf(await runCommand(pk, { sub: "classement" }), "editReply"));
-    assert.match(text, /🥇 \*\*user-u2\*\* — 2\/151 espèces · ✨ 1 · 3 captures/);
-    assert.match(text, /🥈 \*\*user-u3\*\* — 1\/151 espèces · 1 captures/);
+    // Sur la taille du Pokédex ouvert : elle grandit à chaque génération.
+    assert.match(text, new RegExp(`🥇 \\*\\*user-u2\\*\\* — 2/${data.dexSize()} espèces · ✨ 1 · 3 captures`));
+    assert.match(text, new RegExp(`🥈 \\*\\*user-u3\\*\\* — 1/${data.dexSize()} espèces · 1 captures`));
   });
 
   it("la fiche d'une espèce est privée ; une espèce inconnue est refusée", async () => {
@@ -1042,8 +1043,10 @@ describe("/pk evolution", () => {
     await ownMany("Évoli", 3);
     const reply = payloadOf(await evolution(evo("Évoli")), "editReply");
     const labels = reply.components.flatMap((row) => row.toJSON().components.map((button) => button.label));
-    assert.match(labels[0], /Évolution aléatoire \(1\s500 pts\)/);
-    assert.match(labels[1], /Choisir l'évolution \(3\s000 pts\)/);
+    const fr = (value) => value.toLocaleString("fr-FR");
+    const { evolution: tariff } = getPokemonConfig();
+    assert.ok(labels[0].includes(`Évolution aléatoire (${fr(tariff[2].points)} pts)`), labels[0]);
+    assert.ok(labels[1].includes(`Choisir l'évolution (${fr(tariff.branchChoicePoints)} pts)`), labels[1]);
   });
 
   it("il manque des exemplaires : aucun bouton, et l'écran dit combien", async () => {

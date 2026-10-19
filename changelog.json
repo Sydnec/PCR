@@ -2499,7 +2499,7 @@
     {
       "type": "chore",
       "name": "Tests recentrés",
-      "description": "Les tests en double sont fusionnés, et chaque test ne vérifie plus que la règle qu'il annonce.",
+      "description": "Les tests en double sont fusionnés, chaque test ne vérifie plus que la règle qu'il annonce, et un test qui échouait par moments est corrigé.",
       "announce": false,
       "author": "Sydnec",
       "commit": "pending",

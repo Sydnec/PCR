@@ -29,8 +29,13 @@ const setCount = (user, n, key = MASTER) =>
     [user, key, n]
   );
 const value = () => items.itemOverflowValue(items.getItem(MASTER));
+// La panne du crédit des points, par un déclencheur comme le veut docs/tests.md : elle ne
+// dépend pas du texte de la requête, et tout ce qui écrit dans `points` la rencontre.
+const failPoints = () => dbRun(points, "CREATE TRIGGER panne BEFORE INSERT ON points BEGIN SELECT RAISE(ABORT, 'panne provoquée'); END");
+const healPoints = () => dbRun(points, "DROP TRIGGER IF EXISTS panne");
 
 beforeEach(async () => {
+  await healPoints();
   for (const table of ["pokemon_inventory", "pokemon_item_log", "points", "points_log", "pokemon_trades", "pokemon_data_migrations"]) {
     await dbRun(points, `DELETE FROM ${table}`);
   }
@@ -77,19 +82,12 @@ describe("la limite de détention", () => {
 
   it("si les points de la vente ne passent pas, la ball se garde au-delà de la limite plutôt que de se perdre", async () => {
     await grant("u1");
-    const original = points.run;
-    points.run = function (sql, ...rest) {
-      if (/INSERT INTO points/.test(sql)) {
-        const done = rest.find((arg) => typeof arg === "function");
-        return done.call({}, new Error("panne provoquée"));
-      }
-      return original.call(this, sql, ...rest);
-    };
+    await failPoints();
     let result;
     try {
       result = await grant("u1");
     } finally {
-      points.run = original;
+      await healPoints();
     }
     assert.deepEqual(result, { kept: 1, sold: 0, points: 0 });
     assert.equal(await count("u1"), 2);
@@ -210,18 +208,11 @@ describe("le surplus d'avant la limite", () => {
 
   it("des points qui ne passent pas rendent le surplus, et la migration se rejouera", async () => {
     await setCount("u1", 2);
-    const original = points.run;
-    points.run = function (sql, ...rest) {
-      if (/INSERT INTO points/.test(sql)) {
-        const done = rest.find((arg) => typeof arg === "function");
-        return done.call({}, new Error("panne provoquée"));
-      }
-      return original.call(this, sql, ...rest);
-    };
+    await failPoints();
     try {
       await assert.rejects(() => call(items.sellHeldOverCap), /panne provoquée/);
     } finally {
-      points.run = original;
+      await healPoints();
     }
     assert.equal(await count("u1"), 2, "rien ne se perd");
     assert.equal((await dbAll(points, "SELECT * FROM pokemon_data_migrations")).length, 0);

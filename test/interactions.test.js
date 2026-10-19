@@ -162,7 +162,7 @@ describe("lancer une ball depuis l'annonce", () => {
     const id = await spawnRow("Roucool");
     await setBalance(1000, user);
     const calls = await withRandom(0, () => click(`poke_throw|${id}|poke`, { user }));
-    assert.deepEqual(only(calls, "deferReply"), { flags: EPHEMERAL });
+    assert.equal(only(calls, "deferReply")?.flags, EPHEMERAL);
     const reply = only(calls, "editReply");
     assert.match(reply.content, /Bravo ! \*\*Roucool[^*]*\*\* rejoint ton Pokédex/);
     assert.deepEqual(reply.components, [], "plus rien à relancer");

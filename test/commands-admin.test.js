@@ -80,7 +80,7 @@ describe("le routeur /admin", () => {
 
   it("un administrateur : la réponse est différée en privé, une fois pour toutes", async () => {
     const calls = await run("potcommun", { options: { simulation: true }, guild: community([]) });
-    assert.deepEqual(payloadOf(calls, "deferReply"), { flags: EPHEMERAL });
+    assert.equal(payloadOf(calls, "deferReply")?.flags, EPHEMERAL);
     assert.ok(calls.some((entry) => entry.method === "editReply"));
   });
 
