@@ -214,7 +214,7 @@ export function getBallPrice(userId, ball, cb) {
 // en a besoin : la confirmation Master Ball, qui annonce « ta Master Ball
 // offerte » sans montrer le moindre prix ni regarder le solde. Si l'objet a
 // disparu entre l'ouverture de la confirmation et le clic — un second panneau
-// ouvert ailleurs suffit — payer 22 500 points en silence serait exactement le
+// ouvert ailleurs suffit — la payer en points en silence serait exactement le
 // mésclic irrattrapable que cette confirmation existe pour empêcher.
 //
 // `expectedPrice` en est la jumelle pour une ball payée : le prix que la

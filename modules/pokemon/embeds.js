@@ -225,7 +225,7 @@ export function buildBallRow(
 
 // Le sous-menu des balls spéciales : celles de la boutique (`balls`, avec pour chacune
 // ce qui sert à CETTE apparition dans `counts`) et la Master Ball, qui passe toujours
-// par sa confirmation — à 22 500 points, un mésclic n'est pas rattrapable. Aucun
+// par sa confirmation — à son prix, un mésclic n'est pas rattrapable. Aucun
 // prix : celui d'une ball achetée est déjà payé, celui de la Master Ball se lit sur
 // sa confirmation. Depuis le panneau, un bouton ramène aux balls ordinaires.
 export function buildSpecialRow(
