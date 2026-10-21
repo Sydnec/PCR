@@ -930,14 +930,12 @@ function handleTradePick(interaction, tradeId) {
 
 // ---------------------- Balls spéciales ----------------------
 
-const SPECIAL_BALLS_TEXT =
-  "🌟 **Balls spéciales** — une ball achetée ne sert qu'aux Pokémon qui apparaissent " +
-  "**après** son achat. La boutique : `/pk boutique`.";
-
 function showSpecialBalls(interaction, spawnId, { panel }) {
   specialPanelRow(interaction.user.id, spawnId, { panel })
     .then((row) => {
-      const payload = { content: SPECIAL_BALLS_TEXT, components: [row] };
+      // Les boutons seuls : le texte du panneau (le dernier lancer) s'efface, et
+      // l'éphémère n'en porte pas — le menu ne montre que ce qui sert.
+      const payload = panel ? { content: "", components: [row] } : { components: [row] };
       return panel
         ? interaction.update(payload)
         : interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });

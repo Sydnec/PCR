@@ -223,25 +223,27 @@ export function buildBallRow(
   return row;
 }
 
-// Le sous-menu des balls spéciales : celles de la boutique (`balls`, avec pour chacune
-// ce qui sert à CETTE apparition dans `counts`) et la Master Ball, qui passe toujours
-// par sa confirmation — à son prix, un mésclic n'est pas rattrapable. Aucun
-// prix : celui d'une ball achetée est déjà payé, celui de la Master Ball se lit sur
-// sa confirmation. Depuis le panneau, un bouton ramène aux balls ordinaires.
+// Le sous-menu des balls spéciales : seulement celles de la boutique qui servent à
+// CETTE apparition (`counts`), une ball inutilisable n'y étant qu'un bouton grisé de
+// plus, et la Master Ball, qui passe toujours par sa confirmation — à son prix, un
+// mésclic n'est pas rattrapable. Ce menu est privé : la Master Ball y montre le prix
+// de son dresseur (`masterPrice`), qu'elle renchérit pour lui seul ; illisible, il
+// est tu plutôt que faux. Depuis le panneau, un bouton ramène aux balls ordinaires.
 export function buildSpecialRow(
   spawnId,
-  { balls, counts, masterHeld = 0, panel = false, disabled = false }
+  { balls, counts, masterHeld = 0, masterPrice = null, panel = false, disabled = false }
 ) {
   const row = new ActionRowBuilder();
   for (const ball of balls) {
     const usable = counts?.get(ball.key)?.eligible ?? 0;
+    if (!usable) continue;
     row.addComponents(
       new ButtonBuilder()
         .setCustomId(`${panel ? "poke_rethrow" : "poke_throw"}|${spawnId}|${ball.key}`)
         .setLabel(`${ball.label} (×${usable.toLocaleString("fr-FR")})`)
         .setEmoji(ball.emoji)
         .setStyle(ButtonStyle.Primary)
-        .setDisabled(disabled || usable === 0)
+        .setDisabled(disabled)
     );
   }
   const master = getBall("master");
@@ -250,7 +252,11 @@ export function buildSpecialRow(
       new ButtonBuilder()
         .setCustomId(`${panel ? "poke_remaster" : "poke_master"}|${spawnId}`)
         .setLabel(
-          masterHeld ? `${master.label} (offerte ×${masterHeld.toLocaleString("fr-FR")})` : master.label
+          masterHeld
+            ? `${master.label} (offerte ×${masterHeld.toLocaleString("fr-FR")})`
+            : masterPrice != null
+              ? `${master.label} (${masterPrice.toLocaleString("fr-FR")})`
+              : master.label
         )
         .setEmoji(master.emoji)
         .setStyle(ButtonStyle.Danger)
