@@ -141,7 +141,7 @@ function askMasterBallConfirmation(interaction, spawnId, { panel = false } = {})
         new ButtonBuilder()
           // Le customId porte la promesse faite au dresseur : si la Master Ball
           // annoncée gratuite a disparu entre-temps, le lancer doit refuser, pas
-          // se rabattre sur 22 500 points jamais mentionnés. Payante, il porte
+          // se rabattre sur un prix jamais mentionné. Payante, il porte
           // le prix affiché : un achat fait entre-temps l'a fait monter, et le
           // lancer refuse plutôt que de prendre plus.
           .setCustomId(`poke_master_ok|${spawnId}|${gratuite ? "item" : price}`)
@@ -930,14 +930,12 @@ function handleTradePick(interaction, tradeId) {
 
 // ---------------------- Balls spéciales ----------------------
 
-const SPECIAL_BALLS_TEXT =
-  "🌟 **Balls spéciales** — une ball achetée ne sert qu'aux Pokémon qui apparaissent " +
-  "**après** son achat. La boutique : `/pk boutique`.";
-
 function showSpecialBalls(interaction, spawnId, { panel }) {
   specialPanelRow(interaction.user.id, spawnId, { panel })
     .then((row) => {
-      const payload = { content: SPECIAL_BALLS_TEXT, components: [row] };
+      // Les boutons seuls : le texte du panneau (le dernier lancer) s'efface, et
+      // l'éphémère n'en porte pas — le menu ne montre que ce qui sert.
+      const payload = panel ? { content: "", components: [row] } : { components: [row] };
       return panel
         ? interaction.update(payload)
         : interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });

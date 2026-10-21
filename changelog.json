@@ -2546,5 +2546,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Menu des balls spéciales épuré",
+      "description": "Le menu Balls spéciales ne montre plus que les balls que tu as et qui servent au Pokémon, plus la Master Ball avec son prix.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-21T08:24:35.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
+    }
+  ]
 }

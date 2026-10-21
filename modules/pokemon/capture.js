@@ -103,24 +103,36 @@ export function ballPanelRow(userId, spawnId) {
 // achetées avant elle. Une lecture ratée désactive les boutons plutôt que de promettre
 // des balls qu'on n'a peut-être pas.
 export function specialPanelRow(userId, spawnId, { panel = false } = {}) {
+  const master = getBall("master");
+  // Le prix de la Master Ball est celui du dresseur : il monte à chaque achat. Une
+  // lecture ratée le tait sans griser le menu — la confirmation redonnera le vrai.
+  const masterPrice = (cb) =>
+    master
+      ? getBallPrice(userId, master, (err, price) => {
+          if (err) handleException("Lecture du prix de la Master Ball :", err);
+          cb(err ? null : price);
+        })
+      : cb(null);
   return new Promise((resolve) =>
     getSpawn(spawnId, (spawnError, spawn) =>
       getInventory(userId, (inventoryError, inventory) =>
         getUnitCounts(
           userId,
-          (err, counts) => {
-            const failed = spawnError ?? inventoryError ?? err;
-            if (failed) handleException("Lecture des balls spéciales :", failed);
-            resolve(
-              buildSpecialRow(spawnId, {
-                balls: openSpecialBalls(),
-                counts,
-                masterHeld: inventoryError ? 0 : freeBallCount(inventory, "master"),
-                panel,
-                disabled: Boolean(failed),
-              })
-            );
-          },
+          (err, counts) =>
+            masterPrice((price) => {
+              const failed = spawnError ?? inventoryError ?? err;
+              if (failed) handleException("Lecture des balls spéciales :", failed);
+              resolve(
+                buildSpecialRow(spawnId, {
+                  balls: openSpecialBalls(),
+                  counts,
+                  masterHeld: inventoryError ? 0 : freeBallCount(inventory, "master"),
+                  masterPrice: price,
+                  panel,
+                  disabled: Boolean(failed),
+                })
+              );
+            }),
           { spawnedAt: spawn?.spawned_at ?? 0 }
         )
       )
@@ -214,7 +226,7 @@ export function getBallPrice(userId, ball, cb) {
 // en a besoin : la confirmation Master Ball, qui annonce « ta Master Ball
 // offerte » sans montrer le moindre prix ni regarder le solde. Si l'objet a
 // disparu entre l'ouverture de la confirmation et le clic — un second panneau
-// ouvert ailleurs suffit — payer 22 500 points en silence serait exactement le
+// ouvert ailleurs suffit — la payer en points en silence serait exactement le
 // mésclic irrattrapable que cette confirmation existe pour empêcher.
 //
 // `expectedPrice` en est la jumelle pour une ball payée : le prix que la
