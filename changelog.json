@@ -1,7 +1,24 @@
 {
-  "version": "1.19.0",
-  "lastUpdated": "2026-10-19T18:14:46.697Z",
+  "version": "1.19.1",
+  "lastUpdated": "2026-10-21T09:22:37.663Z",
   "releases": [
+    {
+      "version": "1.19.1",
+      "date": "2026-10-21",
+      "title": "Release 1.19.1",
+      "features": [
+        {
+          "type": "enhancement",
+          "name": "Menu des balls spéciales épuré",
+          "description": "Le menu Balls spéciales ne montre plus que les balls que tu as et qui servent au Pokémon, plus la Master Ball avec son prix.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-10-21T08:24:35.000Z",
+          "branch": "dev/keen-knuth-lcd8tu"
+        }
+      ]
+    },
     {
       "version": "1.19.0",
       "date": "2026-10-19",
@@ -2546,16 +2563,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "enhancement",
-      "name": "Menu des balls spéciales épuré",
-      "description": "Le menu Balls spéciales ne montre plus que les balls que tu as et qui servent au Pokémon, plus la Master Ball avec son prix.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-10-21T08:24:35.000Z",
-      "branch": "dev/keen-knuth-lcd8tu"
-    }
-  ]
+  "pending": []
 }
