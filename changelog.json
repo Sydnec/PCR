@@ -2563,5 +2563,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "chore",
+      "name": "Déploiement plus sûr",
+      "description": "Le déploiement installe exactement les versions de dépendances testées par la CI, et s'arrête sans recharger le bot si cette installation échoue.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-22T08:23:09.000Z",
+      "branch": "dev/serene-carson-h2n784"
+    }
+  ]
 }

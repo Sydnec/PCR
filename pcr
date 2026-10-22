@@ -65,9 +65,18 @@ case "$1" in
         ;;
 
     deploy)
-        echo -e "${BLUE}Installation des dépendances...${NC}"
-        npm install
-        
+        echo -e "${BLUE}Installation des dépendances (npm ci)...${NC}"
+        # npm ci installe exactement package-lock.json, les versions que la CI a
+        # testées et auditées, mais vide node_modules d'abord. Le bot en cours n'en
+        # souffre pas : ses paquets sont chargés au démarrage, et ses import()
+        # dynamiques ne visent que des paquets que le même fichier importe déjà.
+        # Un rechargement après un échec, lui, repartirait sans dépendances : on
+        # s'arrête avant PM2.
+        if ! npm ci; then
+            echo -e "${RED}Erreur: npm ci a échoué, PM2 n'a pas été touché. node_modules est peut-être incomplet : relancez 'pcr deploy' avant tout redémarrage du bot.${NC}"
+            exit 1
+        fi
+
         echo -e "${BLUE}Vérification de PM2...${NC}"
         if pm2 describe "$APP_NAME" > /dev/null 2>&1; then
             echo -e "${GREEN}Application existante détectée. Rechargement...${NC}"
@@ -106,7 +115,7 @@ case "$1" in
     update)
         echo -e "${BLUE}Mise à jour depuis git...${NC}"
         git pull
-        $0 deploy
+        $0 deploy || exit 1
         echo -e "${GREEN}Mise à jour terminée.${NC}"
         ;;
 

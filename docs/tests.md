@@ -67,6 +67,7 @@ génération ouverte en cours de route.
 | `season-recap`                    | bilan de saison : bornes, chaque statistique sur une base dedans/dehors de la fenêtre, sections vides omises, limites de Discord, publication unique, réessai, saison trop ancienne, aperçu |
 | `season-migration`                | base d'avant le bilan : colonne `cast_cost` et tables du suivi ajoutées sans toucher à l'historique                |
 | `utils`, `points-history`, `pseudo` | garde d'administration, rôles en libre-service, journal sur une ligne, courbe des soldes, pseudos                 |
+| `pcr-deploy`                      | `pcr deploy` : installation par `npm ci`, arrêt en erreur avant PM2 si elle échoue, `pcr update` qui ne se dit pas terminé |
 
 ## Ce que les tests n'essaient pas de couvrir
 

@@ -24,7 +24,8 @@ Le déploiement est **automatisé** et déclenché par la création d'un **Tag G
 3.  **Déploiement (GitHub Actions)** :
     - Le workflow `.github/workflows/deploy.yml` détecte le nouveau tag `v*`.
     - Il est exécuté directement sur votre serveur via un **Self-hosted Runner**.
-    - Il exécute la commande : `cd /home/sydnec/pcr && ./pcr update` (ou `deploy`).
+    - Il tire `main` dans `/home/sydnec/pcr`, puis exécute `bash ./pcr deploy`.
+    - `pcr deploy` installe les dépendances avec `npm ci` : exactement les versions de `package-lock.json`, celles que la CI a testées et auditées. Si `npm ci` échoue, le déploiement s'arrête en erreur **avant** de toucher à PM2 : le bot en cours continue de tourner et le workflow apparaît en échec. `node_modules` peut alors être incomplet : relancer `pcr deploy` une fois la cause corrigée, avant tout redémarrage du bot.
 
 ## 🔑 Configuration
 
