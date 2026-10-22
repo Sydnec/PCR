@@ -1,7 +1,24 @@
 {
-  "version": "1.19.1",
-  "lastUpdated": "2026-10-21T09:22:37.663Z",
+  "version": "1.19.2",
+  "lastUpdated": "2026-10-22T14:22:18.488Z",
   "releases": [
+    {
+      "version": "1.19.2",
+      "date": "2026-10-22",
+      "title": "Release 1.19.2",
+      "features": [
+        {
+          "type": "chore",
+          "name": "Déploiement plus sûr",
+          "description": "Le déploiement installe exactement les versions de dépendances testées par la CI, et s'arrête sans recharger le bot si cette installation échoue.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-10-22T08:23:09.000Z",
+          "branch": "dev/serene-carson-h2n784"
+        }
+      ]
+    },
     {
       "version": "1.19.1",
       "date": "2026-10-21",
@@ -2563,16 +2580,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "chore",
-      "name": "Déploiement plus sûr",
-      "description": "Le déploiement installe exactement les versions de dépendances testées par la CI, et s'arrête sans recharger le bot si cette installation échoue.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-10-22T08:23:09.000Z",
-      "branch": "dev/serene-carson-h2n784"
-    }
-  ]
+  "pending": []
 }
