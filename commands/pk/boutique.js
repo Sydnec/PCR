@@ -73,7 +73,8 @@ export default {
         }
         const lines = view.balls.map(
           (ball) =>
-            `${ball.emoji} **${ball.label}** — **${fr(ball.price)}** points · tu en as ${fr(ball.held)}/${fr(view.limit)}\n` +
+            `${ball.emoji} **${ball.label}** — **${fr(ball.price)}** points · tu en as ${fr(ball.held)}/${fr(view.limit)}` +
+            ` · achetées aujourd'hui ${fr(ball.boughtToday)}/${fr(view.dailyLimit)}\n` +
             `*${ball.effect}*`
         );
         reply({
@@ -84,6 +85,7 @@ export default {
               .setDescription(
                 `${lines.join("\n\n")}\n\nTon solde : **${fr(view.balance)}** points. ` +
                   "Une ball achetée ne sert qu'aux Pokémon qui apparaissent **après** son achat.\n" +
+                  `Achats du jour : **${fr(view.dailyLimit)}** de chaque au plus, compteur remis à zéro <t:${Math.floor(view.resetsAt / 1000)}:R>.\n` +
                   "`/pk boutique ball:<nom> quantite:<n>` pour acheter."
               ),
           ],

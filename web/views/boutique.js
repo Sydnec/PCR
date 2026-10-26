@@ -24,7 +24,12 @@ export async function render(ctx) {
         method: "POST",
         body: { ball: ball.key, quantity },
       });
-      shop = { balance: result.balance, limit: result.limit, balls: result.balls };
+      shop = {
+        balance: result.balance,
+        limit: result.limit,
+        dailyLimit: result.dailyLimit,
+        balls: result.balls,
+      };
       if (result.ok) {
         toast(
           `${fmt(result.bought)}× ${ball.label} pour ${fmt(result.cost)} pts.` +
@@ -41,8 +46,12 @@ export async function render(ctx) {
     paint();
   }
 
+  // On achète ce que permettent à la fois la poche et le quota du jour : le plus
+  // serré des deux décide, et le bouton dit lequel.
   function row(ball) {
-    const room = Math.max(0, shop.limit - ball.held);
+    const pocketRoom = Math.max(0, shop.limit - ball.held);
+    const dailyRoom = Math.max(0, shop.dailyLimit - ball.boughtToday);
+    const room = Math.min(pocketRoom, dailyRoom);
     const quantity = h("input", {
       type: "number",
       min: 1,
@@ -53,7 +62,7 @@ export async function render(ctx) {
     const button = h(
       "button",
       { type: "button", class: "button small", disabled: room === 0 },
-      room === 0 ? "Poche pleine" : "Acheter"
+      pocketRoom === 0 ? "Poche pleine" : dailyRoom === 0 ? "Quota du jour atteint" : "Acheter"
     );
     button.addEventListener("click", () =>
       buy(ball, Math.floor(Number(quantity.value)) || 1, button)
@@ -67,7 +76,12 @@ export async function render(ctx) {
         { class: "item-text" },
         h("strong", {}, ball.label),
         h("span", { class: "muted small" }, ball.effect),
-        h("span", { class: "muted small" }, `${fmt(ball.price)} pts l'unité`)
+        h("span", { class: "muted small" }, `${fmt(ball.price)} pts l'unité`),
+        h(
+          "span",
+          { class: "muted small" },
+          `Achetées aujourd'hui : ${fmt(ball.boughtToday)}/${fmt(shop.dailyLimit)}`
+        )
       ),
       h("span", { class: "item-count" }, `${fmt(ball.held)}/${fmt(shop.limit)}`),
       h("span", { class: "item-action" }, quantity, button)
@@ -85,6 +99,7 @@ export async function render(ctx) {
       "p",
       { class: "muted" },
       "Une ball achetée ne sert qu'aux Pokémon qui apparaissent après son achat — pas à celui en cours. ",
+      "Les achats de chaque ball sont limités par jour ; le compteur repart à minuit UTC. ",
       "Elles se lancent dans « Balls spéciales » sur la page Capture."
     ),
     list

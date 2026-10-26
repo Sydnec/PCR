@@ -9,7 +9,7 @@ createSandbox({ config: { pokemon: { generationOpenings: { 2: "2000-01-01T00:00:
 const { points } = await openDatabases();
 const { routes, HttpError } = await import("../modules/web/api.js");
 const data = await import("../modules/pokemon/data.js");
-const { getBall, getPokemonConfig, specialBallLimit } = await import("../modules/pokemon/config.js");
+const { getBall, getPokemonConfig, specialBallDailyLimit, specialBallLimit } = await import("../modules/pokemon/config.js");
 
 const fr = (value) => value.toLocaleString("fr-FR");
 const species = (name) => speciesByName(data.allSpecies, name);
@@ -20,7 +20,7 @@ const setBalance = (amount) =>
   dbRun(points, "INSERT INTO points (user_id, balance) VALUES ('u1', ?) ON CONFLICT(user_id) DO UPDATE SET balance = ?", [amount, amount]);
 
 beforeEach(async () => {
-  for (const table of ["points", "pokemon_ball_units", "pokemon_spawns", "pokemon_inventory", "pokemon_item_log", "points_log"]) await dbRun(points, `DELETE FROM ${table}`);
+  for (const table of ["points", "pokemon_ball_units", "pokemon_spawns", "pokemon_inventory", "pokemon_item_log", "points_log", "pokemon_shop_daily"]) await dbRun(points, `DELETE FROM ${table}`);
 });
 
 describe("la boutique du site", () => {
@@ -35,6 +35,8 @@ describe("la boutique du site", () => {
     const shop = await call("GET", "/api/shop");
     assert.equal(shop.balance, 900);
     assert.equal(shop.limit, specialBallLimit());
+    assert.equal(shop.dailyLimit, specialBallDailyLimit());
+    assert.ok(shop.resetsAt > Date.now());
     assert.deepEqual(shop.balls.map((ball) => [ball.key, ball.price, ball.held]), [
       ["appat", getBall("appat").price, 0],
       ["catalyseur", getBall("catalyseur").price, 0],
@@ -51,6 +53,8 @@ describe("la boutique du site", () => {
     const bought = await call("POST", "/api/shop/buy", { ball: "appat", quantity: 2 });
     assert.deepEqual([bought.ok, bought.bought, bought.cost, bought.balance], [true, 2, 2 * price, left]);
     assert.equal(bought.balls[0].held, 2);
+    assert.equal(bought.balls[0].boughtToday, 2);
+    assert.equal(bought.dailyLimit, specialBallDailyLimit());
     const refused = await call("POST", "/api/shop/buy", { ball: "appat", quantity: 1 });
     assert.equal(refused.ok, false);
     assert.match(refused.message, new RegExp(`Il te faut ${fr(price)} points, tu en as ${fr(left)}`));

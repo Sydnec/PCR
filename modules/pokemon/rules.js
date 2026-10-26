@@ -11,6 +11,7 @@ import {
   getPokemonConfig,
   getSafariConfig,
   hasPersonalPrice,
+  specialBallDailyLimit,
   specialBallLimit,
 } from "./config.js";
 import {
@@ -259,6 +260,7 @@ function starterTable() {
 function shopTable() {
   return {
     maxHeld: specialBallLimit(),
+    dailyLimit: specialBallDailyLimit(),
     balls: openSpecialBalls().map((ball) => ({
       key: ball.key,
       label: ball.label,

@@ -24,6 +24,8 @@ const setBalance = (amount, user = "u1") =>
 const units = (user = "u1", ball = "appat") => dbAll(points, "SELECT * FROM pokemon_ball_units WHERE user_id = ? AND ball = ? ORDER BY bought_at, id", [user, ball]);
 const addUnit = (boughtAt, { user = "u1", ball = "appat" } = {}) =>
   dbRun(points, "INSERT INTO pokemon_ball_units (user_id, ball, bought_at) VALUES (?, ?, ?)", [user, ball, boughtAt]);
+const boughtToday = async (user = "u1", ball = "appat") =>
+  (await dbGet(points, "SELECT bought FROM pokemon_shop_daily WHERE user_id = ? AND ball = ? AND day = ?", [user, ball, new Date().toISOString().slice(0, 10)]))?.bought ?? 0;
 const throwBall = (user, ball, random = [0]) => withRandom(random, () => call(capture.resolveThrow, client, user, 1, ball, {}));
 
 async function seedSpawn(name = "Roucool", { fished = 0, spawnedAt = 1000 } = {}) {
@@ -37,7 +39,7 @@ async function seedSpawn(name = "Roucool", { fished = 0, spawnedAt = 1000 } = {}
 }
 
 beforeEach(async () => {
-  for (const table of ["points", "pokemon_owned", "pokemon_inventory", "pokemon_throws", "pokemon_ball_units", "points_log", "pokemon_shop_purchases"]) {
+  for (const table of ["points", "pokemon_owned", "pokemon_inventory", "pokemon_throws", "pokemon_ball_units", "points_log", "pokemon_shop_purchases", "pokemon_shop_daily"]) {
     await dbRun(points, `DELETE FROM ${table}`);
   }
   await seedSpawn();
@@ -68,11 +70,20 @@ describe("la boutique", () => {
   });
 
   it("deux achats simultanés ne dépassent jamais le plafond, et le surplus est remboursé", async () => {
-    await setBalance(100000);
-    const results = await Promise.all([call(shop.buyBalls, "u1", "appat", 6), call(shop.buyBalls, "u1", "appat", 6)]);
-    assert.equal((await units()).length, 10);
-    assert.equal(results.reduce((sum, result) => sum + result.bought, 0), 10);
-    assert.equal(await balance(), 100000 - 10 * 230, "seules les 10 balls livrées sont payées");
+    // Un quota du jour plus large que la poche : c'est elle seule qui doit tenir.
+    const special = getPokemonConfig().capture.specialBalls;
+    const original = special.dailyLimit;
+    special.dailyLimit = 50;
+    try {
+      await setBalance(100000);
+      const results = await Promise.all([call(shop.buyBalls, "u1", "appat", 6), call(shop.buyBalls, "u1", "appat", 6)]);
+      assert.equal((await units()).length, 10);
+      assert.equal(results.reduce((sum, result) => sum + result.bought, 0), 10);
+      assert.equal(await balance(), 100000 - 10 * 230, "seules les 10 balls livrées sont payées");
+      assert.equal(await boughtToday(), 10, "le quota ne garde que les balls livrées");
+    } finally {
+      special.dailyLimit = original;
+    }
   });
 
   it("un achat dont l'insertion échoue rembourse tout", async () => {
@@ -82,6 +93,7 @@ describe("la boutique", () => {
     await dbRun(points, "DROP TRIGGER panne");
     assert.equal(await balance(), 1000);
     assert.equal((await units()).length, 0);
+    assert.equal(await boughtToday(), 0, "le quota du jour est rendu");
   });
 
   it("une erreur en cours d'achat : ce qui est livré existe, le reste est remboursé, et on le dit", async () => {
@@ -93,6 +105,55 @@ describe("la boutique", () => {
     assert.match(result.reason, /Une erreur a interrompu l'achat : 1 sur 3 achetée/);
     assert.equal((await units()).length, 1);
     assert.equal(await balance(), 1000 - 230, "seule la ball livrée est payée");
+    assert.equal(await boughtToday(), 1, "seule la ball livrée compte dans le quota");
+  });
+
+  it("le quota du jour : refusé avec les chiffres même la poche vidée, sans rien toucher", async () => {
+    await setBalance(100000);
+    await call(shop.buyBalls, "u1", "appat", 7);
+    await dbRun(points, "DELETE FROM pokemon_ball_units"); // toutes lancées
+    await call(shop.buyBalls, "u1", "appat", 3);
+    await dbRun(points, "DELETE FROM pokemon_ball_units");
+    const refused = await call(shop.buyBalls, "u1", "appat", 1);
+    assert.equal(refused.ok, false);
+    assert.match(refused.reason, /Tu en as acheté 10 sur 10 aujourd'hui : tu peux encore en acheter 0, pas 1\. Le compteur repart à minuit UTC/);
+    assert.equal(await balance(), 100000 - 10 * 230, "le refus n'a rien débité");
+    assert.equal((await units()).length, 0);
+    assert.equal(await boughtToday(), 10);
+    // Le quota est par ball : l'autre reste achetable.
+    assert.equal((await call(shop.buyBalls, "u1", "catalyseur", 1)).ok, true);
+  });
+
+  it("le quota repart le lendemain", async () => {
+    await setBalance(100000);
+    await dbRun(points, "INSERT INTO pokemon_shop_daily (user_id, ball, day, bought) VALUES ('u1', 'appat', '2000-01-01', 10)");
+    const result = await call(shop.buyBalls, "u1", "appat", 2);
+    assert.deepEqual([result.ok, result.bought], [true, 2]);
+    assert.equal(await boughtToday(), 2);
+  });
+
+  it("deux achats simultanés ne dépassent jamais le quota du jour", async () => {
+    // Une poche plus grande que le quota : c'est lui seul qui doit tenir.
+    const special = getPokemonConfig().capture.specialBalls;
+    const original = special.maxHeld;
+    special.maxHeld = 50;
+    try {
+      await setBalance(100000);
+      const results = await Promise.all([call(shop.buyBalls, "u1", "appat", 6), call(shop.buyBalls, "u1", "appat", 6)]);
+      assert.deepEqual(results.map((result) => result.ok).sort(), [false, true]);
+      assert.match(results.find((result) => !result.ok).reason, /Tu en as acheté 6 sur 10 aujourd'hui : tu peux encore en acheter 4, pas 6/);
+      assert.equal((await units()).length, 6);
+      assert.equal(await boughtToday(), 6);
+      assert.equal(await balance(), 100000 - 6 * 230);
+    } finally {
+      special.maxHeld = original;
+    }
+  });
+
+  it("un achat refusé faute de points rend le quota réservé", async () => {
+    await setBalance(100);
+    await call(shop.buyBalls, "u1", "appat", 3);
+    assert.equal(await boughtToday(), 0);
   });
 
   it("un achat compte dans les points dépensés du dresseur", async () => {

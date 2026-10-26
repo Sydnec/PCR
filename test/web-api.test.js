@@ -166,6 +166,7 @@ describe("référentiels", () => {
 
       const special = config.capture.specialBalls;
       assert.equal(rules.shop.maxHeld, special.maxHeld);
+      assert.equal(rules.shop.dailyLimit, special.dailyLimit);
       assert.deepEqual(
         rules.shop.balls.map((ball) => [ball.key, ball.price]),
         [["appat", special.appat.price], ["catalyseur", special.catalyseur.price]]

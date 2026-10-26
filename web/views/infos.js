@@ -289,7 +289,8 @@ function shop(rules) {
     ),
     list(
       rule(
-        `Elles s'achètent avec /pk boutique, **${fmt(rules.shop.maxHeld)}** de chaque au plus, ` +
+        `Elles s'achètent avec /pk boutique, **${fmt(rules.shop.maxHeld)}** de chaque au plus en poche ` +
+          `et **${fmt(rules.shop.dailyLimit)}** de chaque par jour (minuit UTC), ` +
           `et se lancent depuis « Balls spéciales ».`
       ),
       rule(

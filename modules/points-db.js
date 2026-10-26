@@ -843,6 +843,22 @@ const db = new sqlite3.Database(dbPath, (err) => {
       }
     );
 
+    // Le quota d'achat du jour de chaque ball spéciale : une ligne par dresseur, ball et jour
+    // (UTC). Réservé AVANT le débit, par un UPSERT gardé, rendu pour ce qui n'est pas livré :
+    // c'est lui qui tient la règle, pas le journal des achats, écrit au mieux.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS pokemon_shop_daily (
+        user_id TEXT NOT NULL,
+        ball TEXT NOT NULL,
+        day TEXT NOT NULL,
+        bought INTEGER NOT NULL DEFAULT 0,
+        PRIMARY KEY (user_id, ball, day)
+      )`,
+      (err) => {
+        if (err) handleException("Erreur création table pokemon_shop_daily :", err);
+      }
+    );
+
     // Le journal des achats de la boutique : une ligne par achat conclu, au prix réellement payé
     // (ce qui a été remboursé n'y figure pas). Ne sert qu'au bilan de saison : un achat n'en
     // dépend jamais, et une écriture ratée est signalée sans le défaire.
