@@ -221,6 +221,27 @@ describe("lire la collection", () => {
     assert.deepEqual(sheet.owned.get(species("Rattatac").id), { normal: 0, shiny: 1 });
   });
 
+  it("la fiche d'une espèce lit les sexes qu'on en a, shiny compris, et rien pour une espèce asexuée", async () => {
+    await give("Rattata", { sex: "M" });
+    await give("Rattatac", { sex: "F" });
+    assert.deepEqual([...(await call(collection.getSpeciesOwnership, "u1", species("Rattata"))).sexes], ["M"], "la femelle d'une autre espèce ne compte pas");
+    await give("Rattata", { sex: "F", shiny: 1 });
+    assert.deepEqual([...(await call(collection.getSpeciesOwnership, "u1", species("Rattata"))).sexes].sort(), ["F", "M"]);
+    await give("Magnéti", { sex: null });
+    assert.equal((await call(collection.getSpeciesOwnership, "u1", species("Magnéti"))).sexes, null);
+  });
+
+  it("une lecture ratée des sexes les omet de la fiche, plutôt que d'annoncer qu'on n'en a aucun", async () => {
+    await give("Rattata", { sex: "M" });
+    await dbRun(points, "ALTER TABLE pokemon_owned RENAME TO pokemon_owned_off");
+    try {
+      const sheet = await call(collection.getSpeciesOwnership, "u1", species("Rattata"));
+      assert.equal(sheet.sexes, null);
+    } finally {
+      await dbRun(points, "ALTER TABLE pokemon_owned_off RENAME TO pokemon_owned");
+    }
+  });
+
   it("le classement ordonne par Pokédex, puis shiny, puis total", async () => {
     await giveMany("Rattata", 3, { user: "gros" });
     await give("Roucool", { user: "dex" });

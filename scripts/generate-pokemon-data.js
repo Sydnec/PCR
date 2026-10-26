@@ -175,20 +175,19 @@ async function main() {
     return raw ? Number(raw) : null;
   };
 
-  // Le stade se calcule en remontant la chaîne, sans compter les bébés et en
-  // s'arrêtant dès qu'on sort des générations incluses. Sans ce garde-fou, 11
-  // Pokémon de génération 1 (Pikachu <- Pichu, Ronflex <- Goinfrex, Leveinard
-  // <- Ptiravi...) seraient classés en stade 2 ou 3 à cause de bébés introduits
-  // plus tard, et deviendraient ultra-rares à tort — et ouvrir la génération 2
-  // rebattrait les raretés de la première. Le stade ne dépend donc jamais des
-  // générations activées : un bébé est de stade 1, sa forme adulte aussi.
+  // Le stade se calcule en remontant la chaîne, en s'arrêtant dès qu'on sort des
+  // générations incluses. Les bébés comptent : Magby est un stade 1, Magmar un
+  // stade 2, comme dans la lignée qu'affiche la fiche. Raretés, revente,
+  // apparitions et coûts d'évolution suivent donc ce qu'un dresseur voit, et
+  // Magmar ne se revend plus au prix d'une forme de base. Le stade ne dépend
+  // jamais des générations activées, seulement de celles du fichier.
   const stageOf = (id) => {
     let stage = 1;
     let current = id;
     while (true) {
       const previous = preEvolutionOf(current);
       if (previous === null || !inGeneration(previous)) return stage;
-      if (!isBaby(previous)) stage++;
+      stage++;
       current = previous;
     }
   };

@@ -181,6 +181,15 @@ export function femaleShare(species) {
   return rate >= 0 && rate <= 8 ? rate / 8 : 0.5;
 }
 
+// Les sexes qu'un individu de l'espèce peut avoir, mâle d'abord : aucun pour
+// Magnéti, un seul pour Nidoran♂ ou Leveinard. La fiche ne demande au dresseur
+// que ceux qui existent.
+export function possibleSexes(species) {
+  const share = femaleShare(species);
+  if (share === null) return [];
+  return [share < 1 ? "M" : null, share > 0 ? "F" : null].filter(Boolean);
+}
+
 // Le sexe d'un nouvel individu. NULL pour une espèce asexuée.
 export function rollSex(species) {
   const share = femaleShare(species);

@@ -57,7 +57,7 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
   suivre l'œuf (voir [Œufs](oeufs.md)).
 - `/pk classement` : classement des dresseurs par espèces distinctes.
 - `/pk info <pokemon>` : la même fiche que le bouton des apparitions — type, rareté,
-  difficulté, répartition mâle/femelle, et la lignée évolutive stade par stade avec ce que le
+  difficulté, répartition mâle/femelle avec les sexes qu'on en a déjà, et la lignée évolutive stade par stade avec ce que le
   dresseur en a déjà.
 - `/pk evolution <espece> [individu]` : fait évoluer un Pokémon de l'espèce. L'individu est
   facultatif : sans lui, le bot prend les sacrifices parmi les moins précieux — hors vitrine, les
@@ -226,10 +226,9 @@ prennent en compte immédiatement. Ce qu'elle change :
 - **Zarbi et ses 26 lettres** : une seule entrée de Pokédex, mais chaque Zarbi porte la sienne,
   avec son image (voir [Individus](individus.md)).
 - **Un Charme Chroma de 2ᵉ génération** (voir [Charme Chroma](charme.md)).
-- **Les raretés de la 1ʳᵉ génération ne bougent pas.** Un bébé est de stade 1, sa forme adulte
-  aussi : Pikachu reste commun et Raichu peu commun, là où compter Pichu en ferait un rare.
-  L'évolution d'un bébé vers sa forme adulte coûte comme une première évolution d'adulte :
-  le tarif du stade 2 (`pokemon.evolution.2`).
+- **Un bébé compte dans le stade.** Pichu est de stade 1, Pikachu de stade 2 et Raichu de stade 3 :
+  Magmar, Pikachu ou Rondoudou sont peu communs, Raichu, Mélodelfe et Grodoudou rares. Rareté, revente, apparitions et coût d'évolution suivent
+  ce stade, comme la lignée qu'affiche la fiche.
 
 Refermer une génération (`pokemon.generation 1`, avec une date d'ouverture repoussée) cache ses
 espèces sans les retirer des collections ; elles réapparaissent à la réouverture.

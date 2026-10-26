@@ -223,10 +223,11 @@ function answerSpeciesInfo(interaction, spawnId) {
 
     // Compteurs à zéro en cas d'erreur : mieux vaut la fiche sans les
     // pastilles de possession qu'un refus sec devant une apparition.
-    getSpeciesOwnership(interaction.user.id, species, (err, { owned, forms }) => {
+    getSpeciesOwnership(interaction.user.id, species, (err, { owned, forms, sexes }) => {
       const fiche = buildSpeciesInfoEmbed(species, {
         owned,
         forms,
+        sexes,
         isShiny: Boolean(spawn.is_shiny),
         catchRate: spawn.catch_rate,
       });

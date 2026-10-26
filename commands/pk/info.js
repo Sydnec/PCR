@@ -44,10 +44,10 @@ export default {
       // Une collection illisible ne doit pas priver le dresseur de la fiche :
       // les compteurs retombent à zéro, et la lignée s'affiche simplement sans
       // ses pastilles de possession.
-      getSpeciesOwnership(interaction.user.id, species, (err, { owned, forms }) => {
+      getSpeciesOwnership(interaction.user.id, species, (err, { owned, forms, sexes }) => {
         interaction
           .reply({
-            embeds: [buildSpeciesInfoEmbed(species, { owned, forms })],
+            embeds: [buildSpeciesInfoEmbed(species, { owned, forms, sexes })],
             flags: MessageFlags.Ephemeral,
           })
           .catch(() => {});
