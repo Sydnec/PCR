@@ -505,7 +505,10 @@ export async function render(ctx) {
               "p",
               { class: "small" },
               species
-                ? [pokemonName(species, false, touch.sex, null, touch.form), " est au bout de ta ligne"]
+                ? [
+                    pokemonName(species, false, touch.sex, null, touch.form),
+                    " est au bout de ta ligne",
+                  ]
                 : "Un Pokémon est au bout de ta ligne",
               " : il s'enfuit dans ",
               countdown(touch.fleesAt),
@@ -541,7 +544,9 @@ export async function render(ctx) {
         buyingSafari = value;
       },
     });
-    return offer ? h("section", { class: "side-section" }, h("h3", {}, "Parc safari"), offer) : null;
+    return offer
+      ? h("section", { class: "side-section" }, h("h3", {}, "Parc safari"), offer)
+      : null;
   }
 
   // ---------------------- Entre deux apparitions ----------------------
