@@ -517,7 +517,10 @@ function eggs(rules) {
           "des deux — pondent un œuf. Chaque parent ne pond qu'une fois. C'est la seule façon " +
           "d'obtenir les bébés 🥚."
       ),
-      rule("Il éclot au premier des deux seuils."),
+      rule(
+        `Il éclot au premier des deux seuils. **${fmt(rules.eggs.perDay)}** ponte` +
+          `${rules.eggs.perDay > 1 ? "s" : ""} par jour au plus, compteur remis à zéro à minuit UTC.`
+      ),
       rule(
         `Chances de shiny d'une apparition, **×${fmt(rules.eggs.shinyFactors[0])}** avec un ` +
           `parent shiny, **×${fmt(rules.eggs.shinyFactors[1])}** avec deux.`

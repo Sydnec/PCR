@@ -15,7 +15,8 @@ génération 2 (voir [Générations](README.md#générations)).
   premier parent choisi, l'autocomplétion ne propose que ses partenaires possibles. Métamorph sert
   aussi de joker dans les évolutions (voir [`/pk evolution`](README.md#commandes)).
 - **Les parents restent**, mais **chacun ne pond qu'une fois dans sa vie** : il devient stérile.
-- **Un seul œuf à la fois** par dresseur.
+- **Un seul œuf à la fois** par dresseur, et **un œuf par jour** au plus (`eggs.perDay`), même si
+  le précédent a éclos : le compteur repart à minuit UTC, comme la loterie.
 - **Éclosion au premier des deux seuils** : **5 jours**, ou **200 messages** de son propriétaire —
   comme des pas dans le jeu. Le bébé naît avec un sexe et s'annonce dans le salon des apparitions.
 - **Shiny** : deux parents normaux donnent les chances d'une apparition sauvage ; **chaque parent

@@ -251,6 +251,9 @@ const POKEMON = {
     enabled: true,
     hatchHours: 120,
     hatchMessages: 200,
+    // Pontes au plus par dresseur et par jour UTC, même si l'œuf a éclos entre-temps :
+    // un dresseur très actif ferait sinon éclore ses œufs à la chaîne.
+    perDay: 1,
     // Le bébé a les chances de shiny d'une apparition, multipliées par ce
     // facteur pour chaque parent shiny : ×2 pour un, ×4 pour deux.
     shinyParentMultiplier: 2,

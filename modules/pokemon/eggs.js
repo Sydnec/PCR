@@ -11,7 +11,8 @@
 // Trois règles tiennent l'économie :
 // - les parents ne sont pas consommés, mais chacun ne pond qu'une fois dans sa
 //   vie : il devient stérile ;
-// - un seul œuf en couvaison par dresseur, garanti en base ;
+// - un seul œuf en couvaison par dresseur, garanti en base, et `perDay` pontes
+//   au plus par jour UTC (celui de la loterie), même si l'œuf a déjà éclos ;
 // - l'œuf éclot au premier des deux seuils — tant d'heures, ou tant de
 //   messages de son propriétaire, comme des pas dans le jeu.
 //
@@ -36,6 +37,7 @@ import { creditSpecies } from "./collection.js";
 import { displayName } from "./embeds.js";
 import { resolveChannel } from "./spawn.js";
 import { getCharms } from "./charms.js";
+import { nextDrawAt } from "./lottery.js";
 
 // Les familles qui ont un bébé jouable, et leurs parents possibles : toute la
 // lignée sauf le bébé lui-même, qui ne pond pas. Recalculé à chaque appel,
@@ -115,6 +117,21 @@ export function describeEgg(first, second) {
   }
   return { baby, father, mother };
 }
+
+// Combien d'œufs le dresseur a pondus depuis minuit UTC. Une lecture suffit à tenir le
+// quota : deux pontes simultanées se heurtent de toute façon à l'index unique des œufs
+// en couvaison, et une ponte ne peut suivre la précédente qu'après son éclosion.
+function eggsLaidToday(userId, now, cb) {
+  const dayStart = nextDrawAt(now) - 24 * 3600 * 1000;
+  db.get(
+    "SELECT COUNT(*) AS n FROM pokemon_eggs WHERE user_id = ? AND laid_at >= ?",
+    [userId, dayStart],
+    (err, row) => cb(err, row?.n ?? 0)
+  );
+}
+
+export const eggsPerDay = () =>
+  Math.max(1, Math.floor(Number(getPokemonConfig().eggs?.perDay) || 1));
 
 export function getIncubatingEgg(userId, cb) {
   db.get(
@@ -202,7 +219,22 @@ export function layEgg(userId, firstGroup, secondGroup, cb) {
         reason: "Tu couves déjà un œuf : il faut qu'il éclose avant d'en pondre un autre.",
       });
     }
+    eggsLaidToday(userId, Date.now(), (err, laid) => {
+      if (err) return cb(err);
+      const perDay = eggsPerDay();
+      if (laid >= perDay) {
+        return cb(null, {
+          ok: false,
+          reason:
+            `Tu as déjà pondu ${laid} œuf${laid > 1 ? "s" : ""} aujourd'hui sur ${perDay} : ` +
+            "reviens après minuit UTC.",
+        });
+      }
+      claimBoth();
+    });
+  });
 
+  function claimBoth() {
     const noFertile = (species, group) =>
       cb(null, {
         ok: false,
@@ -275,7 +307,7 @@ export function layEgg(userId, firstGroup, secondGroup, cb) {
         );
       });
     });
-  });
+  }
 }
 
 // ====================== ÉCLOSION ======================

@@ -722,9 +722,13 @@ describe("œufs", () => {
     assert.equal(second.ok, false);
     assert.match(second.reason, /couves déjà un œuf/);
     await call(eggs.hatchEgg, first.egg.id);
+    // Un jour passe entre deux pontes : le quota quotidien a son propre test (eggs.test.js).
+    const nextDay = () => dbRun(points, "UPDATE pokemon_eggs SET laid_at = laid_at - 86400000");
+    await nextDay();
     const third = await call(eggs.layEgg, "u1", group("Pikachu", "M"), group("Pikachu", "F"));
     assert.equal(third.ok, true, "les deux autres parents sont fertiles");
     await call(eggs.hatchEgg, third.egg.id);
+    await nextDay();
     const exhausted = await call(eggs.layEgg, "u1", group("Pikachu", "M"), group("Pikachu", "F"));
     assert.equal(exhausted.ok, false);
     assert.match(exhausted.reason, /fertile|une fois dans sa vie/);
