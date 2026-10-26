@@ -31,7 +31,7 @@ jobs:
           git pull origin main
 
           # Lancer le script de déploiement interne
-          # Cela gère npm install et le redémarrage PM2
+          # Cela gère npm ci et le redémarrage PM2 (arrêt avant PM2 si npm ci échoue)
           echo "🔄 Exécution du script de déploiement..."
           bash ./pcr deploy
 
