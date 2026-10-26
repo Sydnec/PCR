@@ -1,7 +1,24 @@
 {
-  "version": "1.19.5",
-  "lastUpdated": "2026-10-26T10:18:01.667Z",
+  "version": "1.19.6",
+  "lastUpdated": "2026-10-26T11:18:42.587Z",
   "releases": [
+    {
+      "version": "1.19.6",
+      "date": "2026-10-26",
+      "title": "Release 1.19.6",
+      "features": [
+        {
+          "type": "enhancement",
+          "name": "Page Infos du site plus claire",
+          "description": "La page Infos du site range les règles par thème, met les chiffres clés en avant, et présente la pêche, la boutique et le starter de génération.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-10-26T13:00:00.000Z",
+          "branch": "dev/keen-knuth-lcd8tu"
+        }
+      ]
+    },
     {
       "version": "1.19.5",
       "date": "2026-10-26",
@@ -2671,16 +2688,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "enhancement",
-      "name": "Page Infos du site plus claire",
-      "description": "La page Infos du site range les règles par thème, met les chiffres clés en avant, et présente la pêche, la boutique et le starter de génération.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-10-26T13:00:00.000Z",
-      "branch": "dev/keen-knuth-lcd8tu"
-    }
-  ]
+  "pending": []
 }
