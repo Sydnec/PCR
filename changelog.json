@@ -2715,5 +2715,36 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Starters plus rares",
+      "description": "Les lignées de starter sont un cran plus rares : le stade 1 est peu commun, le stade 2 rare et le stade 3 devient très rare, une nouvelle rareté. Seuls les très rares et les légendaires mentionnent le rôle Pokémon.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-26T13:00:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
+    },
+    {
+      "type": "enhancement",
+      "name": "Plus de Zarbi",
+      "description": "Zarbi apparaît deux fois plus souvent, à l'état sauvage comme au parc safari.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-26T13:01:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
+    },
+    {
+      "type": "enhancement",
+      "name": "Un œuf par jour",
+      "description": "On ne peut plus pondre qu'un œuf par jour ; le compteur repart à minuit UTC.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-26T13:02:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
+    }
+  ]
 }

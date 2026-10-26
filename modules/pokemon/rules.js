@@ -50,7 +50,7 @@ import {
 import { getLotteryConfig } from "./lottery.js";
 import { describeEvolution } from "./collection.js";
 import { pokemonSellValue } from "./sell.js";
-import { eggShinyFactor } from "./eggs.js";
+import { eggShinyFactor, eggsPerDay } from "./eggs.js";
 import { charmSpecies } from "./charms.js";
 import { getRods } from "./fishing.js";
 import { ballEffectText, openSpecialBalls } from "./shop.js";
@@ -391,6 +391,7 @@ export function describeRules(bot) {
       enabled: config.eggs.enabled !== false,
       hatchHours: config.eggs.hatchHours,
       hatchMessages: config.eggs.hatchMessages,
+      perDay: eggsPerDay(),
       shinyFactors: [eggShinyFactor(1), eggShinyFactor(2)],
     },
     trade: {

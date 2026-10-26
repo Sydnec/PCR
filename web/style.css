@@ -428,6 +428,10 @@ input[type="number"] {
   --chip: #3b82f6;
 }
 
+.rarity-TRES_RARE {
+  --chip: #a855f7;
+}
+
 .rarity-LEGENDAIRE {
   --chip: #f59e0b;
 }

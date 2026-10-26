@@ -151,6 +151,23 @@ describe("pondre (layEgg)", () => {
     assert.equal((await eggsOf()).length, 1);
   });
 
+  it("un œuf par jour : éclos ou non, le suivant attend minuit UTC, et les parents restent fertiles", async () => {
+    const [m1, f1] = [await own("Pikachu", { sex: "M" }), await own("Pikachu", { sex: "F", obtained: 2 })];
+    const [m2, f2] = [await own("Pikachu", { sex: "M", obtained: 3 }), await own("Pikachu", { sex: "F", obtained: 4 })];
+    assert.equal((await lay(parent(m1), parent(f1))).ok, true);
+    await dbRun(points, "UPDATE pokemon_eggs SET status = 'HATCHED', hatched_at = ?", [Date.now()]);
+    const refused = await lay(parent(m2), parent(f2));
+    assert.equal(refused.ok, false);
+    assert.equal(refused.reason, "Tu as déjà pondu 1 œuf aujourd'hui sur 1 : reviens après minuit UTC.");
+    assert.deepEqual(await sterileOf(m2, f2), [0, 0]);
+    assert.equal((await eggsOf()).length, 1);
+    // Pondu la veille : le compteur est reparti.
+    const yesterday = new Date();
+    yesterday.setUTCHours(0, 0, 0, 0);
+    await dbRun(points, "UPDATE pokemon_eggs SET laid_at = ?", [yesterday.getTime() - 1]);
+    assert.equal((await lay(parent(m2), parent(f2))).ok, true);
+  });
+
   it("chaque parent ne pond qu'une fois : un stérile est refusé, avec son numéro", async () => {
     const father = await own("Pikachu", { sex: "M", sterile: 1 });
     const mother = await own("Pikachu", { sex: "F" });
@@ -236,6 +253,8 @@ describe("l'éclosion (hatchEgg)", () => {
   async function incubate({ shinyParents = 0, user = "u1" } = {}) {
     const father = await own("Pikachu", { sex: "M", user, shiny: shinyParents > 0 ? 1 : 0 });
     const mother = await own("Pikachu", { sex: "F", user, shiny: shinyParents > 1 ? 1 : 0 });
+    // Les œufs d'avant datent d'un autre jour : le quota quotidien n'est pas l'objet de ces tests.
+    await dbRun(points, "UPDATE pokemon_eggs SET laid_at = laid_at - 86400000 WHERE user_id = ?", [user]);
     await lay(parent(father), parent(mother), user);
     return (await eggsOf(user)).at(-1);
   }

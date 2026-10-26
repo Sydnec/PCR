@@ -122,6 +122,7 @@ describe("référentiels", () => {
     const rules = await call("GET", "/api/rules");
     assert.ok(rules.spawn.legendaryFleeMultiplier >= 1);
     assert.ok(rules.spawn.fleeMinutes.min > 0);
+    assert.equal(rules.eggs.perDay, getPokemonConfig().eggs.perDay);
     assert.ok(rules.capture.table.length > 0);
     const hardest = rules.capture.table.at(-1);
     assert.ok(hardest.balls.every((ball) => ball.min >= 0 && ball.max <= 1));
