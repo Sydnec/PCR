@@ -50,11 +50,11 @@ import {
   tradeEvolutionTarget,
 } from "./data.js";
 
+// Une décimale de plus à mesure que la chance baisse, à la française : « 5,9 % ».
 const formatPercent = (probability) => {
   const percent = probability * 100;
-  if (percent >= 10) return `${Math.round(percent)} %`;
-  if (percent >= 1) return `${percent.toFixed(1)} %`;
-  return `${percent.toFixed(2)} %`;
+  const digits = percent >= 10 ? 0 : percent >= 1 ? 1 : 2;
+  return `${percent.toLocaleString("fr-FR", { minimumFractionDigits: digits, maximumFractionDigits: digits })} %`;
 };
 
 // La répartition des sexes d'une espèce, celle que tire rollSex : des

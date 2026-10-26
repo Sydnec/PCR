@@ -227,7 +227,7 @@ describe("lancer une ball depuis l'annonce", () => {
     const id = await spawnRow("Onix");
     await dbRun(points, "INSERT INTO pokemon_ball_units (user_id, ball, bought_at) VALUES (?, 'appat', 1), (?, 'catalyseur', 1), (?, 'catalyseur', 1)", [user, user, user]);
     // Les chances lues dans la ligne, en probabilités, dans l'ordre des balls.
-    const chances = (content) => [...content.matchAll(/\*\*([\d.]+) %\*\*/g)].map((match) => Number(match[1]) / 100);
+    const chances = (content) => [...content.matchAll(/\*\*([\d,]+) %\*\*/g)].map((match) => Number(match[1].replace(",", ".")) / 100);
     const { globalMultiplier } = getPokemonConfig().capture;
     const catalyseur = getBall("catalyseur");
     // Onix évolue grâce au Catalyseur : la Catalyseur Ball a son bonus, l'Appât Ball (pas
@@ -239,7 +239,7 @@ describe("lancer une ball depuis l'annonce", () => {
     assert.ok(expected[1] > expected[0]);
 
     const opened = only(await click(`poke_special|${id}`, { user }), "reply");
-    assert.match(opened.content, /^🎯 Tes chances sur ce Pokémon : 🎣 Appât Ball \*\*[\d.]+ %\*\* · ⚙️ Catalyseur Ball \*\*[\d.]+ %\*\*$/);
+    assert.match(opened.content, /^🎯 Tes chances sur ce Pokémon : 🎣 Appât Ball \*\*5,9 %\*\* · ⚙️ Catalyseur Ball \*\*24 %\*\*$/, "à la française, une virgule");
     chances(opened.content).forEach((chance, index) => assert.ok(Math.abs(chance - expected[index]) < 0.005, `${chance} ≈ ${expected[index]}`));
 
     // Le lancer tire bien cette chance, et le panneau la redonne sous le raté.

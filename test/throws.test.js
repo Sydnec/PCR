@@ -177,7 +177,7 @@ describe("le tirage", () => {
     await setBalance(1000);
     const outcome = await throwBall("u1", "poke", 0.999);
     assert.ok(Math.abs(outcome.probability - data.catchProbability(species("Roucool").catchRate, balls().poke.multiplier, 1)) < 1e-9);
-    assert.ok(capture.throwMessage(outcome).includes(`${(outcome.probability * 100).toFixed(1)} % de réussite`));
+    assert.ok(capture.throwMessage(outcome).includes(`${(outcome.probability * 100).toFixed(1).replace(".", ",")} % de réussite`));
   });
 
   it("capture, crédite la boîte avec la ball, le sexe de l'annonce, et ferme l'apparition", async () => {

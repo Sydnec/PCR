@@ -605,7 +605,10 @@ export function throwMessage(outcome) {
       const { species, spawn } = outcome;
       return (
         `❌ Raté ! **${displayName(species, spawn.is_shiny, spawn.sex, spawn.form)}** s'est ` +
-        `dégagé de ta ${ball.label}. (${mention}, ${(outcome.probability * 100).toFixed(1)} % ` +
+        `dégagé de ta ${ball.label}. (${mention}, ${(outcome.probability * 100).toLocaleString("fr-FR", {
+          minimumFractionDigits: 1,
+          maximumFractionDigits: 1,
+        })} % ` +
         `de réussite)`
       );
     }
