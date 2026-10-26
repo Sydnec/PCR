@@ -1291,6 +1291,10 @@ input[type="number"] {
   gap: 8px;
 }
 
+.side-section > p {
+  margin: 0;
+}
+
 .throws {
   display: flex;
   flex-direction: column;
@@ -1326,6 +1330,65 @@ input[type="number"] {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* La touche d'une pêche, en tête du centre et séparée du Pokémon du salon. */
+.touch {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.touch-banner {
+  align-self: center;
+  width: 100%;
+  max-width: 720px;
+  border-left: 3px solid var(--accent);
+}
+
+.countdown {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Les cannes, une par ligne dans la colonne de côté : ce qu'elles pêchent se lit en
+   entier, sur plusieurs lignes s'il le faut. */
+.rods {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rods .ball {
+  align-items: flex-start;
+  width: 100%;
+}
+
+.rod-pool {
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+
+.rods .ball-meta {
+  white-space: normal;
+}
+
+/* Le bouton du parc dans la colonne de côté : plus de bandeau, et le bouton sur toute
+   la largeur sous son texte. */
+.side-section .safari-offer {
+  padding: 0;
+  background: none;
+}
+
+.side-section .safari-offer-text {
+  flex: 1 1 0;
+}
+
+.side-section .safari-offer > .button,
+.side-section .safari-gens {
+  flex: 1 1 100%;
 }
 
 .drop-text {
