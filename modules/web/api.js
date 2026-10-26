@@ -35,8 +35,6 @@ import {
   RARITIES,
   activeGeneration,
   allSpecies,
-  ballMultiplier,
-  catchProbability,
   charmFactor,
   dexSize,
   difficultyOf,
@@ -63,6 +61,7 @@ import {
   safariFleeChance,
   speciesForms,
   spriteUrl,
+  throwProbability,
   typeColors,
 } from "../pokemon/data.js";
 import { getBalls, getPokemonConfig, getSafariConfig } from "../pokemon/config.js";
@@ -459,11 +458,7 @@ async function spawnJson(ctx, spawn, balance) {
       label: ball.label,
       emoji: ball.emoji,
       image: itemImageUrl(ball.sprite),
-      probability: catchProbability(
-        spawn.catch_rate,
-        ballMultiplier(ball, { fished: Boolean(spawn.fished), speciesId: spawn.species_id }),
-        config.capture.globalMultiplier
-      ),
+      probability: throwProbability(spawn, ball),
       held: unitCounts.get(ball.key)?.held ?? 0,
       eligible: unitCounts.get(ball.key)?.eligible ?? 0,
     })),

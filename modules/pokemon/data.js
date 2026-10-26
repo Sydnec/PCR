@@ -444,6 +444,18 @@ export function ballMultiplier(ball, { fished = false, speciesId = null } = {}) 
   return met ? ball.multiplier * bonus.multiplier : ball.multiplier;
 }
 
+// La chance de capture d'une ball contre CETTE apparition : son taux figé, et le
+// bonus de la ball si la pêche ou l'espèce le déclenche. Le lancer tire ce nombre,
+// le site et le menu des balls spéciales l'affichent : un seul calcul pour les trois.
+export function throwProbability(spawn, ball) {
+  if (ball.guaranteed) return 1;
+  return catchProbability(
+    spawn.catch_rate,
+    ballMultiplier(ball, { fished: Boolean(spawn.fished), speciesId: spawn.species_id }),
+    getPokemonConfig().capture.globalMultiplier
+  );
+}
+
 // Probabilités affichées dans les embeds, pour que le joueur sache ce qu'il paie.
 export function probabilitiesByBall(catchRate) {
   const config = getPokemonConfig();

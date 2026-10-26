@@ -209,7 +209,7 @@ describe("lancer une ball depuis l'annonce", () => {
     const calls = await click(`poke_special|${id}`, { user });
     const reply = only(calls, "reply");
     assert.equal(reply.flags, MessageFlags.Ephemeral);
-    assert.equal(reply.content, undefined, "pas de texte : les boutons seuls");
+    assert.match(reply.content, /^🎯 Tes chances sur ce Pokémon : 🎣 Appât Ball \*\*\d+ %\*\*$/, "une ligne : la chance de la seule ball qui sert");
     const master = getBall("master");
     assert.deepEqual(
       labels(reply),
@@ -221,11 +221,58 @@ describe("lancer une ball depuis l'annonce", () => {
     assert.deepEqual(buttons.map((button) => button.custom_id), [`poke_throw|${id}|appat`, `poke_master|${id}`]);
   });
 
+  it("la ligne du menu donne la chance que le lancer tire, bonus de la ball compris", async () => {
+    sandbox.writeConfig(GEN2);
+    const user = newUser();
+    const id = await spawnRow("Onix");
+    await dbRun(points, "INSERT INTO pokemon_ball_units (user_id, ball, bought_at) VALUES (?, 'appat', 1), (?, 'catalyseur', 1), (?, 'catalyseur', 1)", [user, user, user]);
+    // Les chances lues dans la ligne, en probabilités, dans l'ordre des balls.
+    const chances = (content) => [...content.matchAll(/\*\*([\d.]+) %\*\*/g)].map((match) => Number(match[1]) / 100);
+    const { globalMultiplier } = getPokemonConfig().capture;
+    const catalyseur = getBall("catalyseur");
+    // Onix évolue grâce au Catalyseur : la Catalyseur Ball a son bonus, l'Appât Ball (pas
+    // de pêche) le sien n'a pas.
+    const expected = [
+      data.catchProbability(species("Onix").catchRate, getBall("appat").multiplier, globalMultiplier),
+      data.catchProbability(species("Onix").catchRate, catalyseur.multiplier * catalyseur.bonus.multiplier, globalMultiplier),
+    ];
+    assert.ok(expected[1] > expected[0]);
+
+    const opened = only(await click(`poke_special|${id}`, { user }), "reply");
+    assert.match(opened.content, /^🎯 Tes chances sur ce Pokémon : 🎣 Appât Ball \*\*[\d.]+ %\*\* · ⚙️ Catalyseur Ball \*\*[\d.]+ %\*\*$/);
+    chances(opened.content).forEach((chance, index) => assert.ok(Math.abs(chance - expected[index]) < 0.005, `${chance} ≈ ${expected[index]}`));
+
+    // Le lancer tire bien cette chance, et le panneau la redonne sous le raté.
+    const thrown = only(await withRandom(0.999, () => click(`poke_rethrow|${id}|catalyseur`, { user })), "editReply");
+    const { probability } = await dbGet(points, "SELECT probability FROM pokemon_throws WHERE spawn_id = ? AND user_id = ?", [id, user]);
+    assert.equal(probability, expected[1]);
+    const [result, line] = thrown.content.split("\n\n");
+    assert.match(result, /Raté/);
+    assert.match(line, /^🎯 Tes chances sur ce Pokémon : 🎣 Appât Ball .* · ⚙️ Catalyseur Ball /, "il en reste une de chaque");
+    assert.deepEqual(chances(line), chances(opened.content));
+  });
+
+  it("une lecture ratée grise le menu et tait les chances", async () => {
+    sandbox.writeConfig(GEN2);
+    const user = newUser();
+    const id = await spawnRow("Roucool");
+    await dbRun(points, "INSERT INTO pokemon_ball_units (user_id, ball, bought_at) VALUES (?, 'appat', 1)", [user]);
+    await dbRun(points, "ALTER TABLE pokemon_inventory RENAME TO pokemon_inventory_off");
+    try {
+      const reply = only(await click(`poke_special|${id}`, { user }), "reply");
+      assert.equal(reply.content, undefined, "rien plutôt qu'une chance peut-être fausse");
+      assert.ok(reply.components[0].toJSON().components.every((button) => button.disabled));
+    } finally {
+      await dbRun(points, "ALTER TABLE pokemon_inventory_off RENAME TO pokemon_inventory");
+    }
+  });
+
   it("la Master Ball du menu affiche le prix de CE dresseur, qui monte à chaque achat", async () => {
     const user = newUser();
     const id = await spawnRow("Roucool");
     await dbRun(points, "INSERT INTO pokemon_throws (spawn_id, user_id, ball, cost, probability, result, thrown_at) VALUES (99, ?, 'master', 1, 1, 'CATCH', 1)", [user]);
     const reply = only(await click(`poke_special|${id}`, { user }), "reply");
+    assert.equal(reply.content, undefined, "aucune ball de la boutique : pas de ligne de chances");
     const master = getBall("master");
     assert.ok(priceAfter(master, 1) > priceAfter(master, 0));
     assert.deepEqual(labels(reply), [`Master Ball (${priceAfter(master, 1).toLocaleString("fr-FR")})`]);

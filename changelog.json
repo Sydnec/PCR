@@ -2550,7 +2550,7 @@
     {
       "type": "enhancement",
       "name": "Menu des balls spéciales épuré",
-      "description": "Le menu Balls spéciales ne montre plus que les balls que tu as et qui servent au Pokémon, plus la Master Ball avec son prix.",
+      "description": "Le menu Balls spéciales ne montre plus que les balls que tu as et qui servent au Pokémon, avec tes chances de capture contre lui, plus la Master Ball avec son prix.",
       "announce": true,
       "author": "Sydnec",
       "commit": "pending",
