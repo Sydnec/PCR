@@ -188,7 +188,7 @@ const POKEMON = {
       catalyseur: {
         label: "Catalyseur Ball",
         emoji: "⚙️",
-        sprite: "up-grade",
+        sprite: "moon-ball",
         price: 300,
         multiplier: 1,
         generation: 2,
