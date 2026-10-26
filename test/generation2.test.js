@@ -193,8 +193,9 @@ describe("la majoration des générations récentes", () => {
       sandbox.writeConfig(GEN2);
     }
   };
+  // Hors lignées de starter : elles pèsent un stade plus haut que le leur.
   const drawable = (generation, stage) =>
-    all().find((entry) => entry.generation === generation && entry.stage === stage && data.spawnWeight(entry, spawn()) > 0);
+    all().find((entry) => entry.generation === generation && entry.stage === stage && !data.isStarterLine(entry) && data.spawnWeight(entry, spawn()) > 0);
 
   it("par défaut ×2 : une espèce de la 2ᵉ génération pèse le double d'une de la 1ʳᵉ du même stade", () => {
     assert.equal(spawn().generationBoost, 2);
@@ -219,7 +220,7 @@ describe("la majoration des générations récentes", () => {
   });
 
   it("le facteur se cumule : une 3ᵉ génération pèserait quatre fois la 1ʳᵉ", () => {
-    const hypothetical = { ...species("Salamèche"), generation: 3 };
+    const hypothetical = { ...species("Roucool"), generation: 3 };
     assert.equal(data.spawnWeight(hypothetical, spawn()), 4 * spawn().weightsByStage[1]);
   });
 
@@ -272,12 +273,39 @@ describe("la majoration des générations récentes", () => {
     near(table.rows.reduce((sum, row) => sum + row.share, 0), 1, "les parts font un tout");
   });
 
+  it("Zarbi pèse son facteur propre fois un stade 1 de sa génération, aux apparitions comme au parc", () => {
+    const zarbi = species("Zarbi");
+    const other = drawable(2, 1);
+    assert.equal(spawn().speciesFactors[zarbi.id], 2);
+    assert.equal(data.spawnWeight(zarbi, spawn()), 2 * data.spawnWeight(other, spawn()));
+    assert.equal(data.spawnWeight(zarbi, getSafariConfig()), 2 * data.spawnWeight(other, getSafariConfig()));
+    // Un facteur nul ou illisible ne retire personne du pool.
+    for (const value of [0, -1, "n'importe quoi"]) {
+      const config = { ...spawn(), speciesFactors: { [zarbi.id]: value } };
+      assert.equal(data.spawnWeight(zarbi, config), data.spawnWeight(other, config), `facteur ${value}`);
+    }
+    // La table /admin poids lui donne sa ligne, avec le poids réellement tiré.
+    const row = weights.describeSpawnPool().rows.find((entry) => entry.label === "Zarbi (×2)");
+    assert.deepEqual([row.count, row.weight], [1, data.spawnWeight(zarbi, spawn())]);
+  });
+
   it("sans majoration, ou au parc safari, la table garde une seule ligne par catégorie", () => {
     withBoost(1, () => {
       assert.ok(weights.describeSpawnPool().rows.every((row) => !row.label.includes("gén.")));
     });
     const safari = weights.describeSafariPool().rows.map((row) => row.label);
-    assert.deepEqual(safari, ["Stade 1", "Stade 2", "Stade 3", "Légendaires", "Hors pool (échange, objet)", "Hors pool (œuf)"]);
+    assert.deepEqual(safari, [
+      "Stade 1",
+      "Stade 2",
+      "Stade 3",
+      "Starters, stade 1",
+      "Starters, stade 2",
+      "Starters, stade 3",
+      "Zarbi (×2)",
+      "Légendaires",
+      "Hors pool (échange, objet)",
+      "Hors pool (œuf)",
+    ]);
   });
 });
 

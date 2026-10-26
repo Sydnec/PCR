@@ -14,8 +14,10 @@ import {
   allSpecies,
   generationOrdinal,
   isLegendary,
+  isStarterLine,
   itemOnlySpecies,
   spawnWeight,
+  speciesFactor,
 } from "./data.js";
 import {
   getItems,
@@ -85,7 +87,11 @@ function speciesRows(poolConfig) {
           ? "Hors pool (œuf)"
           : isLegendary(species)
             ? "Légendaires"
-            : `Stade ${species.stage}`;
+            : speciesFactor(species, poolConfig) !== 1
+              ? `${species.name} (×${speciesFactor(species, poolConfig).toLocaleString("fr-FR")})`
+              : isStarterLine(species)
+              ? `Starters, stade ${species.stage}`
+              : `Stade ${species.stage}`;
     const key = `${category}|${weight}`;
     const group = groups.get(key) ?? { category, count: 0, weight, generations: new Set() };
     group.count += 1;
@@ -97,6 +103,9 @@ function speciesRows(poolConfig) {
     "Stade 1",
     "Stade 2",
     "Stade 3",
+    "Starters, stade 1",
+    "Starters, stade 2",
+    "Starters, stade 3",
     "Légendaires",
     "Hors pool (échange, objet)",
     "Hors pool (œuf)",
@@ -106,10 +115,14 @@ function speciesRows(poolConfig) {
     parCategorie.set(group.category, (parCategorie.get(group.category) ?? 0) + 1);
   }
   const first = (group) => Math.min(...group.generations);
+  // Une espèce à facteur propre (« Zarbi (×2) ») n'a pas de place dans l'ordre fixe :
+  // elle se range juste avant les légendaires.
+  const rank = (category) =>
+    ordre.includes(category) ? ordre.indexOf(category) : ordre.indexOf("Légendaires") - 0.5;
   return (
     [...groups.values()]
       .sort(
-        (a, b) => ordre.indexOf(a.category) - ordre.indexOf(b.category) || first(a) - first(b)
+        (a, b) => rank(a.category) - rank(b.category) || first(a) - first(b)
       )
       // Les groupes se comptent au fil des espèces, mais c'est `row` qui fabrique
       // une ligne : une seule définition de ce qu'est un total.

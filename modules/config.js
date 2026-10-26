@@ -81,6 +81,9 @@ const POKEMON = {
     // dans les jeux, sans être introuvables. 35 et 10 (contre 100) en faisaient
     // des curiosités — un stade 3 sur 75 apparitions.
     weightsByStage: { 1: 70, 2: 60, 3: 25 },
+    // Le poids d'un « Très rare » : le stade 3 d'une lignée de starter
+    // (`starterLines`), entre un stade 3 ordinaire et un légendaire.
+    veryRareWeight: 18,
     legendaryWeight: 8,
     // Les générations récentes sortent plus que les anciennes : le poids d'une
     // espèce est multiplié par ce facteur autant de fois qu'elle compte de
@@ -89,7 +92,11 @@ const POKEMON = {
     // plus de chances d'apparaître qu'un Roucool. Propre aux apparitions du salon :
     // le parc safari ne l'a pas, puisqu'on y choisit sa génération.
     generationBoost: 2,
-    pingRarities: ["RARE", "LEGENDAIRE"],
+    // Le facteur propre d'une espèce, par numéro du Pokédex. Zarbi (201) sort deux
+    // fois plus qu'un stade 1 de sa génération : ses 26 lettres sont autant de
+    // formes à réunir, et un seul Zarbi par lettre ne se croisait presque jamais.
+    speciesFactors: { 201: 2 },
+    pingRarities: ["TRES_RARE", "LEGENDAIRE"],
     throwLogSize: 8,
     // Un Pokémon sur sept environ tient quelque chose. C'est tiré à l'apparition et
     // figé dans la ligne, comme le shiny et le taux de capture : ce que porte un
@@ -229,6 +236,11 @@ const POKEMON = {
   // Charme Chroma — fait ensuite recevoir, une fois chacun, les paliers de
   // `rewards` : `percent` du Pokédex, le `stade` de la lignée choisie, shiny ou non.
   // Un palier déjà atteint au moment du choix se donne aussitôt (rattrapage).
+  // Les lignées de starter, par leur forme de base : chacune commence un cran de
+  // rareté plus haut (stade 1 peu commun, stade 2 rare, stade 3 très rare), et
+  // sort donc moins souvent. Ce sont les Pokémon qu'on choisit dans les jeux :
+  // les croiser au coin de la rue leur ôtait leur valeur.
+  starterLines: [1, 4, 7, 152, 155, 158],
   starters: {
     choices: { 2: [152, 155, 158] },
     rewards: [
@@ -485,7 +497,10 @@ const POKEMON = {
   // Une rareté absente du barème ne se revend pas — c'est le cas des
   // légendaires, qu'on ne monnaie pas.
   sell: {
-    byRarity: { COMMUN: 250, PEU_COMMUN: 600, RARE: 1500 },
+    // Le très rare est l'exception assumée : 2 000 points, un peu plus que sa capture
+    // espérée (~1 700 à l'Hyper Ball). Il ne sort qu'à poids 18, ce qui borne ce
+    // qu'une chasse aux starters peut rapporter.
+    byRarity: { COMMUN: 250, PEU_COMMUN: 600, RARE: 1500, TRES_RARE: 2000 },
     // 0 : un shiny ne se revend pas. C'est une entrée de Pokédex qu'on ne
     // retrouve pas, et personne ne doit pouvoir la brader d'un clic.
     shinyMultiplier: 0,
@@ -555,7 +570,10 @@ const POKEMON = {
     // l'état sauvage : ×0,7 pour un stade 1, autant pour un stade 2, ×1,6 au
     // stade 3, ×3 pour un légendaire.
     weightsByStage: { 1: 50, 2: 60, 3: 40 },
+    veryRareWeight: 30,
     legendaryWeight: 24,
+    // Comme pour les apparitions (spawn.speciesFactors).
+    speciesFactors: { 201: 2 },
   },
   // Le bilan de saison : une saison court d'une ouverture de génération à la suivante, et son
   // bilan part dans le salon des apparitions quand la suivante s'ouvre (modules/pokemon/season.js).

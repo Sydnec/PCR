@@ -221,9 +221,18 @@ describe("raretés et verrou", () => {
     assert.equal(rarityOf(species("Mewtwo")), "LEGENDAIRE");
     assert.equal(rarityOf(species("Mew")), "LEGENDAIRE");
     assert.equal(isLegendary(species("Mew")), true);
-    assert.equal(rarityOf(species("Dracaufeu")), "RARE");
-    assert.equal(rarityOf(species("Reptincel")), "PEU_COMMUN");
-    assert.equal(rarityOf(species("Salamèche")), "COMMUN");
+    assert.equal(rarityOf(species("Roucarnage")), "RARE");
+    assert.equal(rarityOf(species("Roucoups")), "PEU_COMMUN");
+    assert.equal(rarityOf(species("Roucool")), "COMMUN");
+  });
+
+  it("une lignée de starter commence un cran plus haut, jusqu'à très rare", () => {
+    assert.equal(rarityOf(species("Salamèche")), "PEU_COMMUN");
+    assert.equal(rarityOf(species("Reptincel")), "RARE");
+    assert.equal(rarityOf(species("Dracaufeu")), "TRES_RARE");
+    // Ceux de la 2ᵉ génération aussi, avant même son ouverture.
+    assert.equal(rarityOf(data.getSpecies(152)), "PEU_COMMUN");
+    assert.equal(rarityOf(data.getSpecies(157)), "TRES_RARE");
   });
 
   it("les shiny et les légendaires arrivent verrouillés", () => {
@@ -237,10 +246,17 @@ describe("poids d'apparition", () => {
   const spawn = () => getPokemonConfig().spawn;
 
   it("suit le stade, et le poids propre des légendaires", () => {
-    assert.equal(spawnWeight(species("Salamèche"), spawn()), spawn().weightsByStage[1]);
-    assert.equal(spawnWeight(species("Reptincel"), spawn()), spawn().weightsByStage[2]);
-    assert.equal(spawnWeight(species("Dracaufeu"), spawn()), spawn().weightsByStage[3]);
+    assert.equal(spawnWeight(species("Roucool"), spawn()), spawn().weightsByStage[1]);
+    assert.equal(spawnWeight(species("Roucoups"), spawn()), spawn().weightsByStage[2]);
+    assert.equal(spawnWeight(species("Roucarnage"), spawn()), spawn().weightsByStage[3]);
     assert.equal(spawnWeight(species("Mewtwo"), spawn()), spawn().legendaryWeight);
+  });
+
+  it("un starter pèse comme le stade d'au-dessus, son stade 3 a le poids des très rares", () => {
+    assert.equal(spawnWeight(species("Salamèche"), spawn()), spawn().weightsByStage[2]);
+    assert.equal(spawnWeight(species("Reptincel"), spawn()), spawn().weightsByStage[3]);
+    assert.equal(spawnWeight(species("Dracaufeu"), spawn()), spawn().veryRareWeight);
+    assert.equal(spawnWeight(species("Dracaufeu"), getSafariConfig()), getSafariConfig().veryRareWeight);
   });
 
   it("les évolutions par échange ne se croisent jamais à l'état sauvage", () => {
@@ -270,7 +286,7 @@ describe("poids d'apparition", () => {
   });
 
   it("un pool vide ne donne rien plutôt que de planter", () => {
-    const empty = { ...spawn(), weightsByStage: {}, legendaryWeight: 0 };
+    const empty = { ...spawn(), weightsByStage: {}, veryRareWeight: 0, legendaryWeight: 0 };
     assert.equal(pickWeightedSpecies(empty), null);
   });
 

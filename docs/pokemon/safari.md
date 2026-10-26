@@ -30,7 +30,7 @@ visite. C'est le seul contenu Pokémon où les actions ne coûtent rien.
   le dit : elle se montre stade par stade, avec ce que le dresseur en possède (la même présentation
   que `/pk info`, le Pokémon rencontré y est marqué ▸), pour décider d'un lancer en connaissant la
   suite. Une espèce sans lignée garde son champ « Ton Pokédex ».
-- **Raretés compensées** : poids 50/60/40 par stade et 24 pour un légendaire — les stades 1 y pèsent
+- **Raretés compensées** : poids 50/60/40 par stade, 30 pour un très rare (le stade 3 d'un starter) et 24 pour un légendaire — les stades 1 y pèsent
   moins qu'à l'état sauvage, les stades 3 (les *rares*) ×1,6, les légendaires ×3 —, shiny 1/250 au
   lieu de 1/500. En 1ʳᵉ génération, les rares passent de 3,4 % à 6,3 % du pool et les légendaires de
   0,45 % à 1,6 %. Les évolutions par échange ou par objet et les bébés restent hors pool, comme à

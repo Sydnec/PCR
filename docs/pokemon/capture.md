@@ -16,6 +16,15 @@
   plus qu'une de la 1ʳᵉ au même stade, et la 2ᵉ pèse environ 53 % des apparitions au lieu de 36 %.
   `/admin poids` donne le détail par génération. Le parc safari n'a pas ce facteur : on y choisit sa
   génération.
+- **La rareté suit le stade** (commun, peu commun, rare), sauf pour les **starters** : leurs lignées
+  (`starterLines` : Bulbizarre, Salamèche, Carapuce, Germignon, Héricendre, Kaiminus) commencent un
+  cran plus haut. Salamèche est peu commun, Reptincel rare et Dracaufeu **🟣 très rare**, une rareté
+  à part, entre rare et légendaire (poids 18, `veryRareWeight`). Un starter pèse donc comme le stade
+  d'au-dessus, et la rareté vaut aussi pour la revente et l'annonce.
+- **Zarbi sort deux fois plus** qu'un autre stade 1 de sa génération (`speciesFactors`, au parc
+  safari aussi) : ses 26 lettres sont à réunir.
+- **Seuls les très rares et les légendaires mentionnent le rôle Pokémon** à leur apparition
+  (`pingRarities`), avec les shiny.
 - **Fuite autonome** : chaque apparition reçoit une durée de vie tirée au hasard entre 45 minutes et 1 h 30
   (`fleeAfterMinutes`). Passé ce délai, un Pokémon que personne n'a capturé s'enfuit de lui-même,
   sans dépendre de l'activité du serveur — un salon silencieux ne reste donc jamais figé sur le même

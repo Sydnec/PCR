@@ -463,6 +463,7 @@ describe("revente d'un Pokémon", () => {
     assert.equal(sell.pokemonSellValue(species("Roucool"), false), byRarity.COMMUN);
     assert.equal(sell.pokemonSellValue(species("Roucoups"), false), byRarity.PEU_COMMUN);
     assert.equal(sell.pokemonSellValue(species("Roucarnage"), false), byRarity.RARE);
+    assert.equal(sell.pokemonSellValue(species("Dracaufeu"), false), byRarity.TRES_RARE);
     assert.equal(sell.pokemonSellValue(species("Roucool"), true), 0);
     assert.equal(sell.pokemonSellValue(species("Mewtwo"), false), 0);
     assert.equal(sell.pokemonSellValue(null, false), 0);
@@ -476,6 +477,12 @@ describe("revente d'un Pokémon", () => {
       const rates = wild.filter((entry) => data.rarityOf(entry) === rarity).map((entry) => entry.catchRate);
       const average = rates.reduce((sum, rate) => sum + rate, 0) / rates.length;
       const cost = hyper.price / data.catchProbability(average, hyper.multiplier, 1);
+      // Le très rare est l'exception décidée : il dépasse un peu sa capture espérée, mais
+      // de 20 % au plus. Au-delà, chasser les starters deviendrait une rente.
+      if (rarity === "TRES_RARE") {
+        assert.ok(byRarity[rarity] <= cost * 1.2, `${rarity} : ${byRarity[rarity]} > ${Math.round(cost * 1.2)}`);
+        continue;
+      }
       assert.ok(byRarity[rarity] < cost, `${rarity} : ${byRarity[rarity]} ≥ ${Math.round(cost)}`);
     }
   });

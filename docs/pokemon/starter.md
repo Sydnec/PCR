@@ -6,7 +6,7 @@
 
 - **Le choix est définitif**, un par dresseur et par génération. La commande demande une confirmation avant de le prendre.
 - **Le stade 1 est donné tout de suite**, comme premier Pokémon de la génération (origine « starter de génération »).
-- **Les trois starters restent capturables à l'état sauvage** : les apparitions sont les mêmes pour tout le serveur, elles ne dépendent pas du choix de chacun. Ils s'échangent comme les autres.
+- **Les trois starters restent capturables à l'état sauvage** : les apparitions sont les mêmes pour tout le serveur, elles ne dépendent pas du choix de chacun. Comme toutes les lignées de starter, ils y sont un cran plus rares (voir [Capture](capture.md)). Ils s'échangent comme les autres.
 
 ## Les récompenses
 

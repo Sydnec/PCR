@@ -44,6 +44,7 @@ export const RARITIES = {
   COMMUN: { label: "Commun", icon: "⚪" },
   PEU_COMMUN: { label: "Peu commun", icon: "🟢" },
   RARE: { label: "Rare", icon: "🔵" },
+  TRES_RARE: { label: "Très rare", icon: "🟣" },
   LEGENDAIRE: { label: "Légendaire", icon: "🟠" },
 };
 
@@ -216,11 +217,33 @@ export function sexAfterEvolution(target, sex) {
 export const formAfterEvolution = (target, form) =>
   formOf(target, form) ? form : rollForm(target);
 
+// Les raretés ordinaires, du stade 1 au stade 3. Une lignée de starter
+// (`starterLines`) commence un cran plus haut : Bulbizarre est peu commun et
+// Florizarre très rare. Le cran vaut partout — poids d'apparition, revente,
+// mention —, puisque tout se lit dans la rareté.
+const STAGE_RARITIES = ["COMMUN", "PEU_COMMUN", "RARE", "TRES_RARE"];
+
+// La forme de base d'une lignée, en remontant evolvesFrom ; le garde-fou sur les
+// identifiants vus protège d'un cycle dans un dataset régénéré.
+function lineRoot(species) {
+  let root = species;
+  const climbed = new Set([root.id]);
+  while (root.evolvesFrom) {
+    const parent = getSpecies(root.evolvesFrom);
+    if (!parent || climbed.has(parent.id)) break;
+    climbed.add(parent.id);
+    root = parent;
+  }
+  return root;
+}
+
+export const isStarterLine = (species) =>
+  (getPokemonConfig().starterLines ?? []).map(Number).includes(lineRoot(species).id);
+
 export function rarityOf(species) {
   if (isLegendary(species)) return "LEGENDAIRE";
-  if (species.stage >= 3) return "RARE";
-  if (species.stage === 2) return "PEU_COMMUN";
-  return "COMMUN";
+  const stage = Math.min(3, Math.max(1, Number(species.stage) || 1));
+  return STAGE_RARITIES[stage - 1 + (isStarterLine(species) ? 1 : 0)];
 }
 
 // ====================== FORMES ======================
@@ -294,6 +317,23 @@ export function itemOnlySpecies() {
   return ids;
 }
 
+// Le poids de base d'une rareté dans un bloc de tirage (apparitions ou parc) : les
+// raretés ordinaires prennent celui de leur stade, si bien qu'un starter, monté
+// d'un cran, pèse comme le stade d'au-dessus ; « Très rare » a le sien.
+function rarityWeight(rarity, spawnConfig) {
+  if (rarity === "LEGENDAIRE") return spawnConfig.legendaryWeight;
+  if (rarity === "TRES_RARE") return Number(spawnConfig.veryRareWeight) || 0;
+  return spawnConfig.weightsByStage[STAGE_RARITIES.indexOf(rarity) + 1] ?? 0;
+}
+
+// Le facteur propre d'une espèce dans un bloc de tirage (`speciesFactors`, par
+// numéro du Pokédex), 1 sans réglage. Un facteur nul ou négatif retombe à 1 : le
+// retirer du pool est le rôle des règles de spawnWeight, pas d'une faute de frappe.
+export function speciesFactor(species, spawnConfig) {
+  const factor = Number(spawnConfig.speciesFactors?.[species.id]);
+  return Number.isFinite(factor) && factor > 0 ? factor : 1;
+}
+
 // Poids d'apparition d'une espèce.
 // Les évolutions par échange ne se trouvent jamais à l'état sauvage : elles
 // s'obtiennent en fusionnant des doublons, ou en faisant changer de dresseur
@@ -316,16 +356,16 @@ export function spawnWeight(
   rarity = null
 ) {
   if (species.tradeEvolution || species.isBaby || itemOnly.has(species.id)) return 0;
-  const base = isLegendary(species)
-    ? spawnConfig.legendaryWeight
-    : (spawnConfig.weightsByStage[species.stage] ?? 0);
+  const base = rarityWeight(rarityOf(species), spawnConfig);
   // Plancher à 1 : un réglage écrit à la main dans config.json échappe aux bornes de
   // /admin config, et un facteur sous 1 inverserait l'effet attendu.
   const boost = Math.max(1, Number(spawnConfig.generationBoost) || 1);
   // Ce qui se pêche est plus rare à l'état sauvage, une fois la pêche ouverte.
   // Le facteur ne se lit que pour une espèce pêchable : les autres n'ont aucune lecture de config de plus.
   const fished = FISHABLE.has(species.id) ? (rarity ?? fishingRarity()).factor : 1;
-  return base * boost ** Math.max(0, (species.generation || 1) - 1) * fished;
+  return (
+    base * boost ** Math.max(0, (species.generation || 1) - 1) * fished * speciesFactor(species, spawnConfig)
+  );
 }
 
 // Le facteur de rareté des espèces pêchables (`fishing.wildRarityFactor`), ou 1 tant que

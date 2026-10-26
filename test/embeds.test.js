@@ -242,9 +242,10 @@ describe("fiche d'une espèce", () => {
   });
 
   it("la fiche d'un Pokémon rare est complète : type, rareté, difficulté, sexe", () => {
-    const embed = card("Dracaufeu");
+    const embed = card("Roucarnage");
     assert.deepEqual(names(embed).slice(0, 4), ["Type", "Rareté", "Difficulté", "Sexe"]);
     assert.match(field(embed, "Rareté").value, /Rare/);
+    assert.match(field(card("Dracaufeu"), "Rareté").value, /🟣 Très rare/);
   });
 });
 
