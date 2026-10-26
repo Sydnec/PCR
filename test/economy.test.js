@@ -6,7 +6,8 @@ import assert from "node:assert/strict";
 import { MessageFlags } from "discord.js";
 import { createSandbox, openDatabases, dbRun, dbAll, speciesByName, withRandom } from "./helpers.js";
 
-createSandbox({ config: { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } } });
+const GEN1 = { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } };
+const sandbox = createSandbox({ config: GEN1 });
 const { points } = await openDatabases();
 const economy = await import("../modules/economy.js");
 const items = await import("../modules/pokemon/items.js");
@@ -14,6 +15,7 @@ const sell = await import("../modules/pokemon/sell.js");
 const data = await import("../modules/pokemon/data.js");
 const { getPokemonConfig } = await import("../modules/pokemon/config.js");
 const soldeCommand = (await import("../commands/solde.js")).default;
+const lottery = await import("../modules/pokemon/lottery.js");
 const { runCommand, payloadOf, fakeUser } = await import("./fake-discord.js");
 
 const call = (fn, ...args) =>
@@ -245,6 +247,57 @@ describe("points", () => {
     assert.match(embed.title, /Solde de Dresseur u2/);
     assert.match(embed.description, /\*\*1[\s\u202f\u00a0]200\*\*[\s\u202f\u00a0]*points/);
     assert.match(embed.description, /✨ Prochains points : \*\*disponibles\*\*/);
+  });
+
+  describe("le rappel de loterie", () => {
+    const LOTTERY = /🎰 Ta loterie du jour t'attend : `\/pk loterie`/;
+    const description = async (options) => payloadOf(await runCommand(soldeCommand, options), "reply").embeds[0].toJSON().description;
+    beforeEach(async () => {
+      await dbRun(points, "DELETE FROM pokemon_lottery");
+      sandbox.writeConfig(GEN1);
+    });
+
+    it("tant que le tirage du jour n'est pas fait, /solde le rappelle", async () => {
+      await setBalance(500, "u1");
+      assert.match(await description({ user: "u1" }), LOTTERY);
+      // Un tirage d'hier ne compte pas : la journée a changé.
+      await dbRun(points, "INSERT INTO pokemon_lottery (user_id, last_day) VALUES ('u1', '2000-01-01')");
+      assert.match(await description({ user: "u1" }), LOTTERY);
+    });
+
+    it("le tirage fait, le rappel disparaît", async () => {
+      await setBalance(500, "u1");
+      await withRandom(0.999, () => call(lottery.play, "u1"));
+      assert.equal((await dbAll(points, "SELECT last_day FROM pokemon_lottery WHERE user_id = 'u1'"))[0].last_day, lottery.lotteryDay());
+      assert.doesNotMatch(await description({ user: "u1" }), /loterie/);
+    });
+
+    it("pas de rappel sur le solde d'un autre : son tirage ne se joue pas d'ici", async () => {
+      await setBalance(1200, "u2");
+      const text = await description({ user: "u1", users: { user: fakeUser("u2") }, options: { user: "u2" } });
+      assert.match(text, /\*\*1[\s\u202f\u00a0]200\*\*/);
+      assert.doesNotMatch(text, /loterie/);
+    });
+
+    it("loterie fermée, ou jeu Pokémon éteint : pas de rappel", async () => {
+      await setBalance(500, "u1");
+      sandbox.writeConfig({ pokemon: { ...GEN1.pokemon, lottery: { enabled: false } } });
+      assert.doesNotMatch(await description({ user: "u1" }), /loterie/);
+      sandbox.writeConfig({ pokemon: { ...GEN1.pokemon, enabled: false } });
+      assert.doesNotMatch(await description({ user: "u1" }), /loterie/);
+    });
+
+    it("une loterie illisible tait le rappel, le solde s'affiche quand même", async () => {
+      await setBalance(500, "u1");
+      await dbRun(points, "ALTER TABLE pokemon_lottery RENAME TO pokemon_lottery_off");
+      try {
+        const text = await description({ user: "u1" });
+        assert.match(text, /\*\*500\*\*[\s\u202f\u00a0]*points/);
+        assert.doesNotMatch(text, /loterie/);
+      } finally {
+        await dbRun(points, "ALTER TABLE pokemon_lottery_off RENAME TO pokemon_lottery");
+      }
+    });
   });
 });
 

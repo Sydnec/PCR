@@ -2,6 +2,7 @@ import { SlashCommandBuilder, MessageFlags } from "discord.js";
 import { handleException } from "../modules/utils.js";
 import { buildBalanceEmbed, getBalance, getNextPointsAt } from "../modules/economy.js";
 import { getBallStock } from "../modules/pokemon/items.js";
+import { lotteryPending } from "../modules/pokemon/lottery.js";
 
 // Le solde, dans le même embed que celui qui suit la fiche d'un Pokémon sous une
 // apparition : une seule mise en forme, donc deux réponses qui ne peuvent pas
@@ -9,7 +10,7 @@ import { getBallStock } from "../modules/pokemon/items.js";
 // la table des points a un propriétaire, autant s'adresser à lui. Les balls en
 // poche et le compte à rebours avant les prochains points suivent : une ball
 // offerte se lance sans toucher au solde, et le dresseur sait quand son prochain
-// message rapportera.
+// message rapportera — et, s'il ne l'a pas encore tenté, que son tirage du jour l'attend.
 export default {
   data: new SlashCommandBuilder()
     .setName("solde")
@@ -42,21 +43,33 @@ export default {
           if (errBalls) handleException("Lecture des balls pour /solde :", errBalls);
           getNextPointsAt(target.id, (errTimer, nextPointsAt) => {
             if (errTimer) handleException("Lecture du délai de points pour /solde :", errTimer);
-            interaction
-              .reply({
-                // Le destinataire est nommé même quand c'est soi : la commande peut
-                // viser un autre dresseur, et un embed qui changerait de formulation
-                // selon la cible se lirait mal dans un fil où les deux se suivent.
-                embeds: [
-                  buildBalanceEmbed(balance, {
-                    user: target,
-                    balls: errBalls ? null : balls,
-                    nextPointsAt: errTimer ? undefined : nextPointsAt,
-                  }),
-                ],
-                flags: MessageFlags.Ephemeral,
-              })
-              .catch(() => {});
+            // Le rappel de loterie, pour son propre solde seulement : celui qui regarde
+            // le solde d'un autre ne peut pas jouer son tirage. Illisible, il est tu.
+            const pending = (cb) =>
+              target.id === interaction.user.id
+                ? lotteryPending(target.id, (errLottery, value) => {
+                    if (errLottery) handleException("Lecture de la loterie pour /solde :", errLottery);
+                    cb(!errLottery && value);
+                  })
+                : cb(false);
+            pending((lottery) =>
+              interaction
+                .reply({
+                  // Le destinataire est nommé même quand c'est soi : la commande peut
+                  // viser un autre dresseur, et un embed qui changerait de formulation
+                  // selon la cible se lirait mal dans un fil où les deux se suivent.
+                  embeds: [
+                    buildBalanceEmbed(balance, {
+                      user: target,
+                      balls: errBalls ? null : balls,
+                      nextPointsAt: errTimer ? undefined : nextPointsAt,
+                      lotteryPending: lottery,
+                    }),
+                  ],
+                  flags: MessageFlags.Ephemeral,
+                })
+                .catch(() => {})
+            );
           });
         });
       });

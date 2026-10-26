@@ -53,6 +53,17 @@ export function getTicket(userId, cb) {
   db.get("SELECT * FROM pokemon_lottery WHERE user_id = ?", [userId], cb);
 }
 
+// Le tirage du jour reste-t-il à faire ? La règle de claimDraw, lue sans rien écrire : un
+// dresseur sans ligne, ou dont `last_day` n'est pas aujourd'hui, peut tirer. Faux quand la
+// loterie est fermée, ou le jeu Pokémon éteint : /pk loterie refuserait alors.
+export function lotteryPending(userId, cb) {
+  if (!getPokemonConfig().enabled || !getLotteryConfig().enabled) return cb(null, false);
+  getTicket(userId, (err, row) => {
+    if (err) return cb(err);
+    cb(null, (row?.last_day ?? AUCUN_JOUR) !== lotteryDay());
+  });
+}
+
 // Revendication du tirage du jour. Le WHERE porte sur la journée déjà jouée :
 // c'est lui, et rien d'autre, qui tient la règle du « une fois par jour ».
 // L'INSERT couvre le premier tirage d'un dresseur, le DO UPDATE tous les

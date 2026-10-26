@@ -6,7 +6,8 @@ Les points se gagnent au fil des messages (`messagePointsDistribution` : les pre
 rapportent plus, avec une heure de carence entre deux messages récompensés) et se dépensent dans
 les paris, les Pokémon et le parc safari. La commande `/solde` affiche le solde actuel, les balls
 en poche et un compte à rebours (`<t:...:R>`) indiquant dans combien de temps on peut à nouveau
-gagner des points (ou confirme qu'ils sont disponibles dès maintenant).
+gagner des points (ou confirme qu'ils sont disponibles dès maintenant). Sur son propre solde, elle
+rappelle aussi la [loterie](pokemon/loterie.md) du jour tant qu'elle n'a pas été tentée.
 
 **Le pot commun** corrige ce que cette économie a de cumulatif. Une fois par semaine, chacun cotise
 un pourcentage de sa fortune et la cagnotte repart en **parts égales** entre tous les porteurs de

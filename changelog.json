@@ -2556,6 +2556,16 @@
       "commit": "pending",
       "timestamp": "2026-10-21T08:24:35.000Z",
       "branch": "dev/keen-knuth-lcd8tu"
+    },
+    {
+      "type": "enhancement",
+      "name": "Rappel de la loterie dans /solde",
+      "description": "/solde te rappelle ta loterie du jour tant que tu ne l'as pas tentée.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-26T01:41:06.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
     }
   ]
 }
