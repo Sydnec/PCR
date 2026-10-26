@@ -903,11 +903,14 @@ describe("/pk echange", () => {
     assert.equal((await trades()).length, 0);
   });
 
-  it("avec soi-même ou avec un bot : refus en privé, aucune offre", async () => {
+  it("avec soi-même, l'offre se publie (pour l'évolution d'échange) ; avec un bot, refus en privé", async () => {
     const [mine] = await ownMany("Rattata", 2);
     await ownMany("Roucool", 2);
-    const self = await trade({ ...swap(mine), membre: "u1" }, { membre: fakeUser("u1") });
-    assert.match(payloadOf(self, "reply").content, /Tu ne peux pas échanger avec toi-même/);
+    await trade({ ...swap(mine), membre: "u1" }, { membre: fakeUser("u1") });
+    const [self] = await trades();
+    assert.equal(self.from_user_id, "u1");
+    assert.equal(self.to_user_id, "u1");
+    await dbRun(points, "DELETE FROM pokemon_trades");
     const botCalls = await trade({ ...swap(mine), membre: "b1" }, { membre: fakeUser("b1", { bot: true }) });
     assert.ok(payloadOf(botCalls, "reply").content.startsWith("❌"));
     assert.equal((await trades()).length, 0);

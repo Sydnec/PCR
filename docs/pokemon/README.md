@@ -128,7 +128,8 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
   Pokédex n'est jamais perdue. Sans individu choisi, `/pk evolution` prend d'abord un reçu en échange
   (le moins précieux, jamais un verrouillé) : c'est lui qui évolue gratuitement. Le dresseur choisit
   donc s'il évolue, et quand. Un Pokémon jamais échangé garde l'évolution payante ordinaire. La
-  proposition l'annonce avant le clic.
+  proposition l'annonce avant le clic. On peut aussi s'échanger un Pokémon à soi-même (`membre` : soi) :
+  il revient « reçu en échange », sans l'aide d'un autre dresseur.
 - `/pk comparer [membre] [pokemon] [evolutions]` : cherche les échanges **qui servent aux deux** —
   une espèce contre une espèce, chacune absente du Pokédex de celui qui la reçoit. Réponse privée,
   page par page. Trois usages, selon l'option :
