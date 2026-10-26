@@ -1,7 +1,54 @@
 {
-  "version": "1.19.2",
-  "lastUpdated": "2026-10-22T14:22:18.488Z",
+  "version": "1.19.3",
+  "lastUpdated": "2026-10-26T02:07:03.827Z",
   "releases": [
+    {
+      "version": "1.19.3",
+      "date": "2026-10-26",
+      "title": "Release 1.19.3",
+      "features": [
+        {
+          "type": "enhancement",
+          "name": "Chances des balls spéciales",
+          "description": "Le menu Balls spéciales affiche tes chances de capture avec chaque ball que tu as, contre ce Pokémon.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-10-26T01:30:00.000Z",
+          "branch": "dev/keen-knuth-lcd8tu"
+        },
+        {
+          "type": "enhancement",
+          "name": "Rappel de la loterie dans /solde",
+          "description": "/solde te rappelle ta loterie du jour tant que tu ne l'as pas tentée.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-10-26T01:41:06.000Z",
+          "branch": "dev/keen-knuth-lcd8tu"
+        },
+        {
+          "type": "enhancement",
+          "name": "Pêche et parc safari sur le côté de la Capture",
+          "description": "Sur le site, la pêche et le parc safari passent sur le côté de la page Capture. Chaque canne dit ce qu'elle pêche, et une touche s'affiche en haut avec le temps qu'il lui reste.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-10-26T01:46:46.000Z",
+          "branch": "dev/keen-knuth-lcd8tu"
+        },
+        {
+          "type": "fix",
+          "name": "Pourcentages avec une virgule",
+          "description": "Les chances de capture s'écrivent à la française sur Discord : 5,9 % au lieu de 5.9 %.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-10-26T01:52:53.000Z",
+          "branch": "dev/keen-knuth-lcd8tu"
+        }
+      ]
+    },
     {
       "version": "1.19.2",
       "date": "2026-10-22",
@@ -2581,46 +2628,6 @@
     }
   ],
   "pending": [
-    {
-      "type": "enhancement",
-      "name": "Chances des balls spéciales",
-      "description": "Le menu Balls spéciales affiche tes chances de capture avec chaque ball que tu as, contre ce Pokémon.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-10-26T01:30:00.000Z",
-      "branch": "dev/keen-knuth-lcd8tu"
-    },
-    {
-      "type": "enhancement",
-      "name": "Rappel de la loterie dans /solde",
-      "description": "/solde te rappelle ta loterie du jour tant que tu ne l'as pas tentée.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-10-26T01:41:06.000Z",
-      "branch": "dev/keen-knuth-lcd8tu"
-    },
-    {
-      "type": "enhancement",
-      "name": "Pêche et parc safari sur le côté de la Capture",
-      "description": "Sur le site, la pêche et le parc safari passent sur le côté de la page Capture. Chaque canne dit ce qu'elle pêche, et une touche s'affiche en haut avec le temps qu'il lui reste.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-10-26T01:46:46.000Z",
-      "branch": "dev/keen-knuth-lcd8tu"
-    },
-    {
-      "type": "fix",
-      "name": "Pourcentages avec une virgule",
-      "description": "Les chances de capture s'écrivent à la française sur Discord : 5,9 % au lieu de 5.9 %.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-10-26T01:52:53.000Z",
-      "branch": "dev/keen-knuth-lcd8tu"
-    },
     {
       "type": "fix",
       "name": "Les bébés comptent dans le stade",
