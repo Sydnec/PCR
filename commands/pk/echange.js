@@ -214,7 +214,6 @@ export default {
       const refuse = (content) =>
         interaction.reply({ content: `❌ ${content}`, flags: MessageFlags.Ephemeral });
 
-      if (target.id === interaction.user.id) return refuse("Tu ne peux pas échanger avec toi-même.");
       if (target.bot) return refuse("Les bots ne collectionnent pas les Pokémon.");
 
       // Ni ce qu'on donne ni ce qu'on demande : le brouillon, un écran privé où l'on

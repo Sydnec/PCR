@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { createSandbox, openDatabases, dbRun, dbAll, dbGet, speciesByName } from "./helpers.js";
 
 createSandbox({ config: { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } } });
-const { points } = await openDatabases();
+const { points, stats } = await openDatabases();
 const collection = await import("../modules/pokemon/collection.js");
 const data = await import("../modules/pokemon/data.js");
 const { getPokemonConfig } = await import("../modules/pokemon/config.js");
@@ -469,6 +469,25 @@ describe("échanger (createTrade / acceptTrade)", () => {
     assert.equal(arrived.origin, "echange");
     assert.equal(result.evolutions, undefined);
     assert.equal((await ofSpecies("Machopeur", "u1")).length, 1, "celui qui donne garde son autre Machopeur");
+  });
+
+  it("avec soi-même : le Machopeur revient avec l'origine « echange », et l'échange ne compte qu'une fois", async () => {
+    const [give, back] = await giveMany("Machopeur", 3);
+    await dbRun(stats, "DELETE FROM pokemon_stats");
+    const id = await open({
+      toUserId: "u1",
+      offerSpeciesId: species("Machopeur").id,
+      requestSpeciesId: species("Machopeur").id,
+      offerPokemonId: give,
+      requestPokemonId: back,
+    });
+    const result = await accept(id);
+    assert.equal(result.ok, true, result.reason);
+    const mine = await ofSpecies("Machopeur", "u1");
+    assert.equal(mine.length, 3, "rien ne se perd, rien ne se crée");
+    assert.deepEqual(mine.filter((row) => row.origin === "echange").map((row) => row.id).sort(), [give, back].sort());
+    const row = await dbGet(stats, "SELECT trades FROM pokemon_stats WHERE user_id = 'u1'");
+    assert.equal(row.trades, 1);
   });
 
   it("deux Machopeur échangés restent deux Machopeur, chacun libre d'évoluer ensuite", async () => {

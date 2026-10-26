@@ -315,7 +315,8 @@ export function recordTrade({ fromUserId, toUserId }) {
     // Les deux dresseurs comptent l'échange, mais le serveur ne le compte
     // qu'une fois : sans cela le total global serait doublé.
     bumpStats(fromUserId, { trades: 1 }, { global: false });
-    bumpStats(toUserId, { trades: 1 }, { global: false });
+    // Un échange avec soi-même (pour l'évolution d'échange) ne compte qu'une fois.
+    if (toUserId !== fromUserId) bumpStats(toUserId, { trades: 1 }, { global: false });
     bumpStats(GLOBAL, { trades: 1 }, { global: false });
   } catch (error) {
     handleException(error, "recordTrade");

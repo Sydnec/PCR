@@ -2647,6 +2647,16 @@
       "commit": "pending",
       "timestamp": "2026-10-26T09:44:43.000Z",
       "branch": "dev/keen-knuth-lcd8tu"
+    },
+    {
+      "type": "enhancement",
+      "name": "Échange avec soi-même",
+      "description": "/pk echange accepte de t'échanger un Pokémon à toi-même : il revient reçu en échange, et peut faire son évolution d'échange gratuite.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-26T12:00:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
     }
   ]
 }
