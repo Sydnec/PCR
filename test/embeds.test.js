@@ -147,7 +147,7 @@ describe("rencontre du parc safari : le reste", () => {
   it("annonce la probabilité que le tirage utilise, plancher compris", () => {
     const { embed } = encounter("Mewtwo");
     const probability = data.safariCatchProbability(species("Mewtwo").catchRate, 0, safari());
-    assert.ok(field(embed, "Chances de capture").value.startsWith(`${(probability * 100).toFixed(1)} %`));
+    assert.ok(field(embed, "Chances de capture").value.startsWith(`${(probability * 100).toFixed(1).replace(".", ",")} %`));
   });
 
   it("annonce un shiny comme tel", () => {
@@ -261,7 +261,7 @@ describe("annonce d'une apparition", () => {
     assert.match(difficulty.name, /Très difficile/);
     for (const ball of data.probabilitiesByBall(species("Mewtwo").catchRate)) {
       if (ball.guaranteed) continue;
-      assert.ok(difficulty.value.includes(`${(ball.probability * 100).toFixed(1)} %`), ball.key);
+      assert.ok(difficulty.value.includes(`${(ball.probability * 100).toFixed(1).replace(".", ",")} %`), ball.key);
     }
   });
 

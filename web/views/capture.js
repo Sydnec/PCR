@@ -6,8 +6,9 @@
 //
 // Le Pokémon au centre, ses balls juste en dessous, puis ce que donnerait le
 // bouton « Infos du Pokémon » sur Discord : ce qu'on en possède, son solde et
-// ses balls en poche, sa lignée. Le journal des lancers vit sur le côté, et le
-// parc safari s'ouvre d'un bouton au-dessus.
+// ses balls en poche, sa lignée. Sur le côté, tout ce qui se lance d'ailleurs :
+// le journal des lancers, ce qui est au sol, la pêche et le parc safari. La
+// touche d'une pêche passe en tête du centre : elle s'enfuit vite, et n'est qu'à toi.
 import { icon } from "../icons.js";
 import { lineageView } from "../lineage.js";
 import {
@@ -59,27 +60,17 @@ export async function render(ctx) {
   // absents, lui non.
   const draw = () =>
     body.replaceChildren(
-      ...[
-        safariOffer(ctx, state.safari, {
-          onEnter: () => ctx.navigate("/safari"),
-          redraw: draw,
-          confirming: buyingSafari,
-          setConfirming: (value) => {
-            buyingSafari = value;
-          },
-        }),
+      h(
+        "div",
+        { class: "capture-layout" },
         h(
           "div",
-          { class: "capture-layout" },
-          h(
-            "div",
-            { class: "capture-main" },
-            state.spawn ? spawnView(state.spawn) : waiting(),
-            fishingView()
-          ),
-          h("aside", { class: "capture-aside" }, journal(), drops())
+          { class: "capture-main" },
+          touchView(),
+          state.spawn ? spawnView(state.spawn) : waiting()
         ),
-      ].filter(Boolean)
+        h("aside", { class: "capture-aside" }, journal(), drops(), fishingView(), safariView())
+      )
     );
 
   async function refresh({ force = false } = {}) {
@@ -136,6 +127,7 @@ export async function render(ctx) {
         status: result.status,
         spawnId: spawn.id,
         fished: Boolean(spawn.fished),
+        final: Boolean(result.final),
       };
       if (result.status === "cooldown") coolDown(result.remaining);
       else if (!result.final) coolDown(state.cooldownSeconds);
@@ -399,14 +391,101 @@ export async function render(ctx) {
   async function castLine(rod) {
     throwing = true;
     draw();
+    let bitten = false;
     try {
       const result = await api("/api/fishing/cast", { method: "POST", body: { rod: rod.key } });
+      bitten = result.ok;
       panel = result.ok ? null : { text: result.message, status: "error", fished: true };
     } catch (error) {
       panel = { text: error.message, status: "error", fished: true };
     }
     throwing = false;
     await refreshAll();
+    // La canne se lance du côté, la touche arrive en tête : on l'amène sous les yeux,
+    // sur un téléphone le côté est tout en bas.
+    if (bitten) showTouch();
+  }
+
+  // Défiler jusqu'à la touche, juste sous l'en-tête collant : sa hauteur se mesure, car
+  // sur un téléphone il passe sur plusieurs lignes.
+  function showTouch() {
+    const touch = document.getElementById("touch");
+    if (!touch) return;
+    const bar = document.querySelector(".topbar")?.offsetHeight ?? 0;
+    const top = touch.getBoundingClientRect().top + window.scrollY - bar - 8;
+    window.scrollTo({ top, behavior: "smooth" });
+  }
+
+  // Le temps qu'il reste à la touche, « 1:42 ». Les nœuds `data-until` sont remis à jour
+  // chaque seconde par l'horloge de la page, sans tout redessiner.
+  const remaining = (until) => {
+    const seconds = Math.max(0, Math.ceil((until - Date.now()) / 1000));
+    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+  };
+  const countdown = (until) =>
+    h("strong", { class: "countdown", "data-until": String(until) }, remaining(until));
+
+  // La touche, en tête : la carte d'une apparition, sous un bandeau qui dit qu'elle n'est
+  // qu'à toi et combien de temps il lui reste. Partie, l'issue du lancer qui l'a close
+  // reste là où on la regardait ; un raté, lui, ne dit plus rien une fois qu'elle a fui.
+  function touchView() {
+    if (!state.fishing?.open) return null;
+    const touch = state.fishing.spawn;
+    if (!touch) {
+      return panel?.fished && panel.spawnId && panel.final
+        ? h("section", { class: "touch", id: "touch" }, throwPanel())
+        : null;
+    }
+    return h(
+      "section",
+      { class: "touch", id: "touch" },
+      h(
+        "p",
+        { class: "notice touch-banner" },
+        icon("hourglass"),
+        h(
+          "span",
+          {},
+          h("strong", {}, "Ça mord, rien que pour toi !"),
+          " Il s'enfuit dans ",
+          countdown(touch.fleesAt),
+          ". Les balls se paient comme sur une apparition."
+        )
+      ),
+      spawnView(touch)
+    );
+  }
+
+  // Une canne : ce qu'elle pêche, écrit en clair (une infobulle ne s'ouvre pas sur un
+  // téléphone), et pourquoi elle est grisée quand elle l'est.
+  function rodButton(rod) {
+    const poor = state.wallet.balance < rod.price;
+    const status = !rod.owned
+      ? "À trouver sur les Pokémon ou à la loterie"
+      : poor
+        ? `Il te faut ${fmt(rod.price)} pts, tu en as ${fmt(state.wallet.balance)}`
+        : `${fmt(rod.price)} pts`;
+    return h(
+      "button",
+      {
+        class: `ball${rod.owned && !poor ? "" : " ball-off"}`,
+        disabled: throwing || !rod.owned || poor,
+        onclick: () => castLine(rod),
+      },
+      h("span", { class: "ball-icon" }, itemIcon(rod)),
+      h(
+        "span",
+        { class: "ball-text" },
+        h(
+          "span",
+          { class: "ball-label" },
+          rod.owned ? null : [icon("lock", { label: "Pas encore à toi" }), " "],
+          rod.label
+        ),
+        rod.description ? h("span", { class: "rod-pool" }, rod.description) : null,
+        h("span", { class: "ball-meta" }, status)
+      )
+    );
   }
 
   // Les cannes, ou la touche qui attend : une seule à la fois, et elle n'est qu'au pêcheur.
@@ -415,52 +494,59 @@ export async function render(ctx) {
     const fishing = state.fishing;
     if (!fishing?.open) return null;
     const touch = fishing.spawn;
+    const species = touch ? ctx.species.get(touch.speciesId) : null;
     return h(
       "section",
-      { class: "fishing" },
+      { class: "side-section" },
       h("h3", {}, "Pêche"),
       touch
         ? [
             h(
               "p",
-              { class: "muted small" },
-              `Réservé à toi : il s'enfuit vers ${new Date(touch.fleesAt).toLocaleTimeString("fr-FR")}. ` +
-                "Les balls se paient comme sur une apparition."
+              { class: "small" },
+              species
+                ? [
+                    pokemonName(species, false, touch.sex, null, touch.form),
+                    " est au bout de ta ligne",
+                  ]
+                : "Un Pokémon est au bout de ta ligne",
+              " : il s'enfuit dans ",
+              countdown(touch.fleesAt),
+              "."
             ),
-            spawnView(touch),
+            h(
+              "button",
+              {
+                class: "button small primary",
+                onclick: showTouch,
+              },
+              "Lui lancer une ball"
+            ),
           ]
         : [
-            h(
-              "div",
-              { class: "rods" },
-              fishing.rods.map((rod) => {
-                const poor = state.wallet.balance < rod.price;
-                const reason = !rod.owned
-                  ? "Tu n'as pas cette canne : elle tombe sur les Pokémon et se gagne à la loterie."
-                  : poor
-                    ? `Il te faut ${fmt(rod.price)} pts, tu en as ${fmt(state.wallet.balance)}.`
-                    : rod.description;
-                return h(
-                  "button",
-                  {
-                    class: `ball${rod.owned && !poor ? "" : " ball-off"}`,
-                    disabled: throwing || !rod.owned || poor,
-                    title: reason,
-                    onclick: () => castLine(rod),
-                  },
-                  h("span", { class: "ball-icon" }, itemIcon(rod)),
-                  h(
-                    "span",
-                    { class: "ball-text" },
-                    h("span", { class: "ball-label" }, rod.label),
-                    h("span", { class: "ball-meta" }, `${fmt(rod.price)} pts`)
-                  )
-                );
-              })
-            ),
-            panel?.fished ? throwPanel() : null,
+            h("p", { class: "muted small" }, "Le Pokémon qui mord est pour toi seul."),
+            h("div", { class: "rods" }, fishing.rods.map(rodButton)),
+            // Un refus de la ligne, là où on a cliqué ; le résultat d'un lancer sur la
+            // touche, lui, reste en tête (touchView).
+            panel?.fished && !panel.spawnId ? throwPanel() : null,
           ]
     );
+  }
+
+  // ---------------------- Le parc safari ----------------------
+
+  function safariView() {
+    const offer = safariOffer(ctx, state.safari, {
+      onEnter: () => ctx.navigate("/safari"),
+      redraw: draw,
+      confirming: buyingSafari,
+      setConfirming: (value) => {
+        buyingSafari = value;
+      },
+    });
+    return offer
+      ? h("section", { class: "side-section" }, h("h3", {}, "Parc safari"), offer)
+      : null;
   }
 
   // ---------------------- Entre deux apparitions ----------------------
@@ -597,12 +683,28 @@ export async function render(ctx) {
   const timer = setInterval(() => {
     if (!document.hidden) refresh();
   }, state.refreshSeconds * 1000);
+
+  // L'horloge des comptes à rebours. À zéro, la touche s'est enfuie : on relit tout de
+  // suite, une fois par touche — une horloge en avance sur le serveur la trouverait
+  // encore là, et la relecture habituelle prendra le relais.
+  let expiredTouch = null;
+  const clock = setInterval(() => {
+    for (const node of body.querySelectorAll("[data-until]")) {
+      node.textContent = remaining(Number(node.dataset.until));
+    }
+    const touch = state.fishing?.spawn;
+    if (touch && touch.fleesAt <= Date.now() && expiredTouch !== touch.id && !document.hidden) {
+      expiredTouch = touch.id;
+      refresh();
+    }
+  }, 1000);
   const onVisible = () => {
     if (!document.hidden) refresh();
   };
   document.addEventListener("visibilitychange", onVisible);
   ctx.onLeave(() => {
     clearInterval(timer);
+    clearInterval(clock);
     clearTimeout(coolTimer);
     document.removeEventListener("visibilitychange", onVisible);
   });

@@ -14,7 +14,7 @@ import { buildBalanceEmbed, getBalance } from "../economy.js";
 import { handleException, log } from "../utils.js";
 import { pseudoOf, pseudos } from "../pseudo.js";
 import { getBall, getPokemonConfig, getSafariConfig } from "./config.js";
-import { answerThrow, ballPanelRow, getBallPrice, specialPanelRow, throwBall, trackPanel } from "./capture.js";
+import { answerThrow, ballPanelRow, getBallPrice, specialPanel, throwBall, trackPanel } from "./capture.js";
 import { getSpawn } from "./spawn.js";
 import { getBallItem, getBallStock, getItem, getItemCount, overflowNotice } from "./items.js";
 import { claimDrop, markDropMessageClosed, syncDropMessage } from "./drops.js";
@@ -931,11 +931,11 @@ function handleTradePick(interaction, tradeId) {
 // ---------------------- Balls spéciales ----------------------
 
 function showSpecialBalls(interaction, spawnId, { panel }) {
-  specialPanelRow(interaction.user.id, spawnId, { panel })
-    .then((row) => {
-      // Les boutons seuls : le texte du panneau (le dernier lancer) s'efface, et
-      // l'éphémère n'en porte pas — le menu ne montre que ce qui sert.
-      const payload = panel ? { content: "", components: [row] } : { components: [row] };
+  specialPanel(interaction.user.id, spawnId, { panel })
+    .then(({ text, row }) => {
+      // Les chances des balls en poche, et rien d'autre : le texte du panneau (le
+      // dernier lancer) s'efface, et sans ball de la boutique l'éphémère n'en porte pas.
+      const payload = text || panel ? { content: text, components: [row] } : { components: [row] };
       return panel
         ? interaction.update(payload)
         : interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });

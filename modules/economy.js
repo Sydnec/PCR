@@ -142,7 +142,7 @@ export function getBalance(userId, cb) {
 // d'un Pokémon — la ligne est omise.
 export function buildBalanceEmbed(
   balance,
-  { user = null, balls = null, nextPointsAt = undefined, now = Date.now() } = {}
+  { user = null, balls = null, nextPointsAt = undefined, lotteryPending = false, now = Date.now() } = {}
 ) {
   const lines = [`**${balance.toLocaleString("fr-FR")}** points`];
   if (nextPointsAt !== undefined) {
@@ -152,6 +152,8 @@ export function buildBalanceEmbed(
       lines.push("✨ Prochains points : **disponibles**");
     }
   }
+  // Le rappel ne se dit qu'au dresseur lui-même : le tirage d'un autre ne se joue pas d'ici.
+  if (lotteryPending) lines.push("🎰 Ta loterie du jour t'attend : `/pk loterie`");
   if (balls) {
     lines.push(
       "",

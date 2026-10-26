@@ -46,14 +46,15 @@ import {
   speciesForms,
   unobtainableMark,
   spriteUrl,
+  throwProbability,
   tradeEvolutionTarget,
 } from "./data.js";
 
+// Une décimale de plus à mesure que la chance baisse, à la française : « 5,9 % ».
 const formatPercent = (probability) => {
   const percent = probability * 100;
-  if (percent >= 10) return `${Math.round(percent)} %`;
-  if (percent >= 1) return `${percent.toFixed(1)} %`;
-  return `${percent.toFixed(2)} %`;
+  const digits = percent >= 10 ? 0 : percent >= 1 ? 1 : 2;
+  return `${percent.toLocaleString("fr-FR", { minimumFractionDigits: digits, maximumFractionDigits: digits })} %`;
 };
 
 // La répartition des sexes d'une espèce, celle que tire rollSex : des
@@ -223,6 +224,23 @@ export function buildBallRow(
   return row;
 }
 
+// Les balls de la boutique qui servent à CETTE apparition (`counts`), avec leur nombre :
+// le menu n'a de bouton et de chance que pour elles.
+const usableSpecialBalls = (balls, counts) =>
+  balls
+    .map((ball) => ({ ball, usable: counts?.get(ball.key)?.eligible ?? 0 }))
+    .filter(({ usable }) => usable > 0);
+
+// La ligne au-dessus du sous-menu : la chance de chaque ball en poche contre ce
+// Pokémon, bonus compris, au format de la ligne « Difficulté » de l'annonce. La Master
+// Ball n'y est pas : elle capture toujours. Rien en poche, rien à dire.
+export function buildSpecialText(spawn, { balls, counts }) {
+  const chances = usableSpecialBalls(balls, counts).map(
+    ({ ball }) => `${ball.emoji} ${ball.label} **${formatPercent(throwProbability(spawn, ball))}**`
+  );
+  return chances.length ? `🎯 Tes chances sur ce Pokémon : ${chances.join(" · ")}` : "";
+}
+
 // Le sous-menu des balls spéciales : seulement celles de la boutique qui servent à
 // CETTE apparition (`counts`), une ball inutilisable n'y étant qu'un bouton grisé de
 // plus, et la Master Ball, qui passe toujours par sa confirmation — à son prix, un
@@ -234,9 +252,7 @@ export function buildSpecialRow(
   { balls, counts, masterHeld = 0, masterPrice = null, panel = false, disabled = false }
 ) {
   const row = new ActionRowBuilder();
-  for (const ball of balls) {
-    const usable = counts?.get(ball.key)?.eligible ?? 0;
-    if (!usable) continue;
+  for (const { ball, usable } of usableSpecialBalls(balls, counts)) {
     row.addComponents(
       new ButtonBuilder()
         .setCustomId(`${panel ? "poke_rethrow" : "poke_throw"}|${spawnId}|${ball.key}`)

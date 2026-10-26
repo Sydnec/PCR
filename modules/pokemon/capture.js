@@ -27,9 +27,9 @@ import {
   overflowNotice,
 } from "./items.js";
 import { dropItem, leavesItemBehind } from "./drops.js";
-import { ballMultiplier, catchProbability, charmFactor, getSpecies } from "./data.js";
+import { charmFactor, getSpecies, throwProbability } from "./data.js";
 import { getOpenSpecialBall, getUnitCounts, openSpecialBalls, restoreUnit, takeUnit } from "./shop.js";
-import { buildBallRow, buildSpecialRow, displayName } from "./embeds.js";
+import { buildBallRow, buildSpecialRow, buildSpecialText, displayName } from "./embeds.js";
 import { finalizeCaughtSpawn, getSpawn, refreshSpawnEmbed } from "./spawn.js";
 import { recordSpawnEnd, recordThrow } from "./stats.js";
 import { getCharms } from "./charms.js";
@@ -100,9 +100,10 @@ export function ballPanelRow(userId, spawnId) {
 }
 
 // Le sous-menu des balls spéciales, avec ce qui sert à cette apparition : les balls
-// achetées avant elle. Une lecture ratée désactive les boutons plutôt que de promettre
-// des balls qu'on n'a peut-être pas.
-export function specialPanelRow(userId, spawnId, { panel = false } = {}) {
+// achetées avant elle, et la ligne qui donne leurs chances contre ce Pokémon. Une
+// lecture ratée désactive les boutons plutôt que de promettre des balls qu'on n'a
+// peut-être pas, et tait les chances.
+export function specialPanel(userId, spawnId, { panel = false } = {}) {
   const master = getBall("master");
   // Le prix de la Master Ball est celui du dresseur : il monte à chaque achat. Une
   // lecture ratée le tait sans griser le menu — la confirmation redonnera le vrai.
@@ -122,16 +123,18 @@ export function specialPanelRow(userId, spawnId, { panel = false } = {}) {
             masterPrice((price) => {
               const failed = spawnError ?? inventoryError ?? err;
               if (failed) handleException("Lecture des balls spéciales :", failed);
-              resolve(
-                buildSpecialRow(spawnId, {
-                  balls: openSpecialBalls(),
+              const balls = openSpecialBalls();
+              resolve({
+                text: failed || !spawn ? "" : buildSpecialText(spawn, { balls, counts }),
+                row: buildSpecialRow(spawnId, {
+                  balls,
                   counts,
                   masterHeld: inventoryError ? 0 : freeBallCount(inventory, "master"),
                   masterPrice: price,
                   panel,
                   disabled: Boolean(failed),
-                })
-              );
+                }),
+              });
             }),
           { spawnedAt: spawn?.spawned_at ?? 0 }
         )
@@ -332,7 +335,6 @@ export function resolveThrow(
   { requireItem = false, expectedPrice = null } = {},
   cb
 ) {
-  const config = getPokemonConfig();
   const ball = getBall(ballKey);
   if (!ball) return cb(null, { status: "unknown-ball" });
 
@@ -358,13 +360,7 @@ export function resolveThrow(
     // Une ball spéciale hors du jeu — sa génération est fermée — n'existe pas.
     if (ball.special && !getOpenSpecialBall(ball.key)) return cb(null, { status: "unknown-ball" });
 
-    const probability = ball.guaranteed
-      ? 1
-      : catchProbability(
-          spawn.catch_rate,
-          ballMultiplier(ball, { fished: Boolean(spawn.fished), speciesId: spawn.species_id }),
-          config.capture.globalMultiplier
-        );
+    const probability = throwProbability(spawn, ball);
 
     // 1. Paiement atomique : une ball offerte d'abord, le solde ensuite, et
     // refusé sans rien prélever si ni l'un ni l'autre ne suffit.
@@ -609,7 +605,10 @@ export function throwMessage(outcome) {
       const { species, spawn } = outcome;
       return (
         `❌ Raté ! **${displayName(species, spawn.is_shiny, spawn.sex, spawn.form)}** s'est ` +
-        `dégagé de ta ${ball.label}. (${mention}, ${(outcome.probability * 100).toFixed(1)} % ` +
+        `dégagé de ta ${ball.label}. (${mention}, ${(outcome.probability * 100).toLocaleString("fr-FR", {
+          minimumFractionDigits: 1,
+          maximumFractionDigits: 1,
+        })} % ` +
         `de réussite)`
       );
     }
@@ -682,19 +681,19 @@ export async function throwBall(
     // La réponse attend l'acquittement : sans lui, Discord refuserait editReply.
     if (!(await acknowledged)) return;
     // Un seul point de sortie décide de la forme de la réponse : les boutons
-    // disparaissent quand il n'y a plus rien à relancer.
+    // disparaissent quand il n'y a plus rien à relancer. Après une ball spéciale, le
+    // panneau reste sur le sous-menu, ses chances sous le résultat : on enchaîne sans
+    // le rouvrir, et les nombres sont à jour.
+    const menu = isFinalThrow(outcome)
+      ? null
+      : getBall(ballKey)?.special
+        ? await specialPanel(userId, spawnId, { panel: true })
+        : { text: "", row: await ballPanelRow(userId, spawnId) };
+    const message = throwMessage(outcome);
     interaction
       .editReply({
-        content: throwMessage(outcome),
-        // Après une ball spéciale, le panneau reste sur le sous-menu : on enchaîne sans
-        // le rouvrir, et les nombres sont à jour.
-        components: isFinalThrow(outcome)
-          ? []
-          : [
-              await (getBall(ballKey)?.special
-                ? specialPanelRow(userId, spawnId, { panel: true })
-                : ballPanelRow(userId, spawnId)),
-            ],
+        content: menu?.text ? `${message}\n\n${menu.text}` : message,
+        components: menu ? [menu.row] : [],
       })
       .catch(() => {});
   });
