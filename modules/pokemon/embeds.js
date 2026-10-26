@@ -35,6 +35,7 @@ import {
   isEggOnly,
   isEvolutionOnly,
   isSafariFinished,
+  possibleSexes,
   probabilitiesByBall,
   rarityOf,
   safariBaitCapped,
@@ -59,13 +60,19 @@ const formatPercent = (probability) => {
 
 // La répartition des sexes d'une espèce, celle que tire rollSex : des
 // huitièmes, donc au plus une décimale (87,5 %). « Asexué » pour Magnéti,
-// Métamorph ou les légendaires.
-function genderLine(species) {
+// Métamorph ou les légendaires. `owned` : les sexes que le dresseur en a déjà,
+// pour savoir lequel chercher encore ; null sans lecture, et la ligne s'omet.
+function genderLine(species, owned = null) {
   const share = femaleShare(species);
   if (share === null) return "Asexué";
   const pct = (value) =>
     `${(value * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %`;
-  return `${sexSymbol("M")} ${pct(1 - share)} · ${sexSymbol("F")} ${pct(share)}`;
+  const line = `${sexSymbol("M")} ${pct(1 - share)} · ${sexSymbol("F")} ${pct(share)}`;
+  if (!owned) return line;
+  const mine = possibleSexes(species)
+    .map((sex) => `${sexSymbol(sex)} ${owned.has(sex) ? "✅" : "❔"}`)
+    .join(" · ");
+  return `${line}\nTu as : ${mine}`;
 }
 
 // Un instant rendu par Discord dans le fuseau de celui qui lit. Il ne s'affiche
@@ -404,7 +411,13 @@ export function buildSpeciesInfoEmbed(
   // catchRate se passe explicitement : une apparition fige le sien à la
   // naissance du spawn, et la fiche doit annoncer le même chiffre que l'embed
   // d'où l'on vient, pas celui d'un dataset régénéré entre-temps.
-  { owned = new Map(), isShiny = false, catchRate = species.catchRate, forms = null } = {}
+  {
+    owned = new Map(),
+    isShiny = false,
+    catchRate = species.catchRate,
+    forms = null,
+    sexes = null,
+  } = {}
 ) {
   const rarity = RARITIES[rarityOf(species)];
   const ball = referenceBall(catchRate);
@@ -425,7 +438,7 @@ export function buildSpeciesInfoEmbed(
         inline: true,
       },
       // Seul sur sa ligne : les stades qui suivent en occupent une à eux.
-      { name: "Sexe", value: genderLine(species), inline: false }
+      { name: "Sexe", value: genderLine(species, sexes), inline: false }
     );
 
   embed.addFields(lineageFields(species, chain, owned, { isShiny }));

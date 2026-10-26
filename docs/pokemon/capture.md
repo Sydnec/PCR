@@ -61,7 +61,7 @@
   zéro verrouille tous les stades 3 et le cadenas suit.
 - **Bouton « ℹ️ Infos du Pokémon »** sur chaque apparition : un message Discord étant identique
   pour tous ses lecteurs, ce bouton ouvre à chacun en privé la fiche de l'espèce — type, rareté,
-  chances à la Poké Ball, répartition mâle/femelle, et toute la lignée évolutive avec ce qu'il en
+  chances à la Poké Ball, répartition mâle/femelle avec les sexes qu'il en a déjà, et toute la lignée évolutive avec ce qu'il en
   possède déjà — suivie de
   **son solde de points et des balls qu'il a en poche**, l'autre question qu'on se pose devant une
   apparition. `/solde` affiche le même embed.

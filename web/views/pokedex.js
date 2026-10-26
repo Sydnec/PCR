@@ -11,6 +11,7 @@ import {
   obtentionMark,
   openDialog,
   progressBar,
+  sexMark,
   speciesChips,
 } from "../lib.js";
 
@@ -147,6 +148,21 @@ function card(ctx, species, counts, mine = true) {
   );
 }
 
+// « Tu as : ♂ ✓ · ♀ ? », comme la fiche Discord : le sexe qu'il reste à chercher.
+function ownedSexesView(sexes) {
+  return h(
+    "span",
+    { class: "muted small sexes-owned" },
+    "Tu as : ",
+    sexes.flatMap(({ sex, owned }, index) => [
+      index ? " · " : null,
+      sexMark(sex),
+      " ",
+      icon(owned ? "check" : "question", { label: owned ? "Possédé" : "Pas encore" }),
+    ])
+  );
+}
+
 function openSpecies(ctx, species, counts) {
   const gender = species.genderless
     ? "Asexué"
@@ -155,10 +171,13 @@ function openSpecies(ctx, species, counts) {
   // La lignée arrive après la fiche, avec ce qu'on possède de chaque maillon :
   // le même rendu que sur l'onglet Capture.
   const lineage = h("div", { class: "lineage-slot" });
+  // Les sexes qu'on en a déjà arrivent avec la lignée, sous la répartition.
+  const sexes = h("span");
   loadLineage(species.id)
-    .then(({ lineage: links, forms }) =>
-      lineage.replaceWith(lineageView(ctx, links, { currentId: species.id, forms }))
-    )
+    .then(({ lineage: links, forms, sexes: owned }) => {
+      lineage.replaceWith(lineageView(ctx, links, { currentId: species.id, forms }));
+      if (owned) sexes.replaceWith(ownedSexesView(owned));
+    })
     .catch(() => lineage.remove());
 
   const dialog = openDialog(
@@ -180,7 +199,7 @@ function openSpecies(ctx, species, counts) {
       h("dt", {}, "Obtention"),
       h("dd", {}, OBTENTION[species.obtention]),
       h("dt", {}, "Sexe"),
-      h("dd", {}, gender),
+      h("dd", {}, gender, sexes),
       h("dt", {}, "Capture"),
       h("dd", {}, `Taux ${species.catchRate} / 255`),
       h("dt", {}, "Revente"),

@@ -19,6 +19,7 @@ import {
   isAvailable,
   itemOnlyTargets,
   lockedByDefault,
+  possibleSexes,
   rollForm,
   rollSex,
   sexAfterEvolution,
@@ -460,11 +461,21 @@ export function getOwnedForms(userId, speciesId, cb) {
   );
 }
 
+// Les sexes qu'un dresseur possède d'une espèce, shiny ou non.
+export function getOwnedSexes(userId, speciesId, cb) {
+  db.all(
+    `SELECT DISTINCT sex FROM pokemon_owned
+      WHERE user_id = ? AND species_id = ? AND sex IS NOT NULL`,
+    [userId, Number(speciesId)],
+    (err, rows) => cb(err, new Set((rows || []).map((row) => row.sex)))
+  );
+}
+
 // Ce que la fiche d'une espèce montre de la collection d'un dresseur : ses
 // exemplaires de chaque maillon de la lignée (compteurs à zéro sur une lecture
-// ratée, comme getOwnedVariantsFor), et les formes qu'il en a quand l'espèce en
-// a. `forms` vaut null sans formes ou sur une lecture ratée : la fiche l'omet
-// plutôt que d'annoncer zéro.
+// ratée, comme getOwnedVariantsFor), les formes qu'il en a quand l'espèce en
+// a, et ses sexes quand elle en a. `forms` et `sexes` valent null sans objet ou
+// sur une lecture ratée : la fiche les omet plutôt que d'annoncer zéro.
 export function getSpeciesOwnership(userId, species, cb) {
   const chain = evolutionChain(species);
   getOwnedVariantsFor(
@@ -472,13 +483,23 @@ export function getSpeciesOwnership(userId, species, cb) {
     chain.map((link) => link.id),
     (err, owned) => {
       if (err) handleException("Lecture de la collection pour une fiche :", err);
-      if (!speciesForms(species).length) return cb(null, { owned, forms: null });
-      getOwnedForms(userId, species.id, (err, forms) => {
-        if (err) handleException("Lecture des formes pour une fiche :", err);
-        cb(null, { owned, forms: err ? null : forms });
+      readSexes(userId, species, (sexes) => {
+        if (!speciesForms(species).length) return cb(null, { owned, forms: null, sexes });
+        getOwnedForms(userId, species.id, (err, forms) => {
+          if (err) handleException("Lecture des formes pour une fiche :", err);
+          cb(null, { owned, forms: err ? null : forms, sexes });
+        });
       });
     }
   );
+}
+
+function readSexes(userId, species, done) {
+  if (!possibleSexes(species).length) return done(null);
+  getOwnedSexes(userId, species.id, (err, sexes) => {
+    if (err) handleException("Lecture des sexes pour une fiche :", err);
+    done(err ? null : sexes);
+  });
 }
 
 export function getLeaderboard(limit, cb) {

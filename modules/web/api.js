@@ -14,6 +14,7 @@ import {
   getIndividuals,
   getLeaderboard,
   getOwnedForms,
+  getOwnedSexes,
   getOwnedVariantsFor,
   resolveSelector,
   evolve,
@@ -52,6 +53,7 @@ import {
   isEvolutionOnly,
   isGenderless,
   isLegendary,
+  possibleSexes,
   probabilitiesByBall,
   rarityOf,
   safariBaitCapped,
@@ -342,6 +344,22 @@ async function formsJson(userId, species) {
     icon: iconUrl(species, false, form.key),
     owned: owned.has(form.key),
   }));
+}
+
+// Les sexes possibles d'une espèce, avec ceux que le dresseur en a déjà, comme
+// la fiche Discord. null pour une espèce asexuée ou sur une lecture ratée : le
+// site omet la ligne plutôt que de dire qu'on n'en a aucun.
+async function sexesJson(userId, species) {
+  const sexes = possibleSexes(species);
+  if (!sexes.length) return null;
+  let owned;
+  try {
+    owned = await promise((cb) => getOwnedSexes(userId, species.id, cb));
+  } catch (error) {
+    handleException("API web, lecture des sexes :", error);
+    return null;
+  }
+  return sexes.map((sex) => ({ sex, owned: owned.has(sex) }));
 }
 
 // La vitrine d'un dresseur telle que le site la montre.
@@ -698,6 +716,7 @@ export const routes = [
       return {
         lineage: await lineageJson(ctx.user.id, species),
         forms: await formsJson(ctx.user.id, species),
+        sexes: await sexesJson(ctx.user.id, species),
       };
     },
   },

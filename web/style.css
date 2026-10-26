@@ -657,6 +657,11 @@ input[type="number"] {
   margin: 0;
 }
 
+/* Sous la répartition, sur sa propre ligne. */
+.sexes-owned {
+  display: block;
+}
+
 /* ---------- Actions d'une fiche (boîte) ---------- */
 
 .pokemon-actions {

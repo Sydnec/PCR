@@ -847,6 +847,14 @@ describe("la lignée et les référentiels restants", () => {
     const plain = await call("GET", "/api/me/lineage/:speciesId", { params: { speciesId: String(species("Rattata").id) } });
     assert.equal(plain.forms, null);
   });
+
+  it("la lignée dit quels sexes on possède déjà, et rien pour une espèce asexuée", async () => {
+    await dbRun(points, "INSERT INTO pokemon_owned (user_id, species_id, is_shiny, sex, origin, obtained_at) VALUES (?, ?, 1, 'F', 'test', 1)", [USER, species("Rattata").id]);
+    const { sexes } = await call("GET", "/api/me/lineage/:speciesId", { params: { speciesId: String(species("Rattata").id) } });
+    assert.deepEqual(sexes, [{ sex: "M", owned: false }, { sex: "F", owned: true }]);
+    const genderless = await call("GET", "/api/me/lineage/:speciesId", { params: { speciesId: String(species("Magnéti").id) } });
+    assert.equal(genderless.sexes, null);
+  });
 });
 
 describe("le parc safari (/api/safari/*)", () => {

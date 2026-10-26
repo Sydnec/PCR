@@ -229,6 +229,13 @@ describe("fiche d'une espèce", () => {
     assert.match(field(embed, "Stade 1").value, /▸ ❔ `#002` __\*\*Herbizarre\*\*__/);
   });
 
+  it("dit quels sexes le dresseur possède déjà, parmi ceux que l'espèce peut avoir", () => {
+    assert.match(field(card("Rattata", { sexes: new Set(["M"]) }), "Sexe").value, /\nTu as : ♂ ✅ · ♀ ❔$/);
+    assert.match(field(card("Leveinard", { sexes: new Set() }), "Sexe").value, /\nTu as : ♀ ❔$/, "un seul sexe possible");
+    assert.doesNotMatch(field(card("Rattata"), "Sexe").value, /Tu as/, "sans lecture, la ligne s'omet");
+    assert.equal(field(card("Magnéti", { sexes: null }), "Sexe").value, "Asexué");
+  });
+
   it("explique 🔒 dans le pied de page", () => {
     assert.match(card("Kadabra").footer.text, /Introuvable à l'état sauvage/);
     assert.equal(card("Salamèche").footer, undefined);
