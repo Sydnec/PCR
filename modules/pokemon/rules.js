@@ -6,7 +6,13 @@
 // Les parts (rareté, objets, loterie) sont des poids rapportés à leur total,
 // exactement ceux que pickWeightedSpecies et pickWeightedItem cumulent.
 import { getConfig } from "../config.js";
-import { getBalls, getPokemonConfig, getSafariConfig, hasPersonalPrice } from "./config.js";
+import {
+  getBalls,
+  getPokemonConfig,
+  getSafariConfig,
+  hasPersonalPrice,
+  specialBallLimit,
+} from "./config.js";
 import {
   RARITIES,
   activeGeneration,
@@ -15,6 +21,9 @@ import {
   difficultyOf,
   dittoSpecies,
   effectiveCatchRate,
+  fishingOpen,
+  fishingPool,
+  fishingRarity,
   itemImageUrl,
   probabilitiesByBall,
   rarityOf,
@@ -42,6 +51,9 @@ import { describeEvolution } from "./collection.js";
 import { pokemonSellValue } from "./sell.js";
 import { eggShinyFactor } from "./eggs.js";
 import { charmSpecies } from "./charms.js";
+import { getRods } from "./fishing.js";
+import { ballEffectText, openSpecialBalls } from "./shop.js";
+import { lineageAt, starterGenerations, starterChoices, starterTiers } from "./starters.js";
 
 // La part de chaque rareté dans un tirage d'apparition (sauvage ou parc), et
 // combien d'espèces elle compte.
@@ -181,6 +193,99 @@ function sellTable() {
   };
 }
 
+// Les cannes ouvertes, chacune avec les espèces qu'elle pêche le plus : les poids
+// mêmes que pickFished cumule, rapportés à leur total. La page n'en montre que la
+// tête, le reste se compte.
+function fishingTable() {
+  if (!fishingOpen()) return { enabled: false, rods: [] };
+  return {
+    enabled: true,
+    fleeSeconds: getPokemonConfig().fishing.fleeSeconds,
+    // Le facteur que subissent ses espèces à l'état sauvage (1 : aucun).
+    wildRarityFactor: fishingRarity().factor,
+    rods: getRods().map((rod) => {
+      const pool = fishingPool(rod.rod.pool);
+      const total = pool.reduce((sum, entry) => sum + entry.weight, 0);
+      return {
+        key: rod.key,
+        label: rod.label,
+        emoji: rod.emoji,
+        image: itemImageUrl(rod.sprite),
+        description: rod.description ?? null,
+        price: rod.rod.price,
+        base: Boolean(rod.rod.base),
+        species: pool.length,
+        top: total
+          ? pool
+              .slice()
+              .sort((a, b) => b.weight - a.weight)
+              .slice(0, 4)
+              .map((entry) => ({ name: entry.species.name, share: entry.weight / total }))
+          : [],
+      };
+    }),
+  };
+}
+
+// Les starters des générations ouvertes, chacun avec sa lignée, et ce que rapporte
+// chaque palier du Pokédex : un stade de la lignée choisie, shiny ou non.
+function starterTable() {
+  const tiers = starterTiers().map((tier) => ({
+    percent: tier.percent,
+    stage: tier.stage,
+    shiny: Boolean(tier.shiny),
+  }));
+  const line = (starter) => {
+    const names = [];
+    for (let stage = 1; ; stage++) {
+      const species = lineageAt(starter, stage);
+      if (!species) return names;
+      names.push(species.name);
+    }
+  };
+  return {
+    tiers,
+    generations: starterGenerations().map((generation) => ({
+      generation,
+      choices: starterChoices(generation).map((species) => ({
+        name: species.name,
+        line: line(species),
+      })),
+    })),
+  };
+}
+
+// Les balls spéciales en vente, avec la phrase même de la boutique.
+function shopTable() {
+  return {
+    maxHeld: specialBallLimit(),
+    balls: openSpecialBalls().map((ball) => ({
+      key: ball.key,
+      label: ball.label,
+      emoji: ball.emoji,
+      image: itemImageUrl(ball.sprite),
+      price: ball.price,
+      effect: ballEffectText(ball),
+    })),
+  };
+}
+
+// La prochaine génération programmée (`generationOpenings`), si sa date est à venir
+// et que le jeu de données la contient : activeGeneration, interrogée à cette date,
+// dit si elle ouvrira vraiment. Null sinon.
+function nextGeneration() {
+  const active = activeGeneration();
+  const now = Date.now();
+  const next = Object.entries(getPokemonConfig().generationOpenings ?? {})
+    .map(([generation, date]) => ({ generation: Number(generation), opensAt: Date.parse(date) }))
+    .filter(
+      ({ generation, opensAt }) =>
+        generation > active && opensAt > now && activeGeneration(opensAt) >= generation
+    )
+    .sort((a, b) => a.opensAt - b.opensAt);
+  return next[0] ?? null;
+}
+
 // Les commandes /pk, telles que Discord les connaît : le nom, les options et
 // la description viennent de la définition des commandes, pas d'une copie.
 function pkCommands(bot) {
@@ -225,6 +330,8 @@ export function describeRules(bot) {
 
   return {
     commands: pkCommands(bot),
+    generation: activeGeneration(),
+    nextGeneration: nextGeneration(),
     points: { ranks, then: distribution.default ?? null },
     spawn: {
       messages: config.spawn.messagesPerSpawn,
@@ -264,6 +371,9 @@ export function describeRules(bot) {
       })),
       table: catchTable(config.spawn),
     },
+    shop: shopTable(),
+    fishing: fishingTable(),
+    starters: starterTable(),
     items: itemTable(),
     lottery: {
       enabled: lottery.enabled !== false,
