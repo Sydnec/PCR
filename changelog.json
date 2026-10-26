@@ -2671,5 +2671,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Page Infos du site plus claire",
+      "description": "La page Infos du site range les règles par thème, met les chiffres clés en avant, et présente la pêche, la boutique et le starter de génération.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-26T13:00:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
+    }
+  ]
 }

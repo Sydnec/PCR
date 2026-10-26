@@ -134,6 +134,55 @@ describe("référentiels", () => {
     assert.ok(master > 1, "la Master Ball renchérit");
     assert.deepEqual(growth, { poke: null, super: null, hyper: null, master });
   });
+
+  it("génération fermée : ni pêche, ni boutique, ni starter, et la date d'ouverture annoncée", async () => {
+    const rules = await call("GET", "/api/rules");
+    assert.equal(rules.generation, 1);
+    assert.deepEqual(rules.nextGeneration, { generation: 2, opensAt: Date.parse("2999-01-01T00:00:00+01:00") });
+    assert.deepEqual(rules.fishing, { enabled: false, rods: [] });
+    assert.deepEqual(rules.shop.balls, []);
+    assert.deepEqual(rules.starters.generations, []);
+  });
+
+  it("génération ouverte : les cannes et leurs prises, les balls spéciales et les starters, lus dans la config", async () => {
+    sandbox.writeConfig({ pokemon: { generation: 2, generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } });
+    try {
+      const rules = await call("GET", "/api/rules");
+      const config = getPokemonConfig();
+      assert.equal(rules.nextGeneration, null, "une génération déjà ouverte ne s'annonce plus");
+
+      assert.equal(rules.fishing.fleeSeconds, config.fishing.fleeSeconds);
+      assert.equal(rules.fishing.wildRarityFactor, config.fishing.wildRarityFactor);
+      assert.deepEqual(rules.fishing.rods.map((rod) => rod.key), ["canne", "super_canne", "mega_canne"]);
+      assert.deepEqual(rules.fishing.rods.filter((rod) => rod.base).map((rod) => rod.key), ["canne"]);
+      for (const rod of rules.fishing.rods) {
+        assert.equal(rod.price, items.getItem(rod.key).rod.price);
+        assert.ok(rod.top.length > 0 && rod.top.length <= rod.species);
+        const shares = rod.top.map((entry) => entry.share);
+        assert.deepEqual(shares, [...shares].sort((a, b) => b - a), "les plus probables d'abord");
+        assert.ok(shares.reduce((sum, share) => sum + share, 0) <= 1);
+      }
+      assert.equal(rules.fishing.rods[0].top[0].name, "Magicarpe");
+
+      const special = config.capture.specialBalls;
+      assert.equal(rules.shop.maxHeld, special.maxHeld);
+      assert.deepEqual(
+        rules.shop.balls.map((ball) => [ball.key, ball.price]),
+        [["appat", special.appat.price], ["catalyseur", special.catalyseur.price]]
+      );
+      assert.match(rules.shop.balls[0].effect, /pêchés/);
+
+      const [gen2] = rules.starters.generations;
+      assert.equal(gen2.generation, 2);
+      assert.deepEqual(gen2.choices[0].line, ["Germignon", "Macronium", "Méganium"]);
+      assert.deepEqual(
+        rules.starters.tiers,
+        config.starters.rewards.map(({ percent, stage, shiny }) => ({ percent, stage, shiny }))
+      );
+    } finally {
+      sandbox.writeConfig({ pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } });
+    }
+  });
 });
 
 describe("sac : le prix de revente et la vente", () => {

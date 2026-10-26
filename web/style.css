@@ -1715,9 +1715,16 @@ input[type="number"] {
   gap: 6px;
 }
 
-/* La barre du haut colle en tête de page : une section atteinte par le
-   sommaire ne doit pas passer dessous. */
-.rules-section {
+.rules-banner {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
+
+/* La barre du haut colle en tête de page : un thème atteint par le sommaire ne
+   doit pas passer dessous. */
+.rules-theme {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1726,8 +1733,68 @@ input[type="number"] {
   scroll-margin-top: 76px;
 }
 
-.rules-section h2 {
-  font-size: 1.1rem;
+.rules-theme h2 {
+  font-size: 1.2rem;
+}
+
+.rules-theme > p {
+  margin: 0;
+}
+
+/* Deux colonnes dès qu'il y a la place, une seule sur un téléphone ; une carte qui
+   porte un grand tableau prend toute la largeur. */
+.rules-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr));
+  gap: 12px;
+}
+
+.rules-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.rules-wide {
+  grid-column: 1 / -1;
+}
+
+.rules-card h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.rules-card p {
+  margin: 0;
+}
+
+.rules-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rules-fact {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+
+.rules-fact strong {
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.rules-fact span {
+  color: var(--muted);
+  font-size: 0.8rem;
 }
 
 .rules-list {
@@ -1741,6 +1808,12 @@ input[type="number"] {
 .rules-list ul {
   margin: 4px 0 0;
   padding-left: 20px;
+}
+
+.rules-items {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+  gap: 10px 16px;
 }
 
 .rules-commands {
@@ -1762,6 +1835,11 @@ input[type="number"] {
   font-size: 0.9rem;
 }
 
+/* Un tableau large défile dans sa carte plutôt que d'élargir la page. */
+.rules-scroll {
+  overflow-x: auto;
+}
+
 .rules-table {
   width: 100%;
   max-width: 560px;
@@ -1777,13 +1855,14 @@ input[type="number"] {
   text-align: left;
 }
 
+/* Le nom d'une ligne (une canne, une rareté) ne se coupe pas. */
+.rules-card .rules-table td:first-child {
+  white-space: nowrap;
+}
+
 .rules-table th {
   color: var(--muted);
   font-weight: 600;
-}
-
-.rules-section p {
-  margin: 0;
 }
 
 /* ---------- Œuf ---------- */
