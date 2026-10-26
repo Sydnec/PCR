@@ -2620,6 +2620,16 @@
       "commit": "pending",
       "timestamp": "2026-10-26T01:52:53.000Z",
       "branch": "dev/keen-knuth-lcd8tu"
+    },
+    {
+      "type": "fix",
+      "name": "Les bébés comptent dans le stade",
+      "description": "Une forme adulte de bébé est un stade de plus : Magmar, Pikachu ou Rondoudou deviennent peu communs et se revendent 600, Raichu, Mélodelfe et Grodoudou deviennent rares.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-26T09:39:44.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
     }
   ]
 }

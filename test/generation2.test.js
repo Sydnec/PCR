@@ -162,10 +162,13 @@ describe("apparitions", () => {
     assert.deepEqual([...seen].sort(), [1, 2]);
   });
 
-  it("les raretés de la 1ʳᵉ génération ne bougent pas : Pikachu reste commun, Raichu peu commun", () => {
-    assert.equal(data.rarityOf(species("Pikachu")), "COMMUN");
-    assert.equal(data.rarityOf(species("Raichu")), "PEU_COMMUN");
+  it("un bébé compte dans le stade : Magmar se revend comme un stade 2, Raichu est rare", async () => {
+    const sell = await import("../modules/pokemon/sell.js");
     assert.equal(data.rarityOf(species("Pichu")), "COMMUN", "un bébé est de stade 1");
+    assert.equal(data.rarityOf(species("Pikachu")), "PEU_COMMUN");
+    assert.equal(data.rarityOf(species("Raichu")), "RARE");
+    assert.equal(species("Magmar").stage, 2);
+    assert.equal(sell.pokemonSellValue(species("Magmar"), false), getPokemonConfig().sell.byRarity.PEU_COMMUN);
   });
 
   it("la 1ʳᵉ génération garde exactement ses chances d'apparaître : seul le total grandit", () => {
@@ -383,7 +386,7 @@ describe("parc safari", () => {
     }
   });
 
-  it("la lignée d'un bébé et de sa forme adulte tient dans le champ « Forme de base », qui sont tous deux de stade 1", () => {
+  it("la lignée d'un bébé range sa forme adulte au stade suivant, comme une évolution", () => {
     const lineage = new Map(data.evolutionChain(species("Pichu")).map((link) => [link.id, { normal: 0, shiny: 0 }]));
     const session = {
       id: 1, user_id: "u", status: "ACTIVE", actions_left: 5, encounter_no: 1, encounter_species_id: species("Pikachu").id,
@@ -391,9 +394,9 @@ describe("parc safari", () => {
     };
     const embed = embeds.buildSafariView(session, { owned: null, lineage }).embeds[0].toJSON();
     const base = embed.fields.find((field) => field.name === "Forme de base").value.split("\n");
-    assert.equal(base.length, 2);
+    assert.equal(base.length, 1);
     assert.match(base[0], /Pichu 🥚/);
-    assert.match(base[1], /▸ ❔ `#025` __\*\*Pikachu\*\*__/);
+    assert.match(embed.fields.find((field) => field.name === "Stade 1").value, /▸ ❔ `#025` __\*\*Pikachu\*\*__/);
     assert.match(embed.footer.text, /œuf/);
   });
 });
