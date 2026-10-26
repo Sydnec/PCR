@@ -53,12 +53,15 @@ export function getBall(key) {
 export function getSpecialBalls() {
   const balls = getPokemonConfig().capture.specialBalls ?? {};
   return Object.entries(balls)
-    .filter(([key]) => key !== "maxHeld")
+    .filter(([key]) => key !== "maxHeld" && key !== "dailyLimit")
     .map(([key, ball]) => ({ key, special: true, ...ball }));
 }
 
 export const specialBallLimit = () =>
   Math.max(1, Math.floor(Number(getPokemonConfig().capture.specialBalls?.maxHeld) || 10));
+
+export const specialBallDailyLimit = () =>
+  Math.max(1, Math.floor(Number(getPokemonConfig().capture.specialBalls?.dailyLimit) || 10));
 
 export function getBalls() {
   const balls = getPokemonConfig().capture.balls;

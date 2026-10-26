@@ -2688,5 +2688,26 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Balls spéciales limitées par jour",
+      "description": "On ne peut plus acheter que 10 exemplaires de chaque ball spéciale par jour ; le compteur repart à minuit UTC.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-26T12:00:36.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
+    },
+    {
+      "type": "enhancement",
+      "name": "Nouvelle image de la Catalyseur Ball",
+      "description": "Sur le site, la Catalyseur Ball a désormais l'image de la Lune Ball.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-26T12:10:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
+    }
+  ]
 }

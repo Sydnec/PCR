@@ -8,7 +8,7 @@ import { runCommand, runAutocomplete, payloadOf, textOf } from "./fake-discord.j
 createSandbox({ config: { pokemon: { generationOpenings: { 2: "2000-01-01T00:00:00+01:00" } } } });
 const { points } = await openDatabases();
 const pk = (await import("../commands/pk.js")).default;
-const { getPokemonConfig, specialBallLimit } = await import("../modules/pokemon/config.js");
+const { getPokemonConfig, specialBallDailyLimit, specialBallLimit } = await import("../modules/pokemon/config.js");
 const { getSpecies, speciesEvolvingWith } = await import("../modules/pokemon/data.js");
 const shop = (options = {}) => runCommand(pk, { sub: "boutique", options });
 // Prix et plafond relus dans la configuration : un rééquilibrage ne casse pas ces tests.
@@ -19,7 +19,7 @@ const setBalance = (amount, user = "u1") =>
 const units = () => dbAll(points, "SELECT ball FROM pokemon_ball_units WHERE user_id = 'u1'");
 
 beforeEach(async () => {
-  for (const table of ["points", "pokemon_ball_units", "points_log"]) await dbRun(points, `DELETE FROM ${table}`);
+  for (const table of ["points", "pokemon_ball_units", "points_log", "pokemon_shop_daily"]) await dbRun(points, `DELETE FROM ${table}`);
 });
 
 describe("/pk boutique", () => {
@@ -36,7 +36,7 @@ describe("/pk boutique", () => {
       assert.ok(at >= 0, `${label} est au catalogue`);
       return { header: lines[at], effect: lines[at + 1] };
     };
-    const priceAndStock = ({ price }) => new RegExp(`${price.toLocaleString("fr-FR")}.*points.*tu en as 0/${specialBallLimit()}`);
+    const priceAndStock = ({ price }) => new RegExp(`${price.toLocaleString("fr-FR")}.*points.*tu en as 0/${specialBallLimit()} · achetées aujourd'hui 0/${specialBallDailyLimit()}`);
     const { appat, catalyseur } = getPokemonConfig().capture.specialBalls;
 
     const lure = entry("Appât Ball");
@@ -52,6 +52,7 @@ describe("/pk boutique", () => {
 
     assert.match(description, /Ton solde : \*\*1\s?500\*\* points/);
     assert.match(description, /après\*\* son achat/);
+    assert.match(description, new RegExp(`\\*\\*${specialBallDailyLimit()}\\*\\* de chaque au plus, compteur remis à zéro <t:\\d+:R>`));
   });
 
   it("acheter débite le prix et donne les balls, en le disant", async () => {
@@ -77,6 +78,14 @@ describe("/pk boutique", () => {
     );
     assert.match(payloadOf(await shop({ ball: "poke" }), "reply").content, /pas en vente/);
     assert.equal((await units()).length, limit - 1, "les refus n'ont rien donné");
+    // Le quota du jour, une fois la poche vidée : le refus dit combien on en a acheté.
+    const daily = specialBallDailyLimit();
+    await dbRun(points, "DELETE FROM pokemon_ball_units");
+    await dbRun(points, "UPDATE pokemon_shop_daily SET bought = ? WHERE user_id = 'u1' AND ball = 'catalyseur'", [daily]);
+    const refusal = payloadOf(await shop({ ball: "catalyseur" }), "reply");
+    assert.equal(refusal.flags, MessageFlags.Ephemeral);
+    assert.ok(refusal.content.includes(`Tu en as acheté ${daily} sur ${daily} aujourd'hui : tu peux encore en acheter 0, pas 1`), refusal.content);
+    assert.equal((await units()).length, 0);
   });
 
   it("/pk inventaire montre les balls spéciales, et rien quand on n'en a pas", async () => {

@@ -166,13 +166,16 @@ const POKEMON = {
     // Les balls spéciales : à la boutique seulement (/pk boutique), jamais en drop
     // ni à la loterie. Une ball achetée ne sert qu'aux apparitions qui viennent
     // APRÈS son achat — pas à celle en cours —, et on en garde `maxHeld` de
-    // chaque en poche. Hors bonus, elles valent `multiplier` ; `bonus` la
+    // chaque en poche. `dailyLimit` borne les achats de chacune par jour (minuit
+    // UTC, comme la loterie) : sans lui, on rachète à mesure qu'on lance et la
+    // poche ne limite rien. Hors bonus, elles valent `multiplier` ; `bonus` la
     // multiplie quand la condition est remplie : `fished` (le Pokémon vient d'une
     // pêche) ou `item` (l'espèce évolue grâce à cet objet, lu dans le catalogue :
     // `evolution.targets`). `generation` les garde hors du jeu tant qu'elle est
     // fermée. Les emoji sont unicode : celui d'une ball du serveur reste à créer.
     specialBalls: {
       maxHeld: 10,
+      dailyLimit: 10,
       appat: {
         label: "Appât Ball",
         emoji: "🎣",
@@ -185,7 +188,7 @@ const POKEMON = {
       catalyseur: {
         label: "Catalyseur Ball",
         emoji: "⚙️",
-        sprite: "up-grade",
+        sprite: "moon-ball",
         price: 300,
         multiplier: 1,
         generation: 2,
