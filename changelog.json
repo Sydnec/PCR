@@ -1,7 +1,44 @@
 {
-  "version": "1.21.0",
-  "lastUpdated": "2026-10-27T11:28:42.786Z",
+  "version": "1.21.1",
+  "lastUpdated": "2026-10-27T13:45:35.559Z",
   "releases": [
+    {
+      "version": "1.21.1",
+      "date": "2026-10-27",
+      "title": "Release 1.21.1",
+      "features": [
+        {
+          "type": "fix",
+          "name": "Double-clic à l'entrée du safari",
+          "description": "Un double-clic sur l'entrée payante du parc safari rouvre ta visite au lieu de te dire que tu as déjà payé une entrée.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-10-27T12:51:09.000Z",
+          "branch": "dev/optimistic-darwin-vypmot"
+        },
+        {
+          "type": "enhancement",
+          "name": "Boîte plus lisible",
+          "description": "Sur le site, la boîte s'étale sur deux colonnes : la grille d'un côté, la recherche et les outils de l'autre. Les filtres de la boîte et du Pokédex se rangent sous un bouton « Filtres ».",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-10-27T16:00:00.000Z",
+          "branch": "dev/keen-knuth-lcd8tu"
+        },
+        {
+          "type": "fix",
+          "name": "Boîte depuis le Pokédex",
+          "description": "« Voir dans ma boîte » depuis le Pokédex ouvre de nouveau la boîte au lieu d'une erreur.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-10-27T16:01:00.000Z",
+          "branch": "dev/keen-knuth-lcd8tu"
+        }
+      ]
+    },
     {
       "version": "1.21.0",
       "date": "2026-10-27",
@@ -2820,26 +2857,6 @@
     }
   ],
   "pending": [
-    {
-      "type": "enhancement",
-      "name": "Boîte plus lisible",
-      "description": "Sur le site, la boîte s'étale sur deux colonnes : la grille d'un côté, la recherche et les outils de l'autre. Les filtres de la boîte et du Pokédex se rangent sous un bouton « Filtres ».",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-10-27T16:00:00.000Z",
-      "branch": "dev/keen-knuth-lcd8tu"
-    },
-    {
-      "type": "fix",
-      "name": "Boîte depuis le Pokédex",
-      "description": "« Voir dans ma boîte » depuis le Pokédex ouvre de nouveau la boîte au lieu d'une erreur.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-10-27T16:01:00.000Z",
-      "branch": "dev/keen-knuth-lcd8tu"
-    },
     {
       "type": "fix",
       "name": "Tous les parents proposés pour un œuf",
