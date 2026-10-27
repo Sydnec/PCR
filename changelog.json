@@ -2821,6 +2821,16 @@
   ],
   "pending": [
     {
+      "type": "fix",
+      "name": "Double-clic à l'entrée du safari",
+      "description": "Un double-clic sur l'entrée payante du parc safari rouvre ta visite au lieu de te dire que tu as déjà payé une entrée.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-27T12:51:09.000Z",
+      "branch": "dev/optimistic-darwin-vypmot"
+    },
+    {
       "type": "enhancement",
       "name": "Boîte plus lisible",
       "description": "Sur le site, la boîte s'étale sur deux colonnes : la grille d'un côté, la recherche et les outils de l'autre. Les filtres de la boîte et du Pokédex se rangent sous un bouton « Filtres ».",

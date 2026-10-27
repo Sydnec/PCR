@@ -333,11 +333,40 @@ describe("le lancer d'une ball spéciale", () => {
   it("battu à la course : la ball est rendue avec sa date, et le lancer annulé", async () => {
     await addUnit(500, { user: "u1" });
     await addUnit(600, { user: "u2" });
-    const [first, second] = await Promise.all([throwBall("u1", "appat", [0]), throwBall("u2", "appat", [0])]);
+    // Les deux réclamations ne partent qu'une fois que chaque lancer a lu l'apparition
+    // active et pris sa ball : lancés côte à côte, sqlite3 pouvait finir le premier avant
+    // que le second ne lise l'apparition, qui la trouvait alors partie (« gone ») au lieu
+    // de perdre la course (le test échouait par moments sous la charge de `npm test`).
+    // Le délai de secours ne sert qu'à un lancer qui n'atteint plus sa réclamation :
+    // l'assertion échoue alors au lieu de bloquer la suite.
+    const original = points.run;
+    const held = [];
+    const release = () => {
+      points.run = original;
+      for (const claim of held.splice(0)) claim();
+    };
+    const fallback = setTimeout(release, 5000);
+    points.run = function (sql, ...rest) {
+      if (!/SET status = 'CAUGHT'/.test(sql)) return original.call(this, sql, ...rest);
+      held.push(() => original.call(this, sql, ...rest));
+      if (held.length === 2) release();
+      return this;
+    };
+    let first, second;
+    try {
+      // Un seul hasard figé pour les deux : imbriqués, le premier fini rendait au second
+      // un Math.random qui n'était plus le sien.
+      [first, second] = await withRandom(0, () =>
+        Promise.all([call(capture.resolveThrow, client, "u1", 1, "appat", {}), call(capture.resolveThrow, client, "u2", 1, "appat", {})])
+      );
+    } finally {
+      clearTimeout(fallback);
+      points.run = original;
+    }
     const statuses = [first.status, second.status].sort();
     assert.deepEqual(statuses, ["catch", "void"]);
     const loser = first.status === "void" ? "u1" : "u2";
-    assert.equal((await units(loser)).length, 1, "la perdante retrouve sa ball");
+    assert.deepEqual((await units(loser)).map((unit) => unit.bought_at), [loser === "u1" ? 500 : 600], "la perdante retrouve sa ball, à sa date");
     assert.match(capture.throwMessage(first.status === "void" ? first : second), /Ta \*\*Appât Ball\*\* t'a été rendue/);
   });
 

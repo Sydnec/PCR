@@ -128,6 +128,50 @@ describe("entrée payante", () => {
     await eventuallyStable(async () => assert.equal(await balance(), price() * 4, "un seul débit net, les autres remboursés"));
   });
 
+  it("le clic qui trouve le délai d'une entrée simultanée retrouve la visite, sans refus ni débit", async () => {
+    await setBalance(price() * 2);
+    // Le second clic a cherché une visite en cours avant que le premier n'insère la
+    // sienne, et lit le délai juste après : l'insertion attend que cette lecture soit
+    // demandée, et la lecture que l'insertion soit faite. Sous charge, cet ordre
+    // venait tout seul, et le second clic se faisait refuser l'entrée. Le délai de
+    // secours ne sert qu'à un clic qui ne lit plus le délai : l'assertion échoue
+    // alors au lieu de bloquer la suite.
+    const { get, run } = points;
+    let asked, inserted;
+    const readAsked = new Promise((resolve) => (asked = resolve));
+    const sessionInserted = new Promise((resolve) => (inserted = resolve));
+    const fallback = setTimeout(() => (asked(), inserted()), 5000);
+    let reads = 0;
+    points.get = function (sql, ...rest) {
+      if (!/AS last_paid/.test(sql) || ++reads !== 2) return get.call(this, sql, ...rest);
+      asked();
+      sessionInserted.then(() => get.call(this, sql, ...rest));
+      return this;
+    };
+    points.run = function (sql, params, done) {
+      if (!/INSERT INTO pokemon_safari_sessions/.test(sql)) return run.call(this, sql, params, done);
+      readAsked.then(() =>
+        run.call(this, sql, params, function (err) {
+          inserted();
+          done.call(this, err);
+        })
+      );
+      return this;
+    };
+    let results;
+    try {
+      results = await Promise.all([call(safari.startPaidSession, "u1", {}), call(safari.startPaidSession, "u1", {})]);
+    } finally {
+      clearTimeout(fallback);
+      Object.assign(points, { get, run });
+    }
+    assert.deepEqual(results.map((result) => result.reason), [undefined, undefined], "aucun refus");
+    assert.equal(new Set(results.map((result) => result.session.id)).size, 1, "la même visite pour les deux");
+    assert.equal(results.filter((result) => result.resumed).length, 1);
+    assert.equal((await sessions()).length, 1);
+    assert.equal(await balance(), price(), "un seul débit, et rien à rembourser");
+  });
+
   it("garde les générations visées pour toute la visite, et les encounters en viennent", async () => {
     await setBalance(price());
     const result = await call(safari.startPaidSession, "u1", { generations: [2] });
