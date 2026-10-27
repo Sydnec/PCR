@@ -96,6 +96,7 @@ describe("/pk echange sans options", () => {
     assert.equal((await trades()).length, 0);
     const [row] = await drafts();
     assert.equal(row.from_user_id, "u1");
+    assert.deepEqual(JSON.parse(row.request), { kind: "points", amount: 0 }, "ce qu'on demande part de 0 point");
     assert.equal(row.expires_at - row.created_at, getPokemonConfig().trade.draftMinutes * 60 * 1000);
   });
 

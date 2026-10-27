@@ -331,10 +331,12 @@ const field = (interaction, id) => {
 
 // Ouvre le brouillon en réponse éphémère à /pk echange.
 export async function openDraft(interaction, target) {
+  // Ce qu'on demande part de 0 point, comme dans la commande : il reste à le changer.
   const draftId = await createDraft({
     fromUserId: interaction.user.id,
     toUserId: target.id,
     channelId: interaction.channelId,
+    get: { kind: "points", amount: 0 },
   });
   const draft = await getDraft(draftId);
   return interaction.reply({ ...(await draftView(draft)), flags: MessageFlags.Ephemeral });

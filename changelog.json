@@ -2755,6 +2755,16 @@
       "commit": "pending",
       "timestamp": "2026-10-27T10:00:00.000Z",
       "branch": "dev/keen-knuth-lcd8tu"
+    },
+    {
+      "type": "enhancement",
+      "name": "Échange : 0 point par défaut",
+      "description": "Sans rien préciser dans « je_recois », une offre d'échange ne demande rien en retour (0 point).",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-27T11:00:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
     }
   ]
 }

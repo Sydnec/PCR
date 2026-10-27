@@ -849,6 +849,13 @@ describe("/pk echange", () => {
     assert.equal(await balance("u1"), 900, "rien ne bouge avant l'acceptation");
   });
 
+  it("sans `je_recois`, l'offre ne demande rien : 0 point, un cadeau", async () => {
+    await setBalance(5);
+    await trade({ membre: "u2", je_donne: "5" });
+    const [row] = await trades();
+    assert.deepEqual([row.offer_points, row.request_points, row.request_open], [5, 0, 0]);
+  });
+
   it("l'objet demandé a une quantité d'un par défaut", async () => {
     await grant("super_bonbon", 2, "u2");
     await setBalance(50);
@@ -873,7 +880,7 @@ describe("/pk echange", () => {
     await setBalance(100);
     await ownMany("Roucool", 2, { user: "u2" });
     assert.match(refusal(await trade({ membre: "u2", je_recois: ids("Roucool") })), /Dis ce que tu donnes \(`je_donne`\).*0 pour ne rien donner/);
-    assert.match(refusal(await trade({ membre: "u2", je_donne: "5" })), /Dis ce que tu demandes \(`je_recois`\).*0 pour ne rien demander/);
+    assert.match(refusal(await trade({ membre: "u2", je_donne: "0" })), /Rien à échanger : les deux côtés sont à 0 point/);
     assert.match(refusal(await trade({ membre: "u2", je_donne: "0", je_recois: "rien" })), /Rien à échanger : les deux côtés sont à 0 point/);
     assert.match(refusal(await trade({ membre: "u2", je_donne: "5", mon_individu: "#1", je_recois: "5" })), /`mon_individu` ne va qu'avec un Pokémon/);
     assert.match(refusal(await trade({ membre: "u2", je_donne: "n'importe quoi", je_recois: "5" })), /autocomplétion, ou tape un nombre/);

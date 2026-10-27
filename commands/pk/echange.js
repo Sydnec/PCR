@@ -102,6 +102,7 @@ function respondWithIndividuals(interaction, userId, query) {
 // seule : aucune évolution ne demande à la fois un échange et un objet, il n'y a
 // donc rien à gagner à les mélanger. Zéro point est un côté valide : c'est ainsi
 // qu'on fait un cadeau.
+const NOTHING = { kind: "points", amount: 0 };
 const OPTIONS = {
   give: { choice: "je_donne", individual: "mon_individu" },
   get: { choice: "je_recois", individual: null },
@@ -116,11 +117,14 @@ async function readSide(interaction, names, owner, own, receiver) {
   const raw = interaction.options.getString(names.choice);
   const individual = names.individual ? interaction.options.getString(names.individual) : null;
 
+  // Ce qu'on demande, laissé vide, vaut 0 point : une offre sans contrepartie est un
+  // cadeau, pas un oubli à refuser. Ce qu'on donne doit toujours se dire.
   if (raw === null || raw === undefined) {
+    if (!own) return checkSide(NOTHING, null, owner, own, receiver);
     return {
       error:
-        `Dis ${own ? "ce que tu donnes" : "ce que tu demandes"} (\`${names.choice}\`) : un Pokémon, ` +
-        `un objet ou un nombre de points (0 pour ne rien ${own ? "donner" : "demander"}).`,
+        `Dis ce que tu donnes (\`${names.choice}\`) : un Pokémon, un objet ou un nombre de ` +
+        "points (0 pour ne rien donner).",
     };
   }
   const choice = parseChoice(raw);
@@ -170,7 +174,7 @@ export default {
       .addStringOption((option) =>
         option
           .setName("je_recois")
-          .setDescription("Ce que tu demandes (un nombre : des points)")
+          .setDescription("Ce que tu demandes (défaut : 0 point)")
           .setRequired(false)
           .setAutocomplete(true)
       ),

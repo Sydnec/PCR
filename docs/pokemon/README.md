@@ -88,7 +88,8 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
     tape devant son nom : `je_donne: 3 bonbon` (1 par défaut quand on choisit l'objet dans la
     liste). `mon_individu` désigne un individu précis de l'espèce que tu donnes. Pas de mélange
     dans un côté. `0` (ou « Rien ») fait un cadeau : `je_donne: 0` pour demander sans rien donner,
-    `je_recois: 0` pour offrir sans rien demander.
+    `je_recois: 0` pour offrir sans rien demander. **Sans `je_recois`, l'offre demande 0 point**, et
+    « Ce que je demande » du brouillon part de 0 point.
   - Sans `mon_individu`, c'est le moins précieux de l'espèce qui part, le plus récent à égalité.
     Le Pokémon demandé ne se désigne que par son espèce : **le destinataire choisit lequel**,
     parmi ses Pokémon libres, dans un menu privé qui s'ouvre quand il clique sur « Accepter ».
