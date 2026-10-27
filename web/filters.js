@@ -5,7 +5,9 @@
 // rechargement ou un lien les retrouve.
 //
 // La barre se construit une fois et reste en place : redessinée à chaque frappe, la
-// recherche perdrait le curseur.
+// recherche perdrait le curseur. Elle tient sur une ligne — la recherche et un bouton
+// « Filtres » qui dit combien sont posés — et ses listes s'ouvrent dessous à la
+// demande : ouvertes d'office seulement si l'adresse en apporte.
 import { h, normalize } from "./lib.js";
 
 const ordinal = (n) => (n === 1 ? "1ʳᵉ" : `${n}ᵉ`);
@@ -60,9 +62,19 @@ export function speciesFilters(ctx) {
 
 // La barre : `filters` (speciesFilters et ceux de la page), `search(entry, needle)` dit
 // si une entrée répond à la recherche (déjà sans accents ni majuscules), `params` les
-// valeurs lues dans l'adresse, `onchange` redessine la page, `onreset` efface ce que la
-// page filtre en plus de la barre.
-export function filterBar({ filters, search, placeholder, params, onchange, onreset = () => {} }) {
+// valeurs lues dans l'adresse, `onchange` redessine la page. `label` nomme la recherche
+// pour les lecteurs d'écran quand `placeholder` est abrégé. `pending` dit si la page
+// filtre aussi en dehors de la barre (« Effacer » se montre alors), `onreset` l'efface.
+export function filterBar({
+  filters,
+  search,
+  placeholder,
+  label = placeholder,
+  params,
+  onchange,
+  pending = () => false,
+  onreset = () => {},
+}) {
   const state = { q: params.get("q") ?? "", values: {} };
   for (const filter of filters) {
     const value = params.get(filter.key);
@@ -71,8 +83,10 @@ export function filterBar({ filters, search, placeholder, params, onchange, onre
   }
 
   const active = () => Boolean(state.q.trim()) || Object.values(state.values).some(Boolean);
+  const chosen = () => Object.values(state.values).filter(Boolean).length;
   const changed = () => {
-    clear.hidden = !active();
+    clear.hidden = !active() && !pending();
+    toggle.replaceChildren(...toggleLabel());
     onchange();
   };
 
@@ -80,7 +94,7 @@ export function filterBar({ filters, search, placeholder, params, onchange, onre
     type: "search",
     value: state.q,
     placeholder,
-    "aria-label": placeholder,
+    "aria-label": label,
     oninput: (event) => {
       state.q = event.target.value;
       changed();
@@ -104,10 +118,32 @@ export function filterBar({ filters, search, placeholder, params, onchange, onre
       )
     )
   );
+  const panel = h("div", { class: "filters-panel", hidden: !chosen() }, selects);
+  // Sans null : replaceChildren l'écrirait en toutes lettres, là où h() l'ignore.
+  const toggleLabel = () =>
+    chosen() ? ["Filtres", h("span", { class: "chip" }, String(chosen()))] : ["Filtres"];
+  const toggle = h(
+    "button",
+    {
+      class: "button ghost filters-toggle",
+      type: "button",
+      "aria-expanded": String(!panel.hidden),
+      onclick: () => {
+        panel.hidden = !panel.hidden;
+        toggle.setAttribute("aria-expanded", String(!panel.hidden));
+      },
+    },
+    ...toggleLabel()
+  );
   const clear = h(
     "button",
-    { class: "button small ghost", type: "button", hidden: !active(), onclick: () => reset() },
-    "Effacer les filtres"
+    {
+      class: "button small ghost",
+      type: "button",
+      hidden: !active() && !pending(),
+      onclick: () => reset(),
+    },
+    "Effacer"
   );
 
   function reset() {
@@ -123,7 +159,12 @@ export function filterBar({ filters, search, placeholder, params, onchange, onre
   }
 
   return {
-    element: h("div", { class: "toolbar filters" }, input, selects, clear),
+    element: h(
+      "div",
+      { class: "filters" },
+      h("div", { class: "filters-row" }, input, toggle, clear),
+      panel
+    ),
     active,
     reset,
     matches(entry) {

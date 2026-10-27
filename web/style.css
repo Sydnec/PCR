@@ -360,12 +360,35 @@ input[type="number"] {
   flex: 1 1 200px;
 }
 
-/* Les listes de filtres passent à la ligne sur un écran étroit ; celle qui filtre se
-   voit d'un coup d'œil. */
-.filters select {
-  flex: 0 1 auto;
+/* Les filtres : la recherche et le bouton « Filtres » sur une ligne, les listes dans un
+   panneau qui s'ouvre dessous, en colonnes qui remplissent la largeur disponible ;
+   celle qui filtre se voit d'un coup d'œil. */
+.filters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.filters-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filters-row input[type="search"] {
+  flex: 1;
   min-width: 0;
-  max-width: 100%;
+}
+
+.filters-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px;
+}
+
+.filters select {
+  min-width: 0;
+  width: 100%;
 }
 
 .filters select.active {
@@ -1485,13 +1508,38 @@ input[type="number"] {
 
 /* ---------- Boîte PC ---------- */
 
+/* La boîte et sa colonne d'outils côte à côte sur un écran large, sans prendre toute
+   la largeur ; empilées (les outils au-dessus) sur un écran étroit. */
 .pc {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
   width: 100%;
   max-width: 620px;
   margin: 0 auto;
+}
+
+@media (min-width: 900px) {
+  .pc {
+    grid-template-columns: minmax(0, 620px) minmax(260px, 320px);
+    max-width: 960px;
+    align-items: start;
+  }
+
+  .pc-side {
+    position: sticky;
+    top: 16px;
+    order: 2;
+  }
+}
+
+.pc-main,
+.pc-side,
+.pc-side-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
 }
 
 .pc-head {
@@ -1670,19 +1718,35 @@ input[type="number"] {
   color: var(--accent);
 }
 
-/* Ce qui se redessine dans la boîte suit la mise en page de .pc, sous les filtres. */
-.pc-body {
-  display: contents;
-}
-
 .pc-tools {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.pc-selection {
+/* Dans la colonne d'outils, les bandeaux passent à la ligne plutôt que de s'écraser. */
+.pc-side .notice {
   flex-wrap: wrap;
+}
+
+.pc-side .pc-banner > span {
+  flex-basis: 100%;
+}
+
+.pc-selection {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.pc-selection-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pc-selection-row select {
+  flex: 1;
+  min-width: 0;
 }
 
 .pc-stash {

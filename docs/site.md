@@ -14,7 +14,7 @@ en donne le lien, en réponse privée (ou dit que le site n'est pas en ligne, ou
 | **Capture** (accueil) | Le Pokémon qui apparaît dans le salon Discord, en direct, avec son sexe et ses balls juste en dessous : rareté, types et difficulté en couleur, chances par ball, ton solde et tes balls en poche, et sa lignée avec ce que tu en possèdes (la fiche du bouton « Infos du Pokémon »). Une ball hors de portée est grisée, sauf si tu en as en poche. On lui **lance ses balls** comme depuis Discord. Une apparition qui ne brille que pour les porteurs du [Charme Chroma](pokemon/charme.md) le dit, et s'affiche shiny pour eux. Sur le côté : le journal des lancers, ce qu'un Pokémon a laissé tomber (à **ramasser**), la **Pêche** (2ᵉ génération) et le bouton du **parc safari**. Quand ça mord, la touche réservée à toi passe en tête de page, avec le temps qu'il lui reste. |
 | **Parc safari** | La visite du parc, ouverte depuis la Capture : la rencontre, ses chances et le risque qu'elle détale, la lignée du Pokémon avec ce que tu en possèdes (comme sur la Capture), et les trois actions de Discord (Safari Ball, appât, fuite). Tes prises s'affichent sur le côté, et le bilan à la fin. |
 | **Boîte** | Ton PC : des boîtes de cases où tu ranges tes Pokémon comme tu veux. Une case ne montre que le sprite ; un clic ouvre la fiche (provenance, place, lignée, valeur), d'où l'on **surnomme**, **déplace**, **verrouille**, **expose en vitrine**, **revend** ou **fait évoluer** le Pokémon. |
-| **Pokédex** | Toutes les espèces des générations ouvertes, celles qu'on possède en couleur, avec une recherche et des **filtres** (rareté, génération, type, obtention, shiny possédé) qui restent dans l'adresse. La fiche d'une espèce montre sa lignée, ce que tu en possèdes et les sexes que tu en as déjà. |
+| **Pokédex** | Toutes les espèces des générations ouvertes, celles qu'on possède en couleur, avec une recherche et des **filtres** (rareté, génération, type, obtention, shiny possédé) rangés sous le bouton « Filtres », qui dit combien sont posés, et qui restent dans l'adresse. La fiche d'une espèce montre sa lignée, ce que tu en possèdes et les sexes que tu en as déjà. |
 | **Boutique** | Les balls spéciales (Appât Ball, Catalyseur Ball), comme `/pk boutique` : prix, effet, ce que tu en as sur le maximum, ce que tu en as acheté aujourd'hui sur le quota du jour, et l'achat par quantité. L'onglet n'apparaît qu'à l'ouverture de la 2ᵉ génération. Sur la Capture, la Master Ball et ces balls sont derrière le bouton **Balls spéciales**. |
 | **Sac** | Le solde et les objets. Un objet qui se revend montre son prix à l'unité et un bouton **Revendre** : on choisit la quantité, le total s'affiche avant de confirmer, comme `/pk revendre objet`. |
 | **Œuf** | L'œuf qui couve, ou le formulaire pour en **pondre** un. |
@@ -87,7 +87,9 @@ parce que le Pokémon est le dernier de son espèce, ou verrouillé : la note so
   `#numéro` de l'individu, et les mêmes filtres que le Pokédex, plus le sexe, le shiny et l'état
   (verrouillé, fertile, en vitrine). Ce qui ne répond pas s'estompe, le menu des boîtes dit combien
   chacune a de résultats, et les flèches du bandeau sautent d'une boîte de résultats à l'autre. Les
-  filtres restent dans l'adresse.
+  filtres s'ouvrent sous le bouton « Filtres » et restent dans l'adresse. Sur un écran large, la
+  recherche, les outils (sélection, rang de la boîte) et leurs bandeaux tiennent dans une colonne à
+  droite de la boîte ; sur un téléphone, ils passent au-dessus.
 - **Ranger plusieurs Pokémon** : « Sélectionner plusieurs », puis toucher les Pokémon à cocher, dans
   une ou plusieurs boîtes — ou « Toute la boîte », ou « Tout sélectionner » sur les résultats d'une
   recherche —, choisir la boîte et « Ranger ». Ils prennent ses cases libres, dans l'ordre où ils
