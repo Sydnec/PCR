@@ -74,8 +74,8 @@ async function execute(bot) {
         if (err) setTimeout(() => migrateRetiredStones(), 60_000);
     });
 
-    // Ce qui dépasse déjà la limite de détention (une Master Ball) se vend
-    // d'office, une seule fois. Un passage incomplet se rejoue une minute après,
+    // Ce qui dépasse déjà la limite de détention (Master Ball, cannes) se vend
+    // d'office, une seule fois par objet. Un passage incomplet se rejoue une minute après,
     // jusqu'à ce qu'il passe : la marque n'est posée qu'à la fin.
     const sellOverCap = () =>
         sellHeldOverCap((err) => {

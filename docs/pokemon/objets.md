@@ -58,7 +58,12 @@ par terre plutôt que de le faire disparaître.
   Un échange qui la ferait dépasser chez son receveur est refusé, à la proposition comme à
   l'acceptation ; une Master Ball contre une Master Ball passe. Les remboursements rendent ce qu'ils
   ont pris sans regarder la limite, et `/admin item` passe outre. Ce que les dresseurs gardaient au-delà
-  avant la limite s'est vendu une fois, au démarrage, au même prix.
+  avant la limite s'est vendu une fois, au démarrage, au même prix — une fois par objet : un objet
+  qui reçoit une limite plus tard est traité au démarrage suivant.
+- **Les cannes aussi, une de chaque.** `upgradesTo` change l'exemplaire de trop en un autre objet
+  avant de le vendre, si celui-ci a encore de la place : une seconde Super Canne devient la Méga
+  Canne qui manque, sinon elle se vend 500 points ; une seconde Méga Canne, 1 000. Avec les deux, la
+  loterie n'en donne plus (voir [Pêche](peche.md)).
 - **Les balls offertes partent d'elles-mêmes.** Lancer une Poké Ball en en ayant une dans son
   inventaire ne coûte rien : l'objet passe avant le solde, parce qu'un objet posé dans un sac ne
   doit pas dormir pendant qu'on prend la monnaie de son propriétaire. Le panneau de lancer, privé,

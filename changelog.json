@@ -2745,6 +2745,16 @@
       "commit": "pending",
       "timestamp": "2026-10-26T13:02:00.000Z",
       "branch": "dev/keen-knuth-lcd8tu"
+    },
+    {
+      "type": "feature",
+      "name": "Une canne de chaque",
+      "description": "Une seconde Super Canne devient une Méga Canne si tu n'en as pas ; sinon elle est revendue 500 points, et une seconde Méga Canne 1 000 points. Avec les deux, la loterie ne donne plus de cannes.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-27T10:00:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
     }
   ]
 }

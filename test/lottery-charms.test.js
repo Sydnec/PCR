@@ -93,6 +93,45 @@ describe("les tirages", () => {
   });
 });
 
+describe("la loterie et les deux cannes", () => {
+  const RODS = ["super_canne", "mega_canne"];
+  const both = [
+    { item_key: "super_canne", count: 1 },
+    { item_key: "mega_canne", count: 1 },
+  ];
+  // Les poids cumulés suivent l'ordre du catalogue : un balayage fin du second hasard
+  // passe forcément par chaque objet tiré.
+  const sweep = (inventory) =>
+    Array.from({ length: 1000 }, (_, i) =>
+      withRandom([0, i / 1000, 0], () => lottery.rollLottery(inventory)).item.key
+    );
+
+  it("avec les deux cannes, la loterie n'en donne plus, sans rien retirer à la chance de gagner", () => {
+    sandbox.writeConfig(GEN2);
+    assert.ok(sweep([]).some((key) => RODS.includes(key)), "la pêche ouverte, les cannes sortent");
+    assert.ok(!sweep(both).some((key) => RODS.includes(key)));
+    const chance = items.lotteryWinChance();
+    assert.ok(withRandom([chance - 0.0001, 0.5, 0], () => lottery.rollLottery(both)), "la porte ne bouge pas");
+  });
+
+  it("avec une seule canne, les deux sortent encore", () => {
+    sandbox.writeConfig(GEN2);
+    const won = new Set(sweep([{ item_key: "mega_canne", count: 1 }]));
+    assert.ok(RODS.every((key) => won.has(key)));
+  });
+
+  it("play lit le sac : le tirage qui aurait donné une canne donne un autre lot", async () => {
+    sandbox.writeConfig(GEN2);
+    const index = sweep([]).indexOf("super_canne");
+    assert.ok(index >= 0);
+    for (const key of RODS) await call(items.grantItem, "u1", key, 1, { source: "test" });
+    const result = await withRandom([0, index / 1000, 0], () => call(lottery.play, "u1"));
+    assert.ok(result.prize);
+    assert.ok(!RODS.includes(result.prize.item.key), result.prize.item.key);
+    assert.deepEqual([await stock("super_canne"), await stock("mega_canne")], [1, 1]);
+  });
+});
+
 describe("jouer (play)", () => {
   const play = (user = "u1") => call(lottery.play, user);
   const win = (user) => withRandom([0, 0, 0], () => play(user));
