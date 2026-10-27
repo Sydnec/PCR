@@ -109,6 +109,10 @@ export async function render(ctx) {
   // Sans boîte dans l'adresse, la première qui n'est pas archivée : une boîte
   // rangée à part n'est pas celle qu'on vient voir.
   const defaultBox = () => pc.boxes.find((entry) => !entry.archived)?.box ?? 0;
+  // Les résultats, calculés une fois par affichage (matches) : le menu des boîtes les
+  // compte pour chacune de ses soixante boîtes. Déclarés avant le premier calcul, celui
+  // de la boîte où ouvrir une recherche venue de l'adresse (?species=, ?q=).
+  let found = null;
   let box = params.has("box") ? Math.max(0, Number(params.get("box")) - 1) || 0 : defaultBox();
   if (searching() && !params.has("box")) {
     const first = matches()[0];
@@ -153,9 +157,6 @@ export async function render(ctx) {
     return filters.matches({ species, mon });
   }
 
-  // Les résultats, calculés une fois par affichage : le menu des boîtes les compte
-  // pour chacune de ses soixante boîtes.
-  let found = null;
   function matches() {
     found ??= searching() ? pc.pokemon.filter(matchesMon).sort((a, b) => a.pos - b.pos) : [];
     return found;
