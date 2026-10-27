@@ -131,6 +131,17 @@ async function spawnRow(name = "Roucool") {
   );
   return lastID;
 }
+// Une capture fait apparaître le suivant en arrière-plan (spawnAfterCapture) : on
+// attend qu'il soit né, pour qu'il ne tombe pas au milieu du test suivant.
+const respawned = (caughtId) =>
+  eventually(async () => {
+    const next = await dbGet(
+      points,
+      "SELECT s.id FROM pokemon_spawns s, pokemon_state st WHERE s.status = 'ACTIVE' AND s.id != ? AND s.message_id IS NOT NULL AND st.spawning = 0",
+      [caughtId]
+    );
+    assert.ok(next, "le suivant n'est pas encore apparu");
+  });
 const openPark = async () =>
   (await dbRun(points, "INSERT INTO pokemon_safari_parks (status, opened_at, expires_at, reserved_for) VALUES ('OPEN', ?, ?, NULL)", [Date.now(), Date.now() + 7_200_000])).lastID;
 
@@ -168,6 +179,7 @@ describe("lancer une ball depuis l'annonce", () => {
     assert.deepEqual(reply.components, [], "plus rien à relancer");
     assert.equal((await dbAll(points, "SELECT id FROM pokemon_owned WHERE user_id = ?", [user])).length, 1);
     assert.equal(await balance(user), 1000 - getPokemonConfig().capture.balls.poke.price);
+    await respawned(id);
   });
 
   it("un raté : le panneau de relance reste, avec les prix — sauf celui de la Master Ball", async () => {
@@ -458,6 +470,7 @@ describe("la Master Ball et sa confirmation", () => {
     const reply = only(calls, "editReply");
     assert.match(reply.content, new RegExp(`Bravo ! \\*\\*Mewtwo[^*]*\\*\\* rejoint ton Pokédex ! \\(\\*\\*-${fmt(10_000)}\\*\\* points\\)`));
     assert.equal(await balance(user), 20_000);
+    await respawned(id);
 
     const next = await spawnRow("Roucool");
     const confirmation = only(await click(`poke_master|${next}`, { user }), "reply");
@@ -528,6 +541,7 @@ describe("la Master Ball et sa confirmation", () => {
     const calls = await withRandom(0.999, () => click(`poke_master_ok|${id}`, { user }));
     assert.match(only(calls, "editReply").content, /Bravo ! \*\*Mewtwo[^*]*\*\*/);
     assert.equal(await balance(user), 0);
+    await respawned(id);
   });
 
   it("confirmer une ball offerte qui a disparu entre-temps refuse : jamais payée en points", async () => {

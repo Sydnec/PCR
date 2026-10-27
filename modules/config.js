@@ -66,7 +66,9 @@ const POKEMON = {
     messagesPerSpawn: 20,
     minDelayMinutes: 1,
     // Délai plancher avant qu'un nouveau Pokémon apparaisse une fois le
-    // précédent capturé ou enfui. À 0, il apparaît dès le message suivant.
+    // précédent capturé ou enfui. À 0, il apparaît aussitôt après une capture,
+    // et dès le message suivant après une fuite ; au-delà, c'est le premier
+    // message après ce délai, capture comprise.
     minDelayAfterEndMinutes: 0,
     // Durée de vie d'un Pokémon non capturé : il s'enfuit de lui-même après un
     // délai tiré au hasard dans cet intervalle, sans dépendre de l'activité.

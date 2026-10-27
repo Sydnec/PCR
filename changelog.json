@@ -2873,5 +2873,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Un Pokémon capturé est aussitôt remplacé",
+      "description": "Dès qu'un Pokémon est attrapé, le suivant apparaît dans le salon sans attendre de message. Un Pokémon qui s'enfuit laisse toujours le salon vide jusqu'au message suivant.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-27T18:00:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
+    }
+  ]
 }

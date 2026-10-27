@@ -128,6 +128,12 @@ export function resolveChannel(client) {
   return client.channels.fetch(channelId);
 }
 
+// Le salon est vide : plus aucun Pokémon en cours, et le délai plancher écoulé
+// depuis la dernière fin (une pêche n'occupe pas le salon). Une seule rédaction
+// pour le message suivant et la capture : les deux ne divergent jamais.
+const EMPTY_CHANNEL = `NOT EXISTS (SELECT 1 FROM pokemon_spawns WHERE status = 'ACTIVE')
+  AND COALESCE((SELECT MAX(ended_at) FROM pokemon_spawns WHERE fished = 0), 0) <= ?`;
+
 // Compte le message et, si les conditions sont réunies, revendique le droit de
 // faire apparaître un Pokémon.
 //
@@ -146,9 +152,10 @@ export function registerMessageForSpawn(client) {
       const minDelayMs = config.spawn.minDelayMinutes * 60 * 1000;
 
       // Deux cas, en une seule instruction gardée pour rester atomique :
-      //  - plus aucun Pokémon dans le salon (capturé ou enfui) : le prochain
-      //    message en fait apparaître un, éventuellement après un court délai
-      //    plancher réglable (0 par défaut) ;
+      //  - plus aucun Pokémon dans le salon : le prochain message en fait
+      //    apparaître un, éventuellement après un court délai plancher réglable
+      //    (0 par défaut). C'est le chemin d'une fuite ; une capture n'attend
+      //    pas de message (spawnAfterCapture) ;
       //  - un Pokémon est encore là : le seuil de messages et le délai
       //    minimum décident du moment où il s'enfuit, remplacé par le suivant.
       //    Sauf un légendaire, que les messages ne chassent jamais : son
@@ -167,8 +174,7 @@ export function registerMessageForSpawn(client) {
             AND spawning = 0
             AND spawn_paused_until <= ?
             AND (
-              ( NOT EXISTS (SELECT 1 FROM pokemon_spawns WHERE status = 'ACTIVE')
-                AND COALESCE((SELECT MAX(ended_at) FROM pokemon_spawns WHERE fished = 0), 0) <= ? )
+              ( ${EMPTY_CHANNEL} )
               OR ( message_count >= ? AND last_spawn_at <= ?
                  AND NOT EXISTS (
                    SELECT 1 FROM pokemon_spawns WHERE status = 'ACTIVE' AND rarity = 'LEGENDAIRE'
@@ -183,6 +189,36 @@ export function registerMessageForSpawn(client) {
     });
   } catch (error) {
     handleException(error, "registerMessageForSpawn");
+  }
+}
+
+// Après une capture, le suivant apparaît aussitôt, sans attendre de message :
+// la même revendication gardée que le salon vide d'un message, donc un seul
+// Pokémon même si un message arrive en même temps. Une fuite, elle, attend le
+// message suivant. La pause d'un parc safari et le délai plancher l'emportent :
+// c'est alors le premier message permis qui le fait apparaître, comme avant.
+export function spawnAfterCapture(client) {
+  try {
+    const config = getPokemonConfig();
+    if (!config.enabled || !process.env.POKEMON_CHANNEL_ID) return;
+
+    const now = Date.now();
+    const afterEndMs = config.spawn.minDelayAfterEndMinutes * 60 * 1000;
+    db.run(
+      `UPDATE pokemon_state
+          SET message_count = 0, last_spawn_at = ?, spawning = 1
+        WHERE id = 1
+          AND spawning = 0
+          AND spawn_paused_until <= ?
+          AND ${EMPTY_CHANNEL}`,
+      [now, now, now - afterEndMs],
+      function (err) {
+        if (err) return handleException("Apparition après une capture :", err);
+        if (this.changes === 1) doSpawn(client);
+      }
+    );
+  } catch (error) {
+    handleException(error, "spawnAfterCapture");
   }
 }
 
