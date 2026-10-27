@@ -100,6 +100,10 @@ export async function render(ctx) {
       needle === `#${mon.id}`,
     placeholder: "Chercher dans toutes les boîtes…",
     params,
+    // « Effacer les filtres » efface aussi l'espèce venue du Pokédex.
+    onreset: () => {
+      highlight = null;
+    },
     onchange: () => draw(),
   });
   // Sans boîte dans l'adresse, la première qui n'est pas archivée : une boîte
@@ -149,20 +153,35 @@ export async function render(ctx) {
     return filters.matches({ species, mon });
   }
 
+  // Les résultats, calculés une fois par affichage : le menu des boîtes les compte
+  // pour chacune de ses soixante boîtes.
+  let found = null;
   function matches() {
-    return searching() ? pc.pokemon.filter(matchesMon).sort((a, b) => a.pos - b.pos) : [];
+    found ??= searching() ? pc.pokemon.filter(matchesMon).sort((a, b) => a.pos - b.pos) : [];
+    return found;
   }
 
+  // Une page quittée entre-temps n'a plus la main sur l'adresse, et une adresse
+  // inchangée ne se réécrit pas : chaque frappe redessine, et Safari limite les
+  // réécritures.
   function writeUrl() {
     const query = new URLSearchParams();
     if (box !== defaultBox()) query.set("box", String(box + 1));
     if (highlight) query.set("species", String(highlight));
     filters.write(query);
     const text = query.toString();
-    history.replaceState(null, "", `/boite${text ? `?${text}` : ""}`);
+    const next = `/boite${text ? `?${text}` : ""}`;
+    if (location.pathname !== "/boite" || location.pathname + location.search === next) return;
+    history.replaceState(null, "", next);
   }
 
   function draw() {
+    found = null;
+    // Une relecture a pu faire partir un Pokémon coché (échangé, revendu ailleurs) ou
+    // la boîte où ranger.
+    const present = new Set(pc.pokemon.map((mon) => mon.id));
+    for (const id of selected) if (!present.has(id)) selected.delete(id);
+    if (target !== null && target >= pc.boxes.length) target = null;
     writeUrl();
     if (dragSource?.isConnected && !stash.contains(dragSource)) stash.append(dragSource);
     content.replaceChildren(
@@ -357,7 +376,7 @@ export async function render(ctx) {
                 ? ` ${fmt(result.skipped)} avai${result.skipped > 1 ? "en" : ""}t bougé entre-temps : ` +
                   "recharge ta boîte."
                 : "")
-          : `Ils sont déjà dans ${name}.`,
+          : `Rien n'a bougé : ils sont déjà rangés à partir de ${name}.`,
         "success"
       );
     } catch (error) {
@@ -682,11 +701,8 @@ export async function render(ctx) {
         "button",
         {
           class: "button small ghost",
-          onclick: () => {
-            highlight = null;
-            // Redessine la page (onchange), surbrillance comprise.
-            filters.reset();
-          },
+          // Efface aussi l'espèce venue du Pokédex (onreset), et redessine.
+          onclick: () => filters.reset(),
         },
         "Effacer"
       )
@@ -826,10 +842,15 @@ export async function render(ctx) {
   }
 
   // Échap abandonne un déplacement en cours, ou la sélection.
+  // Échap dans un champ (la recherche, un nom de boîte) ne regarde que le champ.
   const onKey = (event) => {
-    if (event.key !== "Escape") return;
+    if (event.key !== "Escape" || event.target.closest?.("input, select, textarea")) return;
     if (moving) {
       moving = null;
+      return draw();
+    }
+    if (reordering) {
+      reordering = false;
       return draw();
     }
     if (selecting) stopSelecting();

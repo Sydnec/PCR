@@ -88,7 +88,12 @@ export function pokedexPanel(ctx, dex, { mine = true, url = null } = {}) {
       if (show !== "all") query.set("vue", show);
       filters.write(query);
       const text = query.toString();
-      history.replaceState(null, "", `${url}${text ? `?${text}` : ""}`);
+      const next = `${url}${text ? `?${text}` : ""}`;
+      // Une page quittée entre-temps n'a plus la main sur l'adresse ; inchangée, elle ne
+      // se réécrit pas (chaque frappe redessine, et Safari limite les réécritures).
+      if (location.pathname === url && location.pathname + location.search !== next) {
+        history.replaceState(null, "", next);
+      }
     }
     const visible = all.filter((species) => {
       if (show === "owned" && !owned.has(species.id)) return false;

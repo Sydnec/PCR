@@ -131,12 +131,9 @@ function readPc(userId, config, cb) {
 
 export const defaultBoxName = (box) => `Boîte ${box + 1}`;
 
-// Le PC d'un dresseur : ses boîtes (nom compris) et la place de chacun de ses
-// Pokémon. Autant de boîtes qu'il en faut, plus une vide pour pouvoir y ranger.
-// La boîte vide de la fin doit pouvoir recevoir : une boîte archivée n'en
-// tient pas lieu, il en vient une de plus.
 // Combien de boîtes le PC montre : autant qu'il en faut, plus une vide pour
-// pouvoir y ranger (voir getPc).
+// pouvoir y ranger. La boîte vide de la fin doit pouvoir recevoir : une boîte
+// archivée n'en tient pas lieu, il en vient une de plus.
 function boxCount(config, layout, archived) {
   const boxOf = (pos) => Math.floor(pos / config.slotsPerBox);
   const occupied = new Set(layout.map(({ pos }) => boxOf(pos)));
@@ -146,6 +143,8 @@ function boxCount(config, layout, archived) {
   return count;
 }
 
+// Le PC d'un dresseur : ses boîtes (nom compris) et la place de chacun de ses
+// Pokémon.
 export function getPc(userId, cb) {
   const config = pcConfig();
   readPc(userId, config, (err, { settings, archived, layout } = {}) => {
@@ -252,22 +251,27 @@ export function movePokemon(userId, pokemonId, targetPos, cb) {
 }
 
 // Écrit des places d'un coup : `moves` = [{ row, pos }], chaque place gardée par celle
-// que la lecture a vue (`pc_pos IS ?`), comme movePokemon. Une instruction par lot
-// de lignes, sous la limite de paramètres de SQLite : un rangement de 300 Pokémon ne
-// fait pas 300 allers-retours. `cb(err, placed)` : combien ont vraiment bougé — un
+// que la lecture a vue (`pc_pos IS …`), comme movePokemon. Une instruction par lot
+// de lignes : un rangement de 300 Pokémon ne fait pas 300 allers-retours. La garde
+// passe par un CASE et la liste par IN, pas par une chaîne de OR : SQLite refuse une
+// expression de plus de 1 000 termes. Le lot (cinq paramètres par ligne) reste sous sa
+// limite de 32 766 paramètres. `cb(err, placed)` : combien ont vraiment bougé — un
 // Pokémon déplacé entre-temps depuis un autre onglet garde sa nouvelle place.
-const PLACE_CHUNK = 2000;
+const PLACE_CHUNK = 6000;
 function placeMany(userId, moves, cb) {
   let placed = 0;
   const next = (start) => {
     const chunk = moves.slice(start, start + PLACE_CHUNK);
     if (!chunk.length) return cb(null, placed);
+    const cases = chunk.map(() => "WHEN ? THEN ?").join(" ");
     db.run(
-      `UPDATE pokemon_owned SET pc_pos = CASE id ${chunk.map(() => "WHEN ? THEN ?").join(" ")} END
-        WHERE user_id = ? AND (${chunk.map(() => "(id = ? AND pc_pos IS ?)").join(" OR ")})`,
+      `UPDATE pokemon_owned SET pc_pos = CASE id ${cases} END
+        WHERE user_id = ? AND id IN (${chunk.map(() => "?").join(", ")})
+          AND pc_pos IS CASE id ${cases} END`,
       [
         ...chunk.flatMap(({ row, pos }) => [row.id, pos]),
         userId,
+        ...chunk.map(({ row }) => row.id),
         ...chunk.flatMap(({ row }) => [row.id, row.pc_pos ?? null]),
       ],
       function (err) {
@@ -278,6 +282,19 @@ function placeMany(userId, moves, cb) {
     );
   };
   next(0);
+}
+
+// Défait placeMany : chacun revient à la place d'avant (`from`, celle de la lecture),
+// gardé sur celle qu'il vient de prendre — seuls ceux qui ont bougé reviennent.
+function unplaceMany(userId, moves, cb) {
+  placeMany(
+    userId,
+    moves.map(({ row, pos, from }) => ({ row: { ...row, pc_pos: pos }, pos: row.pc_pos ?? from })),
+    (err) => {
+      if (err) handleException("Retour des Pokémon d'un rangement inachevé :", err);
+      cb();
+    }
+  );
 }
 
 // Range plusieurs Pokémon dans une boîte : dans ses cases libres, puis dans celles des
@@ -330,10 +347,11 @@ export function movePokemonMany(userId, pokemonIds, targetBox, cb) {
       });
     }
     const moves = moving
-      .map((entry, index) => ({ row: entry.row, pos: free[index] }))
+      .map((entry, index) => ({ row: entry.row, pos: free[index], from: entry.pos }))
       .filter(({ row, pos }) => row.pc_pos !== pos);
     placeMany(userId, moves, (err, placed) => {
-      if (err) return cb(err);
+      // Un lot qui échoue en route : ceux des lots d'avant reviennent.
+      if (err) return unplaceMany(userId, moves, () => cb(err));
       cb(null, { ok: true, moved: placed, skipped: moves.length - placed });
     });
   });
@@ -383,18 +401,9 @@ export function moveBox(userId, from, to, cb) {
       );
 
     placeMany(userId, moves, (err) => {
-      if (err) return cb(err);
+      if (err) return unplaceMany(userId, moves, () => cb(err));
       writeSettings((settingsError) => {
-        if (settingsError) {
-          const back = moves.map(({ row, pos, from: previous }) => ({
-            row: { ...row, pc_pos: pos },
-            pos: row.pc_pos ?? previous,
-          }));
-          return placeMany(userId, back, (restoreError) => {
-            if (restoreError) handleException("Retour des Pokémon d'une boîte déplacée :", restoreError);
-            cb(settingsError);
-          });
-        }
+        if (settingsError) return unplaceMany(userId, moves, () => cb(settingsError));
         db.run(
           "DELETE FROM pokemon_pc_boxes WHERE user_id = ? AND name = '' AND archived = 0",
           [userId],

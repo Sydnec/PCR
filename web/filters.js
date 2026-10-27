@@ -60,8 +60,9 @@ export function speciesFilters(ctx) {
 
 // La barre : `filters` (speciesFilters et ceux de la page), `search(entry, needle)` dit
 // si une entrée répond à la recherche (déjà sans accents ni majuscules), `params` les
-// valeurs lues dans l'adresse, `onchange` redessine la page.
-export function filterBar({ filters, search, placeholder, params, onchange }) {
+// valeurs lues dans l'adresse, `onchange` redessine la page, `onreset` efface ce que la
+// page filtre en plus de la barre.
+export function filterBar({ filters, search, placeholder, params, onchange, onreset = () => {} }) {
   const state = { q: params.get("q") ?? "", values: {} };
   for (const filter of filters) {
     const value = params.get(filter.key);
@@ -117,6 +118,7 @@ export function filterBar({ filters, search, placeholder, params, onchange }) {
       select.value = "";
       select.classList.remove("active");
     }
+    onreset();
     changed();
   }
 

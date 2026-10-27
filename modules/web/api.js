@@ -1087,8 +1087,8 @@ export const routes = [
     auth: true,
     write: true,
     handler: async (ctx) => {
-      const { pokemonIds } = ctx.body;
-      const box = Number(ctx.body.box);
+      // Des nombres entiers tels quels : Number(null) ou Number("") vaudrait la boîte 1.
+      const { pokemonIds, box } = ctx.body;
       const { maxBoxes, slotsPerBox } = pcConfig();
       if (
         !Array.isArray(pokemonIds) ||
@@ -1112,7 +1112,7 @@ export const routes = [
     auth: true,
     write: true,
     handler: async (ctx) => {
-      const to = Number(ctx.body.to);
+      const { to } = ctx.body;
       if (!Number.isInteger(to)) throw new HttpError(400, "`to` doit être un numéro de boîte.");
       const result = await promise((cb) => moveBox(ctx.user.id, Number(ctx.params.box), to, cb));
       if (!result.ok) throw new HttpError(409, result.reason);

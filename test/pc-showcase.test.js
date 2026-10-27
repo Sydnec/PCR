@@ -214,6 +214,17 @@ describe("ranger plusieurs Pokémon (movePokemonMany)", () => {
     assert.deepEqual([await posOf(a), await posOf(b), await posOf(c)], [0, 1, 2]);
   });
 
+  it("un grand lot passe en une fois : 1 200 Pokémon, puis leur boîte déplacée", async () => {
+    const values = Array.from({ length: 1200 }, (_, index) => `('u1', 19, 0, 'M', 'test', ${index + 1}, ${index})`);
+    await dbRun(points, `INSERT INTO pokemon_owned (user_id, species_id, is_shiny, sex, origin, obtained_at, pc_pos) VALUES ${values.join(", ")}`);
+    const ids = (await dbAll(points, "SELECT id FROM pokemon_owned ORDER BY pc_pos")).map((row) => row.id);
+    // Les 30 de la boîte 20 y restent ; les autres prennent la suite, jusqu'à la dernière case.
+    assert.deepEqual(await call(pc.movePokemonMany, "u1", ids, 20), { ok: true, moved: 1170, skipped: 0 });
+    assert.deepEqual([await posOf(ids[600]), await posOf(ids[0]), await posOf(ids[1199])], [600, 630, 1799]);
+    assert.deepEqual(await call(pc.moveBox, "u1", 0, 59), { ok: true });
+    assert.deepEqual([await posOf(ids[600]), await posOf(ids[0]), await posOf(ids[1199])], [570, 600, 1769], "les boîtes 1 à 59 reculent d'un rang");
+  });
+
   it("le Pokémon d'un autre, une boîte qui n'existe pas ou une liste vide : refus, rien ne bouge", async () => {
     const [mine] = await giveMany(1, { pos: 0 });
     const stranger = await give({ user: "u2", pos: 0 });

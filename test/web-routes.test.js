@@ -709,7 +709,7 @@ describe("le PC (/api/me/pc)", () => {
     assert.deepEqual([pc.moved, pc.skipped], [3, 0]);
     assert.deepEqual(ids.map((id) => pc.pokemon.find((entry) => entry.id === id).pos), [2 * slots, 2 * slots + 1, 2 * slots + 2]);
     const stranger = await own("Rattata", { user: OTHER, pos: 0 });
-    for (const body of [{}, { pokemonIds: [], box: 1 }, { pokemonIds: [ids[0]], box: "x" }, { pokemonIds: ["1"], box: 1 }, { pokemonIds: ids[0], box: 1 }]) {
+    for (const body of [{}, { pokemonIds: [], box: 1 }, { pokemonIds: [ids[0]], box: "x" }, { pokemonIds: [ids[0]], box: null }, { pokemonIds: ["1"], box: 1 }, { pokemonIds: ids[0], box: 1 }]) {
       await failure(call("POST", "/api/me/pc/move-many", { body }), 400);
     }
     await failure(call("POST", "/api/me/pc/move-many", { body: { pokemonIds: [stranger], box: 1 } }), 409);
@@ -723,6 +723,8 @@ describe("le PC (/api/me/pc)", () => {
     assert.deepEqual(pc.boxes.slice(0, 3).map((box) => box.name), ["Boîte 1", "Boîte 2", "Gen1"]);
     assert.equal(pc.pokemon.find((entry) => entry.id === id).pos, 2 * getPokemonConfig().pc.slotsPerBox);
     await failure(moveBox(0, {}), 400);
+    await failure(moveBox(0, { to: null }), 400);
+    await failure(moveBox(0, { to: "2" }), 400);
     await failure(moveBox(0, { to: 999 }), 409);
   });
 
