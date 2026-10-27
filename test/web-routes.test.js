@@ -94,6 +94,17 @@ const ownMany = async (name, count, options = {}) => {
   for (let index = 0; index < count; index++) ids.push(await own(name, { obtained: index + 1, ...options }));
   return ids;
 };
+// Une capture fait apparaître le suivant en arrière-plan (spawnAfterCapture) : on
+// attend qu'il soit né, pour qu'il ne tombe pas au milieu du test suivant.
+const respawned = (caughtId) =>
+  eventually(async () => {
+    const next = await dbGet(
+      points,
+      "SELECT s.id FROM pokemon_spawns s, pokemon_state st WHERE s.status = 'ACTIVE' AND s.id != ? AND s.message_id IS NOT NULL AND st.spawning = 0",
+      [caughtId]
+    );
+    assert.ok(next, "le suivant n'est pas encore apparu");
+  });
 async function spawnRow(name = "Roucool", overrides = {}) {
   await dbRun(points, "DELETE FROM pokemon_spawns");
   const { lastID } = await dbRun(
@@ -569,6 +580,7 @@ describe("un lancer (/api/spawn/throw)", () => {
     assert.ok(["M", "F", null].includes(result.pokemon.sex));
     const owned = await dbGet(points, "SELECT user_id, species_id FROM pokemon_owned WHERE id = ?", [result.pokemon.id]);
     assert.deepEqual(owned, { user_id: user.id, species_id: species("Roucool").id });
+    await respawned(id);
   });
 
   it("un raté dit combien de lancers restent, et ne rend aucun Pokémon", async () => {
@@ -614,6 +626,7 @@ describe("un lancer (/api/spawn/throw)", () => {
       const result = await throwBall({ spawnId: id, ball: "master", expectedPrice: 12_000 }, user);
       assert.equal(result.status, "catch");
       assert.equal(await callback(economy.getBalance, user.id), 38_000);
+      await respawned(id);
     }));
 
   it("un prix annoncé qui n'est pas un entier positif est refusé avant tout lancer", async () => {

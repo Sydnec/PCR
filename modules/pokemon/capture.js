@@ -30,7 +30,7 @@ import { dropItem, leavesItemBehind } from "./drops.js";
 import { charmFactor, getSpecies, throwProbability } from "./data.js";
 import { getOpenSpecialBall, getUnitCounts, openSpecialBalls, restoreUnit, takeUnit } from "./shop.js";
 import { buildBallRow, buildSpecialRow, buildSpecialText, displayName } from "./embeds.js";
-import { finalizeCaughtSpawn, getSpawn, refreshSpawnEmbed } from "./spawn.js";
+import { finalizeCaughtSpawn, getSpawn, refreshSpawnEmbed, spawnAfterCapture } from "./spawn.js";
 import { recordSpawnEnd, recordThrow } from "./stats.js";
 import { getCharms } from "./charms.js";
 
@@ -487,6 +487,9 @@ export function resolveThrow(
             creditSpecies(userId, spawn.species_id, shiny, options, (err, caught) => {
               if (err) handleException("Crédit de la collection :", err);
               finalizeCaughtSpawn(client, spawnId, { dropped, charmed });
+              // Le salon ne reste pas vide après une capture. Une pêche ne l'a
+              // jamais occupé : rien à remplacer.
+              if (!spawn.fished) spawnAfterCapture(client);
               pseudo(userId).then((name) =>
                 log(
                   `Capture : ${name} attrape ${species.name}` +

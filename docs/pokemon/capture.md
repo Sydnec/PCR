@@ -3,13 +3,15 @@
 # 🎯 Capture & Pokédex
 
 - **Spawns automatiques** : un Pokémon des générations ouvertes (voir
-  [Générations](README.md#générations)) apparaît dans un salon dédié, un seul à la fois. Dès que le
-  salon est vide — le précédent ayant été capturé ou s'étant enfui — le **message suivant** en fait
-  apparaître un nouveau. Tant qu'un Pokémon est là, ce sont le seuil de messages et
-  le délai minimum (~20 messages et 1 minute) qui décident du moment où il s'enfuit, remplacé par le
-  suivant. Un délai plancher après capture est disponible (`minDelayAfterEndMinutes`, à 0 par défaut)
-  si l'enchaînement devient trop rapide. **Un légendaire fait exception** : les messages ne le
-  chassent jamais, seuls sa durée de vie ou une capture le retirent.
+  [Générations](README.md#générations)) apparaît dans un salon dédié, un seul à la fois. Un Pokémon
+  **capturé** est remplacé **aussitôt**, sans attendre de message ; un Pokémon qui s'est **enfui** au
+  bout de sa durée de vie laisse le salon vide jusqu'au **message suivant**. Tant qu'un Pokémon est
+  là, ce sont le seuil de messages et le délai minimum (~20 messages et 1 minute) qui décident du
+  moment où il s'enfuit, remplacé par le suivant. Un délai plancher après la fin d'un Pokémon est
+  disponible (`minDelayAfterEndMinutes`, à 0 par défaut) si l'enchaînement devient trop rapide :
+  capture comprise, c'est alors le premier message après ce délai qui fait apparaître le suivant.
+  Pendant un parc safari, rien n'apparaît, capture comprise. **Un légendaire fait exception** : les
+  messages ne le chassent jamais, seuls sa durée de vie ou une capture le retirent.
 - **Les générations récentes sortent plus souvent.** Le poids d'une espèce est multiplié par
   `spawn.generationBoost` (2 par défaut) pour chaque génération qu'elle compte après la 1ʳᵉ : ×1 en
   1ʳᵉ, ×2 en 2ᵉ, ×4 en 3ᵉ. À l'ouverture de la 2ᵉ, chacune de ses espèces apparaît donc deux fois

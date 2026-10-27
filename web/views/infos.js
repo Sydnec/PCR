@@ -178,8 +178,12 @@ function spawns(rules) {
     ),
     list(
       rule(
-        `Un Pokémon capturé ou enfui est remplacé au message suivant` +
-          (spawn.afterEndMinutes ? ` (après ${duration(spawn.afterEndMinutes)})` : "") +
+        // Avec un délai plancher, une capture attend comme une fuite le premier
+        // message permis (spawnAfterCapture).
+        (spawn.afterEndMinutes
+          ? `Un Pokémon capturé ou enfui est remplacé au premier message après ` +
+            duration(spawn.afterEndMinutes)
+          : "Un Pokémon capturé est aussitôt remplacé ; un Pokémon enfui l'est au message suivant") +
           `. Sinon, il laisse sa place au bout de **${fmt(spawn.messages)} messages** (et au ` +
           `moins ${duration(spawn.minDelayMinutes)}), ou s'enfuit seul.`
       ),

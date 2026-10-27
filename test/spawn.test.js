@@ -10,7 +10,7 @@ const sandbox = createSandbox({
 });
 process.env.POKEMON_CHANNEL_ID = "123";
 const { points } = await openDatabases();
-const { registerMessageForSpawn, rollFleeDeadline } = await import("../modules/pokemon/spawn.js");
+const { registerMessageForSpawn, rollFleeDeadline, spawnAfterCapture } = await import("../modules/pokemon/spawn.js");
 const { getPokemonConfig } = await import("../modules/pokemon/config.js");
 
 const MINUTE = 60 * 1000;
@@ -214,5 +214,59 @@ describe("revendication d'une apparition (registerMessageForSpawn)", () => {
     const state = await dbGet(points, "SELECT message_count FROM pokemon_state WHERE id = 1");
     assert.equal(state.message_count, 5);
     assert.equal(fetches, 0);
+  });
+
+  // Une capture vient de vider le salon, et c'est elle qui demande le suivant.
+  const caught = (endedAt = Date.now()) =>
+    dbRun(
+      points,
+      `INSERT INTO pokemon_spawns (species_id, catch_rate, rarity, status, spawned_at, ended_at, flees_at)
+       VALUES (16, 255, 'COMMUN', 'CAUGHT', 1, ?, 9999999999999)`,
+      [endedAt]
+    );
+
+  it("après une capture, le suivant apparaît sans attendre de message", async () => {
+    await arrange({ count: 3, lastSpawnAgo: 0 });
+    await caught();
+    spawnAfterCapture(client);
+    await eventually(() => assert.equal(fetches, 1));
+    assert.equal((await readState()).message_count, 0, "le compteur de messages repart de zéro");
+  });
+
+  it("après une capture, un parc safari en cours garde le salon vide", async () => {
+    await arrange({ count: 0, lastSpawnAgo: 0, paused: Date.now() + 60 * MINUTE });
+    await caught();
+    spawnAfterCapture(client);
+    await sleep(300);
+    assert.equal(fetches, 0);
+  });
+
+  it("après une capture, le délai plancher l'emporte : c'est le premier message permis qui fait apparaître le suivant", async () => {
+    sandbox.writeConfig({ pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" }, spawn: { minDelayAfterEndMinutes: 5 } } });
+    try {
+      await arrange({ count: 0, lastSpawnAgo: 0 });
+      await caught();
+      spawnAfterCapture(client);
+      await sleep(300);
+      assert.equal(fetches, 0, "pas avant le délai");
+      assert.equal(claimed(await message()), false, "un message non plus");
+      await dbRun(points, "UPDATE pokemon_spawns SET ended_at = ?", [Date.now() - 6 * MINUTE]);
+      assert.equal(claimed(await message()), true);
+      assert.equal(fetches, 1);
+    } finally {
+      sandbox.writeConfig({ pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } });
+    }
+  });
+
+  it("une capture et dix messages simultanés ne font apparaître qu'un seul Pokémon", async () => {
+    // Un salon qui tarde à répondre : le verrou reste pris le temps de
+    // l'apparition, comme pendant un vrai envoi. Le salon introuvable de `client`
+    // le rendrait aussitôt, salon toujours vide.
+    const slow = { channels: { fetch: () => ((fetches += 1), new Promise(() => {})) } };
+    await arrange({ count: 0, lastSpawnAgo: 0 });
+    await caught();
+    spawnAfterCapture(slow);
+    for (let i = 0; i < 10; i++) registerMessageForSpawn(slow);
+    await eventuallyStable(() => assert.equal(fetches, 1));
   });
 });

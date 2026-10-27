@@ -17,6 +17,7 @@ const items = await import("../modules/pokemon/items.js");
 const data = await import("../modules/pokemon/data.js");
 const { getPokemonConfig } = await import("../modules/pokemon/config.js");
 const { default: attachFleeHandler } = await import("../functions/handlers/handlePokemonFleeOnTimer.js");
+const capture = await import("../modules/pokemon/capture.js");
 
 const call = (fn, ...args) =>
   new Promise((resolve, reject) => fn(...args, (error, value) => (error ? reject(error) : resolve(value))));
@@ -278,6 +279,64 @@ describe("fuite par expiration (balayage)", () => {
     assert.deepEqual(edit.components, []);
     // Le titre de l'embed de fuite, pas un mot qu'aurait aussi l'annonce d'origine.
     assert.match(edit.embeds[0].toJSON().title, /s'est enfui/);
+  });
+});
+
+describe("après une capture ou une fuite", () => {
+  // Le salon est libre : ni verrou pris, ni pause de parc.
+  const freeSlot = () => dbRun(points, "UPDATE pokemon_state SET spawning = 0 WHERE id = 1");
+  const setBalance = (amount) =>
+    dbRun(points, "INSERT INTO points (user_id, balance) VALUES ('u1', ?) ON CONFLICT(user_id) DO UPDATE SET balance = ?", [amount, amount]);
+  // Un lancer qui attrape à coup sûr, par le chemin de Discord et du site.
+  const catchIt = (client, spawnId) =>
+    withRandom(0, () => call(capture.resolveThrow, client, "u1", spawnId, "poke", {}));
+
+  it("une capture fait apparaître le suivant aussitôt, sans attendre de message", async () => {
+    const discord = fakeDiscord();
+    await freeSlot();
+    await setBalance(1000);
+    const { lastID } = await dbRun(
+      points,
+      "INSERT INTO pokemon_spawns (species_id, catch_rate, rarity, status, spawned_at, flees_at, message_id, channel_id) VALUES (?, 255, 'COMMUN', 'ACTIVE', 1, 9999999999999, 'm9', '123')",
+      [species("Roucool").id]
+    );
+    assert.equal((await catchIt(discord.client, lastID)).status, "catch");
+    await born(discord);
+    const rows = await all();
+    assert.deepEqual(rows.map((row) => row.status), ["CAUGHT", "ACTIVE"]);
+    assert.equal(discord.sent.length, 1, "une seule annonce : celle du suivant");
+    assert.equal((await dbGet(points, "SELECT message_count FROM pokemon_state WHERE id = 1")).message_count, 0);
+  });
+
+  it("une prise à la pêche ne fait rien apparaître dans le salon", async () => {
+    const discord = fakeDiscord();
+    await freeSlot();
+    await setBalance(1000);
+    const { lastID } = await dbRun(
+      points,
+      "INSERT INTO pokemon_spawns (species_id, catch_rate, rarity, status, spawned_at, flees_at, fished, reserved_for) VALUES (?, 255, 'COMMUN', 'FISHING', 1, ?, 1, 'u1')",
+      [species("Magicarpe").id, Date.now() + 10 * MINUTE]
+    );
+    assert.equal((await catchIt(discord.client, lastID)).status, "catch");
+    await sleep(250);
+    assert.equal(await active(), undefined);
+    assert.equal(discord.sent.length, 0);
+  });
+
+  it("une fuite laisse le salon vide : le suivant attend un message", async () => {
+    const discord = fakeDiscord();
+    attachFleeHandler(discord.client);
+    await freeSlot();
+    await dbRun(
+      points,
+      "INSERT INTO pokemon_spawns (species_id, catch_rate, rarity, status, spawned_at, flees_at, message_id, channel_id) VALUES (?, 45, 'COMMUN', 'ACTIVE', 1, ?, 'm9', '123')",
+      [species("Roucool").id, Date.now() - 1000]
+    );
+    await discord.client.handlePokemonFleeOnTimer();
+    await eventually(async () => assert.equal((await all())[0].status, "FLED"));
+    await sleep(250);
+    assert.equal(await active(), undefined);
+    assert.equal(discord.sent.length, 0);
   });
 });
 
