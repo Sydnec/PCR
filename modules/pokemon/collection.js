@@ -1320,7 +1320,7 @@ export function createTrade(trade, cb) {
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       trade.fromUserId,
-      trade.toUserId || ANYONE,
+      trade.toUserId,
       trade.offerSpeciesId ?? 0,
       trade.offerIsShiny ? 1 : 0,
       trade.offerSex ?? null,
@@ -1344,7 +1344,9 @@ export function createTrade(trade, cb) {
       trade.requestItemQty ?? null,
       trade.requestOpen ? 1 : 0,
       trade.counterOf ?? null,
-      trade.toUserId ? 0 : 1,
+      // Ouverte à tous seulement si l'appelant le dit (ANYONE) : un destinataire manquant
+      // reste une erreur, pas une offre publiée à tout le salon.
+      trade.toUserId === ANYONE ? 1 : 0,
     ],
     function (err) {
       cb(err, this ? this.lastID : null);
@@ -1415,7 +1417,7 @@ function sideFields(side, prefix) {
   throw new Error("Côté d'échange invalide : ni Pokémon, ni points, ni objet");
 }
 
-// Crée l'offre d'un dresseur à un autre — ou à tous, sans `toUserId` — et rend la
+// Crée l'offre d'un dresseur à un autre — ou à tous, avec `toUserId: ANYONE` — et rend la
 // ligne enregistrée. `offer` et
 // `request` désignent chacun un Pokémon, des points ou un objet (sideFields) ;
 // un Pokémon précis (resolveSelector, selectorOf) a sa fertilité dans l'offre, et

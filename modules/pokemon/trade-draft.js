@@ -457,7 +457,7 @@ async function propose(interaction, draft) {
       counterTrade({ tradeId: draft.counter_of, fromUserId: draft.from_user_id, ...sides }, settle);
     } else {
       proposeTrade(
-        { fromUserId: draft.from_user_id, toUserId: targetOf(draft), ...sides, unique: true },
+        { fromUserId: draft.from_user_id, toUserId: draft.to_user_id, ...sides, unique: true },
         settle
       );
     }

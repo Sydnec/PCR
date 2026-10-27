@@ -4,7 +4,7 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { MessageFlags } from "discord.js";
-import { createSandbox, openDatabases, dbRun, dbAll, dbGet, untilQuiet, speciesByName } from "./helpers.js";
+import { createSandbox, openDatabases, dbRun, dbAll, dbGet, eventually, untilQuiet, speciesByName } from "./helpers.js";
 import { fakeChannel, fakeUser, payloadOf, runAutocomplete, runCommand } from "./fake-discord.js";
 
 createSandbox({ config: { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } } });
@@ -206,6 +206,7 @@ describe("les contre-offres d'une offre ouverte", () => {
     const fromU3 = await counter(open, "u3", 40);
     const { calls } = await press(`poke_trade_accept|${fromU3.id}`, "u1");
     assert.match(JSON.stringify(embedOf(last(calls, "update"))), /Échange effectué/);
+    await eventually(async () => assert.equal((await tradeRow(fromU2.id)).status, "CANCELLED"));
     const base = await tradeRow(open.id);
     assert.deepEqual([base.status, base.to_user_id], ["SETTLED", "u3"]);
     assert.equal((await tradeRow(fromU2.id)).status, "CANCELLED");
@@ -221,8 +222,9 @@ describe("les contre-offres d'une offre ouverte", () => {
     const fromU2 = await counter(open, "u2", 30);
     await grant(BONBON, 1, "u3");
     await press(`poke_trade_accept|${open.id}`, "u3");
+    // La fermeture de la famille suit l'échange : on l'attend plutôt que de la supposer finie.
+    await eventually(async () => assert.equal((await tradeRow(fromU2.id)).status, "CANCELLED"));
     assert.equal((await tradeRow(open.id)).status, "ACCEPTED");
-    assert.equal((await tradeRow(fromU2.id)).status, "CANCELLED");
     assert.equal(await balanceOf("u2"), 30, "la contre-offre annulée n'a rien pris");
   });
 
@@ -238,12 +240,20 @@ describe("les contre-offres d'une offre ouverte", () => {
     const again = (await trades()).find((row) => row.counter_of === fromU2.id);
     assert.equal((await tradeRow(fromU2.id)).status, "COUNTERED");
     await press(`poke_trade_accept|${again.id}`, "u2");
+    await eventually(async () => assert.equal((await tradeRow(open.id)).status, "SETTLED"));
     const base = await tradeRow(open.id);
     assert.deepEqual([base.status, base.to_user_id], ["SETTLED", "u2"]);
   });
 });
 
 describe("closeOpenFamily", () => {
+  it("sans destinataire ni ANYONE, la création échoue au lieu d'ouvrir l'offre à tous", async () => {
+    await assert.rejects(() =>
+      call(collection.proposeTrade, { fromUserId: "u1", toUserId: undefined, offer: { points: 0 }, request: { points: 5 }, channelId: "c" })
+    );
+    assert.deepEqual(await trades(), []);
+  });
+
   it("un échange adressé, sans offre ouverte en amont, ne ferme rien", async () => {
     await setBalance(10, "u1");
     const trade = await call(collection.proposeTrade, { fromUserId: "u1", toUserId: "u2", offer: { points: 10 }, request: { points: 0 }, channelId: "c" });

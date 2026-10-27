@@ -1,6 +1,6 @@
 import { MessageFlags } from "discord.js";
 import { handleException } from "../../modules/utils.js";
-import { getIndividuals, proposeTrade, resolveTradeAs } from "../../modules/pokemon/collection.js";
+import { ANYONE, getIndividuals, proposeTrade, resolveTradeAs } from "../../modules/pokemon/collection.js";
 import { linkTradeMessage } from "../../modules/pokemon/trade-message.js";
 import { getSpecies } from "../../modules/pokemon/data.js";
 import {
@@ -271,7 +271,7 @@ export default {
       proposeTrade(
         {
           fromUserId: interaction.user.id,
-          toUserId: targetId,
+          toUserId: targetId ?? ANYONE,
           offer: offer.side,
           request: request.side,
           channelId: interaction.channelId,
