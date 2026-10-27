@@ -2,7 +2,7 @@
 // et bascules) et portés par le customId, sans rien garder en mémoire.
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { createSandbox, openDatabases, dbRun, untilQuiet, speciesByName } from "./helpers.js";
+import { createSandbox, openDatabases, dbRun, eventually, untilQuiet, speciesByName } from "./helpers.js";
 import { payloadOf, runCommand } from "./fake-discord.js";
 
 const GEN1 = { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } };
@@ -34,6 +34,9 @@ async function click(customId, { values, run = handlePokemonButton } = {}) {
     reply: async (payload) => calls.push({ method: "reply", payload }),
   };
   await run(interaction);
+  // Le Pokédex relit la collection avant de répondre : sous charge, c'est plus long que
+  // le court silence qu'attend untilQuiet avant sa première réponse.
+  await eventually(() => assert.ok(calls.length > 0, `${customId} n'a pas répondu`));
   await untilQuiet(calls);
   return payloadOf(calls, "update");
 }
