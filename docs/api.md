@@ -81,7 +81,7 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
 part pas non plus. `showcased` : exposé dans la vitrine de son dresseur. `form` : sa forme pour une espèce qui en a — la lettre d'un Zarbi —,
 `{ key, name, icon, sprite }` avec ses images (qui remplacent celles de l'espèce), `null` sinon ;
 l'apparition, la rencontre du parc et ses captures la portent de même. Une espèce porte `obtention` (`wild`,
-`evolution` ou `egg`), `femaleShare` (`null` si asexuée), `breeder` (parent possible d'un œuf),
+`evolution` ou `egg`), `femaleShare` (`null` si asexuée),
 `sellValue` / `sellValueShiny` (prix de revente, 0 si invendable), ses évolutions, ses
 illustrations (`sprite`, `spriteShiny`) et ses petites images (`icon`, `iconShiny`).
 

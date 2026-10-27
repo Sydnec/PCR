@@ -895,8 +895,6 @@ describe("site", () => {
     assert.equal(by("Steelix").obtention, "evolution");
     assert.equal(by("Alakazam").obtention, "evolution");
     assert.equal(by("Roucool").obtention, "wild");
-    assert.equal(by("Pikachu").breeder, true);
-    assert.equal(by("Rattata").breeder, false);
     assert.equal(by("Lugia").catchRate, 10);
     assert.equal(by("Celebi").catchRate, 45);
   });
