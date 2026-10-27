@@ -2819,5 +2819,26 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Boîte plus lisible",
+      "description": "Sur le site, la boîte s'étale sur deux colonnes : la grille d'un côté, la recherche et les outils de l'autre. Les filtres de la boîte et du Pokédex se rangent sous un bouton « Filtres ».",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-27T16:00:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
+    },
+    {
+      "type": "fix",
+      "name": "Boîte depuis le Pokédex",
+      "description": "« Voir dans ma boîte » depuis le Pokédex ouvre de nouveau la boîte au lieu d'une erreur.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-27T16:01:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
+    }
+  ]
 }

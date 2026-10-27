@@ -98,9 +98,13 @@ export async function render(ctx) {
       (Boolean(mon.nickname) && normalize(mon.nickname).includes(needle)) ||
       needle === String(species.id) ||
       needle === `#${mon.id}`,
-    placeholder: "Chercher dans toutes les boîtes…",
+    // La colonne est étroite : le texte d'aide se contente d'un mot.
+    placeholder: "Chercher…",
+    label: "Chercher dans toutes les boîtes",
     params,
-    // « Effacer les filtres » efface aussi l'espèce venue du Pokédex.
+    // L'espèce venue du Pokédex filtre aussi : « Effacer » se montre pour elle, et
+    // l'efface avec le reste.
+    pending: () => Boolean(highlight),
     onreset: () => {
       highlight = null;
     },
@@ -134,9 +138,17 @@ export async function render(ctx) {
   let target = null;
   let reordering = false;
 
-  // La barre de filtres reste en place : seul `content` se redessine.
-  const content = h("div", { class: "pc-body" });
-  const body = h("div", { class: "pc" }, filters.element, content);
+  // Deux colonnes : la boîte ouverte et sa grille, puis à côté (au-dessus sur un
+  // écran étroit) la recherche, les outils et les bandeaux. La barre de filtres reste
+  // en place : seuls `main` et `side` se redessinent.
+  const main = h("div", { class: "pc-main" });
+  const side = h("div", { class: "pc-side-body" });
+  const body = h(
+    "div",
+    { class: "pc" },
+    h("aside", { class: "pc-side" }, filters.element, side),
+    main
+  );
   // Le Pokémon qu'on glisse doit rester dans la page jusqu'au bout : retiré
   // avec la grille quand la boîte change, il ne recevrait plus la fin du
   // glissement.
@@ -185,11 +197,8 @@ export async function render(ctx) {
     if (target !== null && target >= pc.boxes.length) target = null;
     writeUrl();
     if (dragSource?.isConnected && !stash.contains(dragSource)) stash.append(dragSource);
-    content.replaceChildren(
-      ...[head(), tools(), banner(), selectionBar(), grid(), summary(), stash]
-        .flat()
-        .filter(Boolean)
-    );
+    main.replaceChildren(head(), grid(), summary(), stash);
+    side.replaceChildren(...[tools(), banner(), selectionBar()].flat().filter(Boolean));
   }
 
   // La boîte voisine dans le même rang : les flèches passent d'une boîte
@@ -395,54 +404,62 @@ export async function render(ctx) {
     if (!selecting) return null;
     const inBox = pc.pokemon.filter((mon) => boxOf(mon.pos) === box);
     const count = selected.size;
+    // Le compte, puis où ranger, puis de quoi cocher ou décocher d'un coup.
     return h(
       "div",
-      { class: "notice pc-banner pc-selection" },
+      { class: "notice pc-selection" },
       h(
         "span",
         {},
         count
-          ? `${fmt(count)} Pokémon sélectionné${count > 1 ? "s" : ""}.`
+          ? `${fmt(count)} Pokémon sélectionné${count > 1 ? "s" : ""}, toutes boîtes confondues.`
           : "Touche les Pokémon à ranger, dans une ou plusieurs boîtes."
       ),
       h(
-        "button",
-        {
-          class: "button small ghost",
-          disabled: !inBox.length || inBox.every((mon) => selected.has(mon.id)),
-          onclick: () => startSelecting(inBox.map((mon) => mon.id)),
-        },
-        "Toute la boîte"
-      ),
-      h(
-        "button",
-        {
-          class: "button small ghost",
-          disabled: !count,
-          onclick: () => {
-            selected.clear();
-            draw();
+        "div",
+        { class: "pc-selection-row" },
+        h(
+          "select",
+          {
+            "aria-label": "Boîte où ranger",
+            onchange: (event) => {
+              target = Number(event.target.value);
+            },
           },
-        },
-        "Vider"
-      ),
-      h(
-        "select",
-        {
-          class: "pc-jump",
-          "aria-label": "Boîte où ranger",
-          onchange: (event) => {
-            target = Number(event.target.value);
-          },
-        },
-        pc.boxes.map((entry) =>
-          h("option", { value: entry.box, selected: entry.box === (target ?? box) }, entry.name)
+          pc.boxes.map((entry) =>
+            h("option", { value: entry.box, selected: entry.box === (target ?? box) }, entry.name)
+          )
+        ),
+        h(
+          "button",
+          { class: "button small primary", disabled: !count, onclick: () => rangeSelected() },
+          "Ranger"
         )
       ),
       h(
-        "button",
-        { class: "button small primary", disabled: !count, onclick: () => rangeSelected() },
-        "Ranger"
+        "div",
+        { class: "pc-selection-row" },
+        h(
+          "button",
+          {
+            class: "button small ghost",
+            disabled: !inBox.length || inBox.every((mon) => selected.has(mon.id)),
+            onclick: () => startSelecting(inBox.map((mon) => mon.id)),
+          },
+          "Toute la boîte"
+        ),
+        h(
+          "button",
+          {
+            class: "button small ghost",
+            disabled: !count,
+            onclick: () => {
+              selected.clear();
+              draw();
+            },
+          },
+          "Vider"
+        )
       )
     );
   }
@@ -697,16 +714,7 @@ export async function render(ctx) {
             },
             "Tout sélectionner"
           )
-        : null,
-      h(
-        "button",
-        {
-          class: "button small ghost",
-          // Efface aussi l'espèce venue du Pokédex (onreset), et redessine.
-          onclick: () => filters.reset(),
-        },
-        "Effacer"
-      )
+        : null
     );
   }
 
@@ -833,17 +841,17 @@ export async function render(ctx) {
     return h(
       "p",
       { class: "muted small pc-summary" },
-      `${fmt(inBox)} / ${fmt(pc.slotsPerBox)} dans cette boîte · ${fmt(pc.pokemon.length)} Pokémon en tout. `,
-      selecting
-        ? "Touche un Pokémon pour le cocher ou le décocher : ta sélection tient d'une boîte à l'autre."
-        : pc.boxes[box]?.archived
-          ? "Boîte archivée : les nouveaux Pokémon n'y arrivent pas d'eux-mêmes, mais tu peux y en ranger."
-          : "Glisse un Pokémon pour le ranger, ou ouvre sa fiche et choisis « Déplacer »."
+      `${fmt(inBox)} / ${fmt(pc.slotsPerBox)} · ${fmt(pc.pokemon.length)} Pokémon en tout. `,
+      pc.boxes[box]?.archived
+        ? "Boîte archivée : les nouveaux venus n'y arrivent pas d'eux-mêmes."
+        : selecting
+          ? null
+          : "Glisse un Pokémon pour le ranger."
     );
   }
 
-  // Échap abandonne un déplacement en cours, ou la sélection.
-  // Échap dans un champ (la recherche, un nom de boîte) ne regarde que le champ.
+  // Échap abandonne un déplacement en cours, un changement de rang ou la sélection ;
+  // dans un champ (la recherche, un nom de boîte), il ne regarde que le champ.
   const onKey = (event) => {
     if (event.key !== "Escape" || event.target.closest?.("input, select, textarea")) return;
     if (moving) {
