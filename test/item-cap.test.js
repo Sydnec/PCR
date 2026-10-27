@@ -172,6 +172,9 @@ describe("l'échange et la limite", () => {
   });
 });
 
+// Une marque par objet limité : Master Ball, Super Canne, Méga Canne.
+const MARKS = 3;
+
 describe("le surplus d'avant la limite", () => {
   it("se vend une seule fois : un don de l'administrateur après coup reste", async () => {
     await setCount("u1", 3);
@@ -194,7 +197,7 @@ describe("le surplus d'avant la limite", () => {
     await dbRun(points, "CREATE TABLE pokemon_migrations (name TEXT PRIMARY KEY, applied_at INTEGER NOT NULL)");
     await setCount("u1", 2);
     assert.deepEqual(await call(items.sellHeldOverCap), { sold: 1 });
-    assert.equal((await dbAll(points, "SELECT name FROM pokemon_data_migrations")).length, 1);
+    assert.equal((await dbAll(points, "SELECT name FROM pokemon_data_migrations")).length, MARKS);
     assert.deepEqual(await call(items.sellHeldOverCap), { sold: 0 });
 
     // Et le démarrage la supprime, sans toucher à la marque.
@@ -203,7 +206,7 @@ describe("le surplus d'avant la limite", () => {
     const tables = (await dbAll(points, "SELECT name FROM sqlite_master WHERE type = 'table'")).map((row) => row.name);
     assert.ok(!tables.includes("pokemon_migrations"));
     assert.ok(tables.includes("pokemon_data_migrations"));
-    assert.equal((await dbAll(points, "SELECT name FROM pokemon_data_migrations")).length, 1);
+    assert.equal((await dbAll(points, "SELECT name FROM pokemon_data_migrations")).length, MARKS);
   });
 
   it("des points qui ne passent pas rendent le surplus, et la migration se rejouera", async () => {
@@ -218,5 +221,117 @@ describe("le surplus d'avant la limite", () => {
     assert.equal((await dbAll(points, "SELECT * FROM pokemon_data_migrations")).length, 0);
     assert.deepEqual(await call(items.sellHeldOverCap), { sold: 1 });
     assert.equal(await count("u1"), 1);
+  });
+});
+
+describe("les cannes", () => {
+  const SUPER = "super_canne";
+  const MEGA = "mega_canne";
+  const grantRod = (user, key, quantity = 1, options = {}) =>
+    call(items.grantItem, user, key, quantity, { source: "test", ...options });
+  const inventory = (user) => call(items.getInventory, user);
+
+  it("une de chaque en poche : la Super Canne de trop vaut 500 points, la Méga Canne 1 000", () => {
+    const superRod = items.getItem(SUPER);
+    const megaRod = items.getItem(MEGA);
+    assert.deepEqual([items.itemCap(superRod), items.itemOverflowValue(superRod)], [1, 500]);
+    assert.deepEqual([items.itemCap(megaRod), items.itemOverflowValue(megaRod)], [1, 1000]);
+    assert.equal(items.itemUpgrade(superRod).key, MEGA);
+    assert.equal(items.itemUpgrade(megaRod), null);
+    assert.equal(items.itemUpgrade(items.getItem(MASTER)), null);
+  });
+
+  it("une seconde Super Canne devient la Méga Canne qui manque, sans un point", async () => {
+    await grantRod("u1", SUPER);
+    assert.deepEqual(await grantRod("u1", SUPER), { kept: 0, sold: 0, points: 0, upgraded: 1 });
+    assert.deepEqual([await count("u1", SUPER), await count("u1", MEGA), await balance("u1")], [1, 1, 0]);
+    // Le journal s'écrit au mieux, sans attendre : son ordre n'est pas garanti.
+    const log = await dbAll(points, "SELECT item_key, delta, source FROM pokemon_item_log WHERE user_id = 'u1' ORDER BY item_key, source");
+    assert.deepEqual(log, [
+      { item_key: MEGA, delta: 1, source: "amelioration:test" },
+      { item_key: SUPER, delta: 0, source: "amelioration:test" },
+      { item_key: SUPER, delta: 1, source: "test" },
+    ]);
+  });
+
+  it("avec les deux, la Super Canne de trop se vend 500 points, la Méga Canne 1 000", async () => {
+    await setCount("u1", 1, SUPER);
+    await setCount("u1", 1, MEGA);
+    assert.deepEqual(await grantRod("u1", SUPER), { kept: 0, sold: 1, points: 500 });
+    assert.deepEqual(await grantRod("u1", MEGA), { kept: 0, sold: 1, points: 1000 });
+    assert.deepEqual([await count("u1", SUPER), await count("u1", MEGA), await balance("u1")], [1, 1, 1500]);
+  });
+
+  it("une Méga Canne de trop se vend même sans Super Canne : rien ne la change", async () => {
+    await setCount("u1", 1, MEGA);
+    assert.deepEqual(await grantRod("u1", MEGA), { kept: 0, sold: 1, points: 1000 });
+    assert.deepEqual([await count("u1", SUPER), await count("u1", MEGA)], [0, 1]);
+  });
+
+  it("deux Super Cannes de trop simultanées : une seule Méga Canne, l'autre vendue", async () => {
+    await setCount("u1", 1, SUPER);
+    const results = await Promise.all([grantRod("u1", SUPER), grantRod("u1", SUPER)]);
+    assert.deepEqual(results.map((r) => r.upgraded ?? 0).sort(), [0, 1]);
+    assert.deepEqual([await count("u1", SUPER), await count("u1", MEGA), await balance("u1")], [1, 1, 500]);
+  });
+
+  it("« ignore » ne change rien, « refuse » refuse sans changer", async () => {
+    await setCount("u1", 1, SUPER);
+    assert.deepEqual(await grantRod("u1", SUPER, 1, { overflow: "ignore" }), { kept: 1, sold: 0, points: 0 });
+    assert.equal(await grantRod("u1", SUPER, 1, { overflow: "refuse" }), null);
+    assert.deepEqual([await count("u1", SUPER), await count("u1", MEGA)], [2, 0]);
+  });
+
+  it("la phrase dit ce que devient la Super Canne de trop, et ce qui est vendu", () => {
+    const superRod = items.getItem(SUPER);
+    assert.equal(
+      items.overflowNotice(superRod, { kept: 0, sold: 0, points: 0, upgraded: 1 }),
+      "Tu as déjà une Super Canne : celle-ci devient une **Méga Canne** !"
+    );
+    assert.equal(
+      items.overflowNotice(superRod, { kept: 0, sold: 1, points: 500 }),
+      "Tu as déjà une Super Canne, le maximum : celle-ci est vendue **500** points."
+    );
+  });
+
+  it("la chaîne n'est pleine qu'avec les deux cannes, et la Master Ball n'en a pas", async () => {
+    const full = async (key) => items.chainFull(await inventory("u1"), items.getItem(key));
+    await setCount("u1", 1, SUPER);
+    assert.deepEqual([await full(SUPER), await full(MEGA)], [false, false]);
+    await setCount("u1", 1, MEGA);
+    assert.deepEqual([await full(SUPER), await full(MEGA)], [true, true]);
+    await setCount("u1", 1);
+    assert.equal(await full(MASTER), false);
+  });
+
+  it("on ne propose pas une Super Canne à qui en a déjà une", async () => {
+    await setCount("u1", 1, SUPER);
+    await setCount("u2", 1, SUPER);
+    const give = await checkSide({ kind: "item", id: SUPER, quantity: 1 }, null, "u1", true, "u2");
+    assert.match(give.error, /<@u2> a déjà \*\*1\*\* Super Canne, et on n'en garde pas plus de \*\*1\*\*/);
+  });
+
+  it("le surplus déjà en poche : la Super Canne de trop devient la Méga Canne qui manque, le reste se vend", async () => {
+    await setCount("u1", 3, SUPER);
+    await setCount("u2", 2, SUPER);
+    await setCount("u2", 3, MEGA);
+    assert.deepEqual(await call(items.sellHeldOverCap), { sold: 1 + 1 + 2 });
+    assert.deepEqual([await count("u1", SUPER), await count("u1", MEGA), await balance("u1")], [1, 1, 500]);
+    assert.deepEqual([await count("u2", SUPER), await count("u2", MEGA), await balance("u2")], [1, 1, 500 + 2 * 1000]);
+    const log = await dbAll(points, "SELECT item_key, delta, source FROM pokemon_item_log WHERE user_id = 'u1' ORDER BY item_key, source");
+    assert.deepEqual(log, [
+      { item_key: MEGA, delta: 1, source: "amelioration:plafond-detention" },
+      { item_key: SUPER, delta: -1, source: "amelioration:plafond-detention" },
+      { item_key: SUPER, delta: -1, source: "vente-auto:plafond-detention" },
+    ]);
+  });
+
+  it("la marque d'avant les cannes vaut pour la Master Ball seule : les cannes passent quand même", async () => {
+    await dbRun(points, "INSERT INTO pokemon_data_migrations (name, done_at) VALUES ('plafond-detention', 1)");
+    await setCount("u1", 2);
+    await setCount("u1", 2, MEGA);
+    assert.deepEqual(await call(items.sellHeldOverCap), { sold: 1 });
+    assert.deepEqual([await count("u1"), await count("u1", MEGA), await balance("u1")], [2, 1, 1000]);
+    assert.deepEqual(await call(items.sellHeldOverCap), { sold: 0 });
   });
 });

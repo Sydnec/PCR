@@ -300,7 +300,8 @@ const POKEMON = {
   // libellé et l'icône, donc changer l'emoji d'une ball suffit, l'objet suit.
   // `sellValue` rend l'objet revendable, et rien d'autre ne le rend revendable.
   // `maxHeld` plafonne ce qu'un dresseur en garde : au-delà, chaque exemplaire
-  // gagné se vend d'office `overflowValue` points.
+  // gagné se vend d'office `overflowValue` points — sauf s'il peut d'abord devenir
+  // l'objet `upgradesTo`, que le dresseur n'a pas encore au maximum.
   // `dropWeight` le fait tomber des Pokémon, et rien d'autre : un objet sans
   // poids ne se trouve pas. L'ordre des clés est celui de l'affichage, et les
   // poids vont du plus commun au plus rare.
@@ -441,6 +442,9 @@ const POKEMON = {
     // `base` : la Canne est donnée à tous, une fois — jamais échangeable, sans quoi
     // l'échanger la ferait redonner. Les deux autres tombent sur les Pokémon et se
     // gagnent à la loterie, dès que la pêche est ouverte (`fishing.generation`).
+    // Une de chaque en poche : la seconde ne pêche pas mieux que la première. Une
+    // Super Canne de trop devient la Méga Canne qui manque (`upgradesTo`), sinon elle
+    // se vend comme la Méga Canne de trop ; avec les deux, la loterie n'en donne plus.
     canne: {
       label: "Canne",
       emoji: "🎣",
@@ -456,6 +460,9 @@ const POKEMON = {
       dropWeight: 20,
       lotteryWeight: 60,
       lot: { min: 1, max: 1 },
+      maxHeld: 1,
+      overflowValue: 500,
+      upgradesTo: "mega_canne",
       rod: { pool: "good", price: 100 },
     },
     mega_canne: {
@@ -466,6 +473,8 @@ const POKEMON = {
       dropWeight: 8,
       lotteryWeight: 25,
       lot: { min: 1, max: 1 },
+      maxHeld: 1,
+      overflowValue: 1000,
       rod: { pool: "super", price: 100 },
     },
     // Les charmes ne tombent pas et ne se revendent pas : ils se gagnent en

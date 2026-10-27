@@ -21,6 +21,7 @@ import vitrine from "./pk/vitrine.js";
 import starter from "./pk/starter.js";
 import boutique from "./pk/boutique.js";
 import pecher from "./pk/pecher.js";
+import zarbis from "./pk/zarbis.js";
 
 // Routeur du jeu Pokémon : toutes ses commandes vivent sous /pk, comme celles
 // d'administration sous /admin. Chaque sous-commande garde son fichier dans
@@ -50,6 +51,7 @@ const SUBCOMMANDS = [
   starter,
   boutique,
   pecher,
+  zarbis,
   web,
 ];
 

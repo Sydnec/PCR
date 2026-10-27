@@ -702,6 +702,32 @@ describe("le PC (/api/me/pc)", () => {
     await failure(pcMove({ pokemonId: stranger, pos: 5 }), 409);
   });
 
+  it("range plusieurs Pokémon d'un coup, et rend le PC relu avec le compte", async () => {
+    const ids = await ownMany("Rattata", 3, { pos: null });
+    const slots = getPokemonConfig().pc.slotsPerBox;
+    const pc = await call("POST", "/api/me/pc/move-many", { body: { pokemonIds: ids, box: 2 } });
+    assert.deepEqual([pc.moved, pc.skipped], [3, 0]);
+    assert.deepEqual(ids.map((id) => pc.pokemon.find((entry) => entry.id === id).pos), [2 * slots, 2 * slots + 1, 2 * slots + 2]);
+    const stranger = await own("Rattata", { user: OTHER, pos: 0 });
+    for (const body of [{}, { pokemonIds: [], box: 1 }, { pokemonIds: [ids[0]], box: "x" }, { pokemonIds: [ids[0]], box: null }, { pokemonIds: ["1"], box: 1 }, { pokemonIds: ids[0], box: 1 }]) {
+      await failure(call("POST", "/api/me/pc/move-many", { body }), 400);
+    }
+    await failure(call("POST", "/api/me/pc/move-many", { body: { pokemonIds: [stranger], box: 1 } }), 409);
+  });
+
+  it("change une boîte de rang avec son nom, et refuse une boîte inexistante", async () => {
+    const [id] = await ownMany("Rattata", 1, { pos: 0 });
+    await call("POST", "/api/me/pc/boxes/:box/name", { params: { box: "0" }, body: { name: "Gen1" } });
+    const moveBox = (box, body) => call("POST", "/api/me/pc/boxes/:box/move", { params: { box: String(box) }, body });
+    const pc = await moveBox(0, { to: 2 });
+    assert.deepEqual(pc.boxes.slice(0, 3).map((box) => box.name), ["Boîte 1", "Boîte 2", "Gen1"]);
+    assert.equal(pc.pokemon.find((entry) => entry.id === id).pos, 2 * getPokemonConfig().pc.slotsPerBox);
+    await failure(moveBox(0, {}), 400);
+    await failure(moveBox(0, { to: null }), 400);
+    await failure(moveBox(0, { to: "2" }), 400);
+    await failure(moveBox(0, { to: 999 }), 409);
+  });
+
   it("nomme une boîte, un nom vide rend le nom par défaut, une boîte inexistante est refusée", async () => {
     const name = (box, text) => call("POST", "/api/me/pc/boxes/:box/name", { params: { box: String(box) }, body: { name: text } });
     assert.deepEqual(await name(0, "  Équipe "), { name: "Équipe", custom: true });

@@ -44,6 +44,7 @@ import {
   itemCap,
   itemOpen,
   itemOverflowValue,
+  itemUpgrade,
   itemSellValue,
   lotteryWinChance,
 } from "./items.js";
@@ -136,6 +137,8 @@ function itemTable() {
     // La limite de détention, et ce que rapporte un exemplaire au-delà.
     maxHeld: itemCap(item),
     overflowValue: itemOverflowValue(item),
+    // Ce que devient un exemplaire de trop avant d'être vendu (la Super Canne).
+    upgradesTo: itemCap(item) ? (itemUpgrade(item)?.label ?? null) : null,
   }));
 }
 

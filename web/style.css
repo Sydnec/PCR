@@ -360,6 +360,18 @@ input[type="number"] {
   flex: 1 1 200px;
 }
 
+/* Les listes de filtres passent à la ligne sur un écran étroit ; celle qui filtre se
+   voit d'un coup d'œil. */
+.filters select {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.filters select.active {
+  border-color: var(--accent);
+}
+
 .loading,
 .empty {
   padding: 48px 0;
@@ -1637,6 +1649,40 @@ input[type="number"] {
 /* Celui qu'on déplace : il attend qu'on lui choisisse une case. */
 .pc-moving {
   opacity: 0.4;
+}
+
+/* Une recherche en cours : ce qui ne répond pas s'efface sans disparaître. */
+.pc-dim {
+  opacity: 0.3;
+}
+
+/* Les Pokémon cochés en mode sélection. */
+.pc-selected {
+  box-shadow: inset 0 0 0 3px var(--accent);
+}
+
+.pc-check {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 16px;
+  height: 16px;
+  color: var(--accent);
+}
+
+/* Ce qui se redessine dans la boîte suit la mise en page de .pc, sous les filtres. */
+.pc-body {
+  display: contents;
+}
+
+.pc-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pc-selection {
+  flex-wrap: wrap;
 }
 
 .pc-stash {

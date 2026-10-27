@@ -2752,5 +2752,66 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "feature",
+      "name": "Une canne de chaque",
+      "description": "Une seconde Super Canne devient une Méga Canne si tu n'en as pas ; sinon elle est revendue 500 points, et une seconde Méga Canne 1 000 points. Avec les deux, la loterie ne donne plus de cannes.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-27T10:00:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
+    },
+    {
+      "type": "enhancement",
+      "name": "Échange : 0 point par défaut",
+      "description": "Sans rien préciser dans « je_recois », une offre d'échange ne demande rien en retour (0 point).",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-27T11:00:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
+    },
+    {
+      "type": "feature",
+      "name": "Échange ouvert à tous",
+      "description": "/pk echange sans membre publie une offre ouverte à tous : le premier qui accepte l'emporte, et chacun peut faire une contre-offre à son auteur.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-27T12:00:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
+    },
+    {
+      "type": "feature",
+      "name": "/pk zarbis",
+      "description": "Nouvelle commande /pk zarbis : les lettres de Zarbi que tu as réunies et celles qui te manquent.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-27T13:00:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
+    },
+    {
+      "type": "feature",
+      "name": "Boîte : recherche et rangement en lot",
+      "description": "Sur le site, la boîte se fouille avec une recherche et des filtres, plusieurs Pokémon se rangent d'un coup et une boîte entière change de place ; le Pokédex gagne des filtres (rareté, génération, type…).",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-27T14:00:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
+    },
+    {
+      "type": "feature",
+      "name": "Filtres de /pk pokedex",
+      "description": "/pk pokedex se filtre comme sur le site : rareté, génération, type, obtention, possédées ou manquantes, shiny.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-27T15:00:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
+    }
+  ]
 }

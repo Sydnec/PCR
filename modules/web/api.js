@@ -47,12 +47,11 @@ import {
   getAvailableSpecies,
   getSpecies,
   iconUrl,
-  isEggOnly,
   isSafariFinished,
   itemImageUrl,
-  isEvolutionOnly,
   isGenderless,
   isLegendary,
+  obtentionOf,
   possibleSexes,
   probabilitiesByBall,
   rarityOf,
@@ -80,7 +79,16 @@ import {
   removeFromShowcase,
   showcaseSlots,
 } from "../pokemon/showcase.js";
-import { archiveBox, getPc, movePokemon, renameBox, renamePokemon } from "../pokemon/pc.js";
+import {
+  archiveBox,
+  getPc,
+  moveBox,
+  movePokemon,
+  movePokemonMany,
+  pcConfig,
+  renameBox,
+  renamePokemon,
+} from "../pokemon/pc.js";
 import {
   enterPark,
   getEntryOffer,
@@ -141,10 +149,6 @@ export class HttpError extends Error {
 
 // ---------------------- Mises en forme ----------------------
 
-// Comment on obtient une espèce, ou pourquoi on ne la croisera pas.
-const obtention = (species) =>
-  isEggOnly(species) ? "egg" : isEvolutionOnly(species) ? "evolution" : "wild";
-
 // `families` se calcule une fois par requête, pas une fois par espèce (voir
 // babyOf).
 function speciesJson(species, families = babyFamilies()) {
@@ -162,7 +166,7 @@ function speciesJson(species, families = babyFamilies()) {
     femaleShare: femaleShare(species),
     // Le taux effectif (plancher compris) : c'est celui que le site affiche.
     catchRate: effectiveCatchRate(species.catchRate),
-    obtention: obtention(species),
+    obtention: obtentionOf(species),
     // Parent possible d'un œuf : de quoi proposer les bons candidats, la ponte
     // tranchant de toute façon.
     breeder: canBreed(species, families),
@@ -653,6 +657,9 @@ export const routes = [
       const families = babyFamilies();
       return {
         generation: activeGeneration(),
+        // Les raretés dans leur ordre, du commun au légendaire : les filtres du site
+        // les proposent ainsi.
+        rarities: Object.entries(RARITIES).map(([key, { label }]) => ({ key, label })),
         species: allSpecies().map((species) => speciesJson(species, families)),
       };
     },
@@ -1061,6 +1068,48 @@ export const routes = [
         throw new HttpError(400, "Déplacement invalide.");
       }
       const result = await promise((cb) => movePokemon(ctx.user.id, pokemonId, pos, cb));
+      if (!result.ok) throw new HttpError(409, result.reason);
+      return pcJson(ctx.user.id);
+    },
+  },
+
+  // Ranger plusieurs Pokémon d'un coup dans une boîte : ses cases libres, puis celles
+  // des boîtes qui suivent. La réponse est la boîte PC relue, avec le compte de ceux
+  // qui ont bougé et de ceux qu'un autre onglet avait déplacés entre-temps.
+  {
+    method: "POST",
+    path: "/api/me/pc/move-many",
+    auth: true,
+    write: true,
+    handler: async (ctx) => {
+      // Des nombres entiers tels quels : Number(null) ou Number("") vaudrait la boîte 1.
+      const { pokemonIds, box } = ctx.body;
+      const { maxBoxes, slotsPerBox } = pcConfig();
+      if (
+        !Array.isArray(pokemonIds) ||
+        !pokemonIds.length ||
+        pokemonIds.length > maxBoxes * slotsPerBox ||
+        !pokemonIds.every(Number.isInteger) ||
+        !Number.isInteger(box)
+      ) {
+        throw new HttpError(400, "Rangement invalide.");
+      }
+      const result = await promise((cb) => movePokemonMany(ctx.user.id, pokemonIds, box, cb));
+      if (!result.ok) throw new HttpError(409, result.reason);
+      return { ...(await pcJson(ctx.user.id)), moved: result.moved, skipped: result.skipped };
+    },
+  },
+
+  // Changer une boîte de rang, avec son nom, son archivage et ses Pokémon.
+  {
+    method: "POST",
+    path: "/api/me/pc/boxes/:box/move",
+    auth: true,
+    write: true,
+    handler: async (ctx) => {
+      const { to } = ctx.body;
+      if (!Number.isInteger(to)) throw new HttpError(400, "`to` doit être un numéro de boîte.");
+      const result = await promise((cb) => moveBox(ctx.user.id, Number(ctx.params.box), to, cb));
       if (!result.ok) throw new HttpError(409, result.reason);
       return pcJson(ctx.user.id);
     },

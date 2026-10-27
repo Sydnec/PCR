@@ -20,6 +20,8 @@ import { handleException, log } from "../utils.js";
 import { pseudo } from "../pseudo.js";
 import { getPokemonConfig } from "./config.js";
 import {
+  chainFull,
+  getInventory,
   grantItem,
   itemLot,
   itemLotteryWeight,
@@ -152,10 +154,14 @@ export function rollLot(item) {
 // Le tirage, et lui seul : deux hasards enchaînés, la porte puis le lot. Sortir
 // l'aléatoire de la décision rend le reste testable, comme pour les objets au
 // sol. Renvoie null quand le dresseur repart les mains vides.
-export function rollLottery() {
+//
+// `inventory` (getInventory) écarte du lot ce que le dresseur a déjà au complet : avec
+// les deux cannes, il n'en gagne plus. La porte, elle, ne bouge pas : sa chance de
+// gagner reste celle de tous, et le lot se tire parmi le reste.
+export function rollLottery(inventory = []) {
   const chance = lotteryWinChance();
   if (!(chance > 0) || Math.random() >= chance) return null;
-  const item = pickWeightedItem(itemLotteryWeight);
+  const item = pickWeightedItem((item) => (chainFull(inventory, item) ? 0 : itemLotteryWeight(item)));
   if (!item) return null;
   return { item, quantity: rollLot(item) };
 }
@@ -185,34 +191,39 @@ export function play(userId, cb) {
 
     // Écrit en parallèle du tirage : ses suites (gagné, rendu) attendent son identifiant.
     const logged = new Promise((resolve) => logDraw(userId, resolve));
-    const prize = rollLottery();
-    if (!prize) {
-      pseudo(userId).then((name) => log(`Loterie : ${name} repart les mains vides`));
-      return cb(null, { ok: true, prize: null, nextAt });
-    }
+    // Un sac illisible n'empêche pas de tirer : ce qui sortirait en trop se vendrait
+    // d'office (grantItem), rien ne se perd.
+    getInventory(userId, (inventoryError, inventory) => {
+      if (inventoryError) handleException("Lecture du sac avant la loterie :", inventoryError);
+      const prize = rollLottery(inventoryError ? [] : inventory);
+      if (!prize) {
+        pseudo(userId).then((name) => log(`Loterie : ${name} repart les mains vides`));
+        return cb(null, { ok: true, prize: null, nextAt });
+      }
 
-    grantItem(userId, prize.item.key, prize.quantity, { source: SOURCE }, (err, granted) => {
-      // Le crédit a échoué : le tirage est rendu plutôt que perdu. Le lot, lui,
-      // est oublié — il sera retiré au sort, et c'est bien une loterie.
-      if (err) return releaseDraw(userId, day, logged, () => cb(err));
+      grantItem(userId, prize.item.key, prize.quantity, { source: SOURCE }, (err, granted) => {
+        // Le crédit a échoué : le tirage est rendu plutôt que perdu. Le lot, lui,
+        // est oublié — il sera retiré au sort, et c'est bien une loterie.
+        if (err) return releaseDraw(userId, day, logged, () => cb(err));
 
-      db.run(
-        "UPDATE pokemon_lottery SET wins = wins + 1 WHERE user_id = ?",
-        [userId],
-        (err) => {
-          if (err) handleException("Comptage d'un gain de loterie :", err);
-        }
-      );
-      logged.then((logId) => {
-        if (logId === null) return;
-        db.run("UPDATE pokemon_lottery_draws SET won = 1 WHERE id = ?", [logId], (err) => {
-          if (err) handleException("Marque d'un tirage gagnant dans le journal :", err);
+        db.run(
+          "UPDATE pokemon_lottery SET wins = wins + 1 WHERE user_id = ?",
+          [userId],
+          (err) => {
+            if (err) handleException("Comptage d'un gain de loterie :", err);
+          }
+        );
+        logged.then((logId) => {
+          if (logId === null) return;
+          db.run("UPDATE pokemon_lottery_draws SET won = 1 WHERE id = ?", [logId], (err) => {
+            if (err) handleException("Marque d'un tirage gagnant dans le journal :", err);
+          });
         });
+        pseudo(userId).then((name) =>
+          log(`Loterie : ${name} gagne ${prize.quantity}× ${prize.item.label}`)
+        );
+        cb(null, { ok: true, prize: { ...prize, granted }, nextAt });
       });
-      pseudo(userId).then((name) =>
-        log(`Loterie : ${name} gagne ${prize.quantity}× ${prize.item.label}`)
-      );
-      cb(null, { ok: true, prize: { ...prize, granted }, nextAt });
     });
   });
 }

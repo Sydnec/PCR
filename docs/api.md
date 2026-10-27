@@ -48,7 +48,7 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
 |---|---|
 | `GET /api/health` | `{ ok, generation }` |
 | `GET /api/me` 🔒 | `{ user, balance, balls, egg }` — `user.admin` pour `SYDNEC_USER_ID` |
-| `GET /api/species` | `{ generation, species: [...] }` — espèces des générations ouvertes |
+| `GET /api/species` | `{ generation, rarities, species: [...] }` — espèces des générations ouvertes ; `rarities` : `{ key, label }` du commun au légendaire |
 | `GET /api/species/:id` | fiche + `chain` (lignée) |
 | `GET /api/catalogue` | `{ balls, items, types }` — clés, noms et emoji (`<:nom:id>` pour ceux du serveur), couleur de chaque type |
 | `GET /api/rules` | Les règles en chiffres pour la page Infos (`modules/pokemon/rules.js`) : `points`, `spawn` (dont `rarities`, part de chaque rareté), `capture` (balls et `table` des chances par difficulté), `items` (`held`, `lottery`, `lot`, `sellValue`), `lottery`, `evolution`, `eggs`, `trade`, `sell`, `lock`, `safari`, `shop` (balls spéciales en vente), `fishing` (cannes, avec les espèces les plus probables de chacune), `starters` (lignées proposées et paliers du Pokédex), `generation` et `nextGeneration` (la prochaine ouverture programmée, ou null), et les `commands` /pk. Lus dans la configuration ou calculés par les fonctions des tirages |
@@ -141,6 +141,8 @@ ou par un groupe `{ "speciesId": 25, "isShiny": false, "sex": "F" }` — les deu
 | `POST /api/safari/action` | `{ sessionId, token, action }` | `{ outcome, message, visit }` — `action` : `BALL`, `BAIT` ou `FLEE` |
 | `POST /api/safari/live` | `{ sessionId }` | `{ live: true }` — met la visite en cours en direct dans le salon Pokémon ; `409` avec `shared` quand elle est déjà partagée. La visite porte alors `live` (et `shared`) |
 | `POST /api/me/pc/move` | `{ pokemonId, pos }` | la boîte PC relue — l'occupant de la case prend l'ancienne place |
+| `POST /api/me/pc/move-many` | `{ pokemonIds, box }` | la boîte PC relue, avec `moved` et `skipped` (déplacés entre-temps ailleurs) — cases libres de `box` puis des suivantes non archivées ; `409` faute de place ou pour le Pokémon d'un autre |
+| `POST /api/me/pc/boxes/:box/move` | `{ to }` | la boîte PC relue — la boîte passe au rang `to` avec son nom, son archivage et ses Pokémon, les autres se décalent ; `409` pour une boîte inexistante |
 | `POST /api/me/pc/boxes/:box/name` | `{ name }` | `{ name, custom }` — vide : nom par défaut |
 | `POST /api/me/pc/boxes/:box/archive` | `{ archived }` | la boîte PC relue — `409` pour une boîte vide (à archiver) ou inexistante |
 | `POST /api/me/pokemon/:id/nickname` | `{ nickname }` | `{ nickname }` — vide : plus de surnom |

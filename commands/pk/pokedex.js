@@ -1,7 +1,7 @@
 import { MessageFlags } from "discord.js";
 import { handleException } from "../../modules/utils.js";
 import { getCollection } from "../../modules/pokemon/collection.js";
-import { buildDexEmbed, buildDexRow } from "../../modules/pokemon/embeds.js";
+import { buildDexComponents, buildDexEmbed } from "../../modules/pokemon/embeds.js";
 
 export default {
   describe: (sub) =>
@@ -31,8 +31,10 @@ export default {
         }
         await interaction
           .editReply({
+            // Les filtres (rareté, génération, type, obtention, possédées, shiny) se
+            // choisissent dans la réponse : voir dex-filter.js.
             embeds: [buildDexEmbed(target, rows || [], 0)],
-            components: [buildDexRow(target.id, 0)],
+            components: buildDexComponents(target.id, rows || [], 0),
           })
           .catch(() => {});
       });

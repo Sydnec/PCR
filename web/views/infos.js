@@ -560,7 +560,9 @@ function items(rules) {
           item.lottery > 0 ? `loterie **${pct(item.lottery)}**${lot}` : null,
           item.sellValue > 0 ? `revente **${fmt(item.sellValue)} pts**` : null,
           item.maxHeld
-            ? `**${fmt(item.maxHeld)}** en poche au plus, vendue **${fmt(item.overflowValue)} pts** au-delà`
+            ? `**${fmt(item.maxHeld)}** en poche au plus, ` +
+              (item.upgradesTo ? `devient une **${item.upgradesTo}** au-delà, ou ` : "") +
+              `vendue **${fmt(item.overflowValue)} pts**${item.upgradesTo ? " si tu l'as déjà" : " au-delà"}`
             : null,
         ].filter(Boolean);
         return h(

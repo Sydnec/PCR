@@ -16,6 +16,10 @@
 // Une boîte archivée se range à part : elle passe en fin de liste sur le site,
 // hors des flèches, et le placement automatique l'évite. On peut toujours y
 // déposer un Pokémon à la main.
+//
+// On range aussi par lots : plusieurs Pokémon d'un coup dans une boîte, qui
+// débordent dans les suivantes (movePokemonMany), et une boîte entière qui change
+// de rang avec son nom, son archivage et son contenu (moveBox).
 import db from "../points-db.js";
 import { handleException } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
@@ -127,20 +131,26 @@ function readPc(userId, config, cb) {
 
 export const defaultBoxName = (box) => `Boîte ${box + 1}`;
 
+// Combien de boîtes le PC montre : autant qu'il en faut, plus une vide pour
+// pouvoir y ranger. La boîte vide de la fin doit pouvoir recevoir : une boîte
+// archivée n'en tient pas lieu, il en vient une de plus.
+function boxCount(config, layout, archived) {
+  const boxOf = (pos) => Math.floor(pos / config.slotsPerBox);
+  const occupied = new Set(layout.map(({ pos }) => boxOf(pos)));
+  const lastBox = Math.max(-1, ...occupied, ...archived);
+  let count = Math.max(config.minBoxes, Math.min(config.maxBoxes, lastBox + 2), lastBox + 1);
+  while (count < config.maxBoxes && (archived.has(count - 1) || occupied.has(count - 1))) count++;
+  return count;
+}
+
 // Le PC d'un dresseur : ses boîtes (nom compris) et la place de chacun de ses
-// Pokémon. Autant de boîtes qu'il en faut, plus une vide pour pouvoir y ranger.
-// La boîte vide de la fin doit pouvoir recevoir : une boîte archivée n'en
-// tient pas lieu, il en vient une de plus.
+// Pokémon.
 export function getPc(userId, cb) {
   const config = pcConfig();
   readPc(userId, config, (err, { settings, archived, layout } = {}) => {
     if (err) return cb(err);
     persistLayout(layout);
-    const boxOf = (pos) => Math.floor(pos / config.slotsPerBox);
-    const occupied = new Set(layout.map(({ pos }) => boxOf(pos)));
-    const lastBox = Math.max(-1, ...occupied, ...archived);
-    let count = Math.max(config.minBoxes, Math.min(config.maxBoxes, lastBox + 2), lastBox + 1);
-    while (count < config.maxBoxes && (archived.has(count - 1) || occupied.has(count - 1))) count++;
+    const count = boxCount(config, layout, archived);
     cb(null, {
       config,
       boxes: Array.from({ length: count }, (_, box) => {
@@ -236,6 +246,173 @@ export function movePokemon(userId, pokemonId, targetPos, cb) {
       }
       if (!occupant) return cb(null, { ok: true });
       place(occupant, moving.pos, (err) => (err ? cb(err) : cb(null, { ok: true })));
+    });
+  });
+}
+
+// Écrit des places d'un coup : `moves` = [{ row, pos }], chaque place gardée par celle
+// que la lecture a vue (`pc_pos IS …`), comme movePokemon. Une instruction par lot
+// de lignes : un rangement de 300 Pokémon ne fait pas 300 allers-retours. La garde
+// passe par un CASE et la liste par IN, pas par une chaîne de OR : SQLite refuse une
+// expression de plus de 1 000 termes. Le lot (cinq paramètres par ligne) reste sous sa
+// limite de 32 766 paramètres. `cb(err, placed)` : combien ont vraiment bougé — un
+// Pokémon déplacé entre-temps depuis un autre onglet garde sa nouvelle place.
+const PLACE_CHUNK = 6000;
+function placeMany(userId, moves, cb) {
+  let placed = 0;
+  const next = (start) => {
+    const chunk = moves.slice(start, start + PLACE_CHUNK);
+    if (!chunk.length) return cb(null, placed);
+    const cases = chunk.map(() => "WHEN ? THEN ?").join(" ");
+    db.run(
+      `UPDATE pokemon_owned SET pc_pos = CASE id ${cases} END
+        WHERE user_id = ? AND id IN (${chunk.map(() => "?").join(", ")})
+          AND pc_pos IS CASE id ${cases} END`,
+      [
+        ...chunk.flatMap(({ row, pos }) => [row.id, pos]),
+        userId,
+        ...chunk.map(({ row }) => row.id),
+        ...chunk.flatMap(({ row }) => [row.id, row.pc_pos ?? null]),
+      ],
+      function (err) {
+        if (err) return cb(err, placed);
+        placed += this.changes;
+        next(start + PLACE_CHUNK);
+      }
+    );
+  };
+  next(0);
+}
+
+// Défait placeMany : chacun revient à la place d'avant (`from`, celle de la lecture),
+// gardé sur celle qu'il vient de prendre — seuls ceux qui ont bougé reviennent.
+function unplaceMany(userId, moves, cb) {
+  placeMany(
+    userId,
+    moves.map(({ row, pos, from }) => ({ row: { ...row, pc_pos: pos }, pos: row.pc_pos ?? from })),
+    (err) => {
+      if (err) handleException("Retour des Pokémon d'un rangement inachevé :", err);
+      cb();
+    }
+  );
+}
+
+// Range plusieurs Pokémon dans une boîte : dans ses cases libres, puis dans celles des
+// boîtes qui suivent, archivées exceptées (le placement automatique les évite aussi),
+// dans l'ordre où ils sont rangés aujourd'hui. Ceux qui sont déjà dans la boîte visée
+// y restent. Faute de place jusqu'au plafond, rien ne bouge et le refus donne les
+// chiffres. `cb(err, { ok, moved, skipped })` : `skipped`, ceux qu'un autre onglet a
+// déplacés entre la lecture et l'écriture.
+export function movePokemonMany(userId, pokemonIds, targetBox, cb) {
+  const config = pcConfig();
+  if (!Number.isInteger(targetBox) || targetBox < 0 || targetBox >= config.maxBoxes) {
+    return cb(null, { ok: false, reason: "Cette boîte n'existe pas." });
+  }
+  const ids = [...new Set(pokemonIds)];
+  if (!ids.length) return cb(null, { ok: false, reason: "Choisis au moins un Pokémon." });
+  readPc(userId, config, (err, { archived, settings, layout } = {}) => {
+    if (err) return cb(err);
+    const byId = new Map(layout.map((entry) => [entry.row.id, entry]));
+    const stranger = ids.find((id) => !byId.has(id));
+    if (stranger !== undefined) {
+      return cb(null, { ok: false, reason: `Le Pokémon #${stranger} n'est pas à toi.` });
+    }
+    const boxOf = (pos) => Math.floor(pos / config.slotsPerBox);
+    const selected = new Set(ids);
+    const moving = layout
+      .filter(({ row, pos }) => selected.has(row.id) && boxOf(pos) !== targetBox)
+      .sort((a, b) => a.pos - b.pos);
+    if (!moving.length) return cb(null, { ok: true, moved: 0, skipped: 0 });
+
+    // Les cases que libèrent les Pokémon qui partent comptent comme libres.
+    const taken = new Set(
+      layout.filter(({ row, pos }) => !selected.has(row.id) || boxOf(pos) === targetBox).map(({ pos }) => pos)
+    );
+    const free = [];
+    for (let box = targetBox; box < config.maxBoxes && free.length < moving.length; box++) {
+      if (box !== targetBox && archived.has(box)) continue;
+      for (let slot = 0; slot < config.slotsPerBox && free.length < moving.length; slot++) {
+        const pos = box * config.slotsPerBox + slot;
+        if (!taken.has(pos)) free.push(pos);
+      }
+    }
+    if (free.length < moving.length) {
+      const name = settings.get(targetBox)?.name ?? defaultBoxName(targetBox);
+      return cb(null, {
+        ok: false,
+        reason:
+          `Il ne reste que ${free.length.toLocaleString("fr-FR")} case${free.length > 1 ? "s" : ""} ` +
+          `libre${free.length > 1 ? "s" : ""} à partir de « ${name} » (boîtes archivées non comprises), ` +
+          `et tu en ranges ${moving.length.toLocaleString("fr-FR")}.`,
+      });
+    }
+    const moves = moving
+      .map((entry, index) => ({ row: entry.row, pos: free[index], from: entry.pos }))
+      .filter(({ row, pos }) => row.pc_pos !== pos);
+    placeMany(userId, moves, (err, placed) => {
+      // Un lot qui échoue en route : ceux des lots d'avant reviennent.
+      if (err) return unplaceMany(userId, moves, () => cb(err));
+      cb(null, { ok: true, moved: placed, skipped: moves.length - placed });
+    });
+  });
+}
+
+// Change une boîte de rang, comme un onglet : la boîte `from` passe au rang `to` avec
+// son nom, son archivage et ses Pokémon (chacun garde sa case), et les boîtes d'entre
+// les deux se décalent d'un cran. Les Pokémon d'abord ; si les réglages des boîtes ne
+// s'écrivent pas ensuite, les Pokémon reviennent à leur place, gardés sur celle qu'ils
+// viennent de prendre : rien ne bouge à moitié.
+export function moveBox(userId, from, to, cb) {
+  const config = pcConfig();
+  readPc(userId, config, (err, { settings, archived, layout } = {}) => {
+    if (err) return cb(err);
+    const count = boxCount(config, layout, archived);
+    const valid = (box) => Number.isInteger(box) && box >= 0 && box < count;
+    if (!valid(from) || !valid(to)) return cb(null, { ok: false, reason: "Cette boîte n'existe pas." });
+    if (from === to) return cb(null, { ok: true });
+
+    const [low, high] = from < to ? [from, to] : [to, from];
+    const step = from < to ? -1 : 1;
+    // Le nouveau rang de chaque boîte de l'intervalle.
+    const rankOf = (box) => (box === from ? to : box >= low && box <= high ? box + step : box);
+    const S = config.slotsPerBox;
+    const boxOf = (pos) => Math.floor(pos / S);
+    const moves = layout
+      .filter(({ pos }) => boxOf(pos) >= low && boxOf(pos) <= high)
+      .map(({ row, pos }) => ({ row, pos: rankOf(boxOf(pos)) * S + (pos % S), from: pos }))
+      .filter(({ row, pos }) => row.pc_pos !== pos);
+
+    // Une seule instruction pour tous les réglages de l'intervalle : renuméroter des
+    // lignes une à une heurterait la clé (user_id, box) en chemin. Une boîte sans
+    // réglage y prend une ligne vide (nom par défaut, non archivée), que la fin efface.
+    const boxes = Array.from({ length: high - low + 1 }, (_, index) => low + index);
+    const newSettings = boxes.map((box) => {
+      const source = boxes.find((candidate) => rankOf(candidate) === box);
+      const entry = settings.get(source);
+      return [box, entry?.name ?? "", entry?.archived ? 1 : 0];
+    });
+    const writeSettings = (next) =>
+      db.run(
+        `INSERT INTO pokemon_pc_boxes (user_id, box, name, archived)
+         VALUES ${newSettings.map(() => "(?, ?, ?, ?)").join(", ")}
+         ON CONFLICT (user_id, box) DO UPDATE SET name = excluded.name, archived = excluded.archived`,
+        newSettings.flatMap((entry) => [userId, ...entry]),
+        next
+      );
+
+    placeMany(userId, moves, (err) => {
+      if (err) return unplaceMany(userId, moves, () => cb(err));
+      writeSettings((settingsError) => {
+        if (settingsError) return unplaceMany(userId, moves, () => cb(settingsError));
+        db.run(
+          "DELETE FROM pokemon_pc_boxes WHERE user_id = ? AND name = '' AND archived = 0",
+          [userId],
+          (cleanError) => {
+            if (cleanError) handleException("Nettoyage des boîtes sans réglage :", cleanError);
+            cb(null, { ok: true });
+          }
+        );
+      });
     });
   });
 }
