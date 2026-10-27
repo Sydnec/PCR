@@ -19,7 +19,11 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
 - `/pk pokedex [membre]` : collection, doublons, shinies et progression. Réponse privée. Une entrée
   est une **espèce**, shiny ou non. Un 🔒 marque les espèces qu'aucune apparition ne donnera
   jamais — elles ne s'obtiennent que par évolution, avec un objet ou par échange —, un 🥚 celles
-  qui ne sortent que d'un œuf.
+  qui ne sortent que d'un œuf. **Les filtres du site** s'y choisissent dans la réponse : menus de
+  rareté, de génération (dès qu'il y en a deux d'ouvertes), de type et d'obtention, et deux
+  bascules à côté des pages, possédées / manquantes et shiny. Le filtre se rappelle en tête, avec
+  ce qu'il retient ; un changement ramène à la première page. Pas d'options de commande : `/pk`
+  frôle la limite de 8 000 caractères que Discord impose à une commande.
 - `/pk zarbis [membre]` : les lettres de Zarbi réunies (avec leur nombre et ✨ leurs shiny) et
   celles qui manquent, sur les formes de la génération ouverte. Réponse privée. Zarbi n'a qu'une
   entrée de Pokédex : c'est ici qu'on suit l'alphabet.

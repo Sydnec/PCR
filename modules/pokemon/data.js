@@ -419,6 +419,11 @@ export const isEggOnly = (species) => Boolean(species?.isBaby);
 export const unobtainableMark = (species) =>
   isEggOnly(species) ? "\u{1F95A}" : isEvolutionOnly(species) ? "\u{1F512}" : "";
 
+// Comment on obtient une espèce, ou pourquoi on ne la croisera pas : « egg »,
+// « evolution » ou « wild ». Les filtres du site et de /pk pokedex lisent celle-ci.
+export const obtentionOf = (species) =>
+  isEggOnly(species) ? "egg" : isEvolutionOnly(species) ? "evolution" : "wild";
+
 // Une espèce qu'aucun tirage ne peut faire apparaître : poids nul dans le pool
 // sauvage ET dans celui du parc. Il ne reste alors qu'une évolution pour
 // l'obtenir : une fusion de doublons, ou un échange pour les quatre qui

@@ -190,7 +190,9 @@ describe("/pk pokedex et /pk boite", () => {
     assert.equal(payloadOf(calls, "deferReply")?.flags, EPHEMERAL);
     const reply = payloadOf(calls, "editReply");
     assert.match(textOf(reply), /Pokédex de user-u1/);
-    assert.equal(reply.components.length, 1);
+    // Les pages et leurs bascules, puis les menus de rareté, de type et d'obtention
+    // (une seule génération ouverte ici : pas de menu de génération).
+    assert.equal(reply.components.length, 4);
   });
 
   it("le Pokédex d'un autre dresseur se lit par son option", async () => {

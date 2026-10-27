@@ -24,7 +24,6 @@ import {
 import { getCharmItem, getItem, overflowNotice, sortByCatalogue } from "./items.js";
 import {
   RARITIES,
-  allSpecies,
   dexSize,
   difficultyLabel,
   embedColor,
@@ -50,6 +49,13 @@ import {
   throwProbability,
   tradeEvolutionTarget,
 } from "./data.js";
+import {
+  describeDexFilters,
+  dexFilterOptions,
+  encodeDexFilters,
+  filterDexSpecies,
+  hasDexFilters,
+} from "./dex-filter.js";
 
 // Une décimale de plus à mesure que la chance baisse, à la française : « 5,9 % ».
 const formatPercent = (probability) => {
@@ -1341,18 +1347,27 @@ export function collectionStats(rows) {
   return { species, shinies, total, owned };
 }
 
-export function dexPageCount() {
-  return Math.ceil(dexSize() / getPokemonConfig().pokedex.pageSize);
-}
-
-export function buildDexEmbed(targetUser, rows, page) {
+// La page `page` des espèces qui passent les filtres (dex-filter.js) : la même pour
+// l'embed et pour ses boutons, ramenée dans les bornes si le filtre a raccourci la liste.
+function dexPage(rows, page, filters) {
   const pageSize = getPokemonConfig().pokedex.pageSize;
   const stats = collectionStats(rows);
+  const matching = filterDexSpecies(filters, stats.owned);
+  const pages = Math.max(1, Math.ceil(matching.length / pageSize));
+  const current = Math.min(Math.max(0, Number(page) || 0), pages - 1);
+  return { stats, matching, pages, current, slice: matching.slice(current * pageSize, (current + 1) * pageSize) };
+}
+
+export function buildDexEmbed(targetUser, rows, page, filters = {}) {
+  const { stats, matching, pages, current, slice } = dexPage(rows, page, filters);
   const total = dexSize();
   const percent = total ? Math.round((stats.species / total) * 100) : 0;
   const filled = Math.round(percent / 10);
-
-  const slice = allSpecies().slice(page * pageSize, (page + 1) * pageSize);
+  const filtered = hasDexFilters(filters);
+  const ownedHere = matching.filter((species) => {
+    const entry = stats.owned.get(species.id);
+    return entry && (entry.normal > 0 || entry.shiny > 0);
+  }).length;
   // Le cadenas des espèces qu'aucune apparition ne donnera jamais. Sans lui, un
   // dresseur peut chasser des mois un Mackogneur qui n'apparaîtra pas : il
   // s'obtient en faisant évoluer un Machopeur ou en s'en faisant échanger un, et
@@ -1387,13 +1402,19 @@ export function buildDexEmbed(targetUser, rows, page) {
     .setDescription(
       `${"🟩".repeat(filled)}${"⬛".repeat(10 - filled)}\n` +
         `**${stats.species}**/${total} espèces (${percent} %) · ✨ **${stats.shinies}** · ` +
-        `**${stats.total}** captures au total`
+        `**${stats.total}** captures au total` +
+        // Le filtre se dit, avec ce qu'il retient : la progression du dessus reste celle
+        // du Pokédex entier.
+        (filtered
+          ? `\n🔎 ${describeDexFilters(filters)} : **${matching.length}** espèce${matching.length > 1 ? "s" : ""}` +
+            `, dont **${ownedHere}** possédée${ownedHere > 1 ? "s" : ""}`
+          : "")
     )
     // La légende ne s'affiche que sur les pages qui en portent un : elle n'a rien
     // à expliquer sur les quatre cinquièmes du Pokédex.
     .setFooter({
       text:
-        `Page ${page + 1}/${dexPageCount()}` +
+        `Page ${current + 1}/${pages}` +
         (locked ? " · 🔒 ne s'obtient que par évolution ou par échange" : "") +
         (eggs ? " · 🥚 ne sort que d'un œuf" : ""),
     });
@@ -1401,12 +1422,50 @@ export function buildDexEmbed(targetUser, rows, page) {
   columns.forEach((value, index) => {
     embed.addFields({ name: index === 0 ? "​" : "​", value, inline: true });
   });
+  if (!slice.length) embed.addFields({ name: "​", value: "Aucune espèce ne correspond à ces filtres." });
 
   return embed;
 }
 
-export function buildDexRow(targetUserId, page) {
-  return pageRow(`poke_dex|${targetUserId}`, `poke_dex_noop|${targetUserId}`, page, dexPageCount());
+// Les boutons de page, les deux bascules (possédées, shiny) et les menus de filtres.
+// Chaque customId porte le dresseur et les filtres en cours (encodeDexFilters) ; un
+// changement de filtre ramène à la première page.
+export function buildDexComponents(targetUserId, rows, page, filters = {}) {
+  const { pages, current } = dexPage(rows, page, filters);
+  const code = encodeDexFilters(filters);
+  const options = dexFilterOptions();
+  // Une bascule passe à la valeur suivante, puis revient à « tous ».
+  const cycle = (key, label) => {
+    const values = ["", ...options[key].map(([value]) => value)];
+    const chosen = options[key].find(([value]) => value === filters[key])?.[1];
+    return new ButtonBuilder()
+      .setCustomId(`poke_dext|${targetUserId}|${code}|${key}`)
+      .setLabel(chosen ?? label)
+      .setStyle(filters[key] ? ButtonStyle.Primary : ButtonStyle.Secondary)
+      .setDisabled(values.length < 2);
+  };
+  const paging = pageRow(`poke_dexf|${targetUserId}|${code}`, `poke_dex_noop|${targetUserId}`, current, pages).addComponents(
+    cycle("v", "Possédées ou non"),
+    cycle("s", "Shiny ou non")
+  );
+  const select = (key, all) =>
+    new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(`poke_dexs|${targetUserId}|${code}|${key}`)
+        .setPlaceholder(all)
+        .addOptions(
+          { label: all, value: "all", default: !filters[key] },
+          ...options[key].map(([value, label]) => ({ label, value, default: filters[key] === value }))
+        )
+    );
+  return [
+    paging,
+    select("r", "Toutes les raretés"),
+    // Une seule génération ouverte : rien à choisir.
+    options.g.length > 1 ? select("g", "Toutes les générations") : null,
+    select("t", "Tous les types"),
+    select("o", "Toutes les obtentions"),
+  ].filter(Boolean);
 }
 
 // ====================== ÉCHANGES ======================

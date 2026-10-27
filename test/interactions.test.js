@@ -596,7 +596,7 @@ describe("les pages du Pokédex, de la boîte et des doublons", () => {
     const calls = await click("poke_dex|42|0");
     const update = only(calls, "update");
     assert.match(JSON.stringify(embedOf(update)), /Pokédex de user-42/);
-    assert.equal(update.components.length, 1);
+    assert.equal(update.components.length, 4, "les pages, puis les menus de filtres");
   });
 
   it("un dresseur parti du serveur s'affiche quand même, sans nom", async () => {

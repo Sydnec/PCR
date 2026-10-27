@@ -66,6 +66,7 @@ import {
   parseIndividual,
   tradeCandidate,
 } from "./collection.js";
+import { decodeDexFilters, dexFilterOptions, encodeDexFilters } from "./dex-filter.js";
 import {
   linkTradeMessage,
   markTradeMessageClosed,
@@ -73,8 +74,8 @@ import {
   tradeOutcome,
 } from "./trade-message.js";
 import {
+  buildDexComponents,
   buildDexEmbed,
-  buildDexRow,
   buildBoxEmbed,
   buildBoxRow,
   buildCompareView,
@@ -295,7 +296,8 @@ function handleDropClaim(interaction, dropId) {
 
 // ---------------------- Pokédex ----------------------
 
-function showDexPage(interaction, targetUserId, page) {
+// `filters` : ceux que porte le customId (decodeDexFilters), relus et revalidés.
+function showDexPage(interaction, targetUserId, page, filters = {}) {
   getCollection(targetUserId, async (err, rows) => {
     if (err) {
       handleException(err);
@@ -309,8 +311,8 @@ function showDexPage(interaction, targetUserId, page) {
     }
     await interaction
       .update({
-        embeds: [buildDexEmbed(target, rows || [], page)],
-        components: [buildDexRow(targetUserId, page)],
+        embeds: [buildDexEmbed(target, rows || [], page, filters)],
+        components: buildDexComponents(targetUserId, rows || [], page, filters),
       })
       .catch(() => {});
   });
@@ -1139,6 +1141,15 @@ export async function handlePokemonSelect(interaction) {
     case "poke_trade_pick":
       return handleTradePick(interaction, args[0]);
 
+    // Un menu de filtre du Pokédex : « all » le retire. La valeur se revalide
+    // (decodeDexFilters) comme celles du customId.
+    case "poke_dexs": {
+      const [targetUserId, code, key] = args;
+      const value = interaction.values?.[0];
+      const filters = { ...decodeDexFilters(code), [key]: value === "all" ? "" : value };
+      return showDexPage(interaction, targetUserId, 0, decodeDexFilters(encodeDexFilters(filters)));
+    }
+
     // Les menus du brouillon d'un échange.
     case "poke_td_kind":
     case "poke_td_pick":
@@ -1472,8 +1483,21 @@ export async function handlePokemonButton(interaction) {
     case "poke_drop":
       return handleDropClaim(interaction, args[0]);
 
+    // Sans filtre (les messages d'avant les filtres), puis filtré : dresseur, filtres, page.
     case "poke_dex":
       return showDexPage(interaction, args[0], Number(args[1]));
+    case "poke_dexf":
+      return showDexPage(interaction, args[0], Number(args[2]), decodeDexFilters(args[1]));
+
+    // Une bascule (possédées, shiny) passe à la valeur suivante, puis revient à « tous » ;
+    // un filtre changé ramène à la première page.
+    case "poke_dext": {
+      const [targetUserId, code, key] = args;
+      const filters = decodeDexFilters(code);
+      const values = ["", ...(dexFilterOptions()[key] ?? []).map(([value]) => value)];
+      const next = values[(values.indexOf(filters[key] ?? "") + 1) % values.length];
+      return showDexPage(interaction, targetUserId, 0, decodeDexFilters(encodeDexFilters({ ...filters, [key]: next })));
+    }
 
     case "poke_box":
       return showBoxPage(interaction, args[0], Number(args[1]) || null, Number(args[2]) || 0);

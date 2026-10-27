@@ -47,12 +47,11 @@ import {
   getAvailableSpecies,
   getSpecies,
   iconUrl,
-  isEggOnly,
   isSafariFinished,
   itemImageUrl,
-  isEvolutionOnly,
   isGenderless,
   isLegendary,
+  obtentionOf,
   possibleSexes,
   probabilitiesByBall,
   rarityOf,
@@ -150,10 +149,6 @@ export class HttpError extends Error {
 
 // ---------------------- Mises en forme ----------------------
 
-// Comment on obtient une espèce, ou pourquoi on ne la croisera pas.
-const obtention = (species) =>
-  isEggOnly(species) ? "egg" : isEvolutionOnly(species) ? "evolution" : "wild";
-
 // `families` se calcule une fois par requête, pas une fois par espèce (voir
 // babyOf).
 function speciesJson(species, families = babyFamilies()) {
@@ -171,7 +166,7 @@ function speciesJson(species, families = babyFamilies()) {
     femaleShare: femaleShare(species),
     // Le taux effectif (plancher compris) : c'est celui que le site affiche.
     catchRate: effectiveCatchRate(species.catchRate),
-    obtention: obtention(species),
+    obtention: obtentionOf(species),
     // Parent possible d'un œuf : de quoi proposer les bons candidats, la ponte
     // tranchant de toute façon.
     breeder: canBreed(species, families),
