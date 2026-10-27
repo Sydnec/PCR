@@ -831,7 +831,17 @@ export function startPaidSession(userId, { generations = null } = {}, cb) {
       // Le refus prévisible passe avant le débit : l'index unique rattraperait
       // le cas, mais au prix d'un aller-retour débit/remboursement que le
       // joueur verrait passer sur son solde.
-      if (retryAt) return cb(null, cooldownRefusal(retryAt));
+      //
+      // Ce délai peut venir de la visite qu'un clic simultané vient d'ouvrir,
+      // après notre reprise du début : on la relit avant de refuser, pour que
+      // le double-clic la retrouve au lieu d'entendre qu'il a déjà payé. La
+      // relecture suit celle qui a vu l'entrée : rien ne passe entre les deux.
+      if (retryAt) {
+        return resumeSession(userId, (err, ongoing) => {
+          if (err) return cb(err);
+          cb(null, ongoing ?? cooldownRefusal(retryAt));
+        });
+      }
 
       // Débit atomique, comme pour un lancer de ball : refusé sans rien
       // prélever si le solde ne suffit pas.
