@@ -465,6 +465,51 @@ export function buildSpeciesInfoEmbed(
 
 const formatPoints = (value) => value.toLocaleString("fr-FR");
 
+// Le suivi des lettres de Zarbi (/pk zarbis) : celles que le dresseur a réunies, avec
+// leur nombre et leurs shiny, et celles qui manquent, sur les formes que la génération
+// ouverte connaît. `rows` : ses individus (getIndividuals), toutes espèces confondues.
+export function buildUnownEmbed(targetUser, species, rows) {
+  const known = speciesForms(species);
+  const counts = new Map();
+  for (const row of rows) {
+    if (row.species_id !== species.id || !row.form) continue;
+    const entry = counts.get(row.form) ?? { total: 0, shiny: 0 };
+    entry.total++;
+    if (row.is_shiny) entry.shiny++;
+    counts.set(row.form, entry);
+  }
+  const mine = known.filter((form) => counts.has(form.key));
+  const missing = known.filter((form) => !counts.has(form.key));
+  const shinies = mine.filter((form) => counts.get(form.key).shiny).length;
+  const percent = known.length ? Math.round((mine.length / known.length) * 100) : 0;
+  const filled = Math.round(percent / 10);
+
+  const ownedLine = mine
+    .map((form) => {
+      const { total, shiny } = counts.get(form.key);
+      return `**${form.name}**${total > 1 ? ` ×${total}` : ""}${shiny ? ` ✨${shiny > 1 ? shiny : ""}` : ""}`;
+    })
+    .join(" · ");
+  return new EmbedBuilder()
+    .setTitle(`🔤 Zarbi de ${targetUser.username}`)
+    .setColor(0x4f545c)
+    .setThumbnail(spriteUrl(species, false))
+    .setDescription(
+      `${"🟩".repeat(filled)}${"⬛".repeat(10 - filled)}\n` +
+        `**${mine.length}** / ${known.length} formes (${percent} %)` +
+        (shinies ? ` · ✨ ${shinies} en shiny` : "")
+    )
+    .addFields(
+      { name: "Réunies", value: ownedLine || "Aucune pour l'instant.", inline: false },
+      {
+        name: "Manquantes",
+        value: missing.length ? missing.map((form) => form.name).join(" ") : "Aucune : l'alphabet est complet ! 🎉",
+        inline: false,
+      }
+    )
+    .setFooter({ text: "Chaque Zarbi tire sa lettre à parts égales en naissant : apparition, parc ou œuf." });
+}
+
 // Qui a lancé quoi. Le champ d'embed est plafonné à 1024 caractères, d'où la
 // coupe au top 5 avec un reliquat agrégé.
 const PARTICIPANTS_SHOWN = 5;

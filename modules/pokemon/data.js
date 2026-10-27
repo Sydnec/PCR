@@ -128,6 +128,10 @@ export function allSpecies(generation = activeGeneration()) {
 }
 export const dexSize = () => allSpecies().length;
 
+// Zarbi, retrouvé par son identifiant de PokéAPI comme Métamorph, que sa génération
+// soit ouverte ou non : /pk zarbis dit alors quand il arrive.
+export const unownSpecies = () => dataset.species.find((species) => species.slug === "unown") ?? null;
+
 // Métamorph s'il fait partie des générations ouvertes, sinon null.
 export const dittoSpecies = () => allSpecies().find(isDitto) ?? null;
 
