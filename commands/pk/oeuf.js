@@ -5,10 +5,9 @@ import {
   decodeEntry,
   encodeEntry,
   getIndividuals,
-  groupIndividuals,
   resolveSelector,
 } from "../../modules/pokemon/collection.js";
-import { getSpecies, isDitto } from "../../modules/pokemon/data.js";
+import { getSpecies } from "../../modules/pokemon/data.js";
 import {
   displayName,
   individualChoices,
@@ -17,10 +16,9 @@ import {
 } from "../../modules/pokemon/embeds.js";
 import {
   babyFamilies,
-  babyOf,
+  breedingGroups,
+  breedsWith,
   buildEggEmbed,
-  canBreed,
-  describeEgg,
   eggCharmFactor,
   getIncubatingEgg,
   layEgg,
@@ -33,10 +31,8 @@ const HINT_VALUE = "0:0";
 const hint = (interaction, name) => respondHint(interaction, name, HINT_VALUE);
 
 // Les parents possibles : les individus fertiles d'une famille qui a un bébé,
-// de n'importe quel sexe, et Métamorph. Groupés par espèce, variante et sexe —
-// lequel pond importe peu, tant qu'il est fertile. Quand l'autre parent est
-// déjà choisi, seuls ses partenaires possibles restent : un Pikachu ♂ ne se voit
-// proposer que des femelles de sa famille et des Métamorph.
+// de n'importe quel sexe, et Métamorph (breedingGroups, la liste du site).
+// Quand l'autre parent est déjà choisi, seuls ses partenaires possibles restent.
 function respondWithParents(interaction, query, partnerValue) {
   if (!babyFamilies().length) {
     return hint(interaction, "Aucun bébé n'existe encore : les œufs arrivent avec la génération 2");
@@ -52,45 +48,37 @@ function respondWithParents(interaction, query, partnerValue) {
     const partnerRow = partnerEntry?.pokemonId
       ? rows.find((row) => row.id === partnerEntry.pokemonId)
       : null;
-    const partner = partnerRow
+    const partnerSource = partnerRow
       ? { speciesId: partnerRow.species_id, sex: partnerRow.sex }
       : partnerEntry;
-    const partnerSpecies = partner ? getSpecies(partner.speciesId) : null;
-    const compatible = (species, sex) =>
-      !partnerSpecies ||
-      !describeEgg({ species: partnerSpecies, sex: partner.sex }, { species, sex }).error;
+    const partnerSpecies = partnerSource ? getSpecies(partnerSource.speciesId) : null;
+    const partner = partnerSpecies ? { species: partnerSpecies, sex: partnerSource.sex } : null;
 
     // « #123 » : un individu précis, fertile et compatible.
     if (wantsIndividual(query)) {
-      const individuals = individualChoices(rows, query, (row) => {
-        const species = getSpecies(row.species_id);
-        return !row.sterile && canBreed(species) && compatible(species, row.sex);
-      });
+      const individuals = individualChoices(
+        rows,
+        query,
+        (row) => !row.sterile && breedsWith(getSpecies(row.species_id), row.sex, partner)
+      );
       if (!individuals.length) return hint(interaction, "Aucun Pokémon fertile avec ce numéro");
       return interaction.respond(individuals).catch(() => {});
     }
 
     const needle = query.toLowerCase();
-    const choices = groupIndividuals(
-      rows.filter((row) => !row.sterile),
-      { bySex: true }
-    )
-      .map((group) => {
-        const species = getSpecies(group.speciesId);
-        if (!canBreed(species) || !compatible(species, group.sex)) return null;
-        return {
-          name:
-            `${displayName(species, group.isShiny, group.sex)} ×${group.count} — ` +
-            (isDitto(species) ? "remplace n'importe quel parent" : `donne ${babyOf(species).name}`),
-          value: encodeEntry(group.speciesId, group.isShiny, group.sex),
-        };
-      })
-      .filter((choice) => choice && choice.name.toLowerCase().includes(needle))
+    const choices = breedingGroups(rows, partner)
+      .map((group) => ({
+        name:
+          `${displayName(group.species, group.isShiny, group.sex)} ×${group.count} — ` +
+          (group.baby ? `donne ${group.baby.name}` : "remplace n'importe quel parent"),
+        value: encodeEntry(group.speciesId, group.isShiny, group.sex),
+      }))
+      .filter((choice) => choice.name.toLowerCase().includes(needle))
       .slice(0, 25);
     if (!choices.length) {
       return hint(
         interaction,
-        partnerSpecies
+        partner
           ? "Aucun partenaire fertile pour ce parent"
           : "Tu n'as aucun Pokémon fertile qui puisse pondre"
       );

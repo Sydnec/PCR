@@ -102,6 +102,7 @@ import {
 } from "../pokemon/safari.js";
 import {
   babyFamilies,
+  breedingGroups,
   canBreed,
   eggCharmFactor,
   eggShinyFactor,
@@ -805,6 +806,26 @@ export const routes = [
     handler: async (ctx) => ({
       egg: await eggWithCharm(await promise((cb) => getIncubatingEgg(ctx.user.id, cb))),
     }),
+  },
+
+  // Les parents possibles, groupés comme l'autocomplétion de /pk oeuf : le
+  // site choisit un groupe, et la ponte prend l'un de ses individus fertiles.
+  {
+    method: "GET",
+    path: "/api/me/egg/parents",
+    auth: true,
+    handler: async (ctx) => {
+      const rows = await promise((cb) => getIndividuals(ctx.user.id, cb));
+      return {
+        parents: breedingGroups(rows).map((group) => ({
+          speciesId: group.speciesId,
+          shiny: group.isShiny,
+          sex: group.sex,
+          count: group.count,
+          babyId: group.baby?.id ?? null,
+        })),
+      };
+    },
   },
 
   // Ce qu'une évolution coûterait, sans rien faire : l'écran d'évolution.

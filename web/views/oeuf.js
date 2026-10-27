@@ -74,15 +74,11 @@ function incubating(ctx, egg) {
   );
 }
 
-// Les candidats : les individus fertiles d'une espèce qui peut être parent.
-// L'API tranche à la ponte (même famille, un mâle et une femelle, un seul
-// Métamorph) : la liste ne fait que dégrossir.
+// Les candidats : les parents possibles groupés par espèce, variante et sexe,
+// comme dans /pk oeuf. L'API tranche à la ponte (même famille, un mâle et une
+// femelle, un seul Métamorph) : la liste ne fait que dégrossir.
 async function layForm(ctx) {
-  // 200 est le plafond d'une page de l'API : largement de quoi choisir.
-  const box = await api("/api/users/me/box?fertile=true&pageSize=200");
-  const candidates = box.items
-    .filter((item) => ctx.species.get(item.speciesId)?.breeder)
-    .sort((a, b) => a.speciesId - b.speciesId || a.id - b.id);
+  const { parents } = await api("/api/me/egg/parents");
   const babies = [...ctx.species.values()]
     .filter((species) => species.baby)
     .map((species) => species.name);
@@ -96,7 +92,7 @@ async function layForm(ctx) {
       ? ` Familles qui pondent : ${babies.join(", ")}.`
       : " Aucun bébé n'existe encore dans les générations ouvertes."
   );
-  if (candidates.length < 2) {
+  if (parents.length < 2) {
     return h(
       "div",
       {},
@@ -109,15 +105,23 @@ async function layForm(ctx) {
     );
   }
 
-  const label = (item) =>
-    `#${item.id} · ${pokemonName(ctx.species.get(item.speciesId), item.shiny, item.sex).textContent}`;
+  const label = (group) =>
+    `${pokemonName(ctx.species.get(group.speciesId), group.shiny, group.sex).textContent} ` +
+    `×${fmt(group.count)} — ` +
+    (group.babyId
+      ? `donne ${ctx.species.get(group.babyId)?.name ?? "?"}`
+      : "remplace n'importe quel parent");
   const picker = (name) =>
     h(
       "select",
       { name, required: true },
       h("option", { value: "" }, "Choisir un parent…"),
-      candidates.map((item) => h("option", { value: item.id }, label(item)))
+      parents.map((group, index) => h("option", { value: index }, label(group)))
     );
+  const selector = (select) => {
+    const group = parents[Number(select.value)];
+    return { speciesId: group.speciesId, isShiny: group.shiny, sex: group.sex };
+  };
   const first = picker("parent1");
   const second = picker("parent2");
   const submit = h("button", { class: "button primary", type: "submit" }, "Pondre");
@@ -132,10 +136,7 @@ async function layForm(ctx) {
         try {
           await api("/api/me/eggs", {
             method: "POST",
-            body: {
-              parent1: { pokemonId: Number(first.value) },
-              parent2: { pokemonId: Number(second.value) },
-            },
+            body: { parent1: selector(first), parent2: selector(second) },
           });
           toast("Un œuf a été pondu !", "success");
           await ctx.refreshMe();

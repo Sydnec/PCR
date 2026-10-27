@@ -2839,6 +2839,16 @@
       "commit": "pending",
       "timestamp": "2026-10-27T16:01:00.000Z",
       "branch": "dev/keen-knuth-lcd8tu"
+    },
+    {
+      "type": "fix",
+      "name": "Tous les parents proposés pour un œuf",
+      "description": "Sur le site, la ponte propose tous tes parents possibles, même les plus anciens, groupés par espèce comme dans /pk oeuf.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-27T17:00:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
     }
   ]
 }
