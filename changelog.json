@@ -2765,6 +2765,16 @@
       "commit": "pending",
       "timestamp": "2026-10-27T11:00:00.000Z",
       "branch": "dev/keen-knuth-lcd8tu"
+    },
+    {
+      "type": "feature",
+      "name": "Échange ouvert à tous",
+      "description": "/pk echange sans membre publie une offre ouverte à tous : le premier qui accepte l'emporte, et chacun peut faire une contre-offre à son auteur.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-27T12:00:00.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
     }
   ]
 }

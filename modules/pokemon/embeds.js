@@ -1373,6 +1373,7 @@ const TRADE_STATUS = {
   CANCELLED: { color: 0x4f545c, title: "🚫 Échange annulé", note: null },
   EXPIRED: { color: 0x4f545c, title: "⌛ Échange expiré", note: null },
   COUNTERED: { color: 0xfee75c, title: "↩️ Contre-offre", note: null },
+  SETTLED: { color: 0x57f287, title: "🤝 Conclu par une contre-offre", note: null },
   FAILED: {
     color: 0xed4245,
     title: "⚠️ Échange impossible",
@@ -1392,7 +1393,8 @@ function tradeEvolutionLines(trade) {
     if (!target) return;
     lines.push(
       `**${displayName(source, isShiny)}** pourra évoluer gratuitement en ` +
-        `**${displayName(target, isShiny)}** chez <@${receiverId}>, avec /pk evolution.`
+        `**${displayName(target, isShiny)}** ${receiverId ? `chez <@${receiverId}>` : "chez qui le recevra"}, ` +
+        "avec /pk evolution."
     );
   };
   add(trade.offer_species_id, trade.offer_is_shiny, trade.to_user_id);
@@ -1449,9 +1451,21 @@ export function buildTradeEmbed(trade, status = "PENDING") {
   const asked = tradeSideText(trade, "request");
   const nothing = (prefix) => trade[`${prefix}_points`] === 0;
 
+  // Une offre ouverte à tous se lit sans destinataire tant que personne ne l'a prise,
+  // et encore une fois conclue par une contre-offre : ce n'est pas elle qui a été échangée.
+  const anyone = Boolean(trade.open_offer) && (!trade.to_user_id || status === "SETTLED");
+
   // Un côté à zéro point est un cadeau : on le dit comme tel plutôt que de faire
   // lire « contre 0 point ».
-  const sentence = trade.request_open
+  const sentence = anyone
+    ? trade.request_open
+      ? `<@${trade.from_user_id}> propose **${given}** à qui le veut, contre ce qu'on lui proposera.`
+      : nothing("request")
+        ? `<@${trade.from_user_id}> offre **${given}** au premier qui le veut.`
+        : nothing("offer")
+          ? `<@${trade.from_user_id}> demande **${asked}** à qui l'a, sans rien donner en retour.`
+          : `<@${trade.from_user_id}> propose **${given}**\ncontre **${asked}**, au premier qui accepte.`
+    : trade.request_open
     ? `<@${trade.from_user_id}> propose **${given}** à <@${trade.to_user_id}>, contre ce qu'il voudra.`
     : nothing("request")
     ? `<@${trade.from_user_id}> offre **${given}** à <@${trade.to_user_id}>.`
@@ -1469,7 +1483,9 @@ export function buildTradeEmbed(trade, status = "PENDING") {
     .setDescription(
       status === "COUNTERED"
         ? `${sentence}\n\n↩️ Contre-offre de <@${trade.to_user_id}>.`
-        : sentence
+        : status === "SETTLED"
+          ? `${sentence}\n\n🤝 Conclu avec <@${trade.to_user_id}> par une contre-offre.`
+          : sentence
     );
   if (offered) {
     embed.setThumbnail(spriteUrl(offered, trade.offer_is_shiny, trade.offer_form));
@@ -1493,7 +1509,11 @@ export function buildTradeEmbed(trade, status = "PENDING") {
     embed.setFooter({
       text:
         (trade.counter_of ? `Contre-offre à l'échange #${trade.counter_of}. ` : "") +
-        "Seul le destinataire peut répondre.",
+        (anyone
+          ? trade.request_open
+            ? "Ouverte à tous : chacun peut faire sa proposition."
+            : "Ouverte à tous : le premier qui accepte l'emporte, chacun peut contre-proposer."
+          : "Seul le destinataire peut répondre."),
     });
   }
   return embed;
@@ -1513,7 +1533,14 @@ export function buildTradePicker(tradeId, choices, species) {
 
 // Une offre « à son choix » ne s'accepte pas telle quelle : « Faire une proposition »
 // prend la place d'« Accepter », et ouvre la même contre-offre que « Contre-offre ».
-export function buildTradeRow(tradeId, { disabled = false, open = false } = {}) {
+// Les options de buildTradeRow que dit la ligne de l'offre.
+export const tradeRowOptions = (trade) => ({
+  open: Boolean(trade.request_open),
+  anyone: Boolean(trade.open_offer),
+});
+
+// Une offre ouverte à tous (`anyone`) n'a personne pour la refuser : pas de « Refuser ».
+export function buildTradeRow(tradeId, { disabled = false, open = false, anyone = false } = {}) {
   const counter = (label, style) =>
     new ButtonBuilder()
       .setCustomId(`poke_trade_counter|${tradeId}`)
@@ -1532,14 +1559,15 @@ export function buildTradeRow(tradeId, { disabled = false, open = false } = {}) 
           .setDisabled(disabled),
         counter("Contre-offre", ButtonStyle.Primary),
       ];
+  const decline = new ButtonBuilder()
+    .setCustomId(`poke_trade_decline|${tradeId}`)
+    .setLabel("Refuser")
+    .setEmoji("❌")
+    .setStyle(ButtonStyle.Danger)
+    .setDisabled(disabled);
   return new ActionRowBuilder().addComponents(
     ...answers,
-    new ButtonBuilder()
-      .setCustomId(`poke_trade_decline|${tradeId}`)
-      .setLabel("Refuser")
-      .setEmoji("❌")
-      .setStyle(ButtonStyle.Danger)
-      .setDisabled(disabled),
+    ...(anyone ? [] : [decline]),
     new ButtonBuilder()
       .setCustomId(`poke_trade_cancel|${tradeId}`)
       .setLabel("Annuler")

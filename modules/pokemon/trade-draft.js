@@ -20,6 +20,7 @@ import db from "../points-db.js";
 import { handleException } from "../utils.js";
 import { getPokemonConfig } from "./config.js";
 import {
+  ANYONE,
   counterTrade,
   expireTrade,
   getIndividual,
@@ -32,8 +33,10 @@ import {
 } from "./collection.js";
 import { getSpecies } from "./data.js";
 import { getItem } from "./items.js";
-import { buildTradeEmbed, buildTradeRow, describeGroup, individualChoices } from "./embeds.js";
+import { buildTradeEmbed, buildTradeRow, describeGroup, individualChoices, tradeRowOptions } from "./embeds.js";
 import {
+  anyItemChoices,
+  anySpeciesChoices,
   checkSide,
   choiceOfTradeSide,
   emptyTradeProblem,
@@ -61,9 +64,12 @@ const MAX_OPTIONS = 25;
 // destinataire. Les colonnes portent les noms de l'offre.
 const COLUMN = { give: "offer", get: "request" };
 const isSide = (which) => which === "give" || which === "get";
-const ownerOf = (draft, which) => (which === "give" ? draft.from_user_id : draft.to_user_id);
+// Un brouillon ouvert à tous a un destinataire vide : ce qu'il demande ne se lit chez
+// personne (null, voir checkSide).
+const targetOf = (draft) => draft.to_user_id || null;
+const ownerOf = (draft, which) => (which === "give" ? draft.from_user_id : targetOf(draft));
 // Celui qui reçoit le côté : l'autre partie.
-const receiverOf = (draft, which) => (which === "give" ? draft.to_user_id : draft.from_user_id);
+const receiverOf = (draft, which) => (which === "give" ? targetOf(draft) : draft.from_user_id);
 
 // ------------------------------- Base -------------------------------
 
@@ -149,16 +155,26 @@ const button = (customId, label, style, disabled = false) =>
 // L'écran du brouillon : les deux côtés, et les boutons pour les remplir ou proposer.
 // `note` dit ce qui vient de se passer (un refus, une erreur) sans quitter l'écran.
 export async function draftView(draft, note = null) {
+  // Une offre ouverte à tous ne se ferme pas quand une contre-offre part : les autres
+  // peuvent encore y répondre.
+  const original = draft.counter_of
+    ? await new Promise((resolve) => getTradeRow(draft.counter_of, (err, row) => resolve(err ? null : row)))
+    : null;
   const embed = new EmbedBuilder()
     .setTitle(draft.counter_of ? "Préparer une contre-offre" : "Préparer un échange")
     .setColor(COLOR)
     .setDescription(
       draft.counter_of
         ? `Contre-offre à l'échange #${draft.counter_of} de <@${draft.to_user_id}> : les côtés sont ` +
-            "inversés, change ce que tu veux avant de proposer. Son offre se ferme quand ta " +
-            "contre-offre part ; rien ne bouge avant qu'il accepte."
-        : `Échange avec <@${draft.to_user_id}>. Choisis ce que chacun donne, puis propose : ` +
+            "inversés, change ce que tu veux avant de proposer. " +
+            (original?.open_offer
+              ? "Son offre reste ouverte aux autres ; rien ne bouge avant qu'il accepte la tienne."
+              : "Son offre se ferme quand ta contre-offre part ; rien ne bouge avant qu'il accepte.")
+        : targetOf(draft)
+          ? `Échange avec <@${draft.to_user_id}>. Choisis ce que chacun donne, puis propose : ` +
             "rien ne bouge avant qu'il accepte."
+          : "Échange ouvert à tous : le premier qui accepte l'emporte, et chacun peut " +
+            "contre-proposer. « À son choix » laisse chacun faire sa proposition."
     )
     .addFields(
       { name: "Tu donnes", value: await describeChoice(draft.give, "give"), inline: true },
@@ -187,7 +203,11 @@ const backRow = (draftId) =>
 // Le menu des sortes de contenu d'un côté.
 function kindView(draft, which, note = null) {
   const question =
-    which === "give" ? "Que donnes-tu ?" : `Que demandes-tu à <@${draft.to_user_id}> ?`;
+    which === "give"
+      ? "Que donnes-tu ?"
+      : targetOf(draft)
+        ? `Que demandes-tu à <@${draft.to_user_id}> ?`
+        : "Que demandes-tu ?";
   return {
     content: [note, question].filter(Boolean).join("\n"),
     embeds: [],
@@ -332,11 +352,12 @@ const field = (interaction, id) => {
 // Ouvre le brouillon en réponse éphémère à /pk echange.
 export async function openDraft(interaction, target) {
   // Ce qu'on demande part de 0 point, comme dans la commande : il reste à le changer.
+  // Ouvert à tous (sans `target`), il part « à son choix ».
   const draftId = await createDraft({
     fromUserId: interaction.user.id,
-    toUserId: target.id,
+    toUserId: target?.id ?? ANYONE,
     channelId: interaction.channelId,
-    get: { kind: "points", amount: 0 },
+    get: target ? { kind: "points", amount: 0 } : { kind: "open" },
   });
   const draft = await getDraft(draftId);
   return interaction.reply({ ...(await draftView(draft)), flags: MessageFlags.Ephemeral });
@@ -351,7 +372,8 @@ export async function openDraft(interaction, target) {
 export async function openCounterDraft(interaction, trade) {
   const asked = choiceOfTradeSide(trade, "request");
   const draftId = await createDraft({
-    fromUserId: trade.to_user_id,
+    // Celui qui clique : le destinataire, ou n'importe qui sur une offre ouverte à tous.
+    fromUserId: interaction.user.id,
     toUserId: trade.from_user_id,
     channelId: interaction.channelId ?? trade.channel_id,
     counterOf: trade.id,
@@ -403,8 +425,8 @@ async function propose(interaction, draft) {
     return showDraft(interaction, draft, "❌ Il manque un côté : choisis ce que tu donnes et ce que tu demandes.");
   }
   const [offer, request] = await Promise.all([
-    checkSide(draft.give, draft.give.individual ?? null, draft.from_user_id, true, draft.to_user_id),
-    checkSide(draft.get, draft.get.individual ?? null, draft.to_user_id, false, draft.from_user_id),
+    checkSide(draft.give, draft.give.individual ?? null, draft.from_user_id, true, targetOf(draft)),
+    checkSide(draft.get, draft.get.individual ?? null, targetOf(draft), false, draft.from_user_id),
   ]);
   if (offer.error || request.error) {
     return showDraft(interaction, draft, `❌ ${offer.error ?? request.error}`);
@@ -435,23 +457,30 @@ async function propose(interaction, draft) {
       counterTrade({ tradeId: draft.counter_of, fromUserId: draft.from_user_id, ...sides }, settle);
     } else {
       proposeTrade(
-        { fromUserId: draft.from_user_id, toUserId: draft.to_user_id, ...sides, unique: true },
+        { fromUserId: draft.from_user_id, toUserId: targetOf(draft), ...sides, unique: true },
         settle
       );
     }
   });
   if (trade.stale) return counterIsStale(interaction, draft);
   if (trade.duplicate) {
-    return showDraft(interaction, draft, "❌ Une offre identique est déjà ouverte avec ce dresseur.");
+    return showDraft(
+      interaction,
+      draft,
+      targetOf(draft)
+        ? "❌ Une offre identique est déjà ouverte avec ce dresseur."
+        : "❌ Une offre identique, ouverte à tous, est déjà en cours."
+    );
   }
   if (trade.error) return showDraft(interaction, draft, "❌ Impossible de créer l'échange.");
 
   let message;
   try {
+    // Ouverte à tous, l'offre ne mentionne personne.
     message = await channel.send({
-      content: `<@${draft.to_user_id}>`,
+      ...(targetOf(draft) ? { content: `<@${draft.to_user_id}>` } : {}),
       embeds: [buildTradeEmbed(trade.trade, "PENDING")],
-      components: [buildTradeRow(trade.trade.id, { open: Boolean(trade.trade.request_open) })],
+      components: [buildTradeRow(trade.trade.id, tradeRowOptions(trade.trade))],
     });
   } catch (error) {
     // L'offre n'a pas de message, personne ne la verra : on la ferme, le brouillon reste.
@@ -471,7 +500,9 @@ async function propose(interaction, draft) {
   if (draft.counter_of) await syncTradeMessage(interaction.client, draft.counter_of);
   await deleteDraft(draft.id);
   return show(interaction, {
-    content: `✅ ${draft.counter_of ? "Contre-offre" : "Offre"} envoyée à <@${draft.to_user_id}>.`,
+    content: targetOf(draft)
+      ? `✅ ${draft.counter_of ? "Contre-offre" : "Offre"} envoyée à <@${draft.to_user_id}>.`
+      : "✅ Offre publiée, ouverte à tous.",
     embeds: [],
     components: [],
   });
@@ -592,7 +623,7 @@ export async function handleDraftModal(interaction, action, args) {
       const needle = field(interaction, "query").toLowerCase();
       const owner = ownerOf(draft, which);
       if (kind === "pk") {
-        const found = await speciesChoices(owner, needle);
+        const found = owner ? await speciesChoices(owner, needle) : anySpeciesChoices(needle);
         if (!found.length) {
           return show(interaction, kindView(draft, which, `❌ Aucune espèce « ${needle} » à échanger.`));
         }
@@ -603,7 +634,7 @@ export async function handleDraftModal(interaction, action, args) {
       if (!Number.isSafeInteger(count) || count < 1) {
         return show(interaction, kindView(draft, which, "❌ La quantité doit être d'au moins 1."));
       }
-      const found = await itemChoices(owner, needle, count);
+      const found = owner ? await itemChoices(owner, needle, count) : anyItemChoices(needle, count);
       if (!found.length) {
         return show(interaction, kindView(draft, which, "❌ Aucun objet de ce nom à échanger."));
       }

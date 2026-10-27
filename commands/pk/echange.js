@@ -7,10 +7,13 @@ import {
   buildTradeEmbed,
   buildTradeRow,
   HINT_VALUE,
+  tradeRowOptions,
   individualChoices,
   respondHint as hint,
 } from "../../modules/pokemon/embeds.js";
 import {
+  anyItemChoices,
+  anySpeciesChoices,
   checkSide,
   emptyTradeProblem,
   itemChoices,
@@ -36,7 +39,12 @@ function mixedChoices(specials, species, items) {
 // Les choix d'un côté : ce que `userId` peut donner, plus « Rien ». Une saisie qui
 // commence par un nombre propose des points, ou une quantité d'un objet. `giving` dit si
 // c'est le côté de celui qui propose : « rien » n'y vaut pas la même chose qu'une demande.
+// Sans `userId` — ce que demande une offre ouverte à tous —, tout le Pokédex ouvert et tous
+// les objets qui s'échangent.
 async function respondWithSide(interaction, userId, query, { giving, emptyLabel }) {
+  const speciesOf = (needle) => (userId ? speciesChoices(userId, needle) : anySpeciesChoices(needle));
+  const itemsOf = (needle, quantity) =>
+    userId ? itemChoices(userId, needle, quantity) : anyItemChoices(needle, quantity ?? null);
   const needle = query.toLowerCase();
   try {
     const typed = readNumberQuery(query);
@@ -46,12 +54,12 @@ async function respondWithSide(interaction, userId, query, { giving, emptyLabel 
       return interaction.respond([{ name, value: pointsValue(typed.amount) }]).catch(() => {});
     }
     if (typed) {
-      const items = await itemChoices(userId, typed.rest.toLowerCase(), typed.amount);
+      const items = await itemsOf(typed.rest.toLowerCase(), typed.amount);
       if (!items.length) return hint(interaction, `Aucun objet « ${typed.rest} » à échanger`);
       return interaction.respond(items.slice(0, MAX_CHOICES)).catch(() => {});
     }
 
-    const [species, items] = await Promise.all([speciesChoices(userId, needle), itemChoices(userId, needle)]);
+    const [species, items] = await Promise.all([speciesOf(needle), itemsOf(needle)]);
     const specials = [
       { name: "Pour des points, tape un nombre (ex. 3000)", value: HINT_VALUE },
       { name: giving ? "Rien (0 point)" : "Rien (0 point : un cadeau)", value: pointsValue(0) },
@@ -103,6 +111,7 @@ function respondWithIndividuals(interaction, userId, query) {
 // donc rien à gagner à les mélanger. Zéro point est un côté valide : c'est ainsi
 // qu'on fait un cadeau.
 const NOTHING = { kind: "points", amount: 0 };
+const OPEN = { kind: "open" };
 const OPTIONS = {
   give: { choice: "je_donne", individual: "mon_individu" },
   get: { choice: "je_recois", individual: null },
@@ -118,9 +127,11 @@ async function readSide(interaction, names, owner, own, receiver) {
   const individual = names.individual ? interaction.options.getString(names.individual) : null;
 
   // Ce qu'on demande, laissé vide, vaut 0 point : une offre sans contrepartie est un
-  // cadeau, pas un oubli à refuser. Ce qu'on donne doit toujours se dire.
+  // cadeau, pas un oubli à refuser. Ouverte à tous (sans `owner`), elle reste « à son
+  // choix » : chacun fait sa proposition, sauf si 0 point est demandé en toutes lettres.
+  // Ce qu'on donne doit toujours se dire.
   if (raw === null || raw === undefined) {
-    if (!own) return checkSide(NOTHING, null, owner, own, receiver);
+    if (!own) return checkSide(owner ? NOTHING : OPEN, null, owner, own, receiver);
     return {
       error:
         `Dis ce que tu donnes (\`${names.choice}\`) : un Pokémon, un objet ou un nombre de ` +
@@ -154,8 +165,8 @@ export default {
       .addUserOption((option) =>
         option
           .setName("membre")
-          .setDescription("Le destinataire")
-          .setRequired(true)
+          .setDescription("Le destinataire (vide : ouverte à tous)")
+          .setRequired(false)
       )
       .addStringOption((option) =>
         option
@@ -201,12 +212,12 @@ export default {
     // passe les options brutes au resolver). Seule la valeur brute de l'option
     // — l'identifiant du membre — est disponible. Avec getUser(), la liste était
     // systématiquement vide.
+    // Sans membre, l'offre est ouverte à tous : on demande dans tout le catalogue.
     const targetId = interaction.options.get("membre")?.value;
-    if (!targetId) return hint(interaction, "⚠️ Choisis d'abord le dresseur dans l'option « membre »");
     if (focused.name === "je_recois") {
-      return respondWithSide(interaction, String(targetId), query, {
+      return respondWithSide(interaction, targetId ? String(targetId) : null, query, {
         giving: false,
-        emptyLabel: "Ce dresseur n'a rien à échanger",
+        emptyLabel: targetId ? "Ce dresseur n'a rien à échanger" : "Rien de ce nom dans le Pokédex ni les objets",
       });
     }
     return interaction.respond([]).catch(() => {});
@@ -214,11 +225,13 @@ export default {
 
   async execute(interaction) {
     try {
+      // Sans membre, l'offre est ouverte à tous : le premier qui accepte l'emporte.
       const target = interaction.options.getUser("membre");
+      const targetId = target?.id ?? null;
       const refuse = (content) =>
         interaction.reply({ content: `❌ ${content}`, flags: MessageFlags.Ephemeral });
 
-      if (target.bot) return refuse("Les bots ne collectionnent pas les Pokémon.");
+      if (target?.bot) return refuse("Les bots ne collectionnent pas les Pokémon.");
 
       // Ni ce qu'on donne ni ce qu'on demande : le brouillon, un écran privé où l'on
       // choisit avec des menus. Une option seule reste une offre incomplète, refusée plus
@@ -238,8 +251,8 @@ export default {
       let offer, request;
       try {
         [offer, request] = await Promise.all([
-          readSide(interaction, OPTIONS.give, interaction.user.id, true, target.id),
-          readSide(interaction, OPTIONS.get, target.id, false, interaction.user.id),
+          readSide(interaction, OPTIONS.give, interaction.user.id, true, targetId),
+          readSide(interaction, OPTIONS.get, targetId, false, interaction.user.id),
         ]);
       } catch (err) {
         handleException("Lecture des côtés pour /pk echange :", err);
@@ -258,7 +271,7 @@ export default {
       proposeTrade(
         {
           fromUserId: interaction.user.id,
-          toUserId: target.id,
+          toUserId: targetId,
           offer: offer.side,
           request: request.side,
           channelId: interaction.channelId,
@@ -275,10 +288,11 @@ export default {
           // ses boutons n'existent pas.
           let message;
           try {
+            // Ouverte à tous, l'offre ne mentionne personne.
             message = await interaction.editReply({
-              content: `<@${target.id}>`,
+              ...(targetId ? { content: `<@${targetId}>` } : {}),
               embeds: [buildTradeEmbed(trade, "PENDING")],
-              components: [buildTradeRow(trade.id, { open: Boolean(trade.request_open) })],
+              components: [buildTradeRow(trade.id, tradeRowOptions(trade))],
             });
           } catch (error) {
             handleException("Publication d'une offre d'échange :", error);

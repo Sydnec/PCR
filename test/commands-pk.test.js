@@ -964,8 +964,9 @@ describe("/pk echange", () => {
     assert.match(mine[2].name, /évoluera gratuitement en Mackogneur/);
     assert.deepEqual(payloadOf(await asked({ name: "je_donne", value: "mackogneur" }), "respond").map((choice) => choice.value), [ids("Machopeur")]);
     assert.deepEqual(payloadOf(await asked({ name: "je_donne", value: "zzz" }), "respond").map((choice) => choice.value), ["—"]);
-    const none = payloadOf(await asked({ name: "je_recois", value: "" }), "respond");
-    assert.match(none[0].name, /Choisis d'abord le dresseur/);
+    // Sans membre, l'offre est ouverte à tous : on demande dans tout le Pokédex ouvert.
+    const anyone = payloadOf(await asked({ name: "je_recois", value: "roucool" }), "respond");
+    assert.deepEqual(anyone.map((choice) => choice.value), [ids("Roucool")]);
     await ownMany("Roucool", 2, { user: "u2" });
     const theirs = payloadOf(await asked({ name: "je_recois", value: "" }, { membre: "u2" }), "respond");
     assert.deepEqual(theirs.map((choice) => choice.value), ["—", "pts:0", "open", ids("Roucool")]);

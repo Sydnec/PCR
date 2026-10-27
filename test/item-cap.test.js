@@ -245,11 +245,12 @@ describe("les cannes", () => {
     await grantRod("u1", SUPER);
     assert.deepEqual(await grantRod("u1", SUPER), { kept: 0, sold: 0, points: 0, upgraded: 1 });
     assert.deepEqual([await count("u1", SUPER), await count("u1", MEGA), await balance("u1")], [1, 1, 0]);
-    const log = await dbAll(points, "SELECT item_key, delta, source FROM pokemon_item_log WHERE user_id = 'u1' ORDER BY id");
+    // Le journal s'écrit au mieux, sans attendre : son ordre n'est pas garanti.
+    const log = await dbAll(points, "SELECT item_key, delta, source FROM pokemon_item_log WHERE user_id = 'u1' ORDER BY item_key, source");
     assert.deepEqual(log, [
-      { item_key: SUPER, delta: 1, source: "test" },
       { item_key: MEGA, delta: 1, source: "amelioration:test" },
       { item_key: SUPER, delta: 0, source: "amelioration:test" },
+      { item_key: SUPER, delta: 1, source: "test" },
     ]);
   });
 
@@ -317,7 +318,7 @@ describe("les cannes", () => {
     assert.deepEqual(await call(items.sellHeldOverCap), { sold: 1 + 1 + 2 });
     assert.deepEqual([await count("u1", SUPER), await count("u1", MEGA), await balance("u1")], [1, 1, 500]);
     assert.deepEqual([await count("u2", SUPER), await count("u2", MEGA), await balance("u2")], [1, 1, 500 + 2 * 1000]);
-    const log = await dbAll(points, "SELECT item_key, delta, source FROM pokemon_item_log WHERE user_id = 'u1' ORDER BY id");
+    const log = await dbAll(points, "SELECT item_key, delta, source FROM pokemon_item_log WHERE user_id = 'u1' ORDER BY item_key, source");
     assert.deepEqual(log, [
       { item_key: MEGA, delta: 1, source: "amelioration:plafond-detention" },
       { item_key: SUPER, delta: -1, source: "amelioration:plafond-detention" },

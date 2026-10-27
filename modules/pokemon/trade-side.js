@@ -11,8 +11,8 @@ import {
   selectorOf,
   tradeCandidate,
 } from "./collection.js";
-import { getSpecies, tradeEvolutionTarget } from "./data.js";
-import { getInventory, getItem, getItemCount, isTradable, itemCap } from "./items.js";
+import { allSpecies, getSpecies, isAvailable, tradeEvolutionTarget } from "./data.js";
+import { getInventory, getItem, getItemCount, getItems, isTradable, itemCap, itemOpen } from "./items.js";
 import { describeGroup } from "./embeds.js";
 
 const promisify = (fn, ...args) =>
@@ -102,6 +102,24 @@ export function itemChoices(userId, needle, quantity = null) {
   );
 }
 
+// Ce qu'une offre ouverte à tous peut demander, sans destinataire dont lire la
+// collection : les espèces du Pokédex ouvert et les objets qui s'échangent. Celui qui
+// acceptera devra l'avoir : acceptTrade le vérifie.
+export function anySpeciesChoices(needle) {
+  return allSpecies()
+    .filter((species) => species.name.toLowerCase().includes(needle))
+    .map((species) => ({ name: species.name, value: speciesValue(species.id) }));
+}
+
+export function anyItemChoices(needle, quantity = null) {
+  return getItems()
+    .filter((item) => isTradable(item) && itemOpen(item) && item.label.toLowerCase().includes(needle))
+    .map((item) => ({
+      name: quantity !== null ? `${quantity.toLocaleString("fr-FR")}× ${item.label}` : `${item.label} (objet)`,
+      value: itemValue(item.key, quantity),
+    }));
+}
+
 // Valide un côté et le range comme proposeTrade l'attend : `{ side }`, ou `{ error }`
 // rédigé pour celui qui propose. `choice` vient de parseChoice (ou d'un brouillon),
 // `individual` désigne l'individu qu'on donne ("#123", sinon le moins précieux), `owner`
@@ -109,8 +127,12 @@ export function itemChoices(userId, needle, quantity = null) {
 // « tu » ou « <@id> ». `receiver` reçoit le côté : un objet plafonné (la Master Ball)
 // ne s'offre pas à qui en a déjà le maximum. Tout se relit en base : une valeur a pu
 // vieillir depuis le menu.
+//
+// Sans `owner` — ce que demande une offre ouverte à tous —, rien ne se lit chez personne :
+// le côté doit seulement exister, et celui qui acceptera devra l'avoir.
 export async function checkSide(choice, individual, owner, own, receiver = null) {
   const who = own ? "Tu" : `<@${owner}>`;
+  const anyone = !owner;
   // « À son choix » ne se dit que de ce qu'on demande : on ne promet pas « ce que je
   // voudrai » en retour, l'offre doit être concrète.
   if (choice.kind === "open") {
@@ -120,6 +142,7 @@ export async function checkSide(choice, individual, owner, own, receiver = null)
   }
   if (choice.kind === "points") {
     const amount = choice.amount;
+    if (anyone) return { side: { points: amount } };
     const balance = await promisify(getBalance, owner);
     if (amount > balance) {
       return {
@@ -140,7 +163,7 @@ export async function checkSide(choice, individual, owner, own, receiver = null)
     }
     const quantity = choice.quantity;
     if (quantity < 1) return { error: "La quantité doit être d'au moins 1." };
-    const held = await promisify(getItemCount, owner, key);
+    const held = anyone ? quantity : await promisify(getItemCount, owner, key);
     if (quantity > held) {
       return {
         error:
@@ -170,6 +193,11 @@ export async function checkSide(choice, individual, owner, own, receiver = null)
   // libre.
   const { species: found, error } = resolveSpecies(choice.id);
   if (error) return { error };
+  if (anyone) {
+    if (individual) return { error: "Un individu ne se désigne que chez un dresseur précis." };
+    if (!isAvailable(found)) return { error: `**${found.name}** n'est pas encore dans le Pokédex.` };
+    return { side: { speciesId: found.id } };
+  }
   // Un individu désigné se contrôle des deux côtés : celui qu'on donne, et celui qu'une
   // contre-offre redemande tel que l'offre d'origine le désignait (il a pu partir).
   if (individual) {

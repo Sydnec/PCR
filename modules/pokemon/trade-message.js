@@ -7,20 +7,21 @@ import { getConfig } from "../config.js";
 import { syncMessage } from "../message-sync.js";
 import { handleException, log } from "../utils.js";
 import { expireTrade, getTrade, reopenCountered, resolveTradeAs, setTradeMessage } from "./collection.js";
-import { buildTradeEmbed, buildTradeRow } from "./embeds.js";
+import { buildTradeEmbed, buildTradeRow, tradeRowOptions } from "./embeds.js";
 
 const read = (run) => new Promise((resolve, reject) => run((err, value) => (err ? reject(err) : resolve(value))));
 
 // Le message d'une offre conclue : son résultat, et plus aucun bouton actif.
 // `note` : ce que le dresseur doit lire en plus (la raison d'un échec).
-// Une offre contrée n'a plus de boutons du tout : elle a une suite, ailleurs.
+// Une offre contrée n'a plus de boutons du tout : elle a une suite, ailleurs. Une offre
+// ouverte conclue par une contre-offre non plus : la suite est le message de celle-ci.
 export const tradeOutcome = (trade, status, note = null) => ({
   content: note ?? null,
   embeds: [buildTradeEmbed(trade, status)],
   components:
-    status === "COUNTERED"
+    status === "COUNTERED" || status === "SETTLED"
       ? []
-      : [buildTradeRow(trade.id, { disabled: true, open: Boolean(trade.request_open) })],
+      : [buildTradeRow(trade.id, { disabled: true, ...tradeRowOptions(trade) })],
 });
 
 export function markTradeMessageClosed(tradeId) {
@@ -62,7 +63,7 @@ export async function syncTradeMessage(client, tradeId, { note = null, repair = 
       if (restore && fresh?.status === "PENDING") {
         return {
           embeds: [buildTradeEmbed(fresh, "PENDING")],
-          components: [buildTradeRow(fresh.id, { open: Boolean(fresh.request_open) })],
+          components: [buildTradeRow(fresh.id, tradeRowOptions(fresh))],
         };
       }
       final = Boolean(fresh) && fresh.status !== "PENDING";
