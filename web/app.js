@@ -53,6 +53,8 @@ const ctx = {
   balls: new Map(),
   // Couleur de chaque type, celle des embeds Discord.
   types: {},
+  // Les raretés, du commun au légendaire ({ key, label }).
+  rarities: [],
   refreshMe,
   setWallet,
   navigate,
@@ -222,6 +224,7 @@ async function boot() {
     api("/api/catalogue"),
   ]);
   for (const entry of species.species) ctx.species.set(entry.id, entry);
+  ctx.rarities = species.rarities ?? [];
   for (const ball of catalogue.balls) ctx.balls.set(ball.key, ball);
   ctx.types = catalogue.types ?? {};
   // Les messages du jeu citent les objets par leur emoji : le site montre leur

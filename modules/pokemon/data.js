@@ -128,6 +128,10 @@ export function allSpecies(generation = activeGeneration()) {
 }
 export const dexSize = () => allSpecies().length;
 
+// Zarbi, retrouvé par son identifiant de PokéAPI comme Métamorph, que sa génération
+// soit ouverte ou non : /pk zarbis dit alors quand il arrive.
+export const unownSpecies = () => dataset.species.find((species) => species.slug === "unown") ?? null;
+
 // Métamorph s'il fait partie des générations ouvertes, sinon null.
 export const dittoSpecies = () => allSpecies().find(isDitto) ?? null;
 
@@ -414,6 +418,11 @@ export const isEggOnly = (species) => Boolean(species?.isBaby);
 // Pokédex et les fiches, pour que les deux ne se contredisent pas.
 export const unobtainableMark = (species) =>
   isEggOnly(species) ? "\u{1F95A}" : isEvolutionOnly(species) ? "\u{1F512}" : "";
+
+// Comment on obtient une espèce, ou pourquoi on ne la croisera pas : « egg »,
+// « evolution » ou « wild ». Les filtres du site et de /pk pokedex lisent celle-ci.
+export const obtentionOf = (species) =>
+  isEggOnly(species) ? "egg" : isEvolutionOnly(species) ? "evolution" : "wild";
 
 // Une espèce qu'aucun tirage ne peut faire apparaître : poids nul dans le pool
 // sauvage ET dans celui du parc. Il ne reste alors qu'une évolution pour

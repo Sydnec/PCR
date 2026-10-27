@@ -19,7 +19,14 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
 - `/pk pokedex [membre]` : collection, doublons, shinies et progression. Réponse privée. Une entrée
   est une **espèce**, shiny ou non. Un 🔒 marque les espèces qu'aucune apparition ne donnera
   jamais — elles ne s'obtiennent que par évolution, avec un objet ou par échange —, un 🥚 celles
-  qui ne sortent que d'un œuf.
+  qui ne sortent que d'un œuf. **Les filtres du site** s'y choisissent dans la réponse : menus de
+  rareté, de génération (dès qu'il y en a deux d'ouvertes), de type et d'obtention, et deux
+  bascules à côté des pages, possédées / manquantes et shiny. Le filtre se rappelle en tête, avec
+  ce qu'il retient ; un changement ramène à la première page. Pas d'options de commande : `/pk`
+  frôle la limite de 8 000 caractères que Discord impose à une commande.
+- `/pk zarbis [membre]` : les lettres de Zarbi réunies (avec leur nombre et ✨ leurs shiny) et
+  celles qui manquent, sur les formes de la génération ouverte. Réponse privée. Zarbi n'a qu'une
+  entrée de Pokédex : c'est ici qu'on suit l'alphabet.
 - `/pk boite [pokemon] [membre]` : les Pokémon un par un, page par page — `#numéro`, sexe, ball,
   date, fertilité, et 🛡️ les verrouillés (voir [Individus](individus.md)).
 - `/pk renommer <espece> <individu> [surnom]` : donne un surnom à un de tes Pokémon, ou le retire
@@ -77,8 +84,21 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
   (`pokemon.evolution.dittosPerCopy`). Les exemplaires de l'espèce partent d'abord, et il reste
   toujours un Métamorph. Il n'est jamais pris sans qu'on le demande, et le choix de la forme
   (Évoli) reste possible avec lui.
-- `/pk echange <membre>` + de quoi remplir **chaque côté** : un Pokémon, des points ou un objet.
-  - **Sans autre option**, `/pk echange membre:@x` ouvre un **brouillon privé** : « Ce que je donne »
+- `/pk echange [membre]` + de quoi remplir **chaque côté** : un Pokémon, des points ou un objet.
+  - **Sans `membre`, l'offre est ouverte à tous** : publiée sans mention, sans bouton « Refuser ».
+    **Le premier qui accepte l'emporte** (deux clics simultanés, un seul échange), jamais son
+    auteur. S'il lui manque ce qui est demandé, ou s'il dépasserait une limite (Master Ball,
+    cannes), lui seul lit le refus et l'offre reste ouverte aux autres. Ce qu'on demande se
+    choisit dans tout le Pokédex ouvert et les objets échangeables : c'est celui qui accepte qui
+    doit l'avoir. Sans `je_recois`, elle est **« à son choix »** : chacun fait sa proposition par
+    contre-offre ; `je_recois: 0` en fait un cadeau que le premier venu prend.
+  - **N'importe qui, sauf l'auteur, peut contre-proposer** à une offre ouverte : sa contre-offre
+    part vers l'auteur seul, et l'offre ouverte **reste ouverte**. Acceptée directement, elle
+    annule les contre-offres encore en attente ; une contre-offre acceptée (même après plusieurs
+    allers-retours) la ferme en **« 🤝 Conclu par une contre-offre »**, avec le nom de l'autre
+    dresseur, et annule les autres.
+  - **Sans autre option**, `/pk echange membre:@x` (ou `/pk echange` seul, ouvert à tous, « à son
+    choix » par défaut) ouvre un **brouillon privé** : « Ce que je donne »
     et « Ce que je demande » proposent un Pokémon, un objet, des points ou rien, avec des menus et
     des fenêtres de saisie (recherche d'une espèce ou d'un objet, montant, quantité, individu qu'on
     donne). « Proposer » publie la même offre que la commande, après avoir revérifié les deux côtés.
@@ -88,7 +108,8 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
     tape devant son nom : `je_donne: 3 bonbon` (1 par défaut quand on choisit l'objet dans la
     liste). `mon_individu` désigne un individu précis de l'espèce que tu donnes. Pas de mélange
     dans un côté. `0` (ou « Rien ») fait un cadeau : `je_donne: 0` pour demander sans rien donner,
-    `je_recois: 0` pour offrir sans rien demander.
+    `je_recois: 0` pour offrir sans rien demander. **Sans `je_recois`, l'offre demande 0 point**, et
+    « Ce que je demande » du brouillon part de 0 point.
   - Sans `mon_individu`, c'est le moins précieux de l'espèce qui part, le plus récent à égalité.
     Le Pokémon demandé ne se désigne que par son espèce : **le destinataire choisit lequel**,
     parmi ses Pokémon libres, dans un menu privé qui s'ouvre quand il clique sur « Accepter ».

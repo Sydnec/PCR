@@ -439,6 +439,10 @@ const db = new sqlite3.Database(dbPath, (err) => {
         // pas d'un côté de points ou d'objet.
         addColumn("pokemon_trades", "counter_of", "INTEGER");
         addColumn("pokemon_trades", "request_open", "INTEGER NOT NULL DEFAULT 0");
+        // Offre ouverte à tous : `to_user_id` reste vide jusqu'au premier qui accepte, et
+        // ce drapeau le retient ensuite. Close par une contre-offre acceptée, elle passe
+        // en SETTLED, avec ce contre-offrant pour `to_user_id`.
+        addColumn("pokemon_trades", "open_offer", "INTEGER NOT NULL DEFAULT 0");
       }
     );
 

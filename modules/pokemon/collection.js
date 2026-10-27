@@ -1298,6 +1298,11 @@ export function evolve(userId, group, chosenTargetId, helperKey, cb) {
 // acceptant. Les offres d'avant ces choix désignent un groupe — espèce, variante,
 // sexe, fertilité — dont l'individu se choisit à l'acceptation, selon la même règle
 // que partout (jamais le dernier de l'espèce, les moins précieux d'abord).
+// Le destinataire d'une offre ouverte à tous, tant que personne ne l'a acceptée :
+// `to_user_id` ne peut pas être NULL dans les bases déjà en service.
+export const ANYONE = "";
+export const isOpenToAll = (trade) => Boolean(trade?.open_offer) && !trade.to_user_id;
+
 const fertileFlag = (fertile) =>
   fertile === null || fertile === undefined ? null : fertile ? 1 : 0;
 
@@ -1310,8 +1315,9 @@ export function createTrade(trade, cb) {
         request_species_id, request_is_shiny, request_sex, request_fertile,
         offer_pokemon_id, request_pokemon_id, created_at, expires_at, channel_id,
         offer_form, request_form, offer_points, request_points,
-        offer_item, offer_item_qty, request_item, request_item_qty, request_open, counter_of)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        offer_item, offer_item_qty, request_item, request_item_qty, request_open, counter_of,
+        open_offer)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       trade.fromUserId,
       trade.toUserId,
@@ -1338,6 +1344,9 @@ export function createTrade(trade, cb) {
       trade.requestItemQty ?? null,
       trade.requestOpen ? 1 : 0,
       trade.counterOf ?? null,
+      // Ouverte à tous seulement si l'appelant le dit (ANYONE) : un destinataire manquant
+      // reste une erreur, pas une offre publiée à tout le salon.
+      trade.toUserId === ANYONE ? 1 : 0,
     ],
     function (err) {
       cb(err, this ? this.lastID : null);
@@ -1408,7 +1417,8 @@ function sideFields(side, prefix) {
   throw new Error("Côté d'échange invalide : ni Pokémon, ni points, ni objet");
 }
 
-// Crée l'offre d'un dresseur à un autre et rend la ligne enregistrée. `offer` et
+// Crée l'offre d'un dresseur à un autre — ou à tous, avec `toUserId: ANYONE` — et rend la
+// ligne enregistrée. `offer` et
 // `request` désignent chacun un Pokémon, des points ou un objet (sideFields) ;
 // un Pokémon précis (resolveSelector, selectorOf) a sa fertilité dans l'offre, et
 // l'offre échoue à l'acceptation plutôt que de livrer autre chose que ce qui
@@ -1508,6 +1518,30 @@ export function isOldestOpenOffer(trade, cb) {
 export function counterTrade({ tradeId, fromUserId, offer, request, channelId }, cb) {
   getTrade(tradeId, (readError, original) => {
     if (readError) return cb(readError);
+    // Une offre ouverte à tous reste ouverte : chacun peut y répondre par sa contre-offre,
+    // adressée à son auteur, et c'est l'acceptation de l'une d'elles qui la fermera
+    // (closeOpenFamily). Rien à fermer ni à rouvrir ici.
+    if (isOpenToAll(original)) {
+      if (
+        original.status !== "PENDING" ||
+        original.expires_at <= Date.now() ||
+        original.from_user_id === fromUserId
+      ) {
+        return cb(null, null, { stale: true });
+      }
+      return proposeTrade(
+        {
+          fromUserId,
+          toUserId: original.from_user_id,
+          offer,
+          request,
+          channelId,
+          unique: true,
+          counterOf: tradeId,
+        },
+        cb
+      );
+    }
     if (!original || original.to_user_id !== fromUserId) return cb(null, null, { stale: true });
     db.run(
       `UPDATE pokemon_trades SET status = 'COUNTERED', resolved_at = ?
@@ -1752,11 +1786,12 @@ function capReason(trade, offerSide, requestSide, cb) {
       if (err) return cb(err);
       const leaving = other.kind === "item" && other.key === side.key ? other.quantity : 0;
       if (held - leaving + side.quantity <= cap) return next(index + 1);
-      cb(
-        null,
-        `${mine ? "Tu as" : "L'initiateur a"} déjà ${held.toLocaleString("fr-FR")} ${item.label}, ` +
-          `et on n'en garde pas plus de ${cap.toLocaleString("fr-FR")} : l'échange ne passe pas.`
-      );
+      cb(null, {
+        mine,
+        reason:
+          `${mine ? "Tu as" : "L'initiateur a"} déjà ${held.toLocaleString("fr-FR")} ${item.label}, ` +
+          `et on n'en garde pas plus de ${cap.toLocaleString("fr-FR")} : l'échange ne passe pas.`,
+      });
     });
   };
   next(0);
@@ -1770,12 +1805,20 @@ function capReason(trade, offerSide, requestSide, cb) {
 // le choisit en acceptant (`requestPokemonId`) ; sans choix, l'individu est celui
 // que reserveDuplicates retirerait en premier, comme pour les offres d'avant. Il se
 // revalide à l'acceptation : il doit être de l'espèce demandée, et libre de partir.
+//
+// Une offre ouverte à tous revient au premier qui l'accepte (`acceptorId`) : la même
+// revendication l'inscrit comme destinataire, jamais l'auteur. Si ce qui manque est de
+// son côté à lui, l'offre se rouvre pour les autres plutôt que d'échouer.
 export function acceptTrade(tradeId, options, cb) {
   if (typeof options === "function") [options, cb] = [{}, options];
+  const acceptorId = options.acceptorId ? String(options.acceptorId) : null;
   db.run(
-    `UPDATE pokemon_trades SET status = 'ACCEPTED', resolved_at = ?
-      WHERE id = ? AND status = 'PENDING' AND expires_at > ? AND request_open = 0`,
-    [Date.now(), tradeId, Date.now()],
+    `UPDATE pokemon_trades SET status = 'ACCEPTED', resolved_at = ?,
+            to_user_id = CASE WHEN open_offer = 1 AND to_user_id = '' THEN ? ELSE to_user_id END
+      WHERE id = ? AND status = 'PENDING' AND expires_at > ? AND request_open = 0
+        AND (open_offer = 0 OR to_user_id <> ''
+             OR (? IS NOT NULL AND from_user_id <> ?))`,
+    [Date.now(), acceptorId, tradeId, Date.now(), acceptorId, acceptorId],
     function (err) {
       if (err) return cb(err);
       if (this.changes === 0) {
@@ -1797,6 +1840,9 @@ export function acceptTrade(tradeId, options, cb) {
               open: true,
               reason: "Cette offre est à ton choix : propose d'abord ce que tu donnes (« Faire une proposition »).",
             });
+          }
+          if (isOpenToAll(open) && open.status === "PENDING" && open.expires_at > Date.now()) {
+            return cb(null, { ok: false, open: true, reason: "Tu ne peux pas accepter ta propre offre." });
           }
           stale();
         });
@@ -1823,21 +1869,32 @@ export function acceptTrade(tradeId, options, cb) {
 
         const fail = (reason) =>
           releaseTrade(tradeId, "FAILED", () => cb(null, { ok: false, reason }));
+        // Une offre ouverte à tous redevient ouverte, sans destinataire, quand le refus
+        // tient à celui qui l'accepte : il lit seul le refus (`open`), les autres peuvent
+        // encore la prendre. Une offre adressée échoue, comme avant.
+        const openOffer = Boolean(trade.open_offer);
+        const refuse = (reason) =>
+          openOffer ? reopenRow(() => cb(null, { ok: false, open: true, reason })) : fail(reason);
 
         // La revendication a fermé l'offre. Tant que rien n'a bougé, ou que tout est
         // remis en place, elle se rouvre : une panne passagère ne doit pas la tuer, et
         // les boutons du message, encore affichés, disent vrai. Une compensation qui
         // échoue la laisse fermée : l'état est à examiner, pas à rejouer.
-        const reopen = (cleanly, error) => {
-          if (!cleanly) return releaseTrade(tradeId, "FAILED", () => cb(error));
+        function reopenRow(next) {
           db.run(
-            "UPDATE pokemon_trades SET status = 'PENDING', resolved_at = NULL, message_closed_at = NULL WHERE id = ? AND status = 'ACCEPTED'",
+            `UPDATE pokemon_trades SET status = 'PENDING', resolved_at = NULL, message_closed_at = NULL,
+                    to_user_id = CASE WHEN open_offer = 1 THEN '' ELSE to_user_id END
+              WHERE id = ? AND status = 'ACCEPTED'`,
             [tradeId],
             (reopenError) => {
               if (reopenError) handleException("Réouverture d'une offre :", reopenError);
-              cb(error);
+              next();
             }
           );
+        }
+        const reopen = (cleanly, error) => {
+          if (!cleanly) return releaseTrade(tradeId, "FAILED", () => cb(error));
+          reopenRow(() => cb(error));
         };
         const giveBack = (taken, cleanly, next) =>
           taken.restore((restoreError) => {
@@ -1852,7 +1909,7 @@ export function acceptTrade(tradeId, options, cb) {
         // de détention se vérifie avant tout retrait : rien à défaire.
         capReason(trade, offerSide, requestSide, (err, capped) => {
           if (err) return reopen(true, err);
-          if (capped) return fail(capped);
+          if (capped) return capped.mine ? refuse(capped.reason) : fail(capped.reason);
           takeSide(offerSide, trade.from_user_id, (err, offered, offerShortage) => {
             if (err) return reopen(true, err);
             if (!offered) return fail(shortageReason(offerShortage, { mine: false }));
@@ -1861,7 +1918,11 @@ export function acceptTrade(tradeId, options, cb) {
               if (err || !requested) {
                 // Compensation : on rend à l'initiateur ce qu'on lui a retiré.
                 return giveBack(offered, true, (cleanly) =>
-                  err ? reopen(cleanly, err) : fail(shortageReason(requestShortage, { mine: true }))
+                  err
+                    ? reopen(cleanly, err)
+                    : cleanly
+                      ? refuse(shortageReason(requestShortage, { mine: true }))
+                      : fail(shortageReason(requestShortage, { mine: true }))
                 );
               }
 
@@ -1895,20 +1956,89 @@ export function acceptTrade(tradeId, options, cb) {
                   // « un Roucool ».
                   recordGiven(trade, "offer", offered);
                   recordGiven(trade, "request", requested);
-                  cb(null, {
-                    ok: true,
-                    trade,
-                    received: {
-                      byTarget: offered.arrival?.(trade.to_user_id) ?? null,
-                      byInitiator: requested.arrival?.(trade.from_user_id) ?? null,
-                    },
-                  });
+                  closeOpenFamily(trade, (closed) =>
+                    cb(null, {
+                      ok: true,
+                      trade,
+                      closed,
+                      received: {
+                        byTarget: offered.arrival?.(trade.to_user_id) ?? null,
+                        byInitiator: requested.arrival?.(trade.from_user_id) ?? null,
+                      },
+                    })
+                  );
                 });
               });
             });
           });
         });
       });
+    }
+  );
+}
+
+// Un échange conclu ferme ce qui reste de l'offre ouverte à tous d'où il vient : elle-même,
+// ou celle que remonte sa chaîne de contre-offres. Conclue par une contre-offre, l'offre
+// ouverte passe en SETTLED avec son contre-offrant ; les contre-offres encore en attente
+// sur elle sont annulées : ce qu'elles proposaient à son auteur n'a plus lieu d'être.
+// Au mieux : l'échange a eu lieu, une fermeture ratée se journalise sans le défaire.
+// `cb(closed)` : les offres dont le message est à réécrire.
+export function closeOpenFamily(trade, cb) {
+  const closed = [];
+  const failed = (error) => {
+    handleException("Fermeture d'une offre ouverte à tous :", error);
+    cb(closed);
+  };
+  db.get(
+    `WITH RECURSIVE chain(id, counter_of, open_offer, from_user_id) AS (
+       SELECT id, counter_of, open_offer, from_user_id FROM pokemon_trades WHERE id = ?
+       UNION
+       SELECT t.id, t.counter_of, t.open_offer, t.from_user_id
+         FROM pokemon_trades t JOIN chain c ON t.id = c.counter_of
+     )
+     SELECT id, from_user_id FROM chain WHERE open_offer = 1 LIMIT 1`,
+    [trade.id],
+    (err, root) => {
+      if (err) return failed(err);
+      if (!root) return cb(closed);
+      const settle = (next) => {
+        if (root.id === trade.id) return next();
+        const partner = trade.from_user_id === root.from_user_id ? trade.to_user_id : trade.from_user_id;
+        db.run(
+          `UPDATE pokemon_trades SET status = 'SETTLED', resolved_at = ?, to_user_id = ?
+            WHERE id = ? AND status = 'PENDING'`,
+          [Date.now(), partner, root.id],
+          function (err) {
+            if (err) return failed(err);
+            if (this.changes === 1) closed.push(root.id);
+            next();
+          }
+        );
+      };
+      settle(() =>
+        db.all(
+          `WITH RECURSIVE tree(id) AS (
+             SELECT id FROM pokemon_trades WHERE counter_of = ?
+             UNION
+             SELECT t.id FROM pokemon_trades t JOIN tree ON t.counter_of = tree.id
+           )
+           SELECT p.id, p.from_user_id FROM pokemon_trades p JOIN tree ON p.id = tree.id
+            WHERE p.status = 'PENDING' AND p.id <> ?`,
+          [root.id, trade.id],
+          (err, rows) => {
+            if (err) return failed(err);
+            const next = (index) => {
+              if (index >= rows.length) return cb(closed);
+              resolveTradeAs(rows[index].id, rows[index].from_user_id, "CANCELLED", (err, done) => {
+                if (err) handleException("Annulation d'une contre-offre devenue sans objet :", err);
+                if (done) closed.push(rows[index].id);
+                next(index + 1);
+              });
+            };
+            next(0);
+          }
+        )
+      );
     }
   );
 }

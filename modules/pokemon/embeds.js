@@ -24,7 +24,6 @@ import {
 import { getCharmItem, getItem, overflowNotice, sortByCatalogue } from "./items.js";
 import {
   RARITIES,
-  allSpecies,
   dexSize,
   difficultyLabel,
   embedColor,
@@ -50,6 +49,13 @@ import {
   throwProbability,
   tradeEvolutionTarget,
 } from "./data.js";
+import {
+  describeDexFilters,
+  dexFilterOptions,
+  encodeDexFilters,
+  filterDexSpecies,
+  hasDexFilters,
+} from "./dex-filter.js";
 
 // Une décimale de plus à mesure que la chance baisse, à la française : « 5,9 % ».
 const formatPercent = (probability) => {
@@ -464,6 +470,51 @@ export function buildSpeciesInfoEmbed(
 }
 
 const formatPoints = (value) => value.toLocaleString("fr-FR");
+
+// Le suivi des lettres de Zarbi (/pk zarbis) : celles que le dresseur a réunies, avec
+// leur nombre et leurs shiny, et celles qui manquent, sur les formes que la génération
+// ouverte connaît. `rows` : ses individus (getIndividuals), toutes espèces confondues.
+export function buildUnownEmbed(targetUser, species, rows) {
+  const known = speciesForms(species);
+  const counts = new Map();
+  for (const row of rows) {
+    if (row.species_id !== species.id || !row.form) continue;
+    const entry = counts.get(row.form) ?? { total: 0, shiny: 0 };
+    entry.total++;
+    if (row.is_shiny) entry.shiny++;
+    counts.set(row.form, entry);
+  }
+  const mine = known.filter((form) => counts.has(form.key));
+  const missing = known.filter((form) => !counts.has(form.key));
+  const shinies = mine.filter((form) => counts.get(form.key).shiny).length;
+  const percent = known.length ? Math.round((mine.length / known.length) * 100) : 0;
+  const filled = Math.round(percent / 10);
+
+  const ownedLine = mine
+    .map((form) => {
+      const { total, shiny } = counts.get(form.key);
+      return `**${form.name}**${total > 1 ? ` ×${total}` : ""}${shiny ? ` ✨${shiny > 1 ? shiny : ""}` : ""}`;
+    })
+    .join(" · ");
+  return new EmbedBuilder()
+    .setTitle(`🔤 Zarbi de ${targetUser.username}`)
+    .setColor(0x4f545c)
+    .setThumbnail(spriteUrl(species, false))
+    .setDescription(
+      `${"🟩".repeat(filled)}${"⬛".repeat(10 - filled)}\n` +
+        `**${mine.length}** / ${known.length} formes (${percent} %)` +
+        (shinies ? ` · ✨ ${shinies} en shiny` : "")
+    )
+    .addFields(
+      { name: "Réunies", value: ownedLine || "Aucune pour l'instant.", inline: false },
+      {
+        name: "Manquantes",
+        value: missing.length ? missing.map((form) => form.name).join(" ") : "Aucune : l'alphabet est complet ! 🎉",
+        inline: false,
+      }
+    )
+    .setFooter({ text: "Chaque Zarbi tire sa lettre à parts égales en naissant : apparition, parc ou œuf." });
+}
 
 // Qui a lancé quoi. Le champ d'embed est plafonné à 1024 caractères, d'où la
 // coupe au top 5 avec un reliquat agrégé.
@@ -1296,18 +1347,27 @@ export function collectionStats(rows) {
   return { species, shinies, total, owned };
 }
 
-export function dexPageCount() {
-  return Math.ceil(dexSize() / getPokemonConfig().pokedex.pageSize);
-}
-
-export function buildDexEmbed(targetUser, rows, page) {
+// La page `page` des espèces qui passent les filtres (dex-filter.js) : la même pour
+// l'embed et pour ses boutons, ramenée dans les bornes si le filtre a raccourci la liste.
+function dexPage(rows, page, filters) {
   const pageSize = getPokemonConfig().pokedex.pageSize;
   const stats = collectionStats(rows);
+  const matching = filterDexSpecies(filters, stats.owned);
+  const pages = Math.max(1, Math.ceil(matching.length / pageSize));
+  const current = Math.min(Math.max(0, Number(page) || 0), pages - 1);
+  return { stats, matching, pages, current, slice: matching.slice(current * pageSize, (current + 1) * pageSize) };
+}
+
+export function buildDexEmbed(targetUser, rows, page, filters = {}) {
+  const { stats, matching, pages, current, slice } = dexPage(rows, page, filters);
   const total = dexSize();
   const percent = total ? Math.round((stats.species / total) * 100) : 0;
   const filled = Math.round(percent / 10);
-
-  const slice = allSpecies().slice(page * pageSize, (page + 1) * pageSize);
+  const filtered = hasDexFilters(filters);
+  const ownedHere = matching.filter((species) => {
+    const entry = stats.owned.get(species.id);
+    return entry && (entry.normal > 0 || entry.shiny > 0);
+  }).length;
   // Le cadenas des espèces qu'aucune apparition ne donnera jamais. Sans lui, un
   // dresseur peut chasser des mois un Mackogneur qui n'apparaîtra pas : il
   // s'obtient en faisant évoluer un Machopeur ou en s'en faisant échanger un, et
@@ -1342,13 +1402,19 @@ export function buildDexEmbed(targetUser, rows, page) {
     .setDescription(
       `${"🟩".repeat(filled)}${"⬛".repeat(10 - filled)}\n` +
         `**${stats.species}**/${total} espèces (${percent} %) · ✨ **${stats.shinies}** · ` +
-        `**${stats.total}** captures au total`
+        `**${stats.total}** captures au total` +
+        // Le filtre se dit, avec ce qu'il retient : la progression du dessus reste celle
+        // du Pokédex entier.
+        (filtered
+          ? `\n🔎 ${describeDexFilters(filters)} : **${matching.length}** espèce${matching.length > 1 ? "s" : ""}` +
+            `, dont **${ownedHere}** possédée${ownedHere > 1 ? "s" : ""}`
+          : "")
     )
     // La légende ne s'affiche que sur les pages qui en portent un : elle n'a rien
     // à expliquer sur les quatre cinquièmes du Pokédex.
     .setFooter({
       text:
-        `Page ${page + 1}/${dexPageCount()}` +
+        `Page ${current + 1}/${pages}` +
         (locked ? " · 🔒 ne s'obtient que par évolution ou par échange" : "") +
         (eggs ? " · 🥚 ne sort que d'un œuf" : ""),
     });
@@ -1356,12 +1422,50 @@ export function buildDexEmbed(targetUser, rows, page) {
   columns.forEach((value, index) => {
     embed.addFields({ name: index === 0 ? "​" : "​", value, inline: true });
   });
+  if (!slice.length) embed.addFields({ name: "​", value: "Aucune espèce ne correspond à ces filtres." });
 
   return embed;
 }
 
-export function buildDexRow(targetUserId, page) {
-  return pageRow(`poke_dex|${targetUserId}`, `poke_dex_noop|${targetUserId}`, page, dexPageCount());
+// Les boutons de page, les deux bascules (possédées, shiny) et les menus de filtres.
+// Chaque customId porte le dresseur et les filtres en cours (encodeDexFilters) ; un
+// changement de filtre ramène à la première page.
+export function buildDexComponents(targetUserId, rows, page, filters = {}) {
+  const { pages, current } = dexPage(rows, page, filters);
+  const code = encodeDexFilters(filters);
+  const options = dexFilterOptions();
+  // Une bascule passe à la valeur suivante, puis revient à « tous ».
+  const cycle = (key, label) => {
+    const values = ["", ...options[key].map(([value]) => value)];
+    const chosen = options[key].find(([value]) => value === filters[key])?.[1];
+    return new ButtonBuilder()
+      .setCustomId(`poke_dext|${targetUserId}|${code}|${key}`)
+      .setLabel(chosen ?? label)
+      .setStyle(filters[key] ? ButtonStyle.Primary : ButtonStyle.Secondary)
+      .setDisabled(values.length < 2);
+  };
+  const paging = pageRow(`poke_dexf|${targetUserId}|${code}`, `poke_dex_noop|${targetUserId}`, current, pages).addComponents(
+    cycle("v", "Possédées ou non"),
+    cycle("s", "Shiny ou non")
+  );
+  const select = (key, all) =>
+    new ActionRowBuilder().addComponents(
+      new StringSelectMenuBuilder()
+        .setCustomId(`poke_dexs|${targetUserId}|${code}|${key}`)
+        .setPlaceholder(all)
+        .addOptions(
+          { label: all, value: "all", default: !filters[key] },
+          ...options[key].map(([value, label]) => ({ label, value, default: filters[key] === value }))
+        )
+    );
+  return [
+    paging,
+    select("r", "Toutes les raretés"),
+    // Une seule génération ouverte : rien à choisir.
+    options.g.length > 1 ? select("g", "Toutes les générations") : null,
+    select("t", "Tous les types"),
+    select("o", "Toutes les obtentions"),
+  ].filter(Boolean);
 }
 
 // ====================== ÉCHANGES ======================
@@ -1373,6 +1477,7 @@ const TRADE_STATUS = {
   CANCELLED: { color: 0x4f545c, title: "🚫 Échange annulé", note: null },
   EXPIRED: { color: 0x4f545c, title: "⌛ Échange expiré", note: null },
   COUNTERED: { color: 0xfee75c, title: "↩️ Contre-offre", note: null },
+  SETTLED: { color: 0x57f287, title: "🤝 Conclu par une contre-offre", note: null },
   FAILED: {
     color: 0xed4245,
     title: "⚠️ Échange impossible",
@@ -1392,7 +1497,8 @@ function tradeEvolutionLines(trade) {
     if (!target) return;
     lines.push(
       `**${displayName(source, isShiny)}** pourra évoluer gratuitement en ` +
-        `**${displayName(target, isShiny)}** chez <@${receiverId}>, avec /pk evolution.`
+        `**${displayName(target, isShiny)}** ${receiverId ? `chez <@${receiverId}>` : "chez qui le recevra"}, ` +
+        "avec /pk evolution."
     );
   };
   add(trade.offer_species_id, trade.offer_is_shiny, trade.to_user_id);
@@ -1449,9 +1555,21 @@ export function buildTradeEmbed(trade, status = "PENDING") {
   const asked = tradeSideText(trade, "request");
   const nothing = (prefix) => trade[`${prefix}_points`] === 0;
 
+  // Une offre ouverte à tous se lit sans destinataire tant que personne ne l'a prise,
+  // et encore une fois conclue par une contre-offre : ce n'est pas elle qui a été échangée.
+  const anyone = Boolean(trade.open_offer) && (!trade.to_user_id || status === "SETTLED");
+
   // Un côté à zéro point est un cadeau : on le dit comme tel plutôt que de faire
   // lire « contre 0 point ».
-  const sentence = trade.request_open
+  const sentence = anyone
+    ? trade.request_open
+      ? `<@${trade.from_user_id}> propose **${given}** à qui le veut, contre ce qu'on lui proposera.`
+      : nothing("request")
+        ? `<@${trade.from_user_id}> offre **${given}** au premier qui le veut.`
+        : nothing("offer")
+          ? `<@${trade.from_user_id}> demande **${asked}** à qui l'a, sans rien donner en retour.`
+          : `<@${trade.from_user_id}> propose **${given}**\ncontre **${asked}**, au premier qui accepte.`
+    : trade.request_open
     ? `<@${trade.from_user_id}> propose **${given}** à <@${trade.to_user_id}>, contre ce qu'il voudra.`
     : nothing("request")
     ? `<@${trade.from_user_id}> offre **${given}** à <@${trade.to_user_id}>.`
@@ -1469,7 +1587,9 @@ export function buildTradeEmbed(trade, status = "PENDING") {
     .setDescription(
       status === "COUNTERED"
         ? `${sentence}\n\n↩️ Contre-offre de <@${trade.to_user_id}>.`
-        : sentence
+        : status === "SETTLED"
+          ? `${sentence}\n\n🤝 Conclu avec <@${trade.to_user_id}> par une contre-offre.`
+          : sentence
     );
   if (offered) {
     embed.setThumbnail(spriteUrl(offered, trade.offer_is_shiny, trade.offer_form));
@@ -1493,7 +1613,11 @@ export function buildTradeEmbed(trade, status = "PENDING") {
     embed.setFooter({
       text:
         (trade.counter_of ? `Contre-offre à l'échange #${trade.counter_of}. ` : "") +
-        "Seul le destinataire peut répondre.",
+        (anyone
+          ? trade.request_open
+            ? "Ouverte à tous : chacun peut faire sa proposition."
+            : "Ouverte à tous : le premier qui accepte l'emporte, chacun peut contre-proposer."
+          : "Seul le destinataire peut répondre."),
     });
   }
   return embed;
@@ -1513,7 +1637,14 @@ export function buildTradePicker(tradeId, choices, species) {
 
 // Une offre « à son choix » ne s'accepte pas telle quelle : « Faire une proposition »
 // prend la place d'« Accepter », et ouvre la même contre-offre que « Contre-offre ».
-export function buildTradeRow(tradeId, { disabled = false, open = false } = {}) {
+// Les options de buildTradeRow que dit la ligne de l'offre.
+export const tradeRowOptions = (trade) => ({
+  open: Boolean(trade.request_open),
+  anyone: Boolean(trade.open_offer),
+});
+
+// Une offre ouverte à tous (`anyone`) n'a personne pour la refuser : pas de « Refuser ».
+export function buildTradeRow(tradeId, { disabled = false, open = false, anyone = false } = {}) {
   const counter = (label, style) =>
     new ButtonBuilder()
       .setCustomId(`poke_trade_counter|${tradeId}`)
@@ -1532,14 +1663,15 @@ export function buildTradeRow(tradeId, { disabled = false, open = false } = {}) 
           .setDisabled(disabled),
         counter("Contre-offre", ButtonStyle.Primary),
       ];
+  const decline = new ButtonBuilder()
+    .setCustomId(`poke_trade_decline|${tradeId}`)
+    .setLabel("Refuser")
+    .setEmoji("❌")
+    .setStyle(ButtonStyle.Danger)
+    .setDisabled(disabled);
   return new ActionRowBuilder().addComponents(
     ...answers,
-    new ButtonBuilder()
-      .setCustomId(`poke_trade_decline|${tradeId}`)
-      .setLabel("Refuser")
-      .setEmoji("❌")
-      .setStyle(ButtonStyle.Danger)
-      .setDisabled(disabled),
+    ...(anyone ? [] : [decline]),
     new ButtonBuilder()
       .setCustomId(`poke_trade_cancel|${tradeId}`)
       .setLabel("Annuler")

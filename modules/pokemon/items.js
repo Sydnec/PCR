@@ -97,6 +97,48 @@ export const itemCap = (item) => {
   return cap > 0 && itemOverflowValue(item) > 0 ? cap : null;
 };
 
+// L'objet en lequel se change un exemplaire de trop (`upgradesTo`), ou null : la
+// Super Canne de trop devient la Méga Canne qui manque. Une cible hors catalogue, ou
+// l'objet lui-même, ne change rien.
+export const itemUpgrade = (item) => {
+  const target = item?.upgradesTo ? getItem(item.upgradesTo) : null;
+  return target && target.key !== item.key ? target : null;
+};
+
+// Les objets reliés par `upgradesTo`, dans les deux sens : la Super Canne et la Méga
+// Canne. Un objet que rien ne relie n'a pas de chaîne (liste vide).
+export function upgradeChain(item) {
+  if (!item) return [];
+  const chain = new Map([[item.key, item]]);
+  const linked = (other) =>
+    chain.has(itemUpgrade(other)?.key) ||
+    [...chain.values()].some((member) => itemUpgrade(member)?.key === other.key);
+  let grown = true;
+  while (grown) {
+    grown = false;
+    for (const other of getItems()) {
+      if (chain.has(other.key) || !linked(other)) continue;
+      chain.set(other.key, other);
+      grown = true;
+    }
+  }
+  return chain.size > 1 ? [...chain.values()] : [];
+}
+
+// Vrai quand le dresseur (ses lignes d'inventaire, getInventory) garde le maximum de
+// chaque objet de sa chaîne : un gain de plus ne pourrait que se vendre. Avec les deux
+// cannes, la loterie n'en donne plus. Un objet seul (la Master Ball) n'est jamais
+// concerné : sa limite se règle par la vente.
+export function chainFull(inventory, item) {
+  const chain = upgradeChain(item);
+  if (!chain.length) return false;
+  const held = new Map(inventory.map((row) => [row.item_key, row.count]));
+  return chain.every((member) => {
+    const cap = itemCap(member);
+    return cap !== null && (held.get(member.key) ?? 0) >= cap;
+  });
+}
+
 // Trie des lignes d'inventaire dans l'ordre du catalogue. La base rend un tri
 // alphabétique sur les clés, où « ball_hyper » précède « ball_poke » — un ordre
 // qui n'a de sens pour personne. Les clés hors catalogue ferment la marche
@@ -346,14 +388,16 @@ function credit(userId, key, quantity, source, cap, cb) {
 // par diverger entre les copies.
 //
 // Un objet plafonné (`maxHeld`) se crédite à l'unité sous sa garde, et ce qui
-// dépasse se vend `overflowValue` points pièce : on ne refuse pas un butin. Si
-// ces points ne passent pas, l'exemplaire se garde au-delà de la limite plutôt
-// que de se perdre. `overflow` règle les autres cas :
+// dépasse se vend `overflowValue` points pièce : on ne refuse pas un butin. Avant
+// d'être vendu, l'exemplaire de trop devient son `upgradesTo` si celui-ci a encore
+// de la place (`upgraded`, absent sinon). Si les points ne passent pas,
+// l'exemplaire se garde au-delà de la limite plutôt que de se perdre. `overflow`
+// règle les autres cas :
 // - « ignore » : rendre ce qu'on vient de prendre (une compensation) ou ce
 //   qu'un administrateur donne — la limite ne joue pas ;
-// - « refuse » : tout ou rien, sans vente — l'échange, qui a vérifié avant et
-//   compense si une course l'a pris de vitesse.
-// `cb(err, { kept, sold, points })`, ou `cb(null, null)` pour un refus.
+// - « refuse » : tout ou rien, sans vente ni changement — l'échange, qui a vérifié
+//   avant et compense si une course l'a pris de vitesse.
+// `cb(err, { kept, sold, points, upgraded? })`, ou `cb(null, null)` pour un refus.
 export function grantItem(
   userId,
   key,
@@ -373,7 +417,14 @@ export function grantItem(
   }
 
   const value = itemOverflowValue(item);
+  const upgrade = itemUpgrade(item);
   const result = { kept: 0, sold: 0, points: 0 };
+  // La cible garde sa propre limite, dans la même instruction que son crédit : deux
+  // Super Cannes de trop simultanées ne font qu'une Méga Canne.
+  const tryUpgrade = (done) =>
+    upgrade
+      ? credit(userId, upgrade.key, 1, `amelioration:${source || SOURCE_INCONNUE}`, itemCap(upgrade), done)
+      : done(null, false);
   const next = (remaining) => {
     if (!remaining) return cb(null, result);
     credit(userId, key, 1, source, cap, (err, credited) => {
@@ -382,36 +433,53 @@ export function grantItem(
         result.kept++;
         return next(remaining - 1);
       }
-      addPoints(userId, value, (err) => {
-        if (!err) {
-          result.sold++;
-          result.points += value;
-          logMovement(userId, key, 0, `vente-auto:${source || SOURCE_INCONNUE}`);
+      tryUpgrade((err, upgraded) => {
+        if (err) return cb(err);
+        if (upgraded) {
+          result.upgraded = (result.upgraded ?? 0) + 1;
+          logMovement(userId, key, 0, `amelioration:${source || SOURCE_INCONNUE}`);
           return next(remaining - 1);
         }
-        handleException(`Vente automatique d'un objet au-delà de la limite (${key}) :`, err);
-        credit(userId, key, 1, source, null, (err) => {
-          if (err) return cb(err);
-          result.kept++;
-          next(remaining - 1);
-        });
+        sell(remaining);
       });
     });
   };
+  const sell = (remaining) =>
+    addPoints(userId, value, (err) => {
+      if (!err) {
+        result.sold++;
+        result.points += value;
+        logMovement(userId, key, 0, `vente-auto:${source || SOURCE_INCONNUE}`);
+        return next(remaining - 1);
+      }
+      handleException(`Vente automatique d'un objet au-delà de la limite (${key}) :`, err);
+      credit(userId, key, 1, source, null, (err) => {
+        if (err) return cb(err);
+        result.kept++;
+        next(remaining - 1);
+      });
+    });
   next(quantity);
 }
 
-// Ce que dit un gain dont une part a été vendue d'office : la même phrase sur
-// Discord et sur le site. null quand tout a été gardé.
+// Ce que dit un gain dont une part a été changée ou vendue d'office : la même phrase
+// sur Discord et sur le site. null quand tout a été gardé.
 export function overflowNotice(item, granted) {
-  if (!granted?.sold) return null;
+  if (!granted?.sold && !granted?.upgraded) return null;
   const cap = itemCap(item);
   const label = item?.label ?? "cet objet";
-  return (
-    `Tu as déjà ${cap > 1 ? `${cap} ${label}` : `une ${label}`}, le maximum : ` +
-    `${granted.sold > 1 ? `les ${granted.sold} de plus sont vendues` : "celle-ci est vendue"} ` +
-    `**${granted.points.toLocaleString("fr-FR")}** points.`
-  );
+  const upgrade = itemUpgrade(item);
+  const changed = granted.upgraded
+    ? `Tu as déjà une ${label} : ` +
+      `${granted.upgraded > 1 ? `${granted.upgraded} d'entre elles deviennent` : "celle-ci devient"} ` +
+      `une **${upgrade?.label ?? "autre"}** !`
+    : null;
+  const sold = granted.sold
+    ? `Tu as déjà ${cap > 1 ? `${cap} ${label}` : `une ${label}`}, le maximum : ` +
+      `${granted.sold > 1 ? `les ${granted.sold} de plus sont vendues` : "celle-ci est vendue"} ` +
+      `**${granted.points.toLocaleString("fr-FR")}** points.`
+    : null;
+  return [changed, sold].filter(Boolean).join(" ");
 }
 
 // Un objet qu'on ne possède qu'une fois, comme le Charme Chroma : l'écriture ne
@@ -546,23 +614,68 @@ export function migrateRetiredStones(cb = () => {}) {
 }
 
 // La limite de détention arrive après coup : ce que les dresseurs gardent déjà
-// au-delà se vend d'office, au même prix qu'un gain de trop. Une seule fois — la
-// ligne de pokemon_data_migrations le retient —, sans quoi chaque redémarrage
-// revendrait aussi ce qu'un administrateur a donné en passant outre.
+// au-delà se vend d'office, au même prix qu'un gain de trop — une Super Canne de
+// trop devient d'abord la Méga Canne qui manque, comme un gain. Une seule fois par
+// objet — sa ligne de pokemon_data_migrations le retient —, sans quoi chaque
+// redémarrage revendrait aussi ce qu'un administrateur a donné en passant outre.
+// Un objet qui reçoit une limite plus tard est traité au démarrage suivant.
 //
-// Chaque surplus se retire d'abord, gardé sur le compte lu, puis se paie ; si
-// les points ne passent pas, il revient. La marque ne se pose qu'une fois tout
-// traité sans erreur : un passage interrompu se rejoue, et ne trouve plus que ce
-// qui reste au-delà.
+// Chaque surplus se retire d'abord, gardé sur le compte lu, puis se change ou se
+// paie ; si les points ne passent pas, il revient. Les marques ne se posent qu'une
+// fois tout traité sans erreur : un passage interrompu se rejoue, et ne trouve plus
+// que ce qui reste au-delà.
 const CAP_MIGRATION = "plafond-detention";
+// La première passe ne portait qu'un nom, sans objet : elle a traité la Master Ball.
+const LEGACY_CAP_MARKS = { ball_master: CAP_MIGRATION };
+const capMark = (item) => `${CAP_MIGRATION}:${item.key}`;
 
 export function sellHeldOverCap(cb = () => {}) {
-  db.get("SELECT 1 FROM pokemon_data_migrations WHERE name = ?", [CAP_MIGRATION], (err, done) => {
+  db.all("SELECT name FROM pokemon_data_migrations", [], (err, rows) => {
     if (err) return cb(err);
-    if (done) return cb(null, { sold: 0 });
-    const capped = getItems().filter((item) => itemCap(item));
+    const marks = new Set((rows ?? []).map((row) => row.name));
+    const capped = getItems().filter(
+      (item) => itemCap(item) && !marks.has(capMark(item)) && !marks.has(LEGACY_CAP_MARKS[item.key])
+    );
+    if (!capped.length) return cb(null, { sold: 0 });
     let sold = 0;
+    let upgraded = 0;
     let failed = null;
+
+    // Le surplus retiré se change en `upgradesTo` (une fois, sous sa limite), puis le
+    // reste se paie.
+    const settle = (item, userId, extra, next) => {
+      const upgrade = itemUpgrade(item);
+      const source = `amelioration:${CAP_MIGRATION}`;
+      const pay = (count) => {
+        if (!count) return next();
+        addPoints(userId, count * itemOverflowValue(item), (err) => {
+          if (err) {
+            failed = err;
+            return credit(userId, item.key, count, "plafond-annule", null, (restoreError) => {
+              if (restoreError) handleException("Restitution d'un surplus :", restoreError);
+              next();
+            });
+          }
+          logMovement(userId, item.key, -count, `vente-auto:${CAP_MIGRATION}`);
+          sold += count;
+          next();
+        });
+      };
+      if (!upgrade) return pay(extra);
+      credit(userId, upgrade.key, 1, source, itemCap(upgrade), (err, credited) => {
+        if (err) {
+          failed = err;
+          return credit(userId, item.key, extra, "plafond-annule", null, (restoreError) => {
+            if (restoreError) handleException("Restitution d'un surplus :", restoreError);
+            next();
+          });
+        }
+        if (!credited) return pay(extra);
+        logMovement(userId, item.key, -1, source);
+        upgraded++;
+        pay(extra - 1);
+      });
+    };
 
     const sellRow = (item, row, next) => {
       const extra = row.count - itemCap(item);
@@ -580,35 +693,26 @@ export function sellHeldOverCap(cb = () => {}) {
             failed = new Error(`Inventaire modifié pendant la limite : ${row.user_id}`);
             return next();
           }
-          addPoints(row.user_id, extra * itemOverflowValue(item), (err) => {
-            if (err) {
-              failed = err;
-              return credit(row.user_id, item.key, extra, "plafond-annule", null, (restoreError) => {
-                if (restoreError) handleException("Restitution d'un surplus :", restoreError);
-                next();
-              });
-            }
-            logMovement(row.user_id, item.key, -extra, `vente-auto:${CAP_MIGRATION}`);
-            sold += extra;
-            next();
-          });
+          settle(item, row.user_id, extra, next);
         }
       );
     };
 
-    const nextItem = (index) => {
+    const mark = (index) => {
       if (index >= capped.length) {
-        if (failed) return cb(failed);
-        return db.run(
-          "INSERT OR IGNORE INTO pokemon_data_migrations (name, done_at) VALUES (?, ?)",
-          [CAP_MIGRATION, Date.now()],
-          (err) => {
-            if (err) return cb(err);
-            if (sold) log(`Limite de détention : ${sold} objet(s) au-delà vendu(s) d'office`);
-            cb(null, { sold });
-          }
-        );
+        if (sold) log(`Limite de détention : ${sold} objet(s) au-delà vendu(s) d'office`);
+        if (upgraded) log(`Limite de détention : ${upgraded} objet(s) au-delà changé(s)`);
+        return cb(null, { sold });
       }
+      db.run(
+        "INSERT OR IGNORE INTO pokemon_data_migrations (name, done_at) VALUES (?, ?)",
+        [capMark(capped[index]), Date.now()],
+        (err) => (err ? cb(err) : mark(index + 1))
+      );
+    };
+
+    const nextItem = (index) => {
+      if (index >= capped.length) return failed ? cb(failed) : mark(0);
       const item = capped[index];
       db.all(
         "SELECT user_id, count FROM pokemon_inventory WHERE item_key = ? AND count > ?",

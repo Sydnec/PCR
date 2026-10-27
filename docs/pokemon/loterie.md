@@ -45,6 +45,9 @@ fréquents, sans rien changer à ce que tiennent les Pokémon. Les balls y pèse
 toucher à ce que tiennent les Pokémon**. `/admin poids` affiche les deux tables côte à côte : c'est là, et nulle part ailleurs,
 qu'on voit qu'elles ont divergé.
 
+**Avec la Super Canne et la Méga Canne en poche, plus de canne** : le tirage lit le sac et le lot
+se tire parmi le reste, à chance de gagner égale (voir [Pêche](peche.md)).
+
 La fourchette d'un lot vit dans le catalogue (`lot: { min, max }`) : un objet sans `lot` se gagne à
 l'unité, ce qui évite d'écrire `1` à `1` sur les deux tiers des lignes.
 

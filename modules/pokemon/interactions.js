@@ -58,6 +58,7 @@ import {
   getTrade,
   getTradeMatches,
   getTradePartners,
+  isOpenToAll,
   listDuplicates,
   proposeTrade,
   resolveTradeAs,
@@ -65,6 +66,7 @@ import {
   parseIndividual,
   tradeCandidate,
 } from "./collection.js";
+import { decodeDexFilters, dexFilterOptions, encodeDexFilters } from "./dex-filter.js";
 import {
   linkTradeMessage,
   markTradeMessageClosed,
@@ -72,8 +74,8 @@ import {
   tradeOutcome,
 } from "./trade-message.js";
 import {
+  buildDexComponents,
   buildDexEmbed,
-  buildDexRow,
   buildBoxEmbed,
   buildBoxRow,
   buildCompareView,
@@ -294,7 +296,8 @@ function handleDropClaim(interaction, dropId) {
 
 // ---------------------- Pokédex ----------------------
 
-function showDexPage(interaction, targetUserId, page) {
+// `filters` : ceux que porte le customId (decodeDexFilters), relus et revalidés.
+function showDexPage(interaction, targetUserId, page, filters = {}) {
   getCollection(targetUserId, async (err, rows) => {
     if (err) {
       handleException(err);
@@ -308,8 +311,8 @@ function showDexPage(interaction, targetUserId, page) {
     }
     await interaction
       .update({
-        embeds: [buildDexEmbed(target, rows || [], page)],
-        components: [buildDexRow(targetUserId, page)],
+        embeds: [buildDexEmbed(target, rows || [], page, filters)],
+        components: buildDexComponents(targetUserId, rows || [], page, filters),
       })
       .catch(() => {});
   });
@@ -774,8 +777,13 @@ function settleStale(trade, cb) {
 // `handled` : un autre clic a déjà conclu l'offre, il n'y a rien à réécrire. Le
 // bouton écrit sur son propre message ; le menu du destinataire, lui, vit dans un
 // éphémère et fait réécrire le message public.
+//
+// Le premier qui accepte une offre ouverte à tous en devient le destinataire
+// (`acceptorId`). Un refus qui ne tient qu'à lui la laisse ouverte (`open`) : il le lit
+// seul. Les offres de la même famille que l'échange a fermées (closeOpenFamily) se
+// réécrivent d'après la base.
 function acceptAndSettle(interaction, trade, options, write) {
-  acceptTrade(trade.id, options, (err, result) => {
+  acceptTrade(trade.id, { ...options, acceptorId: interaction.user.id }, (err, result) => {
     if (err) {
       handleException(err);
       return ephemeral(interaction, "❌ Erreur base de données.");
@@ -788,11 +796,12 @@ function acceptAndSettle(interaction, trade, options, write) {
       );
     }
     if (!result.ok) return write(trade, "FAILED", `❌ ${result.reason}`);
-    pseudos(trade.from_user_id, trade.to_user_id).then(([from, to]) =>
+    pseudos(result.trade.from_user_id, result.trade.to_user_id).then(([from, to]) =>
       log(`Échange #${trade.id} accepté entre ${from} et ${to}`)
     );
     // La ligne rendue porte l'individu que le destinataire a choisi.
     write(result.trade, "ACCEPTED");
+    for (const id of result.closed ?? []) syncTradeMessage(interaction.client, id);
   });
 }
 
@@ -801,7 +810,8 @@ function acceptAndSettle(interaction, trade, options, write) {
 // comme sur /pk echange. Le menu est privé : sa boîte ne regarde que lui.
 function askTradePick(interaction, trade) {
   const species = getSpecies(trade.request_species_id);
-  getIndividuals(trade.to_user_id, (err, rows) => {
+  // Celui qui clique : le destinataire, ou n'importe qui sur une offre ouverte à tous.
+  getIndividuals(interaction.user.id, (err, rows) => {
     if (err) {
       handleException("Lecture des Pokémon à échanger :", err);
       return ephemeral(interaction, "❌ Erreur base de données.");
@@ -862,7 +872,16 @@ function handleTradeButton(interaction, action, tradeId) {
       });
     }
 
-    if (userId !== trade.to_user_id) {
+    // Une offre ouverte à tous répond à tout le monde, sauf à son auteur ; elle n'a
+    // personne pour la refuser.
+    if (isOpenToAll(trade)) {
+      if (userId === trade.from_user_id) {
+        return ephemeral(interaction, "❌ C'est ta propre offre : tu peux seulement l'annuler.");
+      }
+      if (action === "decline") {
+        return ephemeral(interaction, "❌ Une offre ouverte à tous ne se refuse pas : laisse-la à d'autres.");
+      }
+    } else if (userId !== trade.to_user_id) {
       return ephemeral(interaction, "❌ Cet échange ne t'est pas destiné.");
     }
 
@@ -905,7 +924,8 @@ function handleTradePick(interaction, tradeId) {
     if (trade.status !== "PENDING") {
       return ephemeral(interaction, "❌ Cet échange a déjà été traité.");
     }
-    if (interaction.user.id !== trade.to_user_id) {
+    const anyone = isOpenToAll(trade) && interaction.user.id !== trade.from_user_id;
+    if (!anyone && interaction.user.id !== trade.to_user_id) {
       return ephemeral(interaction, "❌ Cet échange ne t'est pas destiné.");
     }
     const requestPokemonId = parseIndividual(interaction.values?.[0]);
@@ -1120,6 +1140,15 @@ export async function handlePokemonSelect(interaction) {
 
     case "poke_trade_pick":
       return handleTradePick(interaction, args[0]);
+
+    // Un menu de filtre du Pokédex : « all » le retire. La valeur se revalide
+    // (decodeDexFilters) comme celles du customId.
+    case "poke_dexs": {
+      const [targetUserId, code, key] = args;
+      const value = interaction.values?.[0];
+      const filters = { ...decodeDexFilters(code), [key]: value === "all" ? "" : value };
+      return showDexPage(interaction, targetUserId, 0, decodeDexFilters(encodeDexFilters(filters)));
+    }
 
     // Les menus du brouillon d'un échange.
     case "poke_td_kind":
@@ -1454,8 +1483,21 @@ export async function handlePokemonButton(interaction) {
     case "poke_drop":
       return handleDropClaim(interaction, args[0]);
 
+    // Sans filtre (les messages d'avant les filtres), puis filtré : dresseur, filtres, page.
     case "poke_dex":
       return showDexPage(interaction, args[0], Number(args[1]));
+    case "poke_dexf":
+      return showDexPage(interaction, args[0], Number(args[2]), decodeDexFilters(args[1]));
+
+    // Une bascule (possédées, shiny) passe à la valeur suivante, puis revient à « tous » ;
+    // un filtre changé ramène à la première page.
+    case "poke_dext": {
+      const [targetUserId, code, key] = args;
+      const filters = decodeDexFilters(code);
+      const values = ["", ...(dexFilterOptions()[key] ?? []).map(([value]) => value)];
+      const next = values[(values.indexOf(filters[key] ?? "") + 1) % values.length];
+      return showDexPage(interaction, targetUserId, 0, decodeDexFilters(encodeDexFilters({ ...filters, [key]: next })));
+    }
 
     case "poke_box":
       return showBoxPage(interaction, args[0], Number(args[1]) || null, Number(args[2]) || 0);

@@ -6,6 +6,7 @@
 
 - **Le lancer coûte 100 points**, débités tout de suite, quelle que soit la canne : c'est la table de pêche qui change, pas le tarif (`rod.price` de chaque canne dans `modules/config.js`).
 - **Les cannes** : la Canne est donnée à tous (une seule fois, jamais échangeable). La Super Canne et la Méga Canne **tombent sur les Pokémon capturés** et se gagnent à la **loterie**.
+- **Une de chaque en poche** (`maxHeld: 1`). Une seconde Super Canne **devient une Méga Canne** si l'on n'en a pas encore (`upgradesTo`) ; sinon elle se vend d'office **500 points**, et une seconde Méga Canne **1 000 points** (`overflowValue`), d'où qu'elle vienne. **Avec les deux, la loterie n'en donne plus** : le lot se tire parmi le reste, sans rien retirer à la chance de gagner. Un échange qui en donnerait une seconde est refusé, comme pour la Master Ball (voir [Objets](objets.md)). Ce que les dresseurs avaient déjà en trop s'est changé ou vendu une fois, au démarrage, selon la même règle.
 - **Un Pokémon mord, il est pour toi seul.** La touche est privée (un éphémère sur Discord, une carte sur le site) : personne d'autre ne peut lancer dessus. Elle s'enfuit au bout de **`fishing.fleeSeconds`** (2 minutes), et on n'a qu'**une touche à la fois** : tant qu'elle est là, une nouvelle pêche est refusée sans rien débiter.
 - **Les balls se paient comme sur une apparition du salon**, contrairement au safari. L'objet tenu suit le Pokémon capturé, sans course.
 - Une touche pêchée porte le drapeau « pêché » : c'est lui qui donne son bonus de ×3 à l'[Appât Ball](boutique.md).

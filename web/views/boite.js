@@ -7,6 +7,12 @@
 // rien au jeu ; le surnom se donne aussi sur Discord, avec /pk renommer. On déplace en glissant un Pokémon sur une case, ou, au
 // doigt, avec « Déplacer » dans sa fiche puis un clic sur la case voulue. C'est
 // l'API qui range : la page redessine la boîte qu'elle lui renvoie.
+//
+// La recherche et les filtres portent sur toutes les boîtes : ce qui ne répond pas
+// s'estompe, et chaque boîte dit combien elle en a. En mode sélection, on coche des
+// Pokémon (ou tous les résultats) pour les ranger d'un coup dans une boîte, qui
+// déborde dans les suivantes ; une boîte entière change aussi de rang, nom compris.
+import { filterBar, speciesFilters } from "../filters.js";
 import { icon } from "../icons.js";
 import { lineageView, loadLineage } from "../lineage.js";
 import {
@@ -16,6 +22,7 @@ import {
   fmt,
   h,
   itemIcon,
+  normalize,
   openDialog,
   pokemonName,
   richText,
@@ -42,11 +49,76 @@ export async function render(ctx) {
   const params = new URLSearchParams(location.search);
   let highlight = Number(params.get("species")) || null;
   let pc = await api("/api/me/pc");
+  const filters = filterBar({
+    filters: [
+      ...speciesFilters(ctx),
+      {
+        key: "shiny",
+        all: "Shiny ou non",
+        options: [
+          ["oui", "Shiny"],
+          ["non", "Normaux"],
+        ],
+        test: ({ mon }, value) => (value === "oui") === mon.shiny,
+      },
+      {
+        key: "sexe",
+        all: "Tous les sexes",
+        options: [
+          ["M", "Mâles"],
+          ["F", "Femelles"],
+          ["none", "Asexués"],
+        ],
+        test: ({ mon }, value) => (value === "none" ? !mon.sex : mon.sex === value),
+      },
+      {
+        key: "etat",
+        all: "Tous les états",
+        options: [
+          ["verrouille", "Verrouillés"],
+          ["libre", "Non verrouillés"],
+          ["fertile", "Fertiles"],
+          ["sterile", "Stériles"],
+          ["vitrine", "En vitrine"],
+        ],
+        test: ({ mon }, value) =>
+          ({
+            verrouille: mon.locked,
+            libre: !mon.locked,
+            fertile: mon.fertile,
+            sterile: !mon.fertile,
+            vitrine: mon.showcased,
+          })[value],
+      },
+    ],
+    // Le nom de l'espèce, la forme (« zarbi b »), le surnom, le numéro du Pokédex ou
+    // celui de l'individu (« #42 ») tels quels.
+    search: ({ species, mon }, needle) =>
+      normalize(`${species.name}${mon.form ? ` ${mon.form.name}` : ""}`).includes(needle) ||
+      (Boolean(mon.nickname) && normalize(mon.nickname).includes(needle)) ||
+      needle === String(species.id) ||
+      needle === `#${mon.id}`,
+    // La colonne est étroite : le texte d'aide se contente d'un mot.
+    placeholder: "Chercher…",
+    label: "Chercher dans toutes les boîtes",
+    params,
+    // L'espèce venue du Pokédex filtre aussi : « Effacer » se montre pour elle, et
+    // l'efface avec le reste.
+    pending: () => Boolean(highlight),
+    onreset: () => {
+      highlight = null;
+    },
+    onchange: () => draw(),
+  });
   // Sans boîte dans l'adresse, la première qui n'est pas archivée : une boîte
   // rangée à part n'est pas celle qu'on vient voir.
   const defaultBox = () => pc.boxes.find((entry) => !entry.archived)?.box ?? 0;
+  // Les résultats, calculés une fois par affichage (matches) : le menu des boîtes les
+  // compte pour chacune de ses soixante boîtes. Déclarés avant le premier calcul, celui
+  // de la boîte où ouvrir une recherche venue de l'adresse (?species=, ?q=).
+  let found = null;
   let box = params.has("box") ? Math.max(0, Number(params.get("box")) - 1) || 0 : defaultBox();
-  if (highlight && !params.has("box")) {
+  if (searching() && !params.has("box")) {
     const first = matches()[0];
     if (first) box = boxOf(first.pos);
   }
@@ -59,8 +131,24 @@ export async function render(ctx) {
   let dragSource = null;
   let renaming = false;
   let flip = { direction: 0, since: 0, last: 0 };
+  // Le mode sélection et ce qui y est coché, toutes boîtes confondues ; la boîte où
+  // ranger (null : celle qui est ouverte) ; le changement de rang de la boîte ouverte.
+  let selecting = false;
+  const selected = new Set();
+  let target = null;
+  let reordering = false;
 
-  const body = h("div", { class: "pc" });
+  // Deux colonnes : la boîte ouverte et sa grille, puis à côté (au-dessus sur un
+  // écran étroit) la recherche, les outils et les bandeaux. La barre de filtres reste
+  // en place : seuls `main` et `side` se redessinent.
+  const main = h("div", { class: "pc-main" });
+  const side = h("div", { class: "pc-side-body" });
+  const body = h(
+    "div",
+    { class: "pc" },
+    h("aside", { class: "pc-side" }, filters.element, side),
+    main
+  );
   // Le Pokémon qu'on glisse doit rester dans la page jusqu'au bout : retiré
   // avec la grille quand la boîte change, il ne recevrait plus la fin du
   // glissement.
@@ -70,22 +158,47 @@ export async function render(ctx) {
     return Math.floor(pos / pc.slotsPerBox);
   }
 
-  function matches() {
-    return pc.pokemon.filter((mon) => mon.speciesId === highlight).sort((a, b) => a.pos - b.pos);
+  // Une recherche en cours : l'espèce venue du Pokédex, ou un filtre de la barre.
+  function searching() {
+    return Boolean(highlight) || filters.active();
   }
 
+  function matchesMon(mon) {
+    const species = ctx.species.get(mon.speciesId);
+    if (!species || (highlight && mon.speciesId !== highlight)) return false;
+    return filters.matches({ species, mon });
+  }
+
+  function matches() {
+    found ??= searching() ? pc.pokemon.filter(matchesMon).sort((a, b) => a.pos - b.pos) : [];
+    return found;
+  }
+
+  // Une page quittée entre-temps n'a plus la main sur l'adresse, et une adresse
+  // inchangée ne se réécrit pas : chaque frappe redessine, et Safari limite les
+  // réécritures.
   function writeUrl() {
     const query = new URLSearchParams();
     if (box !== defaultBox()) query.set("box", String(box + 1));
     if (highlight) query.set("species", String(highlight));
+    filters.write(query);
     const text = query.toString();
-    history.replaceState(null, "", `/boite${text ? `?${text}` : ""}`);
+    const next = `/boite${text ? `?${text}` : ""}`;
+    if (location.pathname !== "/boite" || location.pathname + location.search === next) return;
+    history.replaceState(null, "", next);
   }
 
   function draw() {
+    found = null;
+    // Une relecture a pu faire partir un Pokémon coché (échangé, revendu ailleurs) ou
+    // la boîte où ranger.
+    const present = new Set(pc.pokemon.map((mon) => mon.id));
+    for (const id of selected) if (!present.has(id)) selected.delete(id);
+    if (target !== null && target >= pc.boxes.length) target = null;
     writeUrl();
     if (dragSource?.isConnected && !stash.contains(dragSource)) stash.append(dragSource);
-    body.replaceChildren(...[head(), banner(), grid(), summary(), stash].filter(Boolean));
+    main.replaceChildren(head(), grid(), summary(), stash);
+    side.replaceChildren(...[tools(), banner(), selectionBar()].flat().filter(Boolean));
   }
 
   // La boîte voisine dans le même rang : les flèches passent d'une boîte
@@ -191,12 +304,216 @@ export async function render(ctx) {
 
   const archivedBoxes = () => pc.boxes.filter((entry) => entry.archived);
 
+  // Pendant une recherche, chaque boîte dit aussi combien elle a de résultats.
   function jumpOption(entry) {
-    const count = pc.pokemon.filter((mon) => boxOf(mon.pos) === entry.box).length;
+    const inBox = (mon) => boxOf(mon.pos) === entry.box;
+    const count = pc.pokemon.filter(inBox).length;
+    const found = searching() ? matches().filter(inBox).length : null;
     return h(
       "option",
       { value: entry.box, selected: entry.box === box },
-      `${entry.name} (${fmt(count)})`
+      `${entry.name} (${fmt(count)}${found ? ` · ${fmt(found)} trouvé${found > 1 ? "s" : ""}` : ""})`
+    );
+  }
+
+  // ---------------------- Outils : sélection, rang de la boîte ----------------------
+
+  function tools() {
+    return h(
+      "div",
+      { class: "pc-tools" },
+      h(
+        "button",
+        {
+          class: `button small${selecting ? " primary" : " ghost"}`,
+          "aria-pressed": String(selecting),
+          onclick: () => (selecting ? stopSelecting() : startSelecting()),
+        },
+        icon("check"),
+        selecting ? "Terminer la sélection" : "Sélectionner plusieurs"
+      ),
+      h(
+        "button",
+        {
+          class: "button small ghost",
+          "aria-pressed": String(reordering),
+          onclick: () => {
+            reordering = !reordering;
+            draw();
+          },
+        },
+        icon("move"),
+        "Déplacer la boîte"
+      )
+    );
+  }
+
+  function startSelecting(ids = []) {
+    moving = null;
+    selecting = true;
+    for (const id of ids) selected.add(id);
+    draw();
+  }
+
+  function stopSelecting() {
+    selecting = false;
+    selected.clear();
+    target = null;
+    draw();
+  }
+
+  function toggle(mon) {
+    if (selected.has(mon.id)) selected.delete(mon.id);
+    else selected.add(mon.id);
+    draw();
+  }
+
+  // Les cochés partent dans la boîte choisie, puis dans les suivantes s'il le faut
+  // (archivées exceptées) : c'est l'API qui place et qui refuse faute de place.
+  async function rangeSelected() {
+    const destination = target ?? box;
+    const name = pc.boxes[destination]?.name ?? "";
+    try {
+      const result = await api("/api/me/pc/move-many", {
+        method: "POST",
+        body: { pokemonIds: [...selected], box: destination },
+      });
+      pc = result;
+      toast(
+        result.moved
+          ? `${fmt(result.moved)} Pokémon rangé${result.moved > 1 ? "s" : ""} à partir de ${name}.` +
+              (result.skipped
+                ? ` ${fmt(result.skipped)} avai${result.skipped > 1 ? "en" : ""}t bougé entre-temps : ` +
+                  "recharge ta boîte."
+                : "")
+          : `Rien n'a bougé : ils sont déjà rangés à partir de ${name}.`,
+        "success"
+      );
+    } catch (error) {
+      toast(error.message, "error");
+      return reload();
+    }
+    selecting = false;
+    selected.clear();
+    target = null;
+    box = Math.min(destination, pc.boxes.length - 1);
+    draw();
+  }
+
+  function selectionBar() {
+    if (!selecting) return null;
+    const inBox = pc.pokemon.filter((mon) => boxOf(mon.pos) === box);
+    const count = selected.size;
+    // Le compte, puis où ranger, puis de quoi cocher ou décocher d'un coup.
+    return h(
+      "div",
+      { class: "notice pc-selection" },
+      h(
+        "span",
+        {},
+        count
+          ? `${fmt(count)} Pokémon sélectionné${count > 1 ? "s" : ""}, toutes boîtes confondues.`
+          : "Touche les Pokémon à ranger, dans une ou plusieurs boîtes."
+      ),
+      h(
+        "div",
+        { class: "pc-selection-row" },
+        h(
+          "select",
+          {
+            "aria-label": "Boîte où ranger",
+            onchange: (event) => {
+              target = Number(event.target.value);
+            },
+          },
+          pc.boxes.map((entry) =>
+            h("option", { value: entry.box, selected: entry.box === (target ?? box) }, entry.name)
+          )
+        ),
+        h(
+          "button",
+          { class: "button small primary", disabled: !count, onclick: () => rangeSelected() },
+          "Ranger"
+        )
+      ),
+      h(
+        "div",
+        { class: "pc-selection-row" },
+        h(
+          "button",
+          {
+            class: "button small ghost",
+            disabled: !inBox.length || inBox.every((mon) => selected.has(mon.id)),
+            onclick: () => startSelecting(inBox.map((mon) => mon.id)),
+          },
+          "Toute la boîte"
+        ),
+        h(
+          "button",
+          {
+            class: "button small ghost",
+            disabled: !count,
+            onclick: () => {
+              selected.clear();
+              draw();
+            },
+          },
+          "Vider"
+        )
+      )
+    );
+  }
+
+  // La boîte ouverte prend un autre rang, avec son nom, son archivage et ses Pokémon ;
+  // celles d'entre les deux se décalent d'un cran.
+  async function reorder(to) {
+    const name = pc.boxes[box]?.name ?? "";
+    reordering = false;
+    try {
+      pc = await api(`/api/me/pc/boxes/${box}/move`, { method: "POST", body: { to } });
+      toast(`${name} passe au rang ${fmt(to + 1)}.`, "success");
+      box = Math.min(to, pc.boxes.length - 1);
+    } catch (error) {
+      toast(error.message, "error");
+      return reload();
+    }
+    draw();
+  }
+
+  function reorderBanner() {
+    if (!reordering) return null;
+    const current = pc.boxes[box];
+    return h(
+      "p",
+      { class: "notice pc-banner" },
+      icon("move"),
+      h("span", {}, `Mettre ${current.name} au rang :`),
+      h(
+        "select",
+        {
+          class: "pc-jump",
+          "aria-label": "Nouveau rang de la boîte",
+          onchange: (event) => reorder(Number(event.target.value)),
+        },
+        pc.boxes.map((entry) =>
+          h(
+            "option",
+            { value: entry.box, selected: entry.box === box },
+            `${fmt(entry.box + 1)}. ${entry.name}`
+          )
+        )
+      ),
+      h(
+        "button",
+        {
+          class: "button small ghost",
+          onclick: () => {
+            reordering = false;
+            draw();
+          },
+        },
+        "Annuler"
+      )
     );
   }
 
@@ -308,6 +625,10 @@ export async function render(ctx) {
   // ---------------------- Bandeaux ----------------------
 
   function banner() {
+    return [reorderBanner(), mainBanner()];
+  }
+
+  function mainBanner() {
     if (moving) {
       const species = ctx.species.get(moving.speciesId);
       return h(
@@ -334,41 +655,66 @@ export async function render(ctx) {
         )
       );
     }
-    if (!highlight) return null;
-    const species = ctx.species.get(highlight);
-    const name = species?.name ?? "Pokémon de cette espèce";
+    return searchBanner();
+  }
+
+  // Le résultat d'une recherche : combien, dans quelles boîtes, et de quoi passer de
+  // l'une à l'autre ou tout cocher d'un coup.
+  function searchBanner() {
+    if (!searching()) return null;
     const found = matches();
     // Une boîte archivée se dit : la page peut y ouvrir, hors des boîtes de
     // tous les jours.
-    const where = [
-      ...new Set(
-        found.map((mon) => {
-          const entry = pc.boxes[boxOf(mon.pos)];
-          return entry.archived ? `${entry.name} (archivée)` : entry.name;
-        })
-      ),
-    ].join(", ");
-    return h(
-      "p",
-      { class: "notice pc-banner" },
-      h(
-        "span",
-        {},
-        found.length
-          ? `${name} : ${fmt(found.length)} dans ta boîte, rangé${found.length > 1 ? "s" : ""} dans ${where}.`
-          : `Aucun ${name} dans ta boîte.`
-      ),
+    const boxes = [...new Set(found.map((mon) => boxOf(mon.pos)))];
+    const where = boxes
+      .map((index) => {
+        const entry = pc.boxes[index];
+        return entry.archived ? `${entry.name} (archivée)` : entry.name;
+      })
+      .join(", ");
+    // Depuis le Pokédex, sans autre filtre, l'espèce se nomme.
+    const species = highlight && !filters.active() ? ctx.species.get(highlight) : null;
+    const text = !found.length
+      ? species
+        ? `Aucun ${species.name} dans ta boîte.`
+        : "Aucun Pokémon ne correspond."
+      : species
+        ? `${species.name} : ${fmt(found.length)} dans ta boîte, rangé${found.length > 1 ? "s" : ""} dans ${where}.`
+        : `${fmt(found.length)} Pokémon trouvé${found.length > 1 ? "s" : ""}, dans ${where}.`;
+    // La boîte de résultats suivante (ou précédente), en faisant le tour.
+    const other = (direction) => {
+      if (!boxes.length || (boxes.length === 1 && boxes[0] === box)) return null;
+      const ordered = direction > 0 ? boxes : [...boxes].reverse();
+      return ordered.find((index) => (direction > 0 ? index > box : index < box)) ?? ordered[0];
+    };
+    const jump = (direction, name, label) =>
       h(
         "button",
         {
-          class: "button small ghost",
-          onclick: () => {
-            highlight = null;
-            draw();
-          },
+          class: "button small ghost pc-arrow",
+          "aria-label": label,
+          title: label,
+          disabled: other(direction) === null,
+          onclick: () => goTo(other(direction)),
         },
-        "Effacer"
-      )
+        icon(name)
+      );
+    return h(
+      "p",
+      { class: "notice pc-banner" },
+      h("span", {}, text),
+      jump(-1, "chevronLeft", "Boîte de résultats précédente"),
+      jump(1, "chevronRight", "Boîte de résultats suivante"),
+      found.length
+        ? h(
+            "button",
+            {
+              class: "button small ghost",
+              onclick: () => startSelecting(found.map((mon) => mon.id)),
+            },
+            "Tout sélectionner"
+          )
+        : null
     );
   }
 
@@ -389,12 +735,14 @@ export async function render(ctx) {
   }
 
   function slot(pos, mon) {
+    // Pendant une recherche, ce qui répond ressort et le reste s'estompe.
+    const hit = mon && searching() ? matchesMon(mon) : null;
     const element = h(
       "div",
       {
-        class: `pc-slot${mon && mon.speciesId === highlight ? " pc-match" : ""}${
+        class: `pc-slot${hit ? " pc-match" : ""}${hit === false ? " pc-dim" : ""}${
           mon && mon.id === moving?.id ? " pc-moving" : ""
-        }`,
+        }${mon && selected.has(mon.id) ? " pc-selected" : ""}`,
         ondragover: (event) => {
           if (!dragging) return;
           event.preventDefault();
@@ -436,10 +784,13 @@ export async function render(ctx) {
       "button",
       {
         class: "pc-mon",
-        draggable: "true",
+        // En mode sélection, toucher coche : on ne glisse pas.
+        draggable: selecting ? "false" : "true",
         title: name,
         "aria-label": name,
+        "aria-pressed": selecting ? String(selected.has(mon.id)) : null,
         onclick: () => {
+          if (selecting) return toggle(mon);
           if (!moving) return openPokemon(ctx, mon, pc, { reload, startMove });
           // En mode « Déplacer », toucher un autre Pokémon échange leurs places ;
           // toucher celui qu'on déplace abandonne.
@@ -464,7 +815,8 @@ export async function render(ctx) {
         draggable: "false",
       }),
       mon.locked ? icon("shield", { className: "pc-lock" }) : null,
-      mon.showcased ? icon("star", { className: "pc-star" }) : null
+      mon.showcased ? icon("star", { className: "pc-star" }) : null,
+      selected.has(mon.id) ? icon("check", { className: "pc-check" }) : null
     );
   }
 
@@ -478,6 +830,8 @@ export async function render(ctx) {
   }
 
   function startMove(mon) {
+    selecting = false;
+    selected.clear();
     moving = mon;
     draw();
   }
@@ -487,18 +841,28 @@ export async function render(ctx) {
     return h(
       "p",
       { class: "muted small pc-summary" },
-      `${fmt(inBox)} / ${fmt(pc.slotsPerBox)} dans cette boîte · ${fmt(pc.pokemon.length)} Pokémon en tout. `,
+      `${fmt(inBox)} / ${fmt(pc.slotsPerBox)} · ${fmt(pc.pokemon.length)} Pokémon en tout. `,
       pc.boxes[box]?.archived
-        ? "Boîte archivée : les nouveaux Pokémon n'y arrivent pas d'eux-mêmes, mais tu peux y en ranger."
-        : "Glisse un Pokémon pour le ranger, ou ouvre sa fiche et choisis « Déplacer »."
+        ? "Boîte archivée : les nouveaux venus n'y arrivent pas d'eux-mêmes."
+        : selecting
+          ? null
+          : "Glisse un Pokémon pour le ranger."
     );
   }
 
-  // Échap abandonne un déplacement en cours.
+  // Échap abandonne un déplacement en cours, un changement de rang ou la sélection ;
+  // dans un champ (la recherche, un nom de boîte), il ne regarde que le champ.
   const onKey = (event) => {
-    if (event.key !== "Escape" || !moving) return;
-    moving = null;
-    draw();
+    if (event.key !== "Escape" || event.target.closest?.("input, select, textarea")) return;
+    if (moving) {
+      moving = null;
+      return draw();
+    }
+    if (reordering) {
+      reordering = false;
+      return draw();
+    }
+    if (selecting) stopSelecting();
   };
   document.addEventListener("keydown", onKey);
   ctx.onLeave(() => document.removeEventListener("keydown", onKey));
