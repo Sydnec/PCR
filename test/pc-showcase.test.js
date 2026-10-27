@@ -172,6 +172,112 @@ describe("déplacer un Pokémon (movePokemon)", () => {
   });
 });
 
+describe("ranger plusieurs Pokémon (movePokemonMany)", () => {
+  const names = async (user = "u1") => (await call(pc.getPc, user)).boxes.map((box) => box.name);
+
+  it("dans les cases libres de la boîte visée, dans l'ordre où ils sont rangés", async () => {
+    const [a, b, c] = await giveMany(3, { pos: null });
+    await dbRun(points, "UPDATE pokemon_owned SET pc_pos = ? WHERE id = ?", [2, a]);
+    await dbRun(points, "UPDATE pokemon_owned SET pc_pos = ? WHERE id = ?", [0, b]);
+    await dbRun(points, "UPDATE pokemon_owned SET pc_pos = ? WHERE id = ?", [1, c]);
+    const other = await give({ pos: 60 });
+    assert.deepEqual(await call(pc.movePokemonMany, "u1", [a, b, c], 2), { ok: true, moved: 3, skipped: 0 });
+    assert.deepEqual([await posOf(b), await posOf(c), await posOf(a), await posOf(other)], [61, 62, 63, 60]);
+  });
+
+  it("déborde dans les boîtes suivantes, archivées exceptées", async () => {
+    const moving = await giveMany(3, { pos: null });
+    for (const [index, id] of moving.entries()) await dbRun(points, "UPDATE pokemon_owned SET pc_pos = ? WHERE id = ?", [index, id]);
+    for (let slot = 0; slot < 29; slot++) await give({ pos: 30 + slot });
+    await dbRun(points, "INSERT INTO pokemon_pc_boxes (user_id, box, name, archived) VALUES ('u1', 2, '', 1)");
+    assert.equal((await call(pc.movePokemonMany, "u1", moving, 1)).ok, true);
+    assert.deepEqual(await Promise.all(moving.map(posOf)), [59, 90, 91]);
+  });
+
+  it("ceux qui sont déjà dans la boîte visée y restent", async () => {
+    const [a, b] = await giveMany(2, { pos: null });
+    await dbRun(points, "UPDATE pokemon_owned SET pc_pos = 31 WHERE id = ?", [a]);
+    await dbRun(points, "UPDATE pokemon_owned SET pc_pos = 0 WHERE id = ?", [b]);
+    assert.deepEqual(await call(pc.movePokemonMany, "u1", [a, b], 1), { ok: true, moved: 1, skipped: 0 });
+    assert.deepEqual([await posOf(a), await posOf(b)], [31, 30]);
+  });
+
+  it("faute de place jusqu'au plafond, rien ne bouge et le refus donne les chiffres", async () => {
+    config({ pc: { slotsPerBox: 2, maxBoxes: 2, minBoxes: 1 } });
+    const [a, b, c] = await giveMany(3, { pos: null });
+    for (const [id, pos] of [[a, 0], [b, 1], [c, 2]]) await dbRun(points, "UPDATE pokemon_owned SET pc_pos = ? WHERE id = ?", [pos, id]);
+    const result = await call(pc.movePokemonMany, "u1", [a, b], 1);
+    assert.deepEqual(result, {
+      ok: false,
+      reason: "Il ne reste que 1 case libre à partir de « Boîte 2 » (boîtes archivées non comprises), et tu en ranges 2.",
+    });
+    assert.deepEqual([await posOf(a), await posOf(b), await posOf(c)], [0, 1, 2]);
+  });
+
+  it("le Pokémon d'un autre, une boîte qui n'existe pas ou une liste vide : refus, rien ne bouge", async () => {
+    const [mine] = await giveMany(1, { pos: 0 });
+    const stranger = await give({ user: "u2", pos: 0 });
+    assert.match((await call(pc.movePokemonMany, "u1", [mine, stranger], 3)).reason, new RegExp(`#${stranger} n'est pas à toi`));
+    assert.equal((await call(pc.movePokemonMany, "u1", [mine], 60)).reason, "Cette boîte n'existe pas.");
+    assert.equal((await call(pc.movePokemonMany, "u1", [], 1)).reason, "Choisis au moins un Pokémon.");
+    assert.deepEqual([await posOf(mine), await posOf(stranger)], [0, 0]);
+    assert.ok((await names()).length >= 8);
+  });
+});
+
+describe("déplacer une boîte (moveBox)", () => {
+  const boxesOf = async (user = "u1") => (await call(pc.getPc, user)).boxes.map(({ name, archived }) => [name, archived]);
+
+  it("la boîte change de rang avec son nom, son archivage et ses Pokémon ; celles d'entre les deux se décalent", async () => {
+    const [a, b] = [await give({ pos: 30 }), await give({ pos: 31 })];
+    const c = await give({ pos: 64 });
+    const d = await give({ pos: 95 });
+    await call(pc.renameBox, "u1", 1, "Gen1");
+    await call(pc.renameBox, "u1", 2, "Eau");
+    await call(pc.archiveBox, "u1", 2, true);
+    assert.deepEqual(await call(pc.moveBox, "u1", 1, 3), { ok: true });
+    assert.deepEqual([await posOf(a), await posOf(b), await posOf(c), await posOf(d)], [90, 91, 34, 65], "chacun garde sa case");
+    assert.deepEqual((await boxesOf()).slice(0, 4), [["Boîte 1", false], ["Eau", true], ["Boîte 3", false], ["Gen1", false]]);
+    assert.deepEqual(await dbAll(points, "SELECT box, name, archived FROM pokemon_pc_boxes ORDER BY box"), [
+      { box: 1, name: "Eau", archived: 1 },
+      { box: 3, name: "Gen1", archived: 0 },
+    ], "pas de ligne vide qui traîne");
+
+    assert.deepEqual(await call(pc.moveBox, "u1", 3, 1), { ok: true }, "et dans l'autre sens");
+    assert.deepEqual([await posOf(a), await posOf(c), await posOf(d)], [30, 64, 95]);
+    assert.deepEqual((await boxesOf()).slice(0, 4), [["Boîte 1", false], ["Gen1", false], ["Eau", true], ["Boîte 4", false]]);
+  });
+
+  it("un Pokémon sans place encore suit la boîte où la lecture le range", async () => {
+    const id = await give({ pos: null });
+    assert.equal((await call(pc.moveBox, "u1", 0, 2)).ok, true);
+    assert.equal(await posOf(id), 60);
+  });
+
+  it("même rang : rien ne change ; une boîte qui n'existe pas est refusée", async () => {
+    const id = await give({ pos: 3 });
+    assert.deepEqual(await call(pc.moveBox, "u1", 0, 0), { ok: true });
+    for (const [from, to] of [[0, 8], [-1, 2], [0, 1.5], [9, 0]]) {
+      assert.deepEqual(await call(pc.moveBox, "u1", from, to), { ok: false, reason: "Cette boîte n'existe pas." }, `${from}→${to}`);
+    }
+    assert.equal(await posOf(id), 3);
+  });
+
+  it("si les réglages des boîtes ne s'écrivent pas, les Pokémon reviennent à leur place", async () => {
+    const a = await give({ pos: 30 });
+    const b = await give({ pos: 61 });
+    await call(pc.renameBox, "u1", 1, "Gen1");
+    await dbRun(points, "CREATE TRIGGER panne_insert BEFORE INSERT ON pokemon_pc_boxes BEGIN SELECT RAISE(ABORT, 'panne provoquée'); END");
+    try {
+      await assert.rejects(() => call(pc.moveBox, "u1", 1, 2), /panne provoquée/);
+    } finally {
+      await dbRun(points, "DROP TRIGGER panne_insert");
+    }
+    assert.deepEqual([await posOf(a), await posOf(b)], [30, 61]);
+    assert.deepEqual((await boxesOf()).slice(1, 3), [["Gen1", false], ["Boîte 3", false]]);
+  });
+});
+
 describe("noms de boîtes et surnoms", () => {
   it("une boîte inexistante est refusée", async () => {
     for (const box of [-1, 60, 1.5, "2", null]) {

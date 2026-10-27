@@ -80,7 +80,16 @@ import {
   removeFromShowcase,
   showcaseSlots,
 } from "../pokemon/showcase.js";
-import { archiveBox, getPc, movePokemon, renameBox, renamePokemon } from "../pokemon/pc.js";
+import {
+  archiveBox,
+  getPc,
+  moveBox,
+  movePokemon,
+  movePokemonMany,
+  pcConfig,
+  renameBox,
+  renamePokemon,
+} from "../pokemon/pc.js";
 import {
   enterPark,
   getEntryOffer,
@@ -1061,6 +1070,48 @@ export const routes = [
         throw new HttpError(400, "Déplacement invalide.");
       }
       const result = await promise((cb) => movePokemon(ctx.user.id, pokemonId, pos, cb));
+      if (!result.ok) throw new HttpError(409, result.reason);
+      return pcJson(ctx.user.id);
+    },
+  },
+
+  // Ranger plusieurs Pokémon d'un coup dans une boîte : ses cases libres, puis celles
+  // des boîtes qui suivent. La réponse est la boîte PC relue, avec le compte de ceux
+  // qui ont bougé et de ceux qu'un autre onglet avait déplacés entre-temps.
+  {
+    method: "POST",
+    path: "/api/me/pc/move-many",
+    auth: true,
+    write: true,
+    handler: async (ctx) => {
+      const { pokemonIds } = ctx.body;
+      const box = Number(ctx.body.box);
+      const { maxBoxes, slotsPerBox } = pcConfig();
+      if (
+        !Array.isArray(pokemonIds) ||
+        !pokemonIds.length ||
+        pokemonIds.length > maxBoxes * slotsPerBox ||
+        !pokemonIds.every(Number.isInteger) ||
+        !Number.isInteger(box)
+      ) {
+        throw new HttpError(400, "Rangement invalide.");
+      }
+      const result = await promise((cb) => movePokemonMany(ctx.user.id, pokemonIds, box, cb));
+      if (!result.ok) throw new HttpError(409, result.reason);
+      return { ...(await pcJson(ctx.user.id)), moved: result.moved, skipped: result.skipped };
+    },
+  },
+
+  // Changer une boîte de rang, avec son nom, son archivage et ses Pokémon.
+  {
+    method: "POST",
+    path: "/api/me/pc/boxes/:box/move",
+    auth: true,
+    write: true,
+    handler: async (ctx) => {
+      const to = Number(ctx.body.to);
+      if (!Number.isInteger(to)) throw new HttpError(400, "`to` doit être un numéro de boîte.");
+      const result = await promise((cb) => moveBox(ctx.user.id, Number(ctx.params.box), to, cb));
       if (!result.ok) throw new HttpError(409, result.reason);
       return pcJson(ctx.user.id);
     },
