@@ -662,6 +662,9 @@ export const routes = [
       const families = babyFamilies();
       return {
         generation: activeGeneration(),
+        // Les raretés dans leur ordre, du commun au légendaire : les filtres du site
+        // les proposent ainsi.
+        rarities: Object.entries(RARITIES).map(([key, { label }]) => ({ key, label })),
         species: allSpecies().map((species) => speciesJson(species, families)),
       };
     },

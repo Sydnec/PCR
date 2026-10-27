@@ -4,7 +4,7 @@
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { MessageFlags } from "discord.js";
-import { createSandbox, openDatabases, dbRun, dbAll, dbGet, untilQuiet, speciesByName } from "./helpers.js";
+import { createSandbox, openDatabases, dbRun, dbAll, dbGet, eventually, untilQuiet, speciesByName } from "./helpers.js";
 import { fakeChannel, fakeUser, payloadOf, runCommand } from "./fake-discord.js";
 
 createSandbox({ config: { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } } });
@@ -426,8 +426,10 @@ describe("la contre-offre depuis le brouillon", () => {
 
     await press(`poke_trade_accept|${fresh.id}`, { user: "u1", channel: salon() });
     assert.equal((await trades())[1].status, "ACCEPTED");
-    const holders = Object.fromEntries((await dbAll(points, "SELECT id, user_id FROM pokemon_owned")).map((row) => [row.id, row.user_id]));
-    assert.equal(holders[shiny], "u2", "le shiny désigné a changé de main");
+    // ACCEPTED se pose dès la revendication : on attend que l'échange ait fini de livrer.
+    const holdersNow = async () => Object.fromEntries((await dbAll(points, "SELECT id, user_id FROM pokemon_owned")).map((row) => [row.id, row.user_id]));
+    await eventually(async () => assert.equal((await holdersNow())[shiny], "u2", "le shiny désigné a changé de main"));
+    const holders = await holdersNow();
     assert.equal(holders[plain], "u1", "le moins précieux reste chez lui");
     assert.deepEqual([await balanceOf("u1"), await balanceOf("u2")], [1800, 200]);
   });

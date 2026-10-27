@@ -47,6 +47,9 @@ async function interact(customId, { kind = "button", user, channel = fakeChannel
   };
   for (const method of ["reply", "update", "showModal"]) interaction[method] = record(method);
   await (kind === "modal" ? handlePokemonModal : handlePokemonButton)(interaction);
+  // Chaque clic finit par répondre : sous charge, l'échange peut dépasser le court silence
+  // qu'attend untilQuiet avant sa première réponse.
+  await eventually(() => assert.ok(calls.length > 0, `${customId} n'a pas répondu`));
   await untilQuiet(calls);
   return { calls, channel };
 }

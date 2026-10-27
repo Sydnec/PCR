@@ -1,6 +1,7 @@
 // Le Pokédex : toutes les espèces des générations ouvertes, celles qu'on
 // possède en couleur, les autres en silhouette. Comme /pk pokedex, ne compte
 // que ce qui est physiquement dans la boîte.
+import { filterBar, speciesFilters } from "../filters.js";
 import { icon } from "../icons.js";
 import { lineageView, loadLineage } from "../lineage.js";
 import {
@@ -25,7 +26,7 @@ const OBTENTION = {
 
 export async function render(ctx) {
   const dex = await api("/api/users/me/pokedex");
-  const panel = pokedexPanel(ctx, dex);
+  const panel = pokedexPanel(ctx, dex, { url: "/pokedex" });
   return h(
     "section",
     { class: "view" },
@@ -42,8 +43,9 @@ export async function render(ctx) {
 // Le Pokédex d'un dresseur (`dex` : la réponse de /api/users/:id/pokedex) : le
 // décompte, la barre, les filtres et la grille. Le sien et celui d'un autre
 // dresseur (page Dresseurs) se dessinent pareil ; seule la fiche d'une espèce,
-// qui montre ce que *tu* en possèdes, ne s'ouvre que sur le sien.
-export function pokedexPanel(ctx, dex, { mine = true } = {}) {
+// qui montre ce que *tu* en possèdes, ne s'ouvre que sur le sien. `url` : la page
+// dont l'adresse garde les filtres (le sien) ; ailleurs, ils ne survivent pas à la page.
+export function pokedexPanel(ctx, dex, { mine = true, url = null } = {}) {
   const owned = new Map();
   for (const entry of dex.entries) {
     const counts = owned.get(entry.speciesId) ?? { normal: 0, shiny: 0 };
@@ -54,16 +56,44 @@ export function pokedexPanel(ctx, dex, { mine = true } = {}) {
   const shinies = dex.entries.filter((entry) => entry.shiny).length;
   const percent = Math.floor((owned.size / dex.dexSize) * 100);
 
-  let show = "all";
-  let search = "";
+  const params = new URLSearchParams(url ? location.search : "");
+  const VIEWS = ["all", "owned", "missing"];
+  let show = VIEWS.includes(params.get("vue")) ? params.get("vue") : "all";
   const grid = h("div", { class: "grid" });
+  const filters = filterBar({
+    filters: [
+      ...speciesFilters(ctx),
+      {
+        key: "shiny",
+        all: "Shiny ou non",
+        options: [
+          ["oui", "Shiny possédé"],
+          ["non", "Pas encore shiny"],
+        ],
+        test: ({ counts }, value) => (value === "oui") === Boolean(counts?.shiny),
+      },
+    ],
+    // Le nom, ou le numéro tel quel (« 25 ») : chercher « 2 » ne doit pas sortir
+    // tous les numéros qui en contiennent un.
+    search: ({ species }, needle) =>
+      normalize(species.name).includes(needle) || String(species.id) === needle,
+    placeholder: "Chercher un Pokémon…",
+    params,
+    onchange: () => draw(),
+  });
 
   function draw() {
-    const needle = normalize(search.trim());
+    if (url) {
+      const query = new URLSearchParams();
+      if (show !== "all") query.set("vue", show);
+      filters.write(query);
+      const text = query.toString();
+      history.replaceState(null, "", `${url}${text ? `?${text}` : ""}`);
+    }
     const visible = all.filter((species) => {
       if (show === "owned" && !owned.has(species.id)) return false;
       if (show === "missing" && owned.has(species.id)) return false;
-      return !needle || normalize(species.name).includes(needle) || String(species.id) === needle;
+      return filters.matches({ species, counts: owned.get(species.id) });
     });
     grid.replaceChildren(
       ...(visible.length
@@ -99,24 +129,7 @@ export function pokedexPanel(ctx, dex, { mine = true } = {}) {
   draw();
   return {
     summary: `${fmt(owned.size)} / ${fmt(dex.dexSize)} espèces (${percent} %) · ${fmt(shinies)} shiny`,
-    nodes: [
-      progressBar(percent),
-      h(
-        "div",
-        { class: "toolbar" },
-        tabs,
-        h("input", {
-          type: "search",
-          placeholder: "Chercher un Pokémon…",
-          "aria-label": "Chercher un Pokémon",
-          oninput: (event) => {
-            search = event.target.value;
-            draw();
-          },
-        })
-      ),
-      grid,
-    ],
+    nodes: [progressBar(percent), h("div", { class: "toolbar" }, tabs), filters.element, grid],
   };
 }
 
