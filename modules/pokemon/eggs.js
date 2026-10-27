@@ -33,7 +33,7 @@ import {
   isDitto,
   spriteUrl,
 } from "./data.js";
-import { creditSpecies } from "./collection.js";
+import { creditSpecies, groupIndividuals } from "./collection.js";
 import { displayName } from "./embeds.js";
 import { resolveChannel } from "./spawn.js";
 import { getCharms } from "./charms.js";
@@ -116,6 +116,28 @@ export function describeEgg(first, second) {
     };
   }
   return { baby, father, mother };
+}
+
+// Un individu de `species` et `sex` peut-il être parent, avec `partner`
+// ({ species, sex }) quand l'autre parent est déjà choisi ? Un Pikachu ♂ n'a
+// alors pour partenaires que des femelles de sa famille et des Métamorph.
+export const breedsWith = (species, sex, partner = null, families = babyFamilies()) =>
+  canBreed(species, families) &&
+  (!partner?.species || !describeEgg(partner, { species, sex }).error);
+
+// Les parents possibles parmi les individus d'un dresseur, groupés par espèce,
+// variante et sexe : lequel pond importe peu, tant qu'il est fertile. /pk oeuf
+// et le site lisent cette même liste sur toute la boîte : une page de boîte la
+// tronquerait, et un vieux parent disparaîtrait derrière les plus récents.
+export function breedingGroups(rows, partner = null) {
+  const families = babyFamilies();
+  return groupIndividuals(
+    rows.filter((row) => !row.sterile),
+    { bySex: true }
+  )
+    .map((group) => ({ ...group, species: getSpecies(group.speciesId) }))
+    .filter((group) => breedsWith(group.species, group.sex, partner, families))
+    .map((group) => ({ ...group, baby: babyOf(group.species, families) }));
 }
 
 // Combien d'œufs le dresseur a pondus depuis minuit UTC. Une lecture suffit à tenir le

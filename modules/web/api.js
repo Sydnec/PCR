@@ -101,8 +101,7 @@ import {
   startPaidSession,
 } from "../pokemon/safari.js";
 import {
-  babyFamilies,
-  canBreed,
+  breedingGroups,
   eggCharmFactor,
   eggShinyFactor,
   getIncubatingEgg,
@@ -149,9 +148,7 @@ export class HttpError extends Error {
 
 // ---------------------- Mises en forme ----------------------
 
-// `families` se calcule une fois par requête, pas une fois par espèce (voir
-// babyOf).
-function speciesJson(species, families = babyFamilies()) {
+function speciesJson(species) {
   return {
     id: species.id,
     name: species.name,
@@ -167,9 +164,6 @@ function speciesJson(species, families = babyFamilies()) {
     // Le taux effectif (plancher compris) : c'est celui que le site affiche.
     catchRate: effectiveCatchRate(species.catchRate),
     obtention: obtentionOf(species),
-    // Parent possible d'un œuf : de quoi proposer les bons candidats, la ponte
-    // tranchant de toute façon.
-    breeder: canBreed(species, families),
     sellValue: pokemonSellValue(species, false),
     sellValueShiny: pokemonSellValue(species, true),
     evolvesFrom: getAvailableSpecies(species.evolvesFrom)?.id ?? null,
@@ -653,16 +647,13 @@ export const routes = [
   {
     method: "GET",
     path: "/api/species",
-    handler: async () => {
-      const families = babyFamilies();
-      return {
-        generation: activeGeneration(),
-        // Les raretés dans leur ordre, du commun au légendaire : les filtres du site
-        // les proposent ainsi.
-        rarities: Object.entries(RARITIES).map(([key, { label }]) => ({ key, label })),
-        species: allSpecies().map((species) => speciesJson(species, families)),
-      };
-    },
+    handler: async () => ({
+      generation: activeGeneration(),
+      // Les raretés dans leur ordre, du commun au légendaire : les filtres du site
+      // les proposent ainsi.
+      rarities: Object.entries(RARITIES).map(([key, { label }]) => ({ key, label })),
+      species: allSpecies().map((species) => speciesJson(species)),
+    }),
   },
 
   // Les noms et icônes des balls et des objets : de quoi afficher la ball d'un
@@ -805,6 +796,26 @@ export const routes = [
     handler: async (ctx) => ({
       egg: await eggWithCharm(await promise((cb) => getIncubatingEgg(ctx.user.id, cb))),
     }),
+  },
+
+  // Les parents possibles, groupés comme l'autocomplétion de /pk oeuf : le
+  // site choisit un groupe, et la ponte prend l'un de ses individus fertiles.
+  {
+    method: "GET",
+    path: "/api/me/egg/parents",
+    auth: true,
+    handler: async (ctx) => {
+      const rows = await promise((cb) => getIndividuals(ctx.user.id, cb));
+      return {
+        parents: breedingGroups(rows).map((group) => ({
+          speciesId: group.speciesId,
+          shiny: group.isShiny,
+          sex: group.sex,
+          count: group.count,
+          babyId: group.baby?.id ?? null,
+        })),
+      };
+    },
   },
 
   // Ce qu'une évolution coûterait, sans rien faire : l'écran d'évolution.

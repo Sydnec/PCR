@@ -102,6 +102,42 @@ describe("qui peut pondre (describeEgg)", () => {
   });
 });
 
+describe("les parents possibles (breedingGroups)", () => {
+  const groupsOf = async (partner = null) =>
+    eggs.breedingGroups(await call(collection.getIndividuals, "u1"), partner).map((entry) => ({
+      name: entry.species.name,
+      shiny: entry.isShiny,
+      sex: entry.sex,
+      count: entry.count,
+      baby: entry.baby?.name ?? null,
+    }));
+
+  it("les fertiles d'une famille à bébé et les Métamorph, groupés par espèce, variante et sexe", async () => {
+    await own("Grodoudou", { sex: "F", obtained: 1 });
+    await own("Grodoudou", { sex: "F", obtained: 2 });
+    await own("Grodoudou", { sex: "F", shiny: 1, obtained: 3 });
+    await own("Grodoudou", { sex: "M", sterile: 1, obtained: 4 });
+    await own("Métamorph", { sex: null, obtained: 5 });
+    await own("Roucool", { sex: "M", obtained: 6 });
+    await own("Toudoudou", { sex: "M", obtained: 7 });
+    await own("Pikachu", { user: "u2", sex: "M" });
+    assert.deepEqual(await groupsOf(), [
+      { name: "Grodoudou", shiny: false, sex: "F", count: 2, baby: "Toudoudou" },
+      { name: "Grodoudou", shiny: true, sex: "F", count: 1, baby: "Toudoudou" },
+      { name: "Métamorph", shiny: false, sex: null, count: 1, baby: null },
+    ]);
+  });
+
+  it("l'autre parent choisi, seuls ses partenaires restent", async () => {
+    await own("Pikachu", { sex: "M" });
+    await own("Raichu", { sex: "F" });
+    await own("Rondoudou", { sex: "F" });
+    await own("Métamorph", { sex: null });
+    const partner = { species: species("Pikachu"), sex: "M" };
+    assert.deepEqual((await groupsOf(partner)).map((entry) => entry.name), ["Raichu", "Métamorph"]);
+  });
+});
+
 describe("pondre (layEgg)", () => {
   it("un œuf du bébé de la famille : couvé, avec ses échéances ; les deux parents deviennent stériles", async () => {
     const father = await own("Pikachu", { sex: "M" });

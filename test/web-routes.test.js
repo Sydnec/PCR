@@ -389,6 +389,27 @@ describe("l'œuf (/api/me/eggs)", () => {
     assert.equal((await dbAll(points, "SELECT * FROM pokemon_eggs")).length, 0);
   });
 
+  it("les parents possibles se lisent sur toute la boîte, groupés : un vieux parent n'est pas caché par 200 récents", async () => {
+    const mother = await own("Grodoudou", { sex: "F", obtained: 1 });
+    const ditto = await own("Métamorph", { sex: null, obtained: 2 });
+    await own("Grodoudou", { sex: "M", sterile: 1, obtained: 3 });
+    await own("Pikachu", { user: OTHER, sex: "M" });
+    await ownMany("Roucool", 200, { obtained: 10 });
+    const { parents } = await call("GET", "/api/me/egg/parents");
+    assert.deepEqual(parents, [
+      { speciesId: species("Grodoudou").id, shiny: false, sex: "F", count: 1, babyId: species("Toudoudou").id },
+      { speciesId: species("Métamorph").id, shiny: false, sex: null, count: 1, babyId: null },
+    ]);
+
+    // Le site pond avec les groupes tels que la liste les rend.
+    const asBody = (group) => ({ speciesId: group.speciesId, isShiny: group.shiny, sex: group.sex });
+    const result = await lay({ parent1: asBody(parents[0]), parent2: asBody(parents[1]) });
+    assert.equal(result.egg.speciesId, species("Toudoudou").id);
+    const parentsLeft = await dbAll(points, "SELECT id, sterile FROM pokemon_owned WHERE id IN (?, ?) ORDER BY id", [mother, ditto]);
+    assert.deepEqual(parentsLeft.map((row) => row.sterile), [1, 1]);
+    assert.deepEqual((await call("GET", "/api/me/egg/parents")).parents, []);
+  });
+
   it("les parents sont validés et doivent être à soi", async () => {
     const mine = await own("Pikachu", { sex: "F" });
     const stranger = await own("Pikachu", { user: OTHER, sex: "M" });
