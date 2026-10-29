@@ -24,6 +24,10 @@ const RULES = [
     // aura peut-être son bouton de traduction. Un profil ou une recherche n'en
     // ont pas.
     tweet: /\/status(?:es)?\/(\d+)/i,
+    // Ce que X colle après le « ? » d'un lien partagé (s=, t=…) piste qui l'a
+    // partagé : la copie n'en garde rien, quel que soit le nom du traceur. Sauf
+    // une recherche, dont la requête est la recherche elle-même.
+    dropQuery: (path) => !/^\/search\/?$/.test(path),
   },
   // Les reels seulement : le miroir ne sait rien faire d'autre.
   { hosts: ["instagram.com", "www.instagram.com"], to: "kkinstagram.com", path: "/reel/" },
@@ -39,8 +43,8 @@ const LINK = /https:\/\/[^\s<>()[\],`]+/gi;
 const MASKED = /\]\(\s*<?https?:\/\//i;
 
 // Le texte, liens X et Instagram réécrits vers leurs miroirs, avec les tweets
-// qu'ils désignent, ou null s'il n'y avait rien à réécrire. Seul l'hôte
-// change : le reste du lien reste tel quel.
+// qu'ils désignent, ou null s'il n'y avait rien à réécrire. L'hôte change, et
+// les liens X perdent leur requête : le reste du lien reste tel quel.
 export function rewriteSocialLinks(text) {
   const source = String(text);
   if (MASKED.test(source)) return null;
@@ -67,7 +71,9 @@ export function rewriteSocialLinks(text) {
     const id = rule.tweet && url.pathname.match(rule.tweet)?.[1];
     if (id && !tweetIds.includes(id)) tweetIds.push(id);
     // L'autorité s'arrête aussi à « \ », comme pour l'analyseur d'URL.
-    return raw.replace(/^https:\/\/[^/\\?#]+/i, `https://${rule.to}`);
+    const mirrored = raw.replace(/^https:\/\/[^/\\?#]+/i, `https://${rule.to}`);
+    // Un « ? » venu après le « # » appartient au fragment, pas à la requête.
+    return rule.dropQuery?.(path) ? mirrored.replace(/^([^?#]*)\?[^#]*/, "$1") : mirrored;
   });
   return changed ? { text: rewritten, tweetIds } : null;
 }
