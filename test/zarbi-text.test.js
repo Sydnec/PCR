@@ -17,6 +17,8 @@ const { points } = await openDatabases();
 const zarbi = (await import("../commands/zarbi.js")).default;
 const data = await import("../modules/pokemon/data.js");
 const unownText = await import("../modules/pokemon/unown-text.js");
+const { getUnownTextConfig } = await import("../modules/pokemon/config.js");
+const { DEFAULTS } = await import("../modules/config.js");
 
 const unown = data.unownSpecies();
 const own = (letters, user = "u1") =>
@@ -31,22 +33,36 @@ const own = (letters, user = "u1") =>
   );
 const write = (texte, user = "u1") => runCommand(zarbi, { user, options: { texte } });
 const methods = (calls) => calls.map((entry) => entry.method);
+const quiet = async (work) => {
+  const saved = console.error;
+  console.error = () => {};
+  try {
+    return await work();
+  } finally {
+    console.error = saved;
+  }
+};
+const pixel = (png, x, y) => [...png.data.subarray((y * png.width + x) * 4, (y * png.width + x) * 4 + 4)];
+const imageOf = (calls) => PNG.sync.read(payloadOf(calls, "editReply").files[0].attachment);
+const STONE = [0xe8, 0xe2, 0xd0, 0xff];
 
-// Une illustration d'un pixel opaque, ou une panne réseau.
-const SPRITE = PNG.sync.write(Object.assign(new PNG({ width: 1, height: 1 }), { data: Buffer.from([10, 20, 30, 255]) }));
+// Une illustration d'un seul pixel, et les adresses en panne (`failing`).
+const spriteOf = (rgba) => PNG.sync.write(Object.assign(new PNG({ width: 1, height: 1 }), { data: Buffer.from(rgba) }));
 let original;
 let fetched;
-let offline;
+let failing;
+let sprite;
 beforeEach(async () => {
   sandbox.writeConfig(gen2());
   await dbRun(points, "DELETE FROM pokemon_owned");
   fetched = [];
-  offline = false;
+  failing = null;
+  sprite = spriteOf([10, 20, 30, 255]);
   original = globalThis.fetch;
   globalThis.fetch = async (url) => {
     fetched.push(String(url));
-    if (offline) throw new Error("hors ligne");
-    return { ok: true, status: 200, arrayBuffer: async () => SPRITE };
+    if (failing?.test(String(url))) throw new Error("hors ligne");
+    return { ok: true, status: 200, arrayBuffer: async () => sprite };
   };
 });
 afterEach(() => {
@@ -66,14 +82,18 @@ describe("/zarbi", () => {
     const png = PNG.sync.read(file.attachment);
     const margin = Math.round(cellSize / 4);
     assert.deepEqual([png.width, png.height], [3 * cellSize + 2 * margin, 2 * cellSize + 2 * margin]);
-    assert.deepEqual([...png.data.subarray(((margin + 1) * png.width + margin + 1) * 4, ((margin + 1) * png.width + margin + 1) * 4 + 4)], [10, 20, 30, 255], "la lettre est dessinée");
+    assert.deepEqual(pixel(png, margin + 1, margin + 1), [10, 20, 30, 255], "la lettre est dessinée");
+    assert.deepEqual(pixel(png, 0, 0), STONE, "la marge");
+    assert.deepEqual(pixel(png, margin + 2 * cellSize + 1, margin + 1), STONE, "la case vide après « ab »");
     // Une illustration par lettre distincte : A est l'image par défaut de Zarbi.
     assert.deepEqual(fetched.map((url) => url.split("/").at(-1)).sort(), ["201-b.png", "201-c.png", "201.png"]);
   });
 
   it("seules les lettres comptent : accents, ponctuation, chiffres, emojis et mentions ne demandent rien", async () => {
     await own("jadoremngupi");
-    const calls = await write("J'adore manger du pain 😂 <:pikachu:123> <a:danse:456> <@42> <#7> <t:1700000000:R> 2026 !");
+    const calls = await write(
+      "J'adore manger du pain 😂 <:pikachu:123> <a:danse:456> <@42> <@!43> <@&44> <#7> <t:1700000000:R> </pk zarbis:8> <id:customize> 2026 !"
+    );
     assert.deepEqual(methods(calls), ["deferReply", "editReply"], "ni le K de « pikachu », ni le T de la date");
 
     await own("ct");
@@ -116,21 +136,47 @@ describe("/zarbi", () => {
     assert.equal(reply.content, `❌ Zarbi n'est pas encore dans le Pokédex : il arrive avec la ${unown.generation}ᵉ génération.`);
   });
 
-  it("une illustration injoignable : la réponse publique disparaît, le refus est privé", async () => {
+  it("une illustration injoignable, même une seule : la réponse publique disparaît, le refus est privé", async () => {
     await own("ab");
-    offline = true;
-    const saved = console.error;
-    console.error = () => {};
+    for (const pattern of [/./, /201-b\.png$/]) {
+      failing = pattern;
+      sandbox.writeConfig(gen2());
+      const calls = await quiet(() => write("ab"));
+      assert.deepEqual(methods(calls), ["deferReply", "deleteReply", "followUp"], String(pattern));
+      const refusal = payloadOf(calls, "followUp");
+      assert.equal(refusal.flags, MessageFlags.Ephemeral);
+      assert.equal(refusal.content, "❌ Les Zarbi ne répondent pas, réessaie dans un instant.");
+    }
+  });
+
+  it("le bord semi-transparent d'une illustration se fond dans la pierre", async () => {
+    await own("a");
+    sprite = spriteOf([10, 20, 30, 128]);
+    const png = imageOf(await write("a"));
+    const margin = Math.round(cellSize / 4);
+    // À moitié opaque : à mi-chemin entre la lettre et la pierre.
+    assert.deepEqual(pixel(png, margin + 1, margin + 1), [121, 123, 119, 255]);
+  });
+
+  it("une collection illisible : refus privé, rien n'est publié", async () => {
+    await own("a");
+    await dbRun(points, "ALTER TABLE pokemon_owned RENAME TO pokemon_owned_off");
     let calls;
     try {
-      calls = await write("ab");
+      calls = await quiet(() => write("a"));
     } finally {
-      console.error = saved;
+      await dbRun(points, "ALTER TABLE pokemon_owned_off RENAME TO pokemon_owned");
     }
-    assert.deepEqual(methods(calls), ["deferReply", "deleteReply", "followUp"]);
-    const refusal = payloadOf(calls, "followUp");
-    assert.equal(refusal.flags, MessageFlags.Ephemeral);
-    assert.equal(refusal.content, "❌ Les Zarbi ne répondent pas, réessaie dans un instant.");
+    assert.deepEqual(methods(calls), ["reply"]);
+    const reply = payloadOf(calls, "reply");
+    assert.equal(reply.flags, MessageFlags.Ephemeral);
+    assert.equal(reply.content, "❌ Impossible de lire ta collection.");
+    assert.deepEqual(fetched, []);
+  });
+
+  it("un réglage retouché à la main qui n'est pas un entier positif reprend la valeur du code", () => {
+    sandbox.writeConfig({ pokemon: { unownText: { maxLetters: 0, lettersPerLine: "dix", imageCell: -5, imageTimeoutSeconds: null } } });
+    assert.deepEqual(getUnownTextConfig(), DEFAULTS.pokemon.unownText);
   });
 });
 
@@ -147,5 +193,6 @@ describe("la mise en lignes", () => {
     assert.deepEqual(unownText.unownWords("  J'ai -- 3 POMMES!!  "), ["j", "ai", "pommes"]);
     assert.deepEqual(unownText.unownWords("Ça, c'est Œdipe"), ["ca", "c", "est", "oedipe"]);
     assert.deepEqual(unownText.unownWords("Σ ж 😂"), [], "pas de Zarbi pour les autres alphabets");
+    assert.deepEqual(unownText.unownWords("ＡＢ ﬁn ᴬ"), ["ab", "fin", "a"], "pleine chasse, ligature, exposant");
   });
 });

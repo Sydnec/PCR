@@ -8,9 +8,9 @@ import { spriteUrl } from "./data.js";
 import { cellOf } from "./showcase-image.js";
 
 // Ce que Discord écrit entre chevrons — emojis du serveur, mentions, salons,
-// dates, commandes — n'est pas du texte : « <:pikachu:123> » ne demande ni P
-// ni K.
-const DISCORD_TOKEN = /<(?:a?:\w+:\d+|@[!&]?\d+|#\d+|t:-?\d+(?::[a-z])?|\/[^<>]+:\d+)>/gi;
+// dates, commandes, pages du serveur — n'est pas du texte : « <:pikachu:123> »
+// ne demande ni P ni K.
+const DISCORD_TOKEN = /<(?:a?:\w+:\d+|@[!&]?\d+|#\d+|t:-?\d+(?::[a-z])?|\/[^<>]+:\d+|id:\w+)>/gi;
 
 // Les ligatures du français, que la décomposition Unicode laisse entières.
 const LIGATURES = { œ: "oe", æ: "ae" };
@@ -21,14 +21,18 @@ const LIGATURES = { œ: "oe", æ: "ae" };
 const BACKGROUND = [0xe8, 0xe2, 0xd0];
 
 // Les mots du message, en lettres de Zarbi (les clés de leurs formes, « a » à
-// « z ») : « é » s'écrit avec le Zarbi E, l'accent part et la lettre reste.
+// « z ») : « é » s'écrit avec le Zarbi E, l'accent part et la lettre reste. La
+// décomposition de compatibilité ramène aussi les lettres pleine chasse (« Ａ »)
+// et les ligatures typographiques (« ﬁ ») à leurs lettres. Elle passe avant les
+// minuscules : « ᴬ » n'a pas de minuscule, et ne devient « A » qu'en se
+// décomposant.
 export function unownWords(text) {
   return String(text ?? "")
     .replace(DISCORD_TOKEN, " ")
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
     .toLowerCase()
     .replace(/[œæ]/g, (char) => LIGATURES[char])
-    .normalize("NFD")
-    .replace(/\p{M}/gu, "")
     .split(/[^a-z]+/)
     .filter(Boolean);
 }
