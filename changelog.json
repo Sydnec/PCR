@@ -2893,6 +2893,16 @@
       "commit": "pending",
       "timestamp": "2026-10-29T10:31:58.000Z",
       "branch": "dev/keen-knuth-lcd8tu"
+    },
+    {
+      "type": "feature",
+      "name": "/zarbi",
+      "description": "Nouvelle commande /zarbi : écris un message en Zarbi, publié en image dans le salon. Il te faut le Zarbi de chaque lettre du message.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-29T10:36:19.000Z",
+      "branch": "dev/keen-knuth-lcd8tu"
     }
   ]
 }

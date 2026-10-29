@@ -62,7 +62,9 @@ function fit(src, size) {
   return out;
 }
 
-async function cellOf(url, size, timeoutSeconds) {
+// Une illustration réduite à une case de `size` pixels. /zarbi y puise aussi
+// ses lettres, et partage le cache.
+export async function cellOf(url, size, timeoutSeconds) {
   const key = `${size}|${url}`;
   const cached = cells.get(key);
   if (cached) {

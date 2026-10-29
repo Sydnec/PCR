@@ -125,7 +125,7 @@ export function slash({
       getFocused: (full = false) => (full ? (focused ?? { name: "", value: "" }) : (focused?.value ?? "")),
     },
   };
-  for (const method of ["reply", "update", "deferReply", "deferUpdate", "editReply", "followUp", "respond"]) interaction[method] = record(method);
+  for (const method of ["reply", "update", "deferReply", "deferUpdate", "editReply", "deleteReply", "followUp", "respond"]) interaction[method] = record(method);
   const deferReply = interaction.deferReply;
   interaction.deferReply = async (payload) => {
     interaction.deferred = true;

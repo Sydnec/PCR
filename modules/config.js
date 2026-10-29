@@ -281,6 +281,11 @@ const POKEMON = {
   // dans une seule image, en cases de `imageCell` pixels, trois par ligne ; une
   // illustration qui ne répond pas en `imageTimeoutSeconds` laisse sa case vide.
   showcase: { slots: 6, shareCooldownMinutes: 60, imageCell: 128, imageTimeoutSeconds: 5 },
+  // /zarbi : un message écrit en Zarbi, dessiné dans une image, `maxLetters`
+  // lettres au plus, `lettersPerLine` par ligne, en cases de `imageCell` pixels.
+  // Une lettre dont l'illustration ne répond pas en `imageTimeoutSeconds`
+  // annule l'image : un message à trous ne dirait plus la même chose.
+  unownText: { maxLetters: 80, lettersPerLine: 10, imageCell: 64, imageTimeoutSeconds: 5 },
   // La boîte PC du site : des boîtes de `slotsPerBox` places, sur `columns`
   // colonnes, qu'on nomme et où l'on range ses Pokémon comme on veut. Il y en a
   // toujours au moins `minBoxes`, et une vide après la dernière occupée pour
@@ -843,6 +848,11 @@ const BOUNDS = {
   // trois tiennent sur un téléphone.
   "pokemon.showcase.imageCell": { min: 48, max: 256 },
   "pokemon.showcase.imageTimeoutSeconds": { min: 1, max: 30 },
+  // Au-delà, l'image devient un mur que Discord réduit jusqu'à l'illisible.
+  "pokemon.unownText.maxLetters": { min: 1, max: 200 },
+  "pokemon.unownText.lettersPerLine": { min: 4, max: 20 },
+  "pokemon.unownText.imageCell": { min: 32, max: 128 },
+  "pokemon.unownText.imageTimeoutSeconds": { min: 1, max: 30 },
   // Changer la taille d'une boîte redistribue les places : on la borne à ce
   // qu'une grille affiche lisiblement.
   "pokemon.pc.slotsPerBox": { min: 6, max: 60 },
