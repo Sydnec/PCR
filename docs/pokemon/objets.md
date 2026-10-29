@@ -12,7 +12,7 @@ noieraient la table.
 |---|---|---|---|
 | Poké Ball | 6,7 % (1 sur 15) | un lancer offert | — |
 | Super Ball | 3,4 % (1 sur 30) | un lancer offert | — |
-| 🍬 Super Bonbon | 2 % (1 sur 50) | **trois** tiennent lieu d'un sacrifice dans une évolution | 300 |
+| 🍬 Super Bonbon | 2 % (1 sur 49) | **trois** tiennent lieu d'un sacrifice dans une évolution | 300 |
 | Hyper Ball | 1,3 % (1 sur 74) | un lancer offert | — |
 | 🔮 Évolyte | 0,34 % (1 sur 297) | un Évoli qui évolue avec lui prend la forme de son choix, sans payer de points ; il tient lieu d'un sacrifice | 500 |
 | ☀️ Pierre Soleil | 0,34 % (1 sur 297), dès la 2ᵉ gén. | Ortide devient Joliflor plutôt que Rafflesia ; tient lieu d'un sacrifice | 500 |
@@ -20,12 +20,13 @@ noieraient la table.
 | ⚙️ Catalyseur | 0,34 % (1 sur 297), dès la 2ᵉ gén. | le seul moyen de faire évoluer Onix, Insécateur, Hypocéan et Porygon ; tient lieu d'un sacrifice | 500 |
 | 💎 Pépite | 0,84 % (1 sur 119) | rien, sinon se revendre | 4 000 |
 | 🎟️ Ticket Safari | 0,34 % (1 sur 297) | une entrée du parc, sans passer par la caisse | — |
-| Master Ball | **0,03 % (1 sur 2 973)** | la capture garantie, offerte — **une seule en poche** | 10 000, d'office, au-delà de la première |
 
 `dropWeight` est un **poids**, pas un pourcentage : la part d'un objet vaut son poids divisé par la
-somme de tous (892 pour le butin). `/admin poids` fait la conversion pour les quatre tables de
+somme de tous (890 pour le butin). `/admin poids` fait la conversion pour les quatre tables de
 tirage du jeu, cadence comprise. La loterie tire dans sa propre table (`lotteryWeight`, voir
 [Loterie](loterie.md)) ; celle-ci ne décrit que le butin.
+
+**Aucun Pokémon ne tient de Master Ball** : elle ne se gagne qu'à la [loterie](loterie.md).
 
 **Les objets d'une génération suivante s'ajoutent sans rien retirer aux autres.** Les 15 %
 (`spawn.heldItemChance`) valent pour les objets de la 1ʳᵉ génération ; à l'ouverture de la 2ᵉ, ses

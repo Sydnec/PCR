@@ -2923,5 +2923,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Master Ball réservée à la loterie",
+      "description": "Les Pokémon ne tiennent plus de Master Ball : elle ne se gagne plus qu'à la loterie.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-10-29T13:46:40.000Z",
+      "branch": "dev/cool-hamilton-iqsozo"
+    }
+  ]
 }
