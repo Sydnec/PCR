@@ -26,8 +26,9 @@ const RULES = [
     tweet: /\/status(?:es)?\/(\d+)/i,
     // Ce que X colle après le « ? » d'un lien partagé (s=, t=…) piste qui l'a
     // partagé : la copie n'en garde rien, quel que soit le nom du traceur. Sauf
-    // une recherche, dont la requête est la recherche elle-même.
-    dropQuery: (path) => !/^\/search\/?$/.test(path),
+    // là où la requête est le contenu : une recherche, un hashtag filtré
+    // (f=live), un lien d'intention (screen_name=, text=).
+    dropQuery: (path) => !/^\/(?:search|hashtag|intent)(?:\/|$)/.test(path),
   },
   // Les reels seulement : le miroir ne sait rien faire d'autre.
   { hosts: ["instagram.com", "www.instagram.com"], to: "kkinstagram.com", path: "/reel/" },
@@ -72,8 +73,13 @@ export function rewriteSocialLinks(text) {
     if (id && !tweetIds.includes(id)) tweetIds.push(id);
     // L'autorité s'arrête aussi à « \ », comme pour l'analyseur d'URL.
     const mirrored = raw.replace(/^https:\/\/[^/\\?#]+/i, `https://${rule.to}`);
+    if (!rule.dropQuery?.(path)) return mirrored;
+    // La ponctuation et le markdown collés au lien (« ?s=20. », « ||…?s=20|| »)
+    // appartiennent à la phrase : partis avec la requête, ils laisseraient un
+    // gras ou un spoiler ouvert sur le reste du message.
+    const [, link, tail] = mirrored.match(/^(.*?)([.!?;:'"*_~|]*)$/);
     // Un « ? » venu après le « # » appartient au fragment, pas à la requête.
-    return rule.dropQuery?.(path) ? mirrored.replace(/^([^?#]*)\?[^#]*/, "$1") : mirrored;
+    return link.replace(/^([^?#]*)\?[^#]*/, "$1") + tail;
   });
   return changed ? { text: rewritten, tweetIds } : null;
 }

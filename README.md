@@ -54,7 +54,8 @@ safari. Chaque semaine, un pot commun prélève un pourcentage des soldes et le 
 - **Aide** : `/help` - Liste des commandes disponibles.
 - **Liens X et Instagram** : republiés vers des miroirs qui en affichent l'aperçu, avec un bouton
   « Traduire » sous les tweets écrits dans une autre langue que le français. Les liens X y perdent
-  les traceurs collés après le « ? » (sauf une recherche, dont c'est la requête).
+  les traceurs collés après le « ? » (sauf une recherche, un hashtag ou un lien d'intention, dont
+  c'est le contenu).
 
 ### 🛡️ Modération & Administration
 
