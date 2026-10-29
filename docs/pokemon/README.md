@@ -3,7 +3,7 @@
 # 🔴 Pokémon
 
 Système de capture qui sert de **puits à points** : chaque lancer de ball débite des points,
-que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
+que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**, sauf `/zarbi`.
 
 - [Capture & Pokédex](capture.md) — apparitions, balls, shiny, fiche d'espèce.
 - [Individus](individus.md) — sexe, ball de capture, fertilité, `#numéro`, toujours un exemplaire.
@@ -27,6 +27,12 @@ que la capture réussisse ou non. Toutes ses commandes vivent sous **`/pk`**.
 - `/pk zarbis [membre]` : les lettres de Zarbi réunies (avec leur nombre et ✨ leurs shiny) et
   celles qui manquent, sur les formes de la génération ouverte. Réponse privée. Zarbi n'a qu'une
   entrée de Pokédex : c'est ici qu'on suit l'alphabet.
+- `/zarbi <texte>` : publie le message dans le salon, écrit en Zarbi dans une image (une
+  illustration par lettre, `pokemon.unownText.lettersPerLine` par ligne). Il faut posséder le Zarbi
+  de chaque lettre du message, et seules les lettres se vérifient : une lettre accentuée compte
+  comme sa lettre de base (« é » demande E), et les chiffres, la ponctuation, les emojis et les
+  mentions ne demandent rien et ne se dessinent pas. Refus privé qui nomme les lettres manquantes.
+  Au plus `pokemon.unownText.maxLetters` lettres.
 - `/pk boite [pokemon] [membre]` : les Pokémon un par un, page par page — `#numéro`, sexe, ball,
   date, fertilité, et 🛡️ les verrouillés (voir [Individus](individus.md)).
 - `/pk renommer <espece> <individu> [surnom]` : donne un surnom à un de tes Pokémon, ou le retire

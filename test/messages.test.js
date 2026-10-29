@@ -268,12 +268,33 @@ describe("la réécriture des liens dans un message", () => {
 describe("rewriteSocialLinks", () => {
   const rewrite = (text) => links.rewriteSocialLinks(text);
 
-  it("X et Twitter, avec ou sans www, vont vers vxtwitter.com ; seul l'hôte change", () => {
+  it("X et Twitter, avec ou sans www, vont vers vxtwitter.com, sans leur requête", () => {
     for (const host of ["x.com", "www.x.com", "twitter.com", "www.twitter.com"]) {
       const result = rewrite(`https://${host}/sacha/status/99?s=20#haut`);
-      assert.equal(result.text, "https://vxtwitter.com/sacha/status/99?s=20#haut", host);
+      assert.equal(result.text, "https://vxtwitter.com/sacha/status/99#haut", host);
       assert.deepEqual(result.tweetIds, ["99"]);
     }
+  });
+
+  it("les traceurs d'un lien X partent tous, quel que soit leur nom ; une recherche, un hashtag, une intention gardent leur requête", () => {
+    assert.equal(rewrite("https://x.com/a/status/1?s=46&t=AbC-dEf_9").text, "https://vxtwitter.com/a/status/1");
+    assert.equal(rewrite("https://x.com/a/status/1?nouveau_traceur=xyz").text, "https://vxtwitter.com/a/status/1");
+    assert.equal(rewrite("voir https://x.com/sacha?s=21&t=x, merci").text, "voir https://vxtwitter.com/sacha, merci");
+    assert.equal(rewrite("https://x.com/a/status/1#bas?pas=requete").text, "https://vxtwitter.com/a/status/1#bas?pas=requete", "un « ? » du fragment reste");
+    assert.equal(rewrite("https://x.com/search?q=pikachu&src=typed_query").text, "https://vxtwitter.com/search?q=pikachu&src=typed_query");
+    assert.equal(rewrite("https://x.com/hashtag/pikachu?f=live").text, "https://vxtwitter.com/hashtag/pikachu?f=live");
+    assert.equal(rewrite("https://x.com/intent/user?screen_name=sacha").text, "https://vxtwitter.com/intent/user?screen_name=sacha");
+    assert.equal(rewrite("https://x.com/searchlight/status/2?s=20").text, "https://vxtwitter.com/searchlight/status/2", "un compte dont le nom commence par search n'est pas une recherche");
+    assert.equal(rewrite("https://instagram.com/reel/abc/?igsh=xyz").text, "https://kkinstagram.com/reel/abc/?igsh=xyz", "Instagram n'est pas concerné");
+  });
+
+  it("la ponctuation et le markdown collés au lien restent : un gras ou un spoiler ne reste jamais ouvert", () => {
+    assert.equal(rewrite("t'as vu https://x.com/a/status/1?s=20.").text, "t'as vu https://vxtwitter.com/a/status/1.");
+    assert.equal(rewrite("**https://x.com/a/status/1?s=20**").text, "**https://vxtwitter.com/a/status/1**");
+    assert.equal(rewrite("||https://x.com/a/status/1?s=20|| la fin").text, "||https://vxtwitter.com/a/status/1|| la fin");
+    assert.equal(rewrite("_https://x.com/a/status/1?s=20_").text, "_https://vxtwitter.com/a/status/1_");
+    assert.equal(rewrite("\"https://x.com/a/status/1?s=20\" !").text, "\"https://vxtwitter.com/a/status/1\" !");
+    assert.equal(rewrite("ça marche https://x.com/a/status/1?").text, "ça marche https://vxtwitter.com/a/status/1?", "le « ? » de la phrase");
   });
 
   it("les reels Instagram vont vers kkinstagram.com, rien d'autre d'Instagram", () => {

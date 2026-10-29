@@ -34,6 +34,23 @@ export function getSeasonRecapConfig() {
   };
 }
 
+// Les réglages de /zarbi, avec le même repli que le bilan de saison : une valeur
+// retouchée à la main qui n'est pas un entier positif reprend celle du code.
+export function getUnownTextConfig() {
+  const config = getPokemonConfig().unownText ?? {};
+  const fallback = DEFAULTS.pokemon.unownText;
+  const whole = (key) => {
+    const value = Math.floor(Number(config[key]));
+    return Number.isFinite(value) && value >= 1 ? value : fallback[key];
+  };
+  return {
+    maxLetters: whole("maxLetters"),
+    lettersPerLine: whole("lettersPerLine"),
+    imageCell: whole("imageCell"),
+    imageTimeoutSeconds: whole("imageTimeoutSeconds"),
+  };
+}
+
 // Renvoie la définition d'une ball, ou null si la clé est inconnue.
 export function getBall(key) {
   const special = getSpecialBalls().find((ball) => ball.key === key);

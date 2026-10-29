@@ -20,7 +20,8 @@ PCR est un bot Discord modulaire conçu pour animer et gérer la communauté. Il
 
 Un jeu de capture de Pokémon — 1ʳᵉ génération, la 2ᵉ ouvre le vendredi 30 octobre 2026 à 18 h — qui sert de
 **puits à points** : chaque lancer de ball débite des points, que la capture réussisse ou non.
-Toutes ses commandes vivent sous `/pk`. → **[Documentation du jeu](docs/pokemon/README.md)**
+Toutes ses commandes vivent sous `/pk`, sauf `/zarbi`, qui écrit un message en Zarbi avec les lettres
+réunies. → **[Documentation du jeu](docs/pokemon/README.md)**
 
 - [Capture & Pokédex](docs/pokemon/capture.md) — apparitions, balls, shiny, fiche d'espèce.
 - [Individus](docs/pokemon/individus.md) — sexe, ball de capture, fertilité, `/pk boite`, et la vitrine
@@ -52,7 +53,9 @@ safari. Chaque semaine, un pot commun prélève un pourcentage des soldes et le 
 - **Threads** : `/join` - Rejoindre rapidement un fil de discussion.
 - **Aide** : `/help` - Liste des commandes disponibles.
 - **Liens X et Instagram** : republiés vers des miroirs qui en affichent l'aperçu, avec un bouton
-  « Traduire » sous les tweets écrits dans une autre langue que le français.
+  « Traduire » sous les tweets écrits dans une autre langue que le français. Les liens X y perdent
+  les traceurs collés après le « ? » (sauf une recherche, un hashtag ou un lien d'intention, dont
+  c'est le contenu).
 
 ### 🛡️ Modération & Administration
 

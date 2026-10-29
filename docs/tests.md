@@ -54,6 +54,7 @@ génération ouverte en cours de route.
 | `evolution`, `collection`         | coût d'une évolution, sacrifices, objets, Métamorph, compensation ; individus, verrous, doublons, échanges, échanges possibles |
 | `eggs`, `lottery-charms`          | ponte, éclosion, compteur de messages ; loterie quotidienne et son journal daté, Charme Chroma et ses rôles       |
 | `pc-showcase`                     | boîtes PC, surnoms, vitrine, envoi de la vitrine                                                                   |
+| `zarbis`, `zarbi-text`            | `/pk zarbis` (lettres réunies et manquantes) ; `/zarbi` : lettres possédées, ce qui ne se vérifie pas, mise en lignes, image |
 | `embeds`                          | embeds Discord, lignée, formats                                                                                    |
 | `web-api`, `web-routes`           | toutes les routes de l'API du site : validation (400), droits (401/403/404), refus du jeu (409)                    |
 | `web-server`, `web-session`       | serveur HTTP réel : session, appartenance au serveur, administrateur, origine, taille, cadence, OAuth, fichiers    |
