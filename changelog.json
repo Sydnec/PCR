@@ -1,7 +1,34 @@
 {
-  "version": "1.21.4",
-  "lastUpdated": "2026-10-29T10:52:32.695Z",
+  "version": "1.21.5",
+  "lastUpdated": "2026-10-29T10:56:55.277Z",
   "releases": [
+    {
+      "version": "1.21.5",
+      "date": "2026-10-29",
+      "title": "Release 1.21.5",
+      "features": [
+        {
+          "type": "enhancement",
+          "name": "Liens X sans traceurs",
+          "description": "Quand le bot republie un lien X, il retire aussi les traceurs que X ajoute après le « ? ».",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-10-29T10:31:58.000Z",
+          "branch": "dev/keen-knuth-lcd8tu"
+        },
+        {
+          "type": "feature",
+          "name": "/zarbi",
+          "description": "Nouvelle commande /zarbi : écris un message en Zarbi, publié en image dans le salon. Il te faut le Zarbi de chaque lettre du message.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-10-29T10:36:19.000Z",
+          "branch": "dev/keen-knuth-lcd8tu"
+        }
+      ]
+    },
     {
       "version": "1.21.4",
       "date": "2026-10-29",
@@ -2896,26 +2923,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "enhancement",
-      "name": "Liens X sans traceurs",
-      "description": "Quand le bot republie un lien X, il retire aussi les traceurs que X ajoute après le « ? ».",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-10-29T10:31:58.000Z",
-      "branch": "dev/keen-knuth-lcd8tu"
-    },
-    {
-      "type": "feature",
-      "name": "/zarbi",
-      "description": "Nouvelle commande /zarbi : écris un message en Zarbi, publié en image dans le salon. Il te faut le Zarbi de chaque lettre du message.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-10-29T10:36:19.000Z",
-      "branch": "dev/keen-knuth-lcd8tu"
-    }
-  ]
+  "pending": []
 }
