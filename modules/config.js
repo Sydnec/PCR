@@ -332,9 +332,6 @@ const POKEMON = {
   // sur un Chenipan est refusée. `generation` le garde hors du jeu tant que sa
   // génération est fermée.
   //
-  // Repère : avec 15 % de porteurs et 892 de poids total, la Master Ball tombe
-  // une fois sur trois mille apparitions environ.
-  //
   // Ajouter un objet demande de toucher ici ET au code qui le consomme :
   // /admin config modifie une valeur existante, il n'invente pas de clé.
   items: {
@@ -436,10 +433,13 @@ const POKEMON = {
       description: "Une entrée pour le parc safari.",
       dropWeight: 20,
     },
+    // Pas de `dropWeight` : aucun Pokémon ne tient de Master Ball, elle ne se gagne
+    // qu'à la loterie. Son `lotteryWeight` doit rester écrit, sans quoi il
+    // retomberait sur le poids du butin, nul, et elle n'y sortirait plus non plus.
     ball_master: {
       ball: "master",
       description: "La capture garantie, offerte. Autant dire qu'elle ne se trouve pas.",
-      dropWeight: 2,
+      lotteryWeight: 2,
       maxHeld: 1,
       overflowValue: 10000,
     },

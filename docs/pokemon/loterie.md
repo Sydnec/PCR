@@ -32,6 +32,8 @@ d'exceptionnel. À `lotDecay: 1` on retrouve exactement l'ancien comportement.
 | 🍬 3× Super Bonbon | 1,02 % | 98 |
 | **Master Ball** | **0,12 %** | **841** |
 
+**La loterie est le seul endroit où se gagne une Master Ball** : aucun Pokémon n'en tient.
+
 **Dès la 2ᵉ génération**, la ☀️ Pierre Soleil, la 👑 Roche Royale et le ⚙️ Catalyseur s'ajoutent
 (1,19 % chacun, un jour sur 84) **en prenant leur place sur « Rien »**, qui tombe à 21,43 % : aucun
 autre lot ne devient plus rare. `winChance` vaut en effet pour les objets de la 1ʳᵉ génération, et

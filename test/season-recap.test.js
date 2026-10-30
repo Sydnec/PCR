@@ -649,17 +649,17 @@ describe("la chance aux objets", () => {
   const near = (actual, expected) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} ≠ ${expected}`);
 
   it("la rareté d'un objet est le poids de sa table sur le sien : la Master Ball vaut bien plus qu'une Poké Ball", () => {
-    assert.ok(rarity("ball_master", 1) > 100 * rarity("ball_poke", 1));
+    assert.ok(rarity("ball_master", 1, "lotteryWeight") > 100 * rarity("ball_poke", 1, "lotteryWeight"));
   });
 
   it("score = somme des raretés des objets obtenus par capture, au sol et à la loterie, vente automatique comprise", async () => {
     await addLog("a", "ball_poke", 3, "capture:1", T1);
     await addLog("a", "pepite", 1, "sol:5", T1);
     await addLog("a", "ball_poke", 2, "loterie", T1);
-    await addLog("b", "ball_master", 0, "vente-auto:capture:7", T1);
+    await addLog("b", "ball_master", 0, "vente-auto:loterie", T1);
     const { itemLuck } = (await compute(W1, 1)).trainers;
     assert.deepEqual(itemLuck.map((p) => p.user), ["b", "a"]);
-    near(itemLuck[0].score, rarity("ball_master", 1));
+    near(itemLuck[0].score, rarity("ball_master", 1, "lotteryWeight"));
     assert.equal(itemLuck[0].items, 1);
     assert.deepEqual(itemLuck[0].rarest.item, "ball_master");
     near(itemLuck[1].score, 3 * rarity("ball_poke", 1) + rarity("pepite", 1) + 2 * rarity("ball_poke", 1, "lotteryWeight"));
@@ -891,7 +891,7 @@ describe("le message", () => {
       await addThrows(user, { count: 30 + index, catches: 5 + (index % 20), p: 0.3 });
       await bulk("pokemon_lottery_draws", ["user_id", "won", "drawn_at"], Array.from({ length: 6 }, (_, k) => [user, k < index % 5 ? 1 : 0, IN()]));
       await addOwned(user, everyone[index].id, IN(index));
-      await addLog(user, index % 2 ? "ball_master" : "pepite", 1 + (index % 3), "capture:1");
+      await addLog(user, index % 2 ? "ball_master" : "pepite", 1 + (index % 3), index % 2 ? "loterie" : "capture:1");
       await addSession(user, { catches: index });
       await dbRun(points, "INSERT INTO pokemon_drops (item_key, status, dropped_at, claimed_by, claimed_at) VALUES ('pepite', 'CLAIMED', 1, ?, ?)", [user, IN(index)]);
       await dbRun(points, "INSERT INTO pokemon_trades (from_user_id, to_user_id, offer_species_id, request_species_id, status, created_at, expires_at, resolved_at) VALUES (?, ?, 0, 0, 'ACCEPTED', 1, 2, ?)", [user, users[(index + 1) % users.length], IN(index)]);

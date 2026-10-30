@@ -393,6 +393,15 @@ describe("objets", () => {
     assert.ok(items.itemLotteryWeight(poke) > items.itemDropWeight(poke), "les balls pèsent plus lourd à la loterie");
   });
 
+  it("la Master Ball ne tombe d'aucun Pokémon : elle ne se gagne qu'à la loterie", () => {
+    const master = items.getItem("ball_master");
+    assert.equal(items.itemDropWeight(master), 0);
+    assert.ok(items.itemLotteryWeight(master) > 0);
+    const held = new Set();
+    for (let i = 0; i < 3000; i++) held.add(items.pickWeightedItem(items.itemDropWeight).key);
+    assert.ok(!held.has("ball_master"));
+  });
+
   it("le tirage d'un objet suit les poids", () => {
     const weightOf = (item) => items.itemDropWeight(item);
     const first = withRandom(0, () => items.pickWeightedItem(weightOf));
