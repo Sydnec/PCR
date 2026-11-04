@@ -100,7 +100,7 @@ export async function render(ctx) {
       { class: "muted" },
       "Une ball achetée ne sert qu'aux Pokémon qui apparaissent après son achat — pas à celui en cours. ",
       "Les achats de chaque ball sont limités par jour ; le compteur repart à minuit UTC. ",
-      "Elles se lancent dans « Balls spéciales » sur la page Capture."
+      "Elles se lancent depuis la page Capture, avec les autres balls."
     ),
     list
   );

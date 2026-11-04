@@ -295,7 +295,7 @@ function shop(rules) {
       rule(
         `Elles s'achètent avec /pk boutique, **${fmt(rules.shop.maxHeld)}** de chaque au plus en poche ` +
           `et **${fmt(rules.shop.dailyLimit)}** de chaque par jour (minuit UTC), ` +
-          `et se lancent depuis « Balls spéciales ».`
+          `et se lancent depuis « Balls spéciales » (sur le site, avec les autres balls).`
       ),
       rule(
         "Une ball achetée ne sert qu'aux Pokémon apparus **après** son achat. Si un autre " +

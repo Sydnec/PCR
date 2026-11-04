@@ -28,7 +28,7 @@ import {
   safariFleeChance,
   safariGenerations,
 } from "./data.js";
-import { creditSpecies, getOwnedVariantsFor } from "./collection.js";
+import { creditSpecies, getOwnedVariantsFor, readOwnedForms } from "./collection.js";
 import { consumeItem, getItem, getItemCount, grantItem } from "./items.js";
 import { resolveChannel } from "./spawn.js";
 import { getCharms } from "./charms.js";
@@ -290,10 +290,13 @@ function buildLivePayload(session, author, cb) {
     if (err) return cb(err);
     getRecentEvents(session.id, config.liveRecentActions, (err, events) => {
       if (err) return cb(err);
-      withOwned({ session }, (err, { owned = null, lineage = null } = {}) => {
+      withOwned({ session }, (err, { owned = null, lineage = null, forms = null } = {}) => {
         if (err) return cb(err);
         try {
-          cb(null, buildSafariLiveView(session, { author, events, catches, owned, lineage }));
+          cb(
+            null,
+            buildSafariLiveView(session, { author, events, catches, owned, lineage, forms })
+          );
         } catch (error) {
           cb(error);
         }
@@ -566,7 +569,8 @@ function storeNextEncounter(sessionId, encounter, cb) {
 // donc la réponse tient directement dans l'embed.
 //
 // `owned` reste les compteurs de l'espèce seule, que l'API du site sert telle
-// quelle ; `lineage` en est la table par maillon, en une seule requête.
+// quelle ; `lineage` en est la table par maillon, en une seule requête ; `forms`,
+// les formes qu'il a de l'espèce (les lettres de Zarbi), null sans objet.
 function withOwned(payload, cb) {
   const session = payload.session;
   // Une visite terminée affiche son bilan, pas une rencontre : rien à lire.
@@ -579,11 +583,14 @@ function withOwned(payload, cb) {
     // Une collection illisible ne doit jamais faire échouer une action déjà
     // jouée et déjà décomptée : on affiche la rencontre sans la pastille.
     if (err) handleException("Lecture de la collection au parc safari :", err);
-    cb(null, {
-      ...payload,
-      owned: err ? null : lineage.get(Number(session.encounter_species_id)),
-      lineage: err ? null : lineage,
-    });
+    readOwnedForms(session.user_id, species, (forms) =>
+      cb(null, {
+        ...payload,
+        owned: err ? null : lineage.get(Number(session.encounter_species_id)),
+        lineage: err ? null : lineage,
+        forms,
+      })
+    );
   });
 }
 

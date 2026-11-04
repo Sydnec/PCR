@@ -20,7 +20,8 @@ le distingue des autres.
   l'annonce montre, « Un Zarbi K sauvage apparaît ! » — ou au parc, avec son image. Les 26 lettres
   d'Or et Argent arrivent avec la 2ᵉ génération ; « ! » et « ? », de Rubis et Saphir, viendront
   avec la 3ᵉ. La lettre suit le Zarbi partout (boîte, échange, revente, autocomplétion), et la fiche
-  de l'espèce (`/pk info`, le site) compte celles qu'on possède : « Formes : 5/26 ». La règle du
+  de l'espèce (`/pk info`, le site) compte celles qu'on possède : « Formes : 5/26 ». Devant un
+  Zarbi apparu ou rencontré au parc, elle dit d'abord si on a déjà sa lettre, shiny ou non. La règle du
   dernier exemplaire reste celle de l'espèce : il reste toujours un Zarbi, quelle que soit sa
   lettre.
 

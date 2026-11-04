@@ -206,7 +206,7 @@ function askMasterBallConfirmation(interaction, spawnId, { panel = false } = {})
 // Répond en privé au cliqueur, ce qu'un embed public ne peut pas faire : un
 // message Discord est identique pour tous ses lecteurs. La fiche est celle de
 // /pk info, à ceci près qu'elle épouse l'apparition d'où vient le clic — sa
-// variante shiny et son taux de capture figé.
+// variante shiny, son taux de capture figé et sa forme.
 //
 // Le solde suit dans un second embed : les deux questions qu'on se pose devant
 // une apparition sont « est-ce que je l'ai déjà ? » et « est-ce que je peux me
@@ -230,6 +230,7 @@ function answerSpeciesInfo(interaction, spawnId) {
         owned,
         forms,
         sexes,
+        form: spawn.form,
         isShiny: Boolean(spawn.is_shiny),
         catchRate: spawn.catch_rate,
       });
@@ -1017,6 +1018,7 @@ function handleSafariEnter(interaction, parkId) {
             ? buildSafariView(ongoing.session, {
                 owned: ongoing.owned,
                 lineage: ongoing.lineage,
+                forms: ongoing.forms,
                 resumed: true,
               })
             : {
@@ -1042,6 +1044,7 @@ function handleSafariEnter(interaction, parkId) {
         ...buildSafariView(result.session, {
           owned: result.owned,
           lineage: result.lineage,
+          forms: result.forms,
           resumed: result.resumed,
         }),
         flags: MessageFlags.Ephemeral,
@@ -1084,6 +1087,7 @@ function handleSafariGo(interaction, mode, parkId, generations) {
       buildSafariView(result.session, {
         owned: result.owned,
         lineage: result.lineage,
+        forms: result.forms,
         resumed: result.resumed,
       })
     );
@@ -1413,6 +1417,7 @@ function handleSafariAction(interaction, action, sessionId, token) {
           catches: result.catches ?? [],
           owned: result.owned,
           lineage: result.lineage,
+          forms: result.forms,
         })
       )
       .catch(() => {});

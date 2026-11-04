@@ -4,11 +4,11 @@
 // course), et l'annonce du salon suit. La page relit l'apparition à la cadence
 // que donne l'API, tant qu'elle est ouverte et visible.
 //
-// Le Pokémon au centre, ses balls juste en dessous, puis ce que donnerait le
-// bouton « Infos du Pokémon » sur Discord : ce qu'on en possède, son solde et
-// ses balls en poche, sa lignée. Sur le côté, tout ce qui se lance d'ailleurs :
-// le journal des lancers, ce qui est au sol, la pêche et le parc safari. La
-// touche d'une pêche passe en tête du centre : elle s'enfuit vite, et n'est qu'à toi.
+// Le Pokémon au centre, ses balls juste en dessous, ce qui est au sol, puis ce que
+// donnerait le bouton « Infos du Pokémon » sur Discord : ce qu'on en possède, son
+// solde et ses balls en poche, sa lignée. Sur le côté, tout ce qui se lance
+// d'ailleurs : le journal des lancers, la pêche et le parc safari. La touche d'une
+// pêche passe en tête du centre : elle s'enfuit vite, et n'est qu'à toi.
 import { icon } from "../icons.js";
 import { lineageView } from "../lineage.js";
 import {
@@ -17,6 +17,7 @@ import {
   dateTimeFr,
   dexNumber,
   fmt,
+  formMark,
   h,
   itemIcon,
   outcomePanel,
@@ -45,9 +46,8 @@ export async function render(ctx) {
   // attente de confirmation, la réponse du dernier lancer, et la fin du
   // cooldown affiché.
   // La confirmation de la Master Ball vise une apparition ({ key, spawnId }) : le salon et la
-  // pêche ont chacun la leur. Les balls spéciales s'ouvrent de même par apparition.
+  // pêche ont chacun la leur.
   let confirming = null;
-  const specialOpen = new Set();
   let buyingSafari = false;
   let panel = null;
   let throwing = false;
@@ -69,7 +69,7 @@ export async function render(ctx) {
           touchView(),
           state.spawn ? spawnView(state.spawn) : waiting()
         ),
-        h("aside", { class: "capture-aside" }, journal(), drops(), fishingView(), safariView())
+        h("aside", { class: "capture-aside" }, journal(), fishingView(), safariView())
       )
     );
 
@@ -150,6 +150,8 @@ export async function render(ctx) {
   function spawnView(spawn) {
     const species = ctx.species.get(spawn.speciesId);
     if (!species) return h("p", { class: "notice" }, "Un Pokémon inconnu apparaît…");
+    // L'espèce ne dit pas tout pour un Zarbi : c'est sa lettre qu'on collectionne.
+    const letter = formMark(species, spawn.form, spawn.forms);
     const view = h(
       "div",
       { class: `spawn${spawn.shiny ? " spawn-shiny" : ""}` },
@@ -187,7 +189,8 @@ export async function render(ctx) {
         { class: "spawn-meta muted" },
         dexNumber(species),
         " · ",
-        ownedMark(spawn.owned, spawn.shiny)
+        ownedMark(spawn.owned, spawn.shiny),
+        letter ? [" · ", letter] : null
       ),
       // Il ne brille que pour les porteurs du Charme Chroma de sa génération :
       // le salon le voit normal, et c'est au porteur qu'il faut le dire.
@@ -209,7 +212,16 @@ export async function render(ctx) {
       balls(spawn),
       confirming?.spawnId === spawn.id ? confirmation(spawn) : null,
       panel?.spawnId === spawn.id ? throwPanel() : null,
-      lineageView(ctx, spawn.lineage, { currentId: spawn.speciesId, shiny: spawn.shiny })
+      // Ce qui est au sol se ramasse dans la même course que les lancers : sous les balls
+      // du salon, pas sur le côté où on ne le voyait pas. La touche d'une pêche ne le
+      // répète pas : le salon, Pokémon ou attente, le montre déjà.
+      spawn.fished ? null : drops(),
+      lineageView(ctx, spawn.lineage, {
+        currentId: spawn.speciesId,
+        shiny: spawn.shiny,
+        forms: spawn.forms,
+        currentForm: spawn.form?.key,
+      })
     );
     // Un halo de la couleur de son premier type, comme la bordure de l'embed.
     const glow = ctx.types[species.types[0]];
@@ -236,14 +248,15 @@ export async function render(ctx) {
     );
   }
 
-  // Les balls ordinaires d'abord ; la Master Ball et celles de la boutique sont
-  // rangées derrière « Balls spéciales », comme dans le sous-menu de Discord.
+  // Toutes les balls à la fois : les ordinaires, celles de la boutique, puis la Master
+  // Ball. Discord les range derrière « Balls spéciales » faute de place pour ses
+  // boutons ; la page, elle, a la place de toutes les montrer.
   function balls(spawn) {
     const cooling = Date.now() < coolUntil;
-    const standard = spawn.balls.filter((ball) => !ball.guaranteed);
-    // Une ball de la boutique sert si on en a acheté AVANT cette apparition : aucun
-    // prix au lancer, son nombre tient lieu de stock.
-    const special = [
+    const all = [
+      ...spawn.balls.filter((ball) => !ball.guaranteed),
+      // Une ball de la boutique sert si on en a acheté AVANT cette apparition : aucun
+      // prix au lancer, son nombre tient lieu de stock.
       ...spawn.specialBalls.map((ball) => ({
         ...ball,
         shop: true,
@@ -306,29 +319,7 @@ export async function render(ctx) {
       );
     };
 
-    return h(
-      "div",
-      { class: "balls-group" },
-      h(
-        "div",
-        { class: "balls" },
-        standard.map(button),
-        h(
-          "button",
-          {
-            class: `ball ball-special${specialOpen.has(spawn.id) ? " ball-open" : ""}`,
-            disabled: throwing,
-            onclick: () => {
-              if (!specialOpen.delete(spawn.id)) specialOpen.add(spawn.id);
-              draw();
-            },
-          },
-          h("span", { class: "ball-icon" }, "🌟"),
-          h("span", { class: "ball-text" }, h("span", { class: "ball-label" }, "Balls spéciales"))
-        )
-      ),
-      specialOpen.has(spawn.id) ? h("div", { class: "balls" }, special.map(button)) : null
-    );
+    return h("div", { class: "balls" }, all.map(button));
   }
 
   function confirmation(spawn) {
@@ -585,6 +576,8 @@ export async function render(ctx) {
             )
           )
         : null,
+      // Ce qu'il tenait tombe à son départ : juste sous lui.
+      drops(),
       // Le parc ouvert suspend les apparitions : l'attente a alors une fin connue.
       state.pausedUntil
         ? h(
@@ -640,38 +633,42 @@ export async function render(ctx) {
     if (!state.drops.length) return null;
     return h(
       "section",
-      { class: "side-section" },
+      { class: "drops" },
       h("h3", {}, "Au sol"),
-      state.drops.map((drop) =>
-        h(
-          "div",
-          { class: "drop" },
-          itemIcon(drop),
-          h("span", { class: "drop-text" }, drop.label),
-          // Ce qu'un Pokémon capturé lâche n'est pas pour son capteur : l'API le
-          // dit, le bouton reste visible mais inerte.
+      h(
+        "div",
+        { class: "drops-list" },
+        state.drops.map((drop) =>
           h(
-            "button",
-            {
-              class: "button small",
-              disabled: !drop.claimable,
-              title: drop.claimable ? null : "Tu l'as capturé : il revient aux autres.",
-              onclick: async (event) => {
-                event.currentTarget.disabled = true;
-                try {
-                  const { item, sold } = await api(`/api/drops/${drop.id}/claim`, {
-                    method: "POST",
-                    body: {},
-                  });
-                  // Au-delà de la limite (la Master Ball), l'objet est vendu d'office.
-                  toast(`Tu ramasses **${item.label}** !${sold ? ` ${sold}` : ""}`, "success");
-                } catch (error) {
-                  toast(error.message, "error");
-                }
-                await refreshAll();
+            "div",
+            { class: "drop" },
+            itemIcon(drop),
+            h("span", { class: "drop-text" }, drop.label),
+            // Ce qu'un Pokémon capturé lâche n'est pas pour son capteur : l'API le
+            // dit, le bouton reste visible mais inerte.
+            h(
+              "button",
+              {
+                class: "button small",
+                disabled: !drop.claimable,
+                title: drop.claimable ? null : "Tu l'as capturé : il revient aux autres.",
+                onclick: async (event) => {
+                  event.currentTarget.disabled = true;
+                  try {
+                    const { item, sold } = await api(`/api/drops/${drop.id}/claim`, {
+                      method: "POST",
+                      body: {},
+                    });
+                    // Au-delà de la limite (la Master Ball), l'objet est vendu d'office.
+                    toast(`Tu ramasses **${item.label}** !${sold ? ` ${sold}` : ""}`, "success");
+                  } catch (error) {
+                    toast(error.message, "error");
+                  }
+                  await refreshAll();
+                },
               },
-            },
-            drop.claimable ? "Ramasser" : "Aux autres"
+              drop.claimable ? "Ramasser" : "Aux autres"
+            )
           )
         )
       )

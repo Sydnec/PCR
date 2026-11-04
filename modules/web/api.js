@@ -13,9 +13,9 @@ import {
   getCollection,
   getIndividuals,
   getLeaderboard,
-  getOwnedForms,
   getOwnedSexes,
   getOwnedVariantsFor,
+  readOwnedForms,
   resolveSelector,
   evolve,
   describeEvolution,
@@ -323,25 +323,23 @@ async function lineageJson(userId, species) {
   }));
 }
 
-// Les formes d'une espèce qui en a, et celles que le dresseur possède : la
-// ligne « Formes » de la fiche Discord. null sans formes, ou sur une lecture
-// ratée — la fiche l'omet plutôt que d'annoncer zéro.
-async function formsJson(userId, species) {
+// Les formes d'une espèce qui en a, et celles que le dresseur possède (`owned`, lu
+// par readOwnedForms) : la ligne « Formes » de la fiche Discord. null sans formes,
+// ou sur une lecture ratée — la fiche l'omet plutôt que d'annoncer zéro.
+function formsList(species, owned) {
   const forms = speciesForms(species);
-  if (!forms.length) return null;
-  let owned;
-  try {
-    owned = await promise((cb) => getOwnedForms(userId, species.id, cb));
-  } catch (error) {
-    handleException("API web, lecture des formes :", error);
-    return null;
-  }
+  if (!forms.length || !owned) return null;
   return forms.map((form) => ({
     key: form.key,
     name: form.name,
     icon: iconUrl(species, false, form.key),
     owned: owned.has(form.key),
   }));
+}
+
+async function formsJson(userId, species) {
+  const owned = await new Promise((resolve) => readOwnedForms(userId, species, resolve));
+  return formsList(species, owned);
 }
 
 // Les sexes possibles d'une espèce, avec ceux que le dresseur en a déjà, comme
@@ -396,10 +394,11 @@ async function spawnJson(ctx, spawn, balance) {
   const config = getPokemonConfig();
   const species = getSpecies(spawn.species_id);
   const specialBalls = openSpecialBalls();
-  const [throws, inventory, lineage, charms, unitCounts] = await Promise.all([
+  const [throws, inventory, lineage, forms, charms, unitCounts] = await Promise.all([
     promise((cb) => recentThrows(spawn.id, config.spawn.throwLogSize, cb)),
     promise((cb) => getInventory(ctx.user.id, cb)),
     lineageJson(ctx.user.id, species),
+    formsJson(ctx.user.id, species),
     // Une lecture ratée des charmes ne coûte pas la page : l'apparition
     // s'affiche comme au salon, sans le charme.
     promise((cb) =>
@@ -446,6 +445,9 @@ async function spawnJson(ctx, spawn, balance) {
       shiny: 0,
     },
     lineage,
+    // Les lettres de Zarbi qu'on a, dont celle de l'apparition (`form`) : la ligne
+    // « Formes » du bouton « Infos du Pokémon ».
+    forms,
     balls: await Promise.all(
       probabilitiesByBall(spawn.catch_rate).map(async (ball) => {
         // Les balls offertes partent avant les points, comme sur Discord : une
@@ -517,7 +519,7 @@ async function fishingJson(ctx, balance) {
 // Une visite du parc telle que le site l'affiche : la rencontre (chances, appât,
 // risque de fuite, calculés par les mêmes fonctions que l'embed Discord) et ce
 // qui a déjà été capturé. `token` est le jeton anti-double-clic de playAction.
-async function visitJson(session, owned, lineageOwned) {
+async function visitJson(session, owned, lineageOwned, forms) {
   const config = getSafariConfig();
   const finished = isSafariFinished(session);
   const species = finished ? null : getSpecies(session.encounter_species_id);
@@ -564,6 +566,8 @@ async function visitJson(session, owned, lineageOwned) {
                 owned: lineageOwned.get(link.id) ?? { normal: 0, shiny: 0 },
               }))
             : null,
+          // Les lettres de Zarbi qu'on a, dont celle de la rencontre : comme sur la Capture.
+          forms: formsList(species, forms),
         }
       : null,
   };
@@ -936,7 +940,9 @@ export const routes = [
       const { json, ongoing } = await safariState(ctx);
       return {
         offer: json,
-        visit: ongoing ? await visitJson(ongoing.session, ongoing.owned, ongoing.lineage) : null,
+        visit: ongoing
+          ? await visitJson(ongoing.session, ongoing.owned, ongoing.lineage, ongoing.forms)
+          : null,
       };
     },
   },
@@ -968,7 +974,7 @@ export const routes = [
       if (!result.resumed) refreshParkMessage(ctx.bot, parkId);
       return {
         resumed: Boolean(result.resumed),
-        visit: await visitJson(result.session, result.owned, result.lineage),
+        visit: await visitJson(result.session, result.owned, result.lineage, result.forms),
       };
     },
   },
@@ -987,7 +993,7 @@ export const routes = [
       return {
         resumed: Boolean(result.resumed),
         ticket: result.ticket?.label ?? null,
-        visit: await visitJson(result.session, result.owned, result.lineage),
+        visit: await visitJson(result.session, result.owned, result.lineage, result.forms),
       };
     },
   },
@@ -1014,7 +1020,7 @@ export const routes = [
       return {
         outcome: result.outcome,
         message: safariOutcomeLine(result, getSafariConfig()),
-        visit: await visitJson(result.session, result.owned, result.lineage),
+        visit: await visitJson(result.session, result.owned, result.lineage, result.forms),
       };
     },
   },

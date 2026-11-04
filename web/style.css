@@ -1079,6 +1079,16 @@ input[type="number"] {
   object-fit: contain;
 }
 
+/* La lettre du Zarbi en face : cerclée, qu'on la trouve d'un coup d'œil dans la grille. */
+.forms-current {
+  display: flex;
+  /* À la taille de l'image, pas de la case : la grille élargit ses colonnes. */
+  justify-self: start;
+  border-radius: 8px;
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
 .lineage-legend {
   display: flex;
   align-items: center;
@@ -1199,18 +1209,6 @@ input[type="number"] {
   font: inherit;
   text-align: left;
   cursor: pointer;
-}
-
-/* Les balls ordinaires, puis celles qu'ouvre « Balls spéciales » : deux rangées. */
-.balls-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 100%;
-}
-
-.ball-open {
-  border-color: var(--accent);
 }
 
 .ball:hover:not(:disabled) {
@@ -1370,10 +1368,35 @@ input[type="number"] {
   white-space: nowrap;
 }
 
+/* Ce qui est au sol, sous le Pokémon : une carte par objet, centrées comme les balls. */
+.drops {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  max-width: 720px;
+  margin-top: 4px;
+}
+
+.drops-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+}
+
 .drop {
   display: flex;
+  flex: 0 1 260px;
   align-items: center;
   gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  text-align: left;
 }
 
 /* La touche d'une pêche, en tête du centre et séparée du Pokémon du salon. */
