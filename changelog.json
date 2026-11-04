@@ -1,7 +1,54 @@
 {
-  "version": "1.21.6",
-  "lastUpdated": "2026-10-30T11:49:45.415Z",
+  "version": "1.21.7",
+  "lastUpdated": "2026-11-04T09:50:02.166Z",
   "releases": [
+    {
+      "version": "1.21.7",
+      "date": "2026-11-04",
+      "title": "Release 1.21.7",
+      "features": [
+        {
+          "type": "enhancement",
+          "name": "Toutes les balls sur la Capture du site",
+          "description": "Sur le site, la page Capture affiche toutes tes balls d'un coup, Master Ball et balls de la boutique comprises, sans passer par « Balls spéciales ».",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-11-04T08:04:16.000Z",
+          "branch": "dev/cool-hamilton-iqsozo"
+        },
+        {
+          "type": "enhancement",
+          "name": "La lettre du Zarbi en face",
+          "description": "Devant un Zarbi, « Infos du Pokémon » et le parc safari disent si tu as déjà sa lettre, shiny ou non.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-11-04T08:24:57.000Z",
+          "branch": "dev/cool-hamilton-iqsozo"
+        },
+        {
+          "type": "enhancement",
+          "name": "Objets au sol et lettres de Zarbi sur la Capture",
+          "description": "Sur le site, les objets au sol s'affichent sous le Pokémon, au centre de la page Capture, et les lettres de Zarbi sous sa lignée.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-11-04T08:24:57.000Z",
+          "branch": "dev/cool-hamilton-iqsozo"
+        },
+        {
+          "type": "chore",
+          "name": "Correctif de sécurité d'une dépendance",
+          "description": "Mise à jour de sécurité d'une bibliothèque utilisée par le bot, sans changement pour les joueurs.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-11-04T09:38:51.000Z",
+          "branch": "dev/cool-hamilton-iqsozo"
+        }
+      ]
+    },
     {
       "version": "1.21.6",
       "date": "2026-10-30",
@@ -2940,46 +2987,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "enhancement",
-      "name": "Toutes les balls sur la Capture du site",
-      "description": "Sur le site, la page Capture affiche toutes tes balls d'un coup, Master Ball et balls de la boutique comprises, sans passer par « Balls spéciales ».",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-11-04T08:04:16.000Z",
-      "branch": "dev/cool-hamilton-iqsozo"
-    },
-    {
-      "type": "enhancement",
-      "name": "La lettre du Zarbi en face",
-      "description": "Devant un Zarbi, « Infos du Pokémon » et le parc safari disent si tu as déjà sa lettre, shiny ou non.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-11-04T08:24:57.000Z",
-      "branch": "dev/cool-hamilton-iqsozo"
-    },
-    {
-      "type": "enhancement",
-      "name": "Objets au sol et lettres de Zarbi sur la Capture",
-      "description": "Sur le site, les objets au sol s'affichent sous le Pokémon, au centre de la page Capture, et les lettres de Zarbi sous sa lignée.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-11-04T08:24:57.000Z",
-      "branch": "dev/cool-hamilton-iqsozo"
-    },
-    {
-      "type": "chore",
-      "name": "Correctif de sécurité d'une dépendance",
-      "description": "Mise à jour de sécurité d'une bibliothèque utilisée par le bot, sans changement pour les joueurs.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-11-04T09:38:51.000Z",
-      "branch": "dev/cool-hamilton-iqsozo"
-    }
-  ]
+  "pending": []
 }
