@@ -248,13 +248,14 @@ export async function render(ctx) {
     );
   }
 
-  // Toutes les balls à la fois : les ordinaires, celles de la boutique, puis la Master
-  // Ball. Discord les range derrière « Balls spéciales » faute de place pour ses
-  // boutons ; la page, elle, a la place de toutes les montrer.
+  // Toutes les balls à la fois, dans l'ordre de Discord : les ordinaires, la Master Ball,
+  // puis celles de la boutique. Discord range ces dernières derrière « Balls spéciales »
+  // faute de place pour ses boutons ; la page, elle, a la place de toutes les montrer.
   function balls(spawn) {
     const cooling = Date.now() < coolUntil;
     const all = [
       ...spawn.balls.filter((ball) => !ball.guaranteed),
+      ...spawn.balls.filter((ball) => ball.guaranteed),
       // Une ball de la boutique sert si on en a acheté AVANT cette apparition : aucun
       // prix au lancer, son nombre tient lieu de stock.
       ...spawn.specialBalls.map((ball) => ({
@@ -265,7 +266,6 @@ export async function render(ctx) {
         usable: ball.eligible > 0,
         guaranteed: false,
       })),
-      ...spawn.balls.filter((ball) => ball.guaranteed),
     ];
 
     const button = (ball) => {

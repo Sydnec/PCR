@@ -2987,5 +2987,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Master Ball en tête des balls spéciales",
+      "description": "La Master Ball passe en tête des balls spéciales, devant celles de la boutique : juste après l'Hyper Ball sur le site.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-11-04T14:22:42.000Z",
+      "branch": "dev/cool-hamilton-iqsozo"
+    }
+  ]
 }
