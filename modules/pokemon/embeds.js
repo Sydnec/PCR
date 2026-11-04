@@ -254,27 +254,19 @@ export function buildSpecialText(spawn, { balls, counts }) {
   return chances.length ? `🎯 Tes chances sur ce Pokémon : ${chances.join(" · ")}` : "";
 }
 
-// Le sous-menu des balls spéciales : seulement celles de la boutique qui servent à
-// CETTE apparition (`counts`), une ball inutilisable n'y étant qu'un bouton grisé de
-// plus, et la Master Ball, qui passe toujours par sa confirmation — à son prix, un
-// mésclic n'est pas rattrapable. Ce menu est privé : la Master Ball y montre le prix
-// de son dresseur (`masterPrice`), qu'elle renchérit pour lui seul ; illisible, il
-// est tu plutôt que faux. Depuis le panneau, un bouton ramène aux balls ordinaires.
+// Le sous-menu des balls spéciales : la Master Ball, qui passe toujours par sa
+// confirmation — à son prix, un mésclic n'est pas rattrapable —, puis seulement celles
+// de la boutique qui servent à CETTE apparition (`counts`), une ball inutilisable n'y
+// étant qu'un bouton grisé de plus. La Master Ball en tête, comme sur le site où elle
+// suit l'Hyper Ball : les balls du jeu d'abord, celles de la boutique ensuite. Ce menu
+// est privé : la Master Ball y montre le prix de son dresseur (`masterPrice`), qu'elle
+// renchérit pour lui seul ; illisible, il est tu plutôt que faux. Depuis le panneau,
+// un bouton ramène aux balls ordinaires.
 export function buildSpecialRow(
   spawnId,
   { balls, counts, masterHeld = 0, masterPrice = null, panel = false, disabled = false }
 ) {
   const row = new ActionRowBuilder();
-  for (const { ball, usable } of usableSpecialBalls(balls, counts)) {
-    row.addComponents(
-      new ButtonBuilder()
-        .setCustomId(`${panel ? "poke_rethrow" : "poke_throw"}|${spawnId}|${ball.key}`)
-        .setLabel(`${ball.label} (×${usable.toLocaleString("fr-FR")})`)
-        .setEmoji(ball.emoji)
-        .setStyle(ButtonStyle.Primary)
-        .setDisabled(disabled)
-    );
-  }
   const master = getBall("master");
   if (master) {
     row.addComponents(
@@ -289,6 +281,16 @@ export function buildSpecialRow(
         )
         .setEmoji(master.emoji)
         .setStyle(ButtonStyle.Danger)
+        .setDisabled(disabled)
+    );
+  }
+  for (const { ball, usable } of usableSpecialBalls(balls, counts)) {
+    row.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`${panel ? "poke_rethrow" : "poke_throw"}|${spawnId}|${ball.key}`)
+        .setLabel(`${ball.label} (×${usable.toLocaleString("fr-FR")})`)
+        .setEmoji(ball.emoji)
+        .setStyle(ButtonStyle.Primary)
         .setDisabled(disabled)
     );
   }

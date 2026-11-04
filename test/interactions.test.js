@@ -209,7 +209,7 @@ describe("lancer une ball depuis l'annonce", () => {
     // Une ball de la boutique qui ne sert pas à cette apparition n'a pas de bouton.
     const balls = [getBall("appat"), getBall("catalyseur")];
     const counts = new Map([["appat", { eligible: 0 }], ["catalyseur", { eligible: 3 }]]);
-    assert.deepEqual(menu({ balls, counts }), ["Catalyseur Ball (×3)", "Master Ball"]);
+    assert.deepEqual(menu({ balls, counts }), ["Master Ball", "Catalyseur Ball (×3)"], "la Master Ball en tête, comme sur le site");
   });
 
   it("les balls spéciales : un éphémère depuis l'annonce, avec ce qui sert à CETTE apparition", async () => {
@@ -225,12 +225,12 @@ describe("lancer une ball depuis l'annonce", () => {
     const master = getBall("master");
     assert.deepEqual(
       labels(reply),
-      ["Appât Ball (×1)", `Master Ball (${priceAfter(master, 0).toLocaleString("fr-FR")})`],
+      [`Master Ball (${priceAfter(master, 0).toLocaleString("fr-FR")})`, "Appât Ball (×1)"],
       "la seconde Appât Ball a été achetée après, et aucune Catalyseur Ball n'est en poche"
     );
     const buttons = reply.components[0].toJSON().components;
     assert.ok(buttons.every((button) => !button.disabled));
-    assert.deepEqual(buttons.map((button) => button.custom_id), [`poke_throw|${id}|appat`, `poke_master|${id}`]);
+    assert.deepEqual(buttons.map((button) => button.custom_id), [`poke_master|${id}`, `poke_throw|${id}|appat`]);
   });
 
   it("la ligne du menu donne la chance que le lancer tire, bonus de la ball compris", async () => {
@@ -310,7 +310,7 @@ describe("lancer une ball depuis l'annonce", () => {
     const calls = await withRandom(0.999, () => click(`poke_throw|${id}|appat`, { user }));
     const reply = only(calls, "editReply");
     assert.match(reply.content, /Raté/);
-    assert.deepEqual(labels(reply).slice(0, 1), ["Appât Ball (×1)"], "une ball de moins, sans rouvrir le menu");
+    assert.deepEqual(labels(reply).slice(1, 2), ["Appât Ball (×1)"], "une ball de moins, sans rouvrir le menu, derrière la Master Ball");
     assert.ok(!labels(reply).some((label) => label.startsWith("Catalyseur")), "ni de ball qu'on n'a pas");
     assert.ok(buttonIds(reply).includes(`poke_reback|${id}`));
   });
