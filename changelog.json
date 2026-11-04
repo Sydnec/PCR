@@ -2953,6 +2953,16 @@
       "commit": "pending",
       "timestamp": "2026-11-04T08:24:57.000Z",
       "branch": "dev/cool-hamilton-iqsozo"
+    },
+    {
+      "type": "enhancement",
+      "name": "Objets au sol et lettres de Zarbi sur la Capture",
+      "description": "Sur le site, les objets au sol s'affichent sous le Pokémon, au centre de la page Capture, et les lettres de Zarbi sous sa lignée.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-11-04T08:24:57.000Z",
+      "branch": "dev/cool-hamilton-iqsozo"
     }
   ]
 }
