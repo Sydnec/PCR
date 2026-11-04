@@ -164,6 +164,18 @@ export function ownedMark(owned, shiny = false) {
   return h("span", { class: "pill-new" }, shiny ? "Nouveau shiny" : "Nouveau");
 }
 
+// « Est-ce que j'ai déjà cette lettre ? » devant un Zarbi : `form`, sa forme, et `forms`,
+// celles de l'espèce avec ce qu'on en possède (shiny ou non). Les mêmes phrases que la
+// ligne « Formes » de Discord ; rien sans forme, ou sans lecture de la collection.
+export function formMark(species, form, forms) {
+  const entry = form && forms?.find((candidate) => candidate.key === form.key);
+  if (!entry) return null;
+  const name = `${species.name} ${entry.name}`;
+  return entry.owned
+    ? h("span", { class: "owned" }, icon("check"), ` Tu as déjà le ${name}`)
+    : h("span", { class: "pill-new" }, `Le ${name} te manque`);
+}
+
 // Comment on obtient une espèce qu'on ne croise pas dans la nature : les mêmes
 // repères que sur Discord, en icônes.
 const OBTENTION_ICONS = {

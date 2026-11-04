@@ -90,7 +90,8 @@ Balls et objets portent leur `emoji` (Discord) et `image` (PokéAPI, ou `null`).
 `spawn` vaut `null` sans apparition ; sinon il porte l'espèce, son `sex`, la rareté, la difficulté
 (`{ level, label }`, `level` de 0 à 5), ce que le dresseur en a déjà (`owned`, normal et shiny),
 sa lignée (`lineage` : chaque maillon avec son stade et ce qu'il en possède, comme la fiche
-Discord), les balls (`price`, `probability`, `free` = balls offertes, `usable` = en poche ou
+Discord), ses formes (`forms`, comme dans `/api/me/lineage` : celle de l'apparition est `form.key` ;
+`null` pour une espèce sans formes ou sur une lecture ratée), les balls (`price`, `probability`, `free` = balls offertes, `usable` = en poche ou
 payable avec le solde) et le journal des derniers
 lancers (`throws`, avec le pseudo et l'avatar du serveur). L'objet tenu reste
 secret. `last` est le dernier Pokémon parti (`CAUGHT` ou `FLED`), `drops` les objets au sol
@@ -109,8 +110,8 @@ dès qu'il y en a plus d'une ouverte, et reste vide sinon.
 Une visite : `{ id, token, actionsLeft, actionsTotal, expiresAt, finished, catches, ball,
 encounter }`. `encounter` (`null` une fois la visite finie) porte l'espèce, `shiny`, `sex`, la
 rareté, `probability`, `bait` (appâts avalés), `baitFactor`, `baitCapped` (un appât de plus ne
-servirait à rien), `fleeRisk`, `owned` et `lineage` (la lignée, `[{ speciesId, stage, owned }]`, comme celle d'une
-apparition ; `null` sur une collection illisible). `token` se renvoie avec chaque action.
+servirait à rien), `fleeRisk`, `owned`, `lineage` (la lignée, `[{ speciesId, stage, owned }]`, comme celle d'une
+apparition ; `null` sur une collection illisible) et `forms` (comme pour une apparition). `token` se renvoie avec chaque action.
 
 Dans la boîte PC, `boxes` liste `{ box, name, custom, defaultName }` et chaque Pokémon est un
 individu avec sa case, `pos` (boîte = `pos / slotsPerBox`). Un Pokémon sans place reçoit la

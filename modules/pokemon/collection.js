@@ -484,14 +484,22 @@ export function getSpeciesOwnership(userId, species, cb) {
     (err, owned) => {
       if (err) handleException("Lecture de la collection pour une fiche :", err);
       readSexes(userId, species, (sexes) => {
-        if (!speciesForms(species).length) return cb(null, { owned, forms: null, sexes });
-        getOwnedForms(userId, species.id, (err, forms) => {
-          if (err) handleException("Lecture des formes pour une fiche :", err);
-          cb(null, { owned, forms: err ? null : forms, sexes });
-        });
+        readOwnedForms(userId, species, (forms) => cb(null, { owned, forms, sexes }));
       });
     }
   );
+}
+
+// Les formes qu'un dresseur possède d'une espèce (un Set de clés), pour une fiche : null
+// pour une espèce sans formes, et sur une lecture ratée — la fiche omet alors la ligne
+// plutôt que d'annoncer qu'il n'en a aucune. La fiche de Discord, celle du site et le
+// parc safari lisent tous par ici.
+export function readOwnedForms(userId, species, done) {
+  if (!speciesForms(species).length) return done(null);
+  getOwnedForms(userId, species.id, (err, forms) => {
+    if (err) handleException("Lecture des formes pour une fiche :", err);
+    done(err ? null : forms);
+  });
 }
 
 function readSexes(userId, species, done) {

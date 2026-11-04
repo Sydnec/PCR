@@ -12,6 +12,7 @@ import {
   dateTimeFr,
   dexNumber,
   fmt,
+  formMark,
   h,
   itemIcon,
   outcomePanel,
@@ -166,6 +167,8 @@ export async function render(ctx) {
   function encounterView(encounter) {
     const species = ctx.species.get(encounter.speciesId);
     if (!species) return h("p", { class: "notice" }, "Un Pokémon inconnu vous observe…");
+    // Comme sur la Capture : pour un Zarbi, c'est sa lettre qu'on collectionne.
+    const letter = formMark(species, encounter.form, encounter.forms);
     const view = h(
       "div",
       { class: `spawn${encounter.shiny ? " spawn-shiny" : ""}` },
@@ -193,7 +196,8 @@ export async function render(ctx) {
         { class: "spawn-meta muted" },
         dexNumber(species),
         // Collection illisible : la rencontre s'affiche sans la pastille.
-        encounter.owned ? [" · ", ownedMark(encounter.owned, encounter.shiny)] : null
+        encounter.owned ? [" · ", ownedMark(encounter.owned, encounter.shiny)] : null,
+        letter ? [" · ", letter] : null
       ),
       actions(encounter),
       panel ? actionPanel() : null,
@@ -203,6 +207,8 @@ export async function render(ctx) {
         ? lineageView(ctx, encounter.lineage, {
             currentId: encounter.speciesId,
             shiny: encounter.shiny,
+            forms: encounter.forms,
+            currentForm: encounter.form?.key,
           })
         : null
     );

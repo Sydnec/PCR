@@ -13,8 +13,13 @@ export const loadLineage = (speciesId) => api(`/api/me/lineage/${speciesId}`);
 // `shiny` : la variante regardée. Une entrée de Pokédex est une espèce, shiny
 // ou non : « je l'ai » veut dire qu'on en a un — sauf sur un shiny, où il veut
 // dire « je l'ai en shiny », puisqu'un premier shiny se signale. Les deux
-// compteurs restent affichés. `currentId` : le maillon consulté, mis en avant.
-export function lineageView(ctx, lineage, { currentId = null, shiny = false, forms = null } = {}) {
+// compteurs restent affichés. `currentId` : le maillon consulté, mis en avant ;
+// `currentForm` : la forme de l'individu en face (la lettre du Zarbi apparu), de même.
+export function lineageView(
+  ctx,
+  lineage,
+  { currentId = null, shiny = false, forms = null, currentForm = null } = {}
+) {
   const stages = new Map();
   for (const link of lineage) {
     const species = ctx.species.get(link.speciesId);
@@ -47,14 +52,14 @@ export function lineageView(ctx, lineage, { currentId = null, shiny = false, for
       .map((kind) =>
         h("p", { class: "lineage-legend muted small" }, richText(OBTENTION_LEGENDS[kind]))
       ),
-    forms ? formsView(forms) : null
+    forms ? formsView(forms, currentForm) : null
   );
 }
 
 // Les formes d'une espèce qui en a — les lettres de Zarbi —, comme la ligne
 // « Formes » de la fiche Discord : celles qu'on possède, en couleur, les
 // autres en silhouette.
-function formsView(forms) {
+function formsView(forms, currentForm) {
   const owned = forms.filter((form) => form.owned).length;
   return h(
     "div",
@@ -63,15 +68,18 @@ function formsView(forms) {
     h(
       "div",
       { class: "forms-grid" },
-      forms.map((form) =>
-        h("img", {
+      forms.map((form) => {
+        const image = h("img", {
           class: `forms-icon${form.owned ? "" : " artwork-missing"}`,
           src: form.icon,
           alt: form.name,
           title: `${form.name}${form.owned ? "" : " (pas encore)"}`,
           loading: "lazy",
-        })
-      )
+        });
+        // La lettre du Zarbi en face, cerclée : le cercle va autour de l'image, qu'une
+        // silhouette pâlit avec elle.
+        return form.key === currentForm ? h("span", { class: "forms-current" }, image) : image;
+      })
     )
   );
 }

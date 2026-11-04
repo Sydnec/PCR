@@ -408,6 +408,34 @@ function lineageLegend(chain) {
   ].filter(Boolean);
 }
 
+// La ligne « Formes » d'une espèce qui en a — les lettres de Zarbi : combien le
+// dresseur en a réunies sur celles que la génération ouverte connaît, et `list`
+// ajoute lesquelles. Devant un individu (`current`, la lettre du Zarbi apparu ou
+// rencontré), elle dit d'abord s'il l'a déjà, shiny ou non : c'est la question qu'on
+// se pose avant de lancer, et la liste obligeait à la chercher soi-même. `them` : la
+// même ligne racontée aux autres, dans le partage en direct. null sans formes, ou
+// sans lecture de sa collection (`forms` null).
+function formsValue(species, forms, { current = null, list = false, them = false } = {}) {
+  const known = speciesForms(species);
+  if (!known.length || !forms) return null;
+  const mine = known.filter((form) => forms.has(form.key));
+  const tally =
+    `**${mine.length}**/${known.length}` +
+    (list && mine.length ? ` : ${mine.map((form) => form.name).join(" ")}` : "");
+  // Parmi les formes ouvertes seulement, comme le site : une lettre inconnue ne se dit pas.
+  const focus = known.find((form) => form.key === current);
+  if (!focus) return tally;
+  const name = displayName(species, false, null, focus.key);
+  const status = forms.has(focus.key)
+    ? them
+      ? `\u2705 Le ${name} est déjà dans sa boîte`
+      : `\u2705 Tu as déjà le ${name}`
+    : them
+      ? `\u{1F195} Le ${name} lui manque !`
+      : `\u{1F195} Le ${name} te manque !`;
+  return `${status}\n${tally}`;
+}
+
 // Fiche d'une espèce : ce qu'elle est, ce qu'elle coûte à attraper, et où en est
 // le dresseur dans sa lignée. Elle sert /pk info comme le bouton des
 // apparitions : « je l'ai déjà ? » n'est qu'un cas particulier de « parle-moi de
@@ -423,6 +451,9 @@ export function buildSpeciesInfoEmbed(
     catchRate = species.catchRate,
     forms = null,
     sexes = null,
+    // La forme de l'individu d'où vient le clic (la lettre du Zarbi apparu) : /pk info
+    // parle d'une espèce, et n'en a pas.
+    form = null,
   } = {}
 ) {
   const rarity = RARITIES[rarityOf(species)];
@@ -449,20 +480,8 @@ export function buildSpeciesInfoEmbed(
 
   embed.addFields(lineageFields(species, chain, owned, { isShiny }));
 
-  // Les formes d'une espèce qui en a — les lettres de Zarbi : celles que le
-  // dresseur possède, sur celles que la génération ouverte connaît. Sans
-  // lecture de sa collection (`forms` null), le champ n'apparaît pas.
-  const known = speciesForms(species);
-  if (known.length && forms) {
-    const mine = known.filter((form) => forms.has(form.key));
-    embed.addFields({
-      name: "Formes",
-      value:
-        `**${mine.length}**/${known.length}` +
-        (mine.length ? ` : ${mine.map((form) => form.name).join(" ")}` : ""),
-      inline: false,
-    });
-  }
+  const formsLine = formsValue(species, forms, { current: form, list: true });
+  if (formsLine) embed.addFields({ name: "Formes", value: formsLine, inline: false });
 
   const legend = lineageLegend(chain);
   if (legend.length) embed.setFooter({ text: legend.join("\n") });
@@ -1814,7 +1833,7 @@ function buildEncounterEmbed(
   session,
   species,
   config,
-  { intro = null, owned = null, lineage = null } = {}
+  { intro = null, owned = null, lineage = null, forms = null } = {}
 ) {
   const isShiny = Boolean(session.encounter_is_shiny);
   const rarity = RARITIES[rarityOf(species)];
@@ -1842,6 +1861,8 @@ function buildEncounterEmbed(
   // doubler l'information. Collection illisible : on préfère une rencontre sans
   // pastille à un champ vide, que l'API refuserait.
   const ownership = lineageRows.length ? null : ownedLine(owned, isShiny);
+  // Sa lettre, s'il est un Zarbi : on l'a déjà, ou elle manque.
+  const formsLine = formsValue(species, forms, { current: session.encounter_form });
 
   const name = displayName(species, false, session.encounter_sex, session.encounter_form);
   const embed = new EmbedBuilder()
@@ -1869,6 +1890,7 @@ function buildEncounterEmbed(
       // champ par stade, dans sa propre rangée), et les actions en dernier.
       ...lineageRows,
       ...(ownership ? [{ name: "Ton Pokédex", value: ownership, inline: true }] : []),
+      ...(formsLine ? [{ name: "Formes", value: formsLine, inline: true }] : []),
       {
         name: "Actions restantes",
         value: `**${session.actions_left}** / ${config.actionsPerSession}`,
@@ -1957,7 +1979,14 @@ function buildSafariShareRow(session) {
 // étalé la vue.
 export function buildSafariView(
   session,
-  { result = null, catches = [], owned = null, lineage = null, resumed = false } = {}
+  {
+    result = null,
+    catches = [],
+    owned = null,
+    lineage = null,
+    forms = null,
+    resumed = false,
+  } = {}
 ) {
   const config = getSafariConfig();
   const intro = result ? safariOutcomeLine(result, config) : null;
@@ -1986,7 +2015,7 @@ export function buildSafariView(
   }
   return {
     content,
-    embeds: [buildEncounterEmbed(session, species, config, { intro, owned, lineage })],
+    embeds: [buildEncounterEmbed(session, species, config, { intro, owned, lineage, forms })],
     components: [buildSafariRow(session, config)],
   };
 }
@@ -2043,7 +2072,7 @@ function buildLiveEncounterEmbed(
   session,
   species,
   config,
-  { author = null, events = [], catches = [], owned = null, lineage = null } = {}
+  { author = null, events = [], catches = [], owned = null, lineage = null, forms = null } = {}
 ) {
   const isShiny = Boolean(session.encounter_is_shiny);
   const name = displayName(species, false, session.encounter_sex, session.encounter_form);
@@ -2056,6 +2085,7 @@ function buildLiveEncounterEmbed(
       : ownedLine(owned, isShiny, { them: true })
         ? { name: "Son Pokédex", value: ownedLine(owned, isShiny, { them: true }) }
         : null;
+  const formsLine = formsValue(species, forms, { current: session.encounter_form, them: true });
 
   const lines = events.map((event) => safariEventLine(event, config)).filter(Boolean);
   // Noms seuls, sur une ligne : vingt-cinq pastilles de rareté feraient
@@ -2080,6 +2110,7 @@ function buildLiveEncounterEmbed(
     )
     .addFields(
       ...(collection ? [{ ...collection, inline: false }] : []),
+      ...(formsLine ? [{ name: "Formes", value: formsLine, inline: false }] : []),
       {
         name: "Dernières actions",
         value: lines.length ? lines.join("\n") : "*La visite commence.*",
@@ -2099,7 +2130,7 @@ function buildLiveEncounterEmbed(
 // comme 25 actions jouées.
 export function buildSafariLiveView(
   session,
-  { author = null, events = [], catches = [], owned = null, lineage = null } = {}
+  { author = null, events = [], catches = [], owned = null, lineage = null, forms = null } = {}
 ) {
   const config = getSafariConfig();
   const over = isSafariFinished(session) || session.expires_at <= Date.now();
@@ -2132,6 +2163,7 @@ export function buildSafariLiveView(
         catches,
         owned,
         lineage,
+        forms,
       }),
     ],
     components: [],
@@ -2224,6 +2256,7 @@ export function buildPaidEntryPrompt(offer, selected = null) {
     return buildSafariView(offer.ongoing.session, {
       owned: offer.ongoing.owned,
       lineage: offer.ongoing.lineage,
+      forms: offer.ongoing.forms,
       resumed: true,
     });
   }
@@ -2306,6 +2339,7 @@ export function buildPaidEntryReply(result) {
   const view = buildSafariView(result.session, {
     owned: result.owned,
     lineage: result.lineage,
+    forms: result.forms,
     resumed: result.resumed,
   });
   const content = result.resumed

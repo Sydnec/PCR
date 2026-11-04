@@ -74,7 +74,8 @@
 - **Bouton « ℹ️ Infos du Pokémon »** sur chaque apparition : un message Discord étant identique
   pour tous ses lecteurs, ce bouton ouvre à chacun en privé la fiche de l'espèce — type, rareté,
   chances à la Poké Ball, répartition mâle/femelle avec les sexes qu'il en a déjà, et toute la lignée évolutive avec ce qu'il en
-  possède déjà — suivie de
+  possède déjà ; devant un Zarbi, si sa lettre est déjà dans sa boîte (« 🆕 Le Zarbi B te
+  manque ! »), shiny ou non — suivie de
   **son solde de points et des balls qu'il a en poche**, l'autre question qu'on se pose devant une
   apparition. `/solde` affiche le même embed.
 - **L'annonce finit toujours sur ce que dit la base.** Ses réécritures passent une à une, le
