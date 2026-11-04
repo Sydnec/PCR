@@ -45,9 +45,8 @@ export async function render(ctx) {
   // attente de confirmation, la réponse du dernier lancer, et la fin du
   // cooldown affiché.
   // La confirmation de la Master Ball vise une apparition ({ key, spawnId }) : le salon et la
-  // pêche ont chacun la leur. Les balls spéciales s'ouvrent de même par apparition.
+  // pêche ont chacun la leur.
   let confirming = null;
-  const specialOpen = new Set();
   let buyingSafari = false;
   let panel = null;
   let throwing = false;
@@ -236,14 +235,15 @@ export async function render(ctx) {
     );
   }
 
-  // Les balls ordinaires d'abord ; la Master Ball et celles de la boutique sont
-  // rangées derrière « Balls spéciales », comme dans le sous-menu de Discord.
+  // Toutes les balls à la fois : les ordinaires, celles de la boutique, puis la Master
+  // Ball. Discord les range derrière « Balls spéciales » faute de place pour ses
+  // boutons ; la page, elle, a la place de toutes les montrer.
   function balls(spawn) {
     const cooling = Date.now() < coolUntil;
-    const standard = spawn.balls.filter((ball) => !ball.guaranteed);
-    // Une ball de la boutique sert si on en a acheté AVANT cette apparition : aucun
-    // prix au lancer, son nombre tient lieu de stock.
-    const special = [
+    const all = [
+      ...spawn.balls.filter((ball) => !ball.guaranteed),
+      // Une ball de la boutique sert si on en a acheté AVANT cette apparition : aucun
+      // prix au lancer, son nombre tient lieu de stock.
       ...spawn.specialBalls.map((ball) => ({
         ...ball,
         shop: true,
@@ -306,29 +306,7 @@ export async function render(ctx) {
       );
     };
 
-    return h(
-      "div",
-      { class: "balls-group" },
-      h(
-        "div",
-        { class: "balls" },
-        standard.map(button),
-        h(
-          "button",
-          {
-            class: `ball ball-special${specialOpen.has(spawn.id) ? " ball-open" : ""}`,
-            disabled: throwing,
-            onclick: () => {
-              if (!specialOpen.delete(spawn.id)) specialOpen.add(spawn.id);
-              draw();
-            },
-          },
-          h("span", { class: "ball-icon" }, "🌟"),
-          h("span", { class: "ball-text" }, h("span", { class: "ball-label" }, "Balls spéciales"))
-        )
-      ),
-      specialOpen.has(spawn.id) ? h("div", { class: "balls" }, special.map(button)) : null
-    );
+    return h("div", { class: "balls" }, all.map(button));
   }
 
   function confirmation(spawn) {
