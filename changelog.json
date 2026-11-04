@@ -2970,6 +2970,16 @@
       "commit": "pending",
       "timestamp": "2026-11-04T08:24:57.000Z",
       "branch": "dev/cool-hamilton-iqsozo"
+    },
+    {
+      "type": "chore",
+      "name": "Correctif de sécurité d'une dépendance",
+      "description": "Mise à jour de sécurité d'une bibliothèque utilisée par le bot, sans changement pour les joueurs.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-11-04T09:38:51.000Z",
+      "branch": "dev/cool-hamilton-iqsozo"
     }
   ]
 }
