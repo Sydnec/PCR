@@ -16,11 +16,15 @@ l'autre jusqu'à la release, puis part en archive (ou disparaît).
 | Site            | refondu aussi, d'abord pour le téléphone                                                  |
 | Loterie         | 100 % de lots : **voulu**                                                                 |
 | Textes          | libellés, descriptions, emoji et sprites **sortent de la config** : plus modifiables à chaud |
+| Release         | le **31/12 après-midi**, pour que tout soit en place avant minuit                         |
+| Panneau Discord | une commande à part, **`/pokemon`** ; `/pk` garde les commandes                           |
+| Branche         | `dev/jolly-archimedes-to3uu1` porte toute la v2 ; `main` y est repris chaque semaine       |
+| Apparitions     | chaque génération pèse **deux fois la précédente** (×1, ×2, ×4) : `generationBoost: 2` reste |
 
 ## Calendrier
 
 La génération 3 s'ouvre à minuit : le code et ses données doivent être en place **avant**. La
-release part donc le **31/12** (proposition : l'après-midi). La v2 tourne quelques heures en
+release part donc le **31/12 après-midi**. La v2 tourne quelques heures en
 génération 2, ce qui sert de rodage, puis trois choses arrivent seules à 00:00 :
 
 1. l'ouverture de la génération 3 (une date relue à chaque usage, sans minuteur) ;
@@ -121,11 +125,11 @@ statistiques Pokémon y restent.
   pokemon: {
     enabled: true,
     generations: {
-      2: { opensAt: "2026-10-26T00:00:00+00:00", starters: [152, 155, 158], spawnBoost: 2 },
-      3: { opensAt: "2027-01-01T00:00:00+01:00", starters: [252, 255, 258], spawnBoost: 4 },
+      2: { opensAt: "2026-10-26T00:00:00+00:00", starters: [152, 155, 158] },
+      3: { opensAt: "2027-01-01T00:00:00+01:00", starters: [252, 255, 258] },
     },
     spawn: {
-      messagesPerSpawn: 20, minDelay: "1m", minDelayAfterEnd: "0m",
+      messagesPerSpawn: 20, minDelay: "1m", minDelayAfterEnd: "0m", generationBoost: 2,
       fleeAfter: { min: "45m", max: "90m" }, legendaryFleeMultiplier: 2,
       shinyOneIn: 500, heldItemChance: 0.2, itemDropChance: 0.2,
       weights: { stage: { 1: 70, 2: 60, 3: 25 }, veryRare: 18, legendary: 8, species: { 201: 2 } },
@@ -208,10 +212,10 @@ Conséquence : un emoji de ball supprimé du serveur se répare par une release,
 
 ### Entrées dans le panneau
 
-- Un bouton « Mon jeu » sur chaque apparition et sur un message épinglé du salon : ouvrir le jeu
-  sans rien taper, ce qui compte sur un téléphone.
-- `/pk menu [onglet]` : Discord n'accepte pas `/pk` seul tant que la commande a des
-  sous-commandes.
+- **`/pokemon [onglet]`**, une commande à part : Discord n'accepte pas `/pk` seul tant que la
+  commande a des sous-commandes.
+- À confirmer : un bouton « Mon jeu » en plus, sur chaque apparition, pour ouvrir le panneau sans
+  rien taper.
 
 ### Le panneau
 
@@ -247,7 +251,7 @@ correspondant.
 
 | v1                                                                  | v2                                                         |
 | ------------------------------------------------------------------- | ---------------------------------------------------------- |
-| —                                                                   | `/pk menu [onglet]`                                        |
+| —                                                                   | `/pokemon [onglet]` (le panneau)                           |
 | `pokedex`, `info`, `zarbis`, `comparer`, `classement`               | `/pk pokedex voir · espece · zarbi · comparer · classement` |
 | `boite`, `doublons`, `verrou`, `renommer`, `revendre pokemon`, `evolution` | `/pk boite voir · doublons · verrou · renommer · revendre · evoluer` |
 | `inventaire`, `loterie`, `boutique`, `revendre objet`               | `/pk sac voir · loterie · boutique · revendre`             |
@@ -255,7 +259,7 @@ correspondant.
 | `echange`, `pecher`, `safari`, `starter`                            | inchangés                                                  |
 | `web`                                                               | `/pk site`                                                 |
 
-Onze entrées au lieu de 21, sous la limite de 25 de Discord, avec de la marge. `/zarbi` et
+`/pk` passe de 21 entrées à 10, sous la limite de 25 de Discord, avec de la marge. `/zarbi` et
 `/admin` ne bougent pas.
 
 ### Messages publics
@@ -304,15 +308,13 @@ saison passent en composants. Un titre y rend le Markdown et les emoji du serveu
   `fished` et `item`.
 - **Objets** : Dent Océan (Coquiperl → Serpang) et Écaille Océan (Coquiperl → Rosabyss), par le
   mécanisme `targets`.
-- **Évolutions particulières** (à trancher) :
-  - Chenipotte → Armulys ou Blindalys : au hasard comme dans les jeux, ou au choix ;
-  - Ningale → Ninjask, et Munja en plus, un individu offert ;
-  - Barpau : seulement à la pêche, comme dans les jeux.
+- **Cas particuliers** (évolutions, bébés, légendaires, obtentions) : en discussion, la liste
+  complète est passée en revue cas par cas ; les choix seront reportés ici.
 - **Zarbi** gagne `!` et `?` (28 formes), et `/zarbi` les écrit.
 - **Pas en v2.0** : formes de Morphéo, de Deoxys et de Spinda ; natures et talents. Beaucoup de
   travail, aucun effet en jeu.
-- **Équilibrage** : `spawnBoost` réglé par génération. Avec le facteur actuel (×4 pour la 3e),
-  elle ferait environ 60 % des apparitions (estimation grossière, hors poids de stade).
+- **Équilibrage** : `generationBoost: 2` reste, soit ×4 par espèce de la génération 3. Elle fera
+  environ 60 % des apparitions (estimation grossière, hors poids de stade).
 
 ## 8. Tests
 
@@ -353,13 +355,8 @@ Aujourd'hui : 52 fichiers, environ 1 670 cas, 21 940 lignes, environ 45 à 50 s.
 
 ## À trancher
 
-1. Release le **31/12 après-midi**, pour que tout soit en place avant minuit ?
-2. Entrées du panneau : bouton sur les apparitions et message épinglé, plus `/pk menu` ? Ou une
-   commande à part (`/jeu`) ?
-3. Conventions de config : durées en texte (`"45m"`), `…Chance` / `…Share` / `…OneIn` ?
-4. Branche : celle-ci sert à toute la v2, et `main` y est repris chaque semaine ?
-5. Génération 3 : les quatre balls proposées ? Chenipotte au hasard ou au choix ? Munja offert ?
-   Barpau seulement à la pêche ?
-6. Valeur de `spawnBoost` pour la génération 3 ?
-7. Clés d'objets : on les garde en français (recommandé : aucun gain pour les joueurs), ou on les
+1. Conventions de config : durées en texte (`"45m"`), `…Chance` / `…Share` / `…OneIn` ?
+2. Génération 3 : les quatre balls proposées, et chaque cas particulier.
+3. Clés d'objets : on les garde en français (recommandé : aucun gain pour les joueurs), ou on les
    passe en anglais avec une migration de l'inventaire ?
+4. Un bouton « Mon jeu » sur les apparitions, en plus de `/pokemon` ?
