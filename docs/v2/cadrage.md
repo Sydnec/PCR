@@ -29,7 +29,7 @@ l'autre jusqu'à la release, puis part en archive (ou disparaît).
 | Rouvrir le setup | `/admin setup` revient si un salon ou un rôle réglé disparaît ; `pcr setup` le rouvre     |
 | Version         | `pcr release <type>` sur `development` ; le merge vers `main` déploie la prod et pose le tag       |
 | Données de test | le bot de test reçoit une copie de `points.db` de prod, pour répéter la migration         |
-| Emoji           | **emoji d'application** partout où le bot affiche une icône propre au jeu (§ 10)          |
+| Emoji           | **emoji d'application** pour toute icône du jeu, Pokémon compris, dessinées d'après les sprites PokéAPI (§ 10) |
 
 ## Calendrier
 
@@ -458,6 +458,8 @@ ce serveur ne peut pas les afficher.
 
 Fonctionnement :
 
+- **Images** : les sprites de PokéAPI pour toutes les icônes (balls, objets, Pokémon), pour un
+  seul style. Le champ `sprite` du catalogue nomme déjà l'image PokéAPI de chaque objet.
 - Les images vivent dans le dépôt (`assets/emojis/`). Le site sert les mêmes depuis ses routes :
   la même icône sur Discord et sur le site, sans adresse externe.
 - Le catalogue désigne un emoji par son nom ; chaque bot retrouve l'identifiant au démarrage (ceux
@@ -475,7 +477,7 @@ Où :
 | Appât Ball, Catalyseur Ball                  | 🎣 ⚙️ (« celui du serveur reste à créer ») | emoji d'application |
 | Filet, Bis, Chrono Ball (3G)                 | —                                   | emoji d'application   |
 | Objets (Super Bonbon, pierres, cannes, Pépite, Ticket, charmes…) | unicode, parfois en double : trois cannes 🎣, Catalyseur et Catalyseur Ball ⚙️ | emoji d'application, une icône par objet |
-| Pokémon dans les listes et les menus du panneau | rien                             | à trancher : ≈ 830 emoji (386 espèces, normales et shiny, et les 28 Zarbi) |
+| Pokémon dans les listes et les menus du panneau | rien                             | emoji d'application : ≈ 830 (386 espèces, normales et shiny, et les 28 Zarbi) |
 | Repères d'interface (🥚 🔒 ✨ ♂ ♀, pastilles de rareté) | unicode                    | inchangés             |
 | Messages de rôles par réaction               | emoji du serveur et unicode         | **inchangés** : les membres réagissent eux-mêmes, et seul le bot peut utiliser un emoji d'application |
 
@@ -540,7 +542,4 @@ Mise en œuvre :
 
 1. Génération 3 : chaque cas particulier (évolutions, bébés, légendaires, obtentions, formes,
    pêche) — repris plus tard.
-2. Emoji des Pokémon (§ 10) : une icône par espèce dans les listes et les menus ?
-3. Images des balls (§ 10) : garder les dessins actuels du serveur, ou des sprites PokéAPI pour
-   toutes les icônes ?
-4. Correctifs 1.21.x d'ici le 01/01 (§ 10) : en suspens.
+2. Correctifs 1.21.x d'ici le 01/01 (§ 10) : en suspens.
