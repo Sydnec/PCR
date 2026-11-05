@@ -26,6 +26,9 @@ l'autre jusqu'à la release, puis part en archive (ou disparaît).
 | Clés d'objets   | restent **en français** (`super_bonbon`, `pierre_soleil`…)                                |
 | Bouton « Mon jeu » | **non** : `/pokemon` suffit ; les boutons de lancer des apparitions restent             |
 | Config          | **une convention unique** de noms et d'unités (§ 2)                                       |
+| Rouvrir le setup | `/admin setup` revient si un salon ou un rôle réglé disparaît ; `pcr setup` le rouvre     |
+| Version         | `pcr release <type>` sur `dev` ; le merge vers `main` déploie la prod et pose le tag       |
+| Données de test | le bot de test reçoit une copie de `points.db` de prod, pour répéter la migration         |
 
 ## Calendrier
 
@@ -431,8 +434,8 @@ et que tout le reste se règle depuis Discord.
   - L'adresse et le port du site s'y règlent aussi ; changer le port demande un redémarrage.
   - **Décidé** : la commande disparaît une fois le setup terminé. Le setup est terminé quand
     chaque fonctionnalité a ses salons et rôles, ou a été coupée volontairement.
-  - À trancher : comment la rouvrir pour changer un salon. Proposition : elle revient d'elle-même
-    si un salon ou un rôle réglé est supprimé, et `pcr setup` la rouvre depuis le serveur.
+  - **Décidé** : elle revient d'elle-même si un salon ou un rôle réglé est supprimé, et
+    `pcr setup` la rouvre depuis le serveur.
 - **Une fonctionnalité sans son salon est coupée**, et le panneau de setup le dit : pas de
   plantage, pas de message envoyé dans le vide.
 - **Premier démarrage** : le bot n'enregistre que `/admin` et écrit dans le journal son lien
@@ -481,12 +484,12 @@ Proposition de mise en œuvre :
   - le déploiement attend qu'elle soit verte ;
   - un runner auto-hébergé par VM, désigné par son étiquette (`pcr-prod`, `pcr-test`) ;
   - chaque VM garde son `.env` : aucun secret dans GitHub.
-- **Version** (à trancher) : `pcr release <type>` se lance sur `dev` (montée de version, changelog,
+- **Version** (décidé) : `pcr release <type>` se lance sur `dev` (montée de version, changelog,
   donc un déploiement de test). Le merge vers `main` déploie la prod, et la CI pose le tag
   `vX.Y.Z`. Aujourd'hui, la prod se déploie sur un tag, sans attendre la CI.
-- **Jusqu'au 01/01** (à trancher) : `dev` porte la v2, donc un correctif 1.21.x ne peut pas en
+- **Jusqu'au 01/01** (en suspens) : `dev` porte la v2, donc un correctif 1.21.x ne peut pas en
   venir. Exception : `fix/…` part de `main` et y revient, puis `main` est repris dans `dev`.
-- **Données du bot de test** : une copie de `points.db` de prod sur la VM de test, pour répéter la
+- **Données du bot de test** (décidé) : une copie de `points.db` de prod sur la VM de test, pour répéter la
   migration v1 → v2 sur de vraies données.
 - **`CLAUDE.md`** : la section « Livraison » est réécrite pour ce flux.
 
@@ -505,6 +508,5 @@ Proposition de mise en œuvre :
 
 1. Génération 3 : chaque cas particulier (évolutions, bébés, légendaires, obtentions, formes,
    pêche) — repris plus tard.
-2. Installation (§ 10) : rouvrir `/admin setup` après coup ? Emoji d'application ?
-3. Déploiement (§ 10) : la montée de version sur `dev` ? L'exception des correctifs 1.21.x ? Une
-   copie de la base de prod pour le bot de test ?
+2. Emoji d'application (§ 10) : on les adopte ?
+3. Correctifs 1.21.x d'ici le 01/01 (§ 10) : en suspens.
