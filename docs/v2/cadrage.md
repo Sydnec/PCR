@@ -22,7 +22,8 @@ l'autre jusqu'à la release, puis part en archive (ou disparaît).
 | Apparitions     | chaque génération pèse **deux fois la précédente** (×1, ×2, ×4) : `generationBoost: 2` reste |
 | Boutique (3G)   | **Filet Ball, Bis Ball, Chrono Ball** ; pas de Faiblo Ball                                |
 | Clés d'objets   | restent **en français** (`super_bonbon`, `pierre_soleil`…)                                |
-| Bouton « Mon jeu » | **non** : `/pokemon` suffit                                                            |
+| Bouton « Mon jeu » | **non** : `/pokemon` suffit ; les boutons de lancer des apparitions restent             |
+| Config          | **une convention unique** de noms et d'unités (§ 2)                                       |
 
 ## Calendrier
 
@@ -41,7 +42,7 @@ Les trois se testent ensemble, horloge figée sur le 31/12 à 23:59.
 | --- | ------------------------------------------------------------------------ | -------------- |
 | 0   | cadrage validé                                                           | → 08/11        |
 | 1   | base : `node:sqlite`, module unique d'accès, schéma v2, script de migration et répétition sur le serveur | 09/11 → 22/11 |
-| 2   | config v2 et catalogue des textes                                        | 16/11 → 22/11  |
+| 2   | config v2, catalogue des textes, installation (§ 10)                     | 16/11 → 22/11  |
 | 3   | refonte du jeu par fonctionnalité, tests réécrits au fur et à mesure     | 23/11 → 06/12  |
 | 4   | Discord : panneau, commandes regroupées, messages publics en composants  | 07/12 → 13/12  |
 | 5   | site, d'abord pour le téléphone                                          | 07/12 → 20/12  |
@@ -101,10 +102,7 @@ statistiques Pokémon y restent.
 ### Principes
 
 - **Des nombres et des interrupteurs, rien d'autre** : les textes partent au catalogue (§ 3).
-- **Durées** : une seule forme, du texte lu par une seule fonction — `"90s"`, `"45m"`, `"24h"`,
-  `"7d"` (type `duration` dans le schéma).
-- **Probabilités et parts** : entre 0 et 1 (`…Chance`, `…Share`), ou `…OneIn` (1 sur N). Plus de
-  pourcentage.
+- **Durées, probabilités, noms** : une seule convention, détaillée plus bas.
 - **Ce qui dépend d'une génération** vit dans `generations` : ouvrir la suivante, c'est remplir
   un bloc.
 - **Équilibrage et technique séparés** : l'un se règle depuis `/admin`, l'autre (réessais,
@@ -115,6 +113,58 @@ statistiques Pokémon y restent.
 - **Les repères se calculent** (gain moyen par jour, une Master Ball tous les N jours) et
   s'affichent dans `/admin poids` ou la page Infos. Plus jamais en commentaire : ceux de la v1 sont
   calculés sur les valeurs du code, pas sur celles de prod.
+
+### Convention (décidée)
+
+Une seule règle partout, dans les noms comme dans les valeurs.
+
+**Noms**
+
+- camelCase anglais, **jamais d'unité dans le nom** : c'est la valeur qui la porte.
+- La même chose porte le même nom dans toutes les sections :
+
+  | Nom           | Sens                                               |
+  | ------------- | -------------------------------------------------- |
+  | `enabled`     | interrupteur d'une fonctionnalité                  |
+  | `price`       | ce que le dresseur paie, en points                 |
+  | `…Value`      | ce qu'il reçoit, en points (`sellValue`, `overflowValue`) |
+  | `multiplier`  | un facteur                                         |
+  | `weights`     | des poids relatifs, toujours de la même forme      |
+  | `dailyLimit`  | un plafond par jour (minuit UTC)                   |
+  | `maxHeld`     | un plafond en poche                                |
+  | `min…` / `max…` | une borne                                        |
+
+- Deux sections de même nature ont la même forme : les apparitions et le parc safari ont le même
+  bloc `weights`.
+
+**Valeurs**
+
+| Ce que c'est            | Écriture                                              |
+| ----------------------- | ----------------------------------------------------- |
+| une durée               | texte avec son unité : `"500ms"`, `"3s"`, `"45m"`, `"24h"`, `"7d"` |
+| une probabilité         | `…Chance`, entre 0 et 1                               |
+| un événement rare       | `…OneIn`, un entier N : « 1 sur N »                   |
+| une part d'un montant   | `…Share`, entre 0 et 1                                |
+| des points              | un entier                                             |
+| une date                | ISO avec son fuseau : `"2027-01-01T00:00:00+01:00"`   |
+
+Plus aucun pourcentage.
+
+**Exemples de renommage**
+
+| v1                                  | v2                                   |
+| ----------------------------------- | ------------------------------------ |
+| `spawn.shinyOdds: 500`              | `spawn.shinyOneIn: 500`              |
+| `capture.throwCooldownSeconds: 3`   | `capture.throwCooldown: "3s"`        |
+| `safari.parkDurationHours: 24`      | `safari.parkDuration: "24h"`         |
+| `safari.randomChancePerHour: 0.04`  | `safari.hourlyChance: 0.04`          |
+| `redistribution.contributionPercent: 7` | `economy.redistribution.contributionShare: 0.07` |
+| `eggs.perDay: 1`                    | `eggs.dailyLimit: 1`                 |
+| `evolution.2.points: 1500`          | `evolution.cost.2.price: 1500`       |
+| `evolution.branchChoicePoints`      | `evolution.branchChoicePrice`        |
+| `items.super_canne.rod.price`       | `fishing.rods.good.castPrice`        |
+
+L'arbre complet suit cette convention ; il se relit en entier au lot 2.
 
 ### Arbre (brouillon)
 
@@ -216,6 +266,8 @@ Conséquence : un emoji de ball supprimé du serveur se répare par une release,
 
 - **`/pokemon [onglet]`**, une commande à part : Discord n'accepte pas `/pk` seul tant que la
   commande a des sous-commandes.
+- Les boutons de lancer restent sur les apparitions, comme aujourd'hui ; aucun bouton n'y est
+  ajouté.
 
 ### Le panneau
 
@@ -341,7 +393,71 @@ Aujourd'hui : 52 fichiers, environ 1 670 cas, 21 940 lignes, environ 45 à 50 s.
 - Pages de `docs/` réécrites pour les nouvelles commandes, sommaire du README mis à jour.
 - `CLAUDE.md` : transactions, composants, chemins uniques, règles de test.
 
-## 10. Risques
+## 10. Installation et `.env` (proposition)
+
+Objectif : qu'une installation neuve (le bot de test, par exemple) demande seulement les secrets,
+et que tout le reste se règle depuis Discord.
+
+### Constat
+
+- Le code lit une trentaine de variables d'environnement :
+  - 4 secrets ;
+  - une vingtaine d'identifiants Discord : serveur, une dizaine de salons, six rôles, un message,
+    un code d'invitation ;
+  - 3 horaires cron ;
+  - 3 réglages du site ;
+  - 3 crochets de test.
+- `dotenv.config()` est appelé dans une quinzaine de fichiers.
+- `ENV` n'est lue que par `environmentIsProd()`, qu'aucun code n'appelle (seul un test).
+- `ANNUAL_RECAP_CRON_TIMER` n'est lue que dans du code commenté.
+- L'administrateur du site est un identifiant en dur (`SYDNEC_USER_ID`).
+
+### Proposition
+
+- **`.env` ne garde que les secrets** :
+  - `DISCORD_TOKEN` ;
+  - `DISCORD_CLIENT_SECRET`, seulement si le site est activé.
+
+  L'identifiant de l'application se lit à la connexion (`client.application.id`). Le secret de
+  session du site est généré au premier démarrage et gardé dans le dossier de données, hors git.
+- **Lu une seule fois**, au démarrage, par Node (`process.loadEnvFile`) : `dotenv` est retiré des
+  dépendances.
+- **`/admin setup`** : un panneau avec les menus natifs de Discord pour choisir salons et rôles,
+  rangés par fonctionnalité, avec un état ✅ / ⚠️ pour chacune.
+  - Les choix sont gardés en base (une table `settings`) et relus à chaque usage.
+  - Le serveur est celui où l'on lance `/admin setup`.
+  - L'adresse et le port du site s'y règlent aussi ; changer le port demande un redémarrage.
+- **Une fonctionnalité sans son salon est coupée**, et le panneau de setup le dit : pas de
+  plantage, pas de message envoyé dans le vide.
+- **Premier démarrage** : le bot n'enregistre que `/admin` et écrit dans le journal son lien
+  d'invitation, avec les bonnes permissions.
+- **Administrateur du site** : les membres qui ont accès à `/admin`, au lieu d'un identifiant en dur.
+- **Horaires** (saint du jour, calendrier de l'Avent) : ils passent dans la config.
+- **Code mort** : `ENV` et `ANNUAL_RECAP_CRON_TIMER` disparaissent.
+- **Crochets de test** (`PCR_DATA_DIR`, `DISCORD_API_BASE`, `DISCORD_AUTHORIZE_URL`) : ils restent
+  et sont documentés, mais ne figurent pas dans l'exemple de `.env`.
+
+### Emoji
+
+Les emoji des balls sont ceux du serveur de prod (`<:pokeball:1551…>`) : un bot qui n'est pas sur
+ce serveur ne peut pas les afficher.
+
+- Proposition : des **emoji d'application**, qui appartiennent au bot Discord et s'affichent
+  partout (jusqu'à 2 000 par application).
+- Le catalogue les nomme ; le bot retrouve leurs identifiants au démarrage.
+- Une commande `pcr emojis` envoie les images du dépôt (`assets/emojis/`) à l'application.
+- Un emoji unicode sert de repli s'il en manque un.
+- Effet de bord : un emoji supprimé du serveur ne casse plus rien.
+
+### Bot de test
+
+- Une seconde application Discord, avec son propre jeton, son dossier de données
+  (`PCR_DATA_DIR`) et, s'il tourne sur la même machine que la prod, son propre nom PM2 et son
+  propre port. Aujourd'hui, `pcr` fixe `APP_NAME="PCR"`.
+- Mise en route : `.env` avec le jeton, puis `pcr start`, l'invitation, et enfin `/admin setup`
+  sur le serveur de test.
+
+## 11. Risques
 
 | Risque                                           | Parade                                                     |
 | ------------------------------------------------ | ---------------------------------------------------------- |
@@ -354,6 +470,7 @@ Aujourd'hui : 52 fichiers, environ 1 670 cas, 21 940 lignes, environ 45 à 50 s.
 
 ## À trancher
 
-1. Conventions de config : durées en texte (`"45m"`), `…Chance` / `…Share` / `…OneIn` ?
-2. Génération 3 : chaque cas particulier (évolutions, bébés, légendaires, obtentions, formes,
-   pêche).
+1. Génération 3 : chaque cas particulier (évolutions, bébés, légendaires, obtentions, formes,
+   pêche) — repris plus tard.
+2. Installation (§ 10) : réglages d'instance en base et `/admin setup` ? Emoji d'application ?
+   Où tourne le bot de test ?
