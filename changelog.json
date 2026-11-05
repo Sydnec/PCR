@@ -3004,5 +3004,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "chore",
+      "name": "Bot de test",
+      "description": "Chaque changement passe d'abord par un bot de test, sur un serveur à part, avant d'arriver sur le bot principal.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-11-05T14:21:23.000Z",
+      "branch": "dev/jolly-archimedes-to3uu1"
+    }
+  ]
 }

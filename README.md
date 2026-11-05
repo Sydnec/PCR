@@ -91,6 +91,8 @@ cp .env.example .env
 
 ### Commandes de Gestion (`pcr`)
 
+À lancer depuis le dossier du bot : le process PM2 porte son nom (`pcr` → `PCR`, `pcr-test` → `PCR-TEST`).
+
 | Commande      | Description                                                       |
 | ------------- | ----------------------------------------------------------------- |
 | `pcr start`   | Démarre le bot via PM2                                            |
@@ -162,7 +164,10 @@ Pour déployer une nouvelle version en production :
     - Déclenche le déploiement sur le serveur de production (via Self-hosted runner).
     - Exécute `./pcr deploy` sur le serveur.
 
-Pour plus de détails sur la configuration CI/CD, voir [CICD.md](./CICD.md).
+Un bot de test, sur la même machine, suit la branche `development` : chaque push l'y met à jour
+après une CI verte.
+
+Pour plus de détails sur la configuration CI/CD et le bot de test, voir [CICD.md](./CICD.md).
 
 ## 📂 Structure du Projet
 

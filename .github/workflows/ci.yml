@@ -4,7 +4,10 @@ on:
   push:
     branches: ["main"]
   pull_request:
-    branches: ["main"]
+    branches: ["main", "development"]
+  # Un push sur development ne lance pas ce workflow directement : deploy-test.yml
+  # l'appelle, et ne déploie le bot de test que s'il est vert.
+  workflow_call:
 
 # Lecture seule : la CI vérifie, elle n'écrit rien dans le dépôt.
 permissions:

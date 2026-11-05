@@ -1,0 +1,43 @@
+name: Deploy to Test
+
+# Le bot de test tourne sur la même machine que la prod, dans son propre dossier
+# et son propre process PM2 (PCR-TEST, nommé d'après le dossier par `pcr`). Tout
+# push sur development le met à jour, après une CI verte : un code rouge ne part
+# jamais, même sur le bot de test.
+#
+# Seul un push déclenche ce workflow, et seuls les collaborateurs peuvent pousser
+# sur development : une PR venue d'un fork ne fait jamais tourner son code sur la
+# machine du bot (voir CICD.md).
+on:
+  push:
+    branches: ["development"]
+
+permissions:
+  contents: read
+
+# Un push arrivé pendant un déploiement attend son tour au lieu de l'interrompre :
+# couper un npm ci au milieu laisserait node_modules à moitié installé.
+concurrency:
+  group: deploy-test
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: ci
+    runs-on: self-hosted
+    steps:
+      - name: Execute deployment script
+        run: |
+          set -e
+          echo "🧪 Déploiement du bot de test..."
+          cd /home/sydnec/pcr-test
+          git fetch origin development
+          git checkout development
+          # --ff-only : le dossier de test ne porte aucun commit à lui. S'il en a,
+          # le déploiement s'arrête au lieu de fabriquer un merge sur le serveur.
+          git pull --ff-only origin development
+          bash ./pcr deploy
+          echo "✅ Bot de test à jour."
