@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # Configuration
-APP_NAME="PCR"
 MAIN_FILE="index.js"
 REPO_URL="https://github.com/Sydnec/PCR.git"
 
@@ -16,7 +15,7 @@ NC='\033[0m' # No Color
 show_help() {
     echo -e "${BLUE}Usage: pcr [command] [options]${NC}"
     echo ""
-    echo "Lifecycle (PM2):"
+    echo "Lifecycle (PM2), depuis le dossier du bot :"
     echo "  start       Démarrer le bot via PM2"
     echo "  stop        Arrêter le bot"
     echo "  restart     Redémarrer le bot"
@@ -34,6 +33,23 @@ show_help() {
     echo "  release <type>          Créer une nouvelle version (major, minor, fix/patch)"
     echo ""
 }
+
+# Le process PM2 porte le nom du dossier du bot : `pcr` donne PCR (la prod),
+# `pcr-test` donne PCR-TEST (le bot de test, sur la même machine). Le lien global
+# installé par `pcr install` est le même pour les deux dossiers : avec un nom
+# fixe, un `pcr restart` lancé dans le dossier de test redémarrerait la prod.
+# Hors du dossier d'un bot, on refuse plutôt que de deviner lequel viser.
+require_bot() {
+    if ! grep -qs '"name": "pcr"' package.json; then
+        echo -e "${RED}Erreur: lancez pcr depuis le dossier d'un bot PCR (celui de son package.json).${NC}" >&2
+        exit 1
+    fi
+    APP_NAME=$(basename "$PWD" | tr '[:lower:]' '[:upper:]')
+}
+
+case "$1" in
+    start|stop|restart|status|logs|deploy|backup|update) require_bot ;;
+esac
 
 # Commandes
 case "$1" in
@@ -129,7 +145,7 @@ case "$1" in
             sudo ln -sf "$SCRIPT_PATH" /usr/local/bin/pcr
         fi
         chmod +x "$SCRIPT_PATH"
-        echo -e "${GREEN}Installé ! Vous pouvez maintenant taper 'pcr' n'importe où.${NC}"
+        echo -e "${GREEN}Installé ! Tapez 'pcr' depuis le dossier du bot à piloter.${NC}"
         ;;
 
     feature)
