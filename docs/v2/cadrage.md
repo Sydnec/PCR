@@ -20,6 +20,9 @@ l'autre jusqu'à la release, puis part en archive (ou disparaît).
 | Panneau Discord | une commande à part, **`/pokemon`** ; `/pk` garde les commandes                           |
 | Branche         | `dev/jolly-archimedes-to3uu1` porte toute la v2 ; `main` y est repris chaque semaine       |
 | Apparitions     | chaque génération pèse **deux fois la précédente** (×1, ×2, ×4) : `generationBoost: 2` reste |
+| Boutique (3G)   | **Filet Ball, Bis Ball, Chrono Ball** ; pas de Faiblo Ball                                |
+| Clés d'objets   | restent **en français** (`super_bonbon`, `pierre_soleil`…)                                |
+| Bouton « Mon jeu » | **non** : `/pokemon` suffit                                                            |
 
 ## Calendrier
 
@@ -74,8 +77,7 @@ minuteurs avec prudence, et reprendre `main` dans la branche de la v2 chaque sem
 - `pokemon_trades` (28 colonnes `offer_*` / `request_*`) devient `trades` + `trade_lines`
   (`trade_id`, `side`, `kind`, `pokemon_id`, `item_key`, `points`, `qty`) ; le brouillon suit.
 - Chaque table repasse en revue : colonnes mortes, index utiles, contraintes `CHECK` / `NOT NULL`.
-- Les clés d'objets (`super_bonbon`, `pierre_soleil`…) restent telles quelles, sauf décision
-  contraire (voir « À trancher »).
+- Les clés d'objets (`super_bonbon`, `pierre_soleil`…) restent telles quelles, en français.
 
 ### Migration
 
@@ -214,8 +216,6 @@ Conséquence : un emoji de ball supprimé du serveur se répare par une release,
 
 - **`/pokemon [onglet]`**, une commande à part : Discord n'accepte pas `/pk` seul tant que la
   commande a des sous-commandes.
-- À confirmer : un bouton « Mon jeu » en plus, sur chaque apparition, pour ouvrir le panneau sans
-  rien taper.
 
 ### Le panneau
 
@@ -294,18 +294,17 @@ saison passent en composants. Un titre y rend le Markdown et les emoji du serveu
 - **Légendaires** : Regirock, Regice, Registeel, Latias, Latios, Kyogre, Groudon, Rayquaza.
   **Fabuleux** : Jirachi, Deoxys.
 - **Charme Chroma** de la génération 3.
-- **Balls de boutique** proposées :
+- **Balls de boutique** :
 
   | Ball         | Bonus                                        |
   | ------------ | -------------------------------------------- |
   | Filet Ball   | types Eau ou Insecte                         |
   | Bis Ball     | espèce déjà au Pokédex                       |
   | Chrono Ball  | grandit avec le nombre de lancers sur l'apparition |
-  | Faiblo Ball  | forme de base (stade 1)                      |
 
-  Écartées : la Scuba Ball, qui double l'Appât Ball ; la Luxe Ball et l'Honor Ball, sans effet.
-  Le bonus apprend quatre conditions de plus (`types`, `owned`, `throws`, `stage`), en plus de
-  `fished` et `item`.
+  Écartées : la Faiblo Ball, sans intérêt ici ; la Scuba Ball, qui double l'Appât Ball ; la Luxe
+  Ball et l'Honor Ball, sans effet. Le bonus apprend trois conditions de plus (`types`, `owned`,
+  `throws`), en plus de `fished` et `item`.
 - **Objets** : Dent Océan (Coquiperl → Serpang) et Écaille Océan (Coquiperl → Rosabyss), par le
   mécanisme `targets`.
 - **Cas particuliers** (évolutions, bébés, légendaires, obtentions) : en discussion, la liste
@@ -356,7 +355,5 @@ Aujourd'hui : 52 fichiers, environ 1 670 cas, 21 940 lignes, environ 45 à 50 s.
 ## À trancher
 
 1. Conventions de config : durées en texte (`"45m"`), `…Chance` / `…Share` / `…OneIn` ?
-2. Génération 3 : les quatre balls proposées, et chaque cas particulier.
-3. Clés d'objets : on les garde en français (recommandé : aucun gain pour les joueurs), ou on les
-   passe en anglais avec une migration de l'inventaire ?
-4. Un bouton « Mon jeu » sur les apparitions, en plus de `/pokemon` ?
+2. Génération 3 : chaque cas particulier (évolutions, bébés, légendaires, obtentions, formes,
+   pêche).
