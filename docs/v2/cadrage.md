@@ -29,6 +29,7 @@ l'autre jusqu'à la release, puis part en archive (ou disparaît).
 | Rouvrir le setup | `/admin setup` revient si un salon ou un rôle réglé disparaît ; `pcr setup` le rouvre     |
 | Version         | `pcr release <type>` sur `development` ; le merge vers `main` déploie la prod et pose le tag       |
 | Données de test | le bot de test reçoit une copie de `points.db` de prod, pour répéter la migration         |
+| Emoji           | **emoji d'application** partout où le bot affiche une icône propre au jeu (§ 10)          |
 
 ## Calendrier
 
@@ -452,12 +453,35 @@ et que tout le reste se règle depuis Discord.
 Les emoji des balls sont ceux du serveur de prod (`<:pokeball:1551…>`) : un bot qui n'est pas sur
 ce serveur ne peut pas les afficher.
 
-- Proposition : des **emoji d'application**, qui appartiennent au bot Discord et s'affichent
-  partout (jusqu'à 2 000 par application).
-- Le catalogue les nomme ; le bot retrouve leurs identifiants au démarrage.
-- Une commande `pcr emojis` envoie les images du dépôt (`assets/emojis/`) à l'application.
+**Décidé** : des **emoji d'application**, qui appartiennent au bot Discord et s'affichent partout
+(jusqu'à 2 000 par application), pour toute icône propre au jeu.
+
+Fonctionnement :
+
+- Les images vivent dans le dépôt (`assets/emojis/`). Le site sert les mêmes depuis ses routes :
+  la même icône sur Discord et sur le site, sans adresse externe.
+- Le catalogue désigne un emoji par son nom ; chaque bot retrouve l'identifiant au démarrage (ceux
+  de la prod et du bot de test diffèrent).
+- `pcr emojis` envoie à l'application les images qui lui manquent, sans toucher aux autres.
 - Un emoji unicode sert de repli s'il en manque un.
-- Effet de bord : un emoji supprimé du serveur ne casse plus rien.
+- Noms : `ball_<clé>`, `item_<clé>` (les clés d'objets, en français), `pkmn_<n°>`,
+  `pkmn_<n°>_shiny`, `unown_<lettre>`.
+
+Où :
+
+| Usage                                        | Aujourd'hui                         | v2                    |
+| -------------------------------------------- | ----------------------------------- | --------------------- |
+| Poké, Super, Hyper, Master, Safari Ball      | emoji du serveur de prod            | emoji d'application   |
+| Appât Ball, Catalyseur Ball                  | 🎣 ⚙️ (« celui du serveur reste à créer ») | emoji d'application |
+| Filet, Bis, Chrono Ball (3G)                 | —                                   | emoji d'application   |
+| Objets (Super Bonbon, pierres, cannes, Pépite, Ticket, charmes…) | unicode, parfois en double : trois cannes 🎣, Catalyseur et Catalyseur Ball ⚙️ | emoji d'application, une icône par objet |
+| Pokémon dans les listes et les menus du panneau | rien                             | à trancher : ≈ 830 emoji (386 espèces, normales et shiny, et les 28 Zarbi) |
+| Repères d'interface (🥚 🔒 ✨ ♂ ♀, pastilles de rareté) | unicode                    | inchangés             |
+| Messages de rôles par réaction               | emoji du serveur et unicode         | **inchangés** : les membres réagissent eux-mêmes, et seul le bot peut utiliser un emoji d'application |
+
+À vérifier sur le bot de test : la permission « Utiliser des emoji externes » dans les réponses aux
+commandes, et la cadence à laquelle Discord accepte les envois d'emoji (≈ 830 par bot, si les
+Pokémon en font partie).
 
 ### Bot de test
 
@@ -516,5 +540,7 @@ Mise en œuvre :
 
 1. Génération 3 : chaque cas particulier (évolutions, bébés, légendaires, obtentions, formes,
    pêche) — repris plus tard.
-2. Emoji d'application (§ 10) : on les adopte ?
-3. Correctifs 1.21.x d'ici le 01/01 (§ 10) : en suspens.
+2. Emoji des Pokémon (§ 10) : une icône par espèce dans les listes et les menus ?
+3. Images des balls (§ 10) : garder les dessins actuels du serveur, ou des sprites PokéAPI pour
+   toutes les icônes ?
+4. Correctifs 1.21.x d'ici le 01/01 (§ 10) : en suspens.
