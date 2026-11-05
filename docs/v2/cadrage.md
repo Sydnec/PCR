@@ -18,7 +18,9 @@ l'autre jusqu'à la release, puis part en archive (ou disparaît).
 | Textes          | libellés, descriptions, emoji et sprites **sortent de la config** : plus modifiables à chaud |
 | Release         | le **31/12 après-midi**, pour que tout soit en place avant minuit                         |
 | Panneau Discord | une commande à part, **`/pokemon`** ; `/pk` garde les commandes                           |
-| Branche         | `dev/jolly-archimedes-to3uu1` porte toute la v2 ; `main` y est repris chaque semaine       |
+| Branches        | `dev` (bot de test) et `main` (bot principal) ; `main` n'est qu'un merge de `dev` (§ 10)   |
+| Instance        | salons et rôles en base, réglés par `/admin setup`, qui disparaît une fois le setup terminé |
+| Bot de test     | une seconde application Discord, sur une autre VM                                         |
 | Apparitions     | chaque génération pèse **deux fois la précédente** (×1, ×2, ×4) : `generationBoost: 2` reste |
 | Boutique (3G)   | **Filet Ball, Bis Ball, Chrono Ball** ; pas de Faiblo Ball                                |
 | Clés d'objets   | restent **en français** (`super_bonbon`, `pierre_soleil`…)                                |
@@ -50,7 +52,7 @@ Les trois se testent ensemble, horloge figée sur le 31/12 à 23:59.
 | 7   | gel le 21/12 ; répétition générale de la migration, docs, changelog      | 21/12 → 31/12  |
 
 Décembre : le calendrier de l'Avent tourne, et `main` continue de recevoir les 1.21.x. Toucher aux
-minuteurs avec prudence, et reprendre `main` dans la branche de la v2 chaque semaine.
+minuteurs avec prudence, et reprendre `main` dans `dev` chaque semaine.
 
 ## 1. Base de données
 
@@ -393,7 +395,7 @@ Aujourd'hui : 52 fichiers, environ 1 670 cas, 21 940 lignes, environ 45 à 50 s.
 - Pages de `docs/` réécrites pour les nouvelles commandes, sommaire du README mis à jour.
 - `CLAUDE.md` : transactions, composants, chemins uniques, règles de test.
 
-## 10. Installation et `.env` (proposition)
+## 10. Installation et `.env`
 
 Objectif : qu'une installation neuve (le bot de test, par exemple) demande seulement les secrets,
 et que tout le reste se règle depuis Discord.
@@ -427,6 +429,10 @@ et que tout le reste se règle depuis Discord.
   - Les choix sont gardés en base (une table `settings`) et relus à chaque usage.
   - Le serveur est celui où l'on lance `/admin setup`.
   - L'adresse et le port du site s'y règlent aussi ; changer le port demande un redémarrage.
+  - **Décidé** : la commande disparaît une fois le setup terminé. Le setup est terminé quand
+    chaque fonctionnalité a ses salons et rôles, ou a été coupée volontairement.
+  - À trancher : comment la rouvrir pour changer un salon. Proposition : elle revient d'elle-même
+    si un salon ou un rôle réglé est supprimé, et `pcr setup` la rouvre depuis le serveur.
 - **Une fonctionnalité sans son salon est coupée**, et le panneau de setup le dit : pas de
   plantage, pas de message envoyé dans le vide.
 - **Premier démarrage** : le bot n'enregistre que `/admin` et écrit dans le journal son lien
@@ -451,11 +457,38 @@ ce serveur ne peut pas les afficher.
 
 ### Bot de test
 
-- Une seconde application Discord, avec son propre jeton, son dossier de données
-  (`PCR_DATA_DIR`) et, s'il tourne sur la même machine que la prod, son propre nom PM2 et son
-  propre port. Aujourd'hui, `pcr` fixe `APP_NAME="PCR"`.
+- Une seconde application Discord, avec son propre jeton, sur **une autre VM**, avec son propre
+  serveur Discord de test.
 - Mise en route : `.env` avec le jeton, puis `pcr start`, l'invitation, et enfin `/admin setup`
   sur le serveur de test.
+- Ses annonces (changelog, génération, bilan) partent dans les salons de son serveur : c'est un
+  aperçu de ce que verra la prod.
+
+### Branches et déploiement
+
+**Décidé** :
+
+- un push sur `dev` déploie le bot de test ;
+- un push sur `main` déploie le bot principal ;
+- `main` n'est qu'un merge de `dev`, quand on veut vraiment livrer.
+
+Proposition de mise en œuvre :
+
+- **Branches** : `feat/…` et `fix/…` partent de `dev` et y reviennent ; `dev` part vers `main` à la
+  release.
+- **Workflows** :
+  - la CI tourne sur chaque push et chaque PR vers `dev` et `main` ;
+  - le déploiement attend qu'elle soit verte ;
+  - un runner auto-hébergé par VM, désigné par son étiquette (`pcr-prod`, `pcr-test`) ;
+  - chaque VM garde son `.env` : aucun secret dans GitHub.
+- **Version** (à trancher) : `pcr release <type>` se lance sur `dev` (montée de version, changelog,
+  donc un déploiement de test). Le merge vers `main` déploie la prod, et la CI pose le tag
+  `vX.Y.Z`. Aujourd'hui, la prod se déploie sur un tag, sans attendre la CI.
+- **Jusqu'au 01/01** (à trancher) : `dev` porte la v2, donc un correctif 1.21.x ne peut pas en
+  venir. Exception : `fix/…` part de `main` et y revient, puis `main` est repris dans `dev`.
+- **Données du bot de test** : une copie de `points.db` de prod sur la VM de test, pour répéter la
+  migration v1 → v2 sur de vraies données.
+- **`CLAUDE.md`** : la section « Livraison » est réécrite pour ce flux.
 
 ## 11. Risques
 
@@ -464,7 +497,7 @@ ce serveur ne peut pas les afficher.
 | La migration échoue ou perd des données          | comptes avant/après bloquants, `--dry-run` sur le serveur, sauvegarde, retour arrière répété |
 | Trois événements à minuit                        | testés ensemble, horloge figée                             |
 | Rafale de messages à minuit (annonce, bilan, apparition) | réécritures déjà espacées et réessayées par `message-sync` |
-| Branche longue face aux 1.21.x de `main`         | `main` repris chaque semaine dans la branche de la v2      |
+| Branche longue face aux 1.21.x de `main`         | `main` repris chaque semaine dans `dev`                    |
 | Gel trop tard, fêtes de fin d'année              | gel le 21/12                                               |
 | Un réglage de prod modifié d'ici là              | `config.json` renvoyé la veille                            |
 
@@ -472,5 +505,6 @@ ce serveur ne peut pas les afficher.
 
 1. Génération 3 : chaque cas particulier (évolutions, bébés, légendaires, obtentions, formes,
    pêche) — repris plus tard.
-2. Installation (§ 10) : réglages d'instance en base et `/admin setup` ? Emoji d'application ?
-   Où tourne le bot de test ?
+2. Installation (§ 10) : rouvrir `/admin setup` après coup ? Emoji d'application ?
+3. Déploiement (§ 10) : la montée de version sur `dev` ? L'exception des correctifs 1.21.x ? Une
+   copie de la base de prod pour le bot de test ?
