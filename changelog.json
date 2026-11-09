@@ -1,7 +1,31 @@
 {
-  "version": "1.21.8",
-  "lastUpdated": "2026-11-04T18:07:17.542Z",
+  "version": "1.22.0",
+  "lastUpdated": "2026-11-09T14:16:13.758Z",
   "releases": [
+    {
+      "version": "1.22.0",
+      "date": "2026-11-09",
+      "title": "Release 1.22.0",
+      "features": [
+        {
+          "version": "1.22.0",
+          "date": "2026-11-09",
+          "title": "Release 1.22.0",
+          "features": [
+            {
+              "type": "feature",
+              "name": "Commande /anniversaire avec système de célébration dans un chan défini",
+              "description": "Commande /anniversaire avec système de célébration dans un chan défini",
+              "announce": true,
+              "author": "Tilli",
+              "commit": "pending",
+              "timestamp": "2026-11-09T15:03:15.000Z",
+              "branch": "feat/birthdays"
+            }
+          ]
+        }
+      ]
+    },
     {
       "version": "1.21.8",
       "date": "2026-11-04",
@@ -3004,23 +3028,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "version": "1.22.0",
-      "date": "2026-11-09",
-      "title": "Release 1.22.0",
-      "features": [
-        {
-          "type": "feature",
-          "name": "Commande /anniversaire avec système de célébration dans un chan défini",
-          "description": "Commande /anniversaire avec système de célébration dans un chan défini",
-          "announce": true,
-          "author": "Tilli",
-          "commit": "pending",
-          "timestamp": "2026-11-09T15:03:15.000Z",
-          "branch": "feat/birthdays"
-        }
-      ]
-    }
-  ]
+  "pending": []
 }
