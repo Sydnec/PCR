@@ -694,6 +694,14 @@ export const DEFAULTS = {
     // ne cotisent pas, mais reçoivent leur part comme les autres.
     contributionPercent: 5,
   },
+  // Anniversaires : l'heure d'envoi du message de fête, et le message lui-même.
+  // {user} devient la mention du membre, {name} son pseudo — relus à chaque
+  // tick, les deux se règlent sans redémarrage.
+  birthday: {
+    enabled: true,
+    hour: 9,
+    message: "🎂 JOAAAAAAAAAAAAAAAAAAAAA {user} ! Passe une excellente journée !!!",
+  },
 };
 
 const isPlainObject = (value) =>
@@ -913,6 +921,7 @@ const BOUNDS = {
   // fichier plutôt qu'écrit ici : préparer la génération suivante, c'est
   // régénérer ce fichier, et rien d'autre ne doit avoir à suivre.
   "pokemon.generation": { min: 1, max: datasetMaxGeneration() },
+  "birthday.hour": { min: 0, max: 23 },
 };
 
 // Plancher déduit du défaut : un réglage dont la valeur par défaut est positive
