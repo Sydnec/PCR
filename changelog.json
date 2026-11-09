@@ -3004,5 +3004,23 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "version": "1.22.0",
+      "date": "2026-11-09",
+      "title": "Release 1.22.0",
+      "features": [
+        {
+          "type": "feature",
+          "name": "Commande /anniversaire avec système de célébration dans un chan défini",
+          "description": "Commande /anniversaire avec système de célébration dans un chan défini",
+          "announce": true,
+          "author": "Tilli",
+          "commit": "pending",
+          "timestamp": "2026-11-09T15:03:15.000Z",
+          "branch": "feat/birthdays"
+        }
+      ]
+    }
+  ]
 }

@@ -146,6 +146,12 @@ try {
     bot.handleRedistributionOnTimer();
   });
 
+  // Anniversaires. Tick minute, heure et activation relues en config : un
+  // réglage changeant s'applique sans redémarrage.
+  schedule("* * * * *", "anniversaires", () => {
+    bot.handleBirthdaysOnTimer();
+  });
+
   bot.on("error", (e) => {
     handleException(e);
   });

@@ -959,6 +959,26 @@ const db = new sqlite3.Database(dbPath, (err) => {
         );
       }
     );
+
+
+    // ================== ANNIVERSAIRES ==================
+
+    // Anniversaires : une ligne par membre, durable comme le reste de cette
+    // base. L'année vaut NULL quand le membre ne donne pas son âge ;
+    // `last_wished_year` est le garde anti-doublon du message de fête — la
+    // fête part une fois par année de fête, même après un redémarrage.
+    db.run(
+      `CREATE TABLE IF NOT EXISTS birthdays (
+        user_id TEXT PRIMARY KEY,
+        day INTEGER NOT NULL,
+        month INTEGER NOT NULL,
+        year INTEGER,
+        last_wished_year INTEGER
+      )`,
+      (err) => {
+        if (err) return handleException("Erreur création table birthdays :", err);
+      }
+    );
   }
 });
 
