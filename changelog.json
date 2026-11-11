@@ -3028,5 +3028,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "feature",
+      "name": "Purge des messages d'un membre",
+      "description": "Les administrateurs peuvent supprimer tous les messages d'un membre sur le serveur avec /admin purge-membre ; le bilan arrive en MP.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-11-11T22:53:26.000Z",
+      "branch": "dev/blissful-thompson-b88p3r"
+    }
+  ]
 }
