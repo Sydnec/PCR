@@ -36,6 +36,16 @@
   - `/admin potcommun [simulation]` : déclenche un pot commun hors calendrier, ou simule le
     prochain sans toucher aux soldes. L'échéance hebdomadaire n'en est pas décalée.
   - `/admin purge [lien] [nombre]` : suppression de messages en masse.
+  - `/admin purge-membre <id>` : supprime tous les messages d'un membre, même parti, sur tout le
+    serveur : salons textuels, annonces, chats vocaux, fils actifs et archivés, posts de forum. Rien
+    n'est publié : la réponse privée confirme le lancement, puis le bilan arrive en MP à
+    l'administrateur, avec le décompte par salon, ceux ignorés faute de droits et ceux en erreur.
+    Les messages de moins de 14 jours partent par lots, les plus anciens un par un, comme Discord
+    l'impose : sur un gros serveur, c'est long. Un fil archivé n'est rouvert que s'il contient des
+    messages du membre, puis refermé. Refusée pour un identifiant inconnu de Discord, pour celui du
+    bot, ou si une purge du même membre tourne déjà. Un redémarrage l'interrompt sans bilan : la
+    relancer reprend ce qui reste. Le bot a besoin de « Voir le salon », « Voir l'historique » et
+    « Gérer les messages », plus « Gérer les fils » pour les fils privés et verrouillés.
   - `/admin pokespawn [espece] [shiny] [annonce] [ping]` : déclenche une apparition (voir [Pokémon](pokemon/README.md)).
   - `/admin safarispawn [joueur] [pause]` : ouvre un parc safari (voir [Parc Safari](pokemon/safari.md)).
   - `/admin saison` : l'aperçu du bilan de la saison en cours, tel que le bot le publiera à l'ouverture
