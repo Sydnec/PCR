@@ -1,10 +1,10 @@
 // /admin : la garde du routeur (l'administration ne se rouvre pas par un réglage de
 // serveur) et chaque sous-commande — points, objets, réglages à chaud, tables de
-// tirage, pot commun, apparitions, parc, purge. Tout répond en éphémère, et un
+// tirage, pot commun, apparitions, parc, purges. Tout répond en éphémère, et un
 // refus donne les chiffres.
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { MessageFlags } from "discord.js";
+import { ChannelType, MessageFlags, PermissionsBitField, RESTJSONErrorCodes, SnowflakeUtil } from "discord.js";
 import { createSandbox, openDatabases, dbRun, dbAll, dbGet, speciesByName, eventually } from "./helpers.js";
 import { fakeUser, fakeChannel, fakeGuild, runCommand, runAutocomplete, payloadOf, textOf } from "./fake-discord.js";
 
@@ -449,6 +449,264 @@ describe("/admin purge", () => {
     const calls = await purge({ lien: link("2", "1000") }, channel);
     assert.match(payloadOf(calls, "editReply").content, /^100 message\(s\) supprimé\(s\) jusqu'au lien indiqué\.\n⚠️ Limite de 100 messages atteinte/);
     assert.equal(channel.deleted.length, 100);
+  });
+});
+
+describe("/admin purge-membre", () => {
+  const BOT = "100000000000000001";
+  const TARGET = "200000000000000002";
+  const OTHER = "300000000000000003";
+  const DAY = 86_400_000;
+  const discordError = (message, code) => Object.assign(new Error(message), { code });
+
+  // Un message daté : comme chez Discord, son âge se lit dans son identifiant.
+  const post = (author, ageDays = 0) => ({
+    id: String(SnowflakeUtil.generate({ timestamp: Date.now() - ageDays * DAY })),
+    author: { id: author },
+  });
+  const posts = (count, author, ageDays = 0) => Array.from({ length: count }, () => post(author, ageDays));
+
+  // Un salon qui se comporte comme Discord sur ce qui compte ici : l'historique
+  // se lit par pages de cent en remontant, un lot ne supprime que des messages
+  // de moins de 14 jours, et un fil archivé refuse toute suppression.
+  const THREADED = [ChannelType.GuildText, ChannelType.GuildAnnouncement, ChannelType.GuildForum];
+  function room(id, { history = [], perms = PermissionsBitField.All, type = ChannelType.GuildText, parentId = null, archived = false, archivedThreads = [] } = {}) {
+    const state = { id, type, parentId, archived, history: [...history], bulk: [], single: [], sent: [], archiving: [] };
+    const remove = (messageId) => {
+      const index = state.history.findIndex((message) => message.id === messageId);
+      if (index < 0) throw discordError("Unknown Message", RESTJSONErrorCodes.UnknownMessage);
+      state.history.splice(index, 1);
+    };
+    const refuseIfArchived = () => {
+      if (state.archived) throw discordError("Thread is archived", 50083);
+    };
+    Object.assign(state, {
+      isTextBased: () => ![ChannelType.GuildCategory, ChannelType.GuildForum].includes(type),
+      isThread: () => parentId !== null,
+      permissionsFor: () => new PermissionsBitField(perms),
+      send: async (payload) => state.sent.push(payload),
+      setArchived: async (value) => {
+        state.archiving.push(value);
+        state.archived = value;
+      },
+      messages: {
+        fetch: async ({ limit, before }) => {
+          const page = state.history
+            .filter((message) => before === undefined || BigInt(message.id) < BigInt(before))
+            .sort((a, b) => (BigInt(b.id) > BigInt(a.id) ? 1 : -1))
+            .slice(0, limit);
+          return new Map(page.map((message) => [message.id, message]));
+        },
+        delete: async (messageId) => {
+          refuseIfArchived();
+          remove(messageId);
+          state.single.push(messageId);
+        },
+      },
+      bulkDelete: async (ids) => {
+        refuseIfArchived();
+        if (ids.some((messageId) => Date.now() - SnowflakeUtil.timestampFrom(messageId) >= 14 * DAY)) {
+          throw discordError("You can only bulk delete messages that are under 14 days old.", 50034);
+        }
+        ids.forEach(remove);
+        state.bulk.push(ids.length);
+        return { size: ids.length };
+      },
+    });
+    if (THREADED.includes(type) && parentId === null) {
+      state.threads = {
+        fetchArchived: async ({ type: kind }) => ({
+          threads: new Map(archivedThreads.filter((thread) => (thread.private ? "private" : "public") === kind).map((thread) => [thread.id, thread])),
+          hasMore: false,
+        }),
+      };
+    }
+    return state;
+  }
+
+  const server = (channels, activeThreads = []) => ({
+    id: "guild-1",
+    name: "PCR",
+    members: { me: { id: BOT }, fetchMe: async () => ({ id: BOT }) },
+    channels: {
+      fetch: async () => new Map(channels.map((channel) => [channel.id, channel])),
+      fetchActiveThreads: async () => ({ threads: new Map(activeThreads.map((thread) => [thread.id, thread])) }),
+    },
+  });
+
+  // Le bot : les comptes Discord qu'il connaît, et les MP qu'il envoie.
+  const botFor = ({ unknown = false, closedDms = false } = {}) => {
+    const dms = [];
+    return {
+      dms,
+      users: {
+        fetch: async (id) => (unknown ? Promise.reject(discordError("Unknown User", RESTJSONErrorCodes.UnknownUser)) : fakeUser(id)),
+        send: async (id, payload) => {
+          if (closedDms) throw discordError("Cannot send messages to this user", 50007);
+          dms.push({ to: id, ...payload });
+        },
+      },
+    };
+  };
+  const purgeMember = (id, guild, bot) => run("purge-membre", { options: { id }, guild }, bot);
+  const authors = (channel) => channel.history.map((message) => message.author.id);
+  const allDms = (bot) => bot.dms.map((dm) => dm.content).join("\n");
+
+  it("remonte tout le serveur, ne supprime que les messages du membre, sans rien publier, et envoie le bilan en MP", async () => {
+    // Trois pages d'historique : 150 messages récents du membre, 100 d'un autre, 3 vieux d'un mois.
+    const general = room("10", { history: [...posts(150, TARGET), ...posts(100, OTHER), ...posts(3, TARGET, 30)] });
+    const voice = room("11", { type: ChannelType.GuildVoice, history: [post(TARGET), post(OTHER)] });
+    const hidden = room("12", { perms: PermissionsBitField.Flags.ViewChannel, history: [post(TARGET)] });
+    const category = room("13", { type: ChannelType.GuildCategory });
+    const activeThread = room("20", { parentId: "10", history: [post(TARGET)] });
+    const hiddenThread = room("23", { parentId: "12", perms: PermissionsBitField.Flags.ViewChannel, history: [post(TARGET)] });
+    const archivedPost = room("21", { parentId: "14", archived: true, history: [post(TARGET, 40), post(OTHER, 40)] });
+    const quietThread = room("22", { parentId: "10", archived: true, history: [post(OTHER, 40)] });
+    const forum = room("14", { type: ChannelType.GuildForum, archivedThreads: [archivedPost] });
+    general.threads.fetchArchived = async () => ({ threads: new Map([[quietThread.id, quietThread]]), hasMore: false });
+    const channels = [general, voice, hidden, category, forum];
+    const bot = botFor();
+
+    const calls = await purgeMember(TARGET, server(channels, [activeThread, hiddenThread]), bot);
+    assert.equal(payloadOf(calls, "deferReply").flags, EPHEMERAL);
+    assert.match(
+      payloadOf(calls, "editReply").content,
+      new RegExp(`^🧹 Purge des messages de \\*\\*Dresseur ${TARGET}\\*\\* \\(\`${TARGET}\`\\) lancée sur tout le serveur\\. Le bilan t'arrivera en MP\\.$`)
+    );
+    await eventually(() => assert.equal(bot.dms.length, 1));
+
+    assert.deepEqual([...new Set(authors(general))], [OTHER], "les messages des autres restent");
+    assert.equal(general.history.length, 100);
+    assert.deepEqual(general.bulk, [100, 50], "les récents partent par lots de cent");
+    assert.equal(general.single.length, 3, "les vieux de plus de 14 jours, un par un");
+    assert.deepEqual(authors(voice), [OTHER], "le chat d'un salon vocal aussi");
+    assert.deepEqual(authors(activeThread), [], "les fils actifs aussi");
+    assert.deepEqual(authors(archivedPost), [OTHER], "les posts de forum archivés aussi");
+    assert.deepEqual(archivedPost.archiving, [false, true], "rouvert le temps du ménage, puis refermé");
+    assert.deepEqual(quietThread.archiving, [], "un fil archivé sans message du membre n'est pas touché");
+    assert.deepEqual(authors(hidden), [TARGET], "un salon sans droits n'est pas touché");
+    for (const channel of [...channels, activeThread, archivedPost, quietThread]) assert.deepEqual(channel.sent, [], `rien publié dans ${channel.id}`);
+
+    const [dm] = bot.dms;
+    assert.equal(dm.to, "u1", "le bilan va à l'administrateur qui a lancé la commande");
+    assert.match(dm.content, new RegExp(`^🧹 Purge terminée sur \\*\\*PCR\\*\\* : \\*\\*156\\*\\* message\\(s\\) de \\*\\*Dresseur ${TARGET}\\*\\*`));
+    for (const line of ["• <#10> : 153", "• <#11> : 1", "• <#20> : 1", "• <#21> : 1"]) assert.ok(dm.content.includes(line), line);
+    assert.match(dm.content, /🚫 Salons ignorés faute de droits.*\n• <#12>/);
+    assert.ok(!/<#1[34]>|<#22>/.test(dm.content), "ni la catégorie, ni le forum, ni le fil sans message");
+    assert.deepEqual(authors(hiddenThread), [TARGET]);
+    assert.ok(!dm.content.includes("<#23>"), "le fil d'un salon déjà ignoré n'est pas cité une seconde fois");
+  });
+
+  it("refuse un identifiant mal formé, celui du bot, ou inconnu de Discord, sans rien supprimer", async () => {
+    const general = room("10", { history: [post(TARGET)] });
+    const cases = [
+      ["abc", botFor(), /^❌ « abc » n'est pas un identifiant Discord : il faut 17 à 20 chiffres\.$/],
+      ["12345", botFor(), /^❌ « 12345 » n'est pas un identifiant Discord/],
+      [BOT, botFor(), /^❌ C'est l'identifiant du bot : effacer ses messages casserait les apparitions/],
+      [TARGET, botFor({ unknown: true }), new RegExp(`^❌ Aucun compte Discord ne porte l'identifiant \`${TARGET}\`\\.$`)],
+    ];
+    for (const [id, bot, refusal] of cases) {
+      const calls = await purgeMember(id, server([general]), bot);
+      assert.match(payloadOf(calls, "editReply").content, refusal, id);
+      assert.deepEqual(bot.dms, [], `aucun MP pour ${id}`);
+    }
+    assert.deepEqual(authors(general), [TARGET]);
+  });
+
+  it("une seule purge à la fois par membre, et le verrou se rend à la fin", async () => {
+    let release;
+    const gate = new Promise((resolve) => (release = resolve));
+    const general = room("10", { history: [post(TARGET)] });
+    const read = general.messages.fetch;
+    general.messages.fetch = async (options) => {
+      await gate;
+      return read(options);
+    };
+    const guild = server([general]);
+    const bot = botFor();
+
+    assert.match(payloadOf(await purgeMember(TARGET, guild, bot), "editReply").content, /lancée/);
+    const second = payloadOf(await purgeMember(TARGET, guild, bot), "editReply").content;
+    assert.match(second, new RegExp(`^❌ Une purge des messages de \\*\\*Dresseur ${TARGET}\\*\\* \\(\`${TARGET}\`\\) est déjà en cours\\.$`));
+    release();
+    await eventually(() => assert.equal(bot.dms.length, 1));
+    assert.deepEqual(authors(general), []);
+
+    assert.match(payloadOf(await purgeMember(TARGET, guild, bot), "editReply").content, /lancée/);
+    await eventually(() => assert.equal(bot.dms.length, 2));
+    assert.match(bot.dms[1].content, /aucun message de \*\*Dresseur/);
+  });
+
+  it("un lot refusé par Discord repart message par message", async () => {
+    const general = room("10", { history: posts(3, TARGET) });
+    general.bulkDelete = async () => {
+      throw discordError("You can only bulk delete messages that are under 14 days old.", 50034);
+    };
+    const bot = botFor();
+    await purgeMember(TARGET, server([general]), bot);
+    await eventually(() => assert.equal(bot.dms.length, 1));
+    assert.deepEqual(authors(general), []);
+    assert.equal(general.single.length, 3);
+    assert.ok(bot.dms[0].content.includes("• <#10> : 3"));
+  });
+
+  it("une panne sur un salon n'arrête pas les autres, et un fil rouvert est refermé quoi qu'il arrive", async () => {
+    const broken = room("10", { history: [post(TARGET)] });
+    broken.messages.fetch = async () => {
+      throw discordError("Missing Access", 50001);
+    };
+    const stuck = room("21", { parentId: "11", archived: true, history: [post(TARGET, 30)] });
+    stuck.messages.delete = async () => {
+      throw discordError("Missing Permissions", 50013);
+    };
+    const parent = room("11", { history: [post(TARGET)], archivedThreads: [stuck] });
+    const bot = botFor();
+
+    await purgeMember(TARGET, server([broken, parent]), bot);
+    await eventually(() => assert.equal(bot.dms.length, 1));
+    assert.deepEqual(authors(parent), [], "le salon suivant est purgé malgré la panne du premier");
+    assert.deepEqual(authors(broken), [TARGET]);
+    assert.deepEqual(authors(stuck), [TARGET]);
+    assert.deepEqual(stuck.archiving, [false, true], "refermé malgré l'échec de la suppression");
+    assert.equal(stuck.archived, true);
+
+    const content = allDms(bot);
+    assert.match(content, /\*\*1\*\* message\(s\) de /);
+    assert.ok(content.includes("• <#21> : 0 (⚠️ 1 impossible(s) à supprimer)"));
+    assert.match(content, /❌ Salons en erreur, à relancer :\n• <#10> : Missing Access/);
+  });
+
+  it("une panne générale : MP d'échec avec ce qui est déjà fait, et le verrou est rendu", async () => {
+    const guild = server([]);
+    guild.channels.fetch = async () => {
+      throw discordError("Service Unavailable", 0);
+    };
+    const bot = botFor();
+    await quiet(async () => {
+      await purgeMember(TARGET, guild, bot);
+      await eventually(() => assert.equal(bot.dms.length, 1));
+    });
+    assert.match(bot.dms[0].content, /^❌ La purge des messages de \*\*Dresseur \d+\*\* .* s'est arrêtée sur une erreur, voir le journal du bot\.\n\*\*0\*\* message\(s\) supprimé\(s\) avant l'arrêt/);
+
+    guild.channels.fetch = async () => new Map();
+    assert.match(payloadOf(await purgeMember(TARGET, guild, bot), "editReply").content, /lancée/);
+    await eventually(() => assert.equal(bot.dms.length, 2));
+  });
+
+  it("des MP fermés : le bilan reste au journal", async () => {
+    const general = room("10", { history: [post(TARGET)] });
+    const bot = botFor({ closedDms: true });
+    const logged = [];
+    const original = console.error;
+    console.error = (...args) => logged.push(args.map(String).join(" "));
+    try {
+      await purgeMember(TARGET, server([general]), bot);
+      await eventually(() => assert.ok(logged.some((line) => line.includes("bilan impossible à envoyer en MP"))));
+    } finally {
+      console.error = original;
+    }
+    assert.deepEqual(authors(general), []);
+    assert.ok(logged.some((line) => line.includes("• <#10> : 1")), "le bilan complet est journalisé");
   });
 });
 

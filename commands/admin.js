@@ -8,6 +8,7 @@ import configVoir from "./admin/config-voir.js";
 import poids from "./admin/poids.js";
 import potcommun from "./admin/potcommun.js";
 import purge from "./admin/purge.js";
+import purgeMembre from "./admin/purge-membre.js";
 import pokespawn from "./admin/pokespawn.js";
 import safarispawn from "./admin/safarispawn.js";
 import saison from "./admin/saison.js";
@@ -28,6 +29,7 @@ const SUBCOMMANDS = [
   poids,
   potcommun,
   purge,
+  purgeMembre,
   pokespawn,
   safarispawn,
   saison,
