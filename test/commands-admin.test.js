@@ -510,7 +510,10 @@ describe("/admin purge-membre", () => {
         }
         ids.forEach(remove);
         state.bulk.push(ids.length);
-        return { size: ids.length };
+        // Comme discord.js : un lot d'un seul message passe par une suppression
+        // simple, et ne rend le message que s'il était en cache, ce qu'un
+        // historique lu sans cache n'est jamais.
+        return { size: ids.length === 1 ? 0 : ids.length };
       },
     });
     if (THREADED.includes(type) && parentId === null) {
@@ -595,6 +598,60 @@ describe("/admin purge-membre", () => {
     assert.ok(!/<#1[34]>|<#22>/.test(dm.content), "ni la catégorie, ni le forum, ni le fil sans message");
     assert.deepEqual(authors(hiddenThread), [TARGET]);
     assert.ok(!dm.content.includes("<#23>"), "le fil d'un salon déjà ignoré n'est pas cité une seconde fois");
+  });
+
+  it("un seul message récent est compté, même si Discord ne le rend pas", async () => {
+    const general = room("10", { history: [post(TARGET), post(OTHER)] });
+    const bot = botFor();
+    await purgeMember(TARGET, server([general]), bot);
+    await eventually(() => assert.equal(bot.dms.length, 1));
+    assert.deepEqual(authors(general), [OTHER]);
+    assert.match(bot.dms[0].content, /\*\*1\*\* message\(s\) de /);
+    assert.ok(bot.dms[0].content.includes("• <#10> : 1"));
+  });
+
+  it("les fils archivés se lisent page par page, et les privés seulement avec « Gérer les fils »", async () => {
+    const archivedThread = (id, ageDays, { isPrivate = false } = {}) =>
+      Object.assign(room(id, { parentId: "10", archived: true, history: [post(TARGET, ageDays)] }), {
+        archivedAt: new Date(Date.now() - ageDays * DAY),
+        private: isPrivate,
+      });
+    const recentThread = archivedThread("21", 20);
+    const olderThread = archivedThread("22", 30);
+    const privateThread = archivedThread("23", 25, { isPrivate: true });
+    const requests = [];
+    const parentWith = (perms) => {
+      const parent = room("10", { perms });
+      parent.threads.fetchArchived = async (options) => {
+        requests.push(options);
+        if (options.type === "private") return { threads: new Map([[privateThread.id, privateThread]]), hasMore: false };
+        // Deux pages : Discord dit qu'il en reste, et la suivante part du plus ancien de la première.
+        return options.before === undefined
+          ? { threads: new Map([[recentThread.id, recentThread]]), hasMore: true }
+          : { threads: new Map([[olderThread.id, olderThread]]), hasMore: false };
+      };
+      return parent;
+    };
+
+    const bot = botFor();
+    const withoutManageThreads = new PermissionsBitField([
+      PermissionsBitField.Flags.ViewChannel,
+      PermissionsBitField.Flags.ReadMessageHistory,
+      PermissionsBitField.Flags.ManageMessages,
+    ]);
+    await purgeMember(TARGET, server([parentWith(withoutManageThreads)]), bot);
+    await eventually(() => assert.equal(bot.dms.length, 1));
+    assert.deepEqual(requests.map((options) => options.type), ["public", "public"], "aucun fil privé demandé sans « Gérer les fils »");
+    assert.equal(requests[1].before, recentThread.archivedAt, "la seconde page part du plus ancien de la première");
+    assert.deepEqual([authors(recentThread), authors(olderThread)], [[], []], "les deux pages sont purgées");
+    assert.deepEqual(authors(privateThread), [TARGET]);
+
+    requests.length = 0;
+    await purgeMember(TARGET, server([parentWith(PermissionsBitField.All)]), bot);
+    await eventually(() => assert.equal(bot.dms.length, 2));
+    assert.ok(requests.some((options) => options.type === "private" && options.fetchAll === true), "tous les fils privés, pas seulement ceux rejoints");
+    assert.deepEqual(authors(privateThread), []);
+    assert.deepEqual(privateThread.archiving, [false, true]);
   });
 
   it("refuse un identifiant mal formé, celui du bot, ou inconnu de Discord, sans rien supprimer", async () => {

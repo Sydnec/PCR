@@ -255,7 +255,11 @@ async function deleteMessages(channel, ids) {
   for (let start = 0; start < recent.length; start += PAGE_SIZE) {
     const batch = recent.slice(start, start + PAGE_SIZE);
     try {
-      deleted += (await channel.bulkDelete(batch)).size;
+      // Le lot passe entier ou pas du tout : on compte ce qu'on a envoyé. La
+      // collection rendue par discord.js est vide pour un lot d'un seul
+      // message absent du cache, et l'historique est lu sans cache.
+      await channel.bulkDelete(batch);
+      deleted += batch.length;
     } catch {
       // Un seul message passé au-delà des 14 jours depuis la lecture fait
       // refuser tout le lot : chacun repart alors seul.
