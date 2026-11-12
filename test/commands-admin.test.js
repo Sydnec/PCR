@@ -4,6 +4,7 @@
 // refus donne les chiffres.
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import { ChannelType, MessageFlags, PermissionsBitField, RESTJSONErrorCodes, SnowflakeUtil } from "discord.js";
 import { createSandbox, openDatabases, dbRun, dbAll, dbGet, speciesByName, eventually } from "./helpers.js";
 import { fakeUser, fakeChannel, fakeGuild, runCommand, runAutocomplete, payloadOf, textOf } from "./fake-discord.js";
@@ -670,24 +671,35 @@ describe("/admin purge-membre", () => {
     assert.deepEqual(authors(general), [TARGET]);
   });
 
-  it("une seule purge à la fois par membre, et le verrou se rend à la fin", async () => {
+  it("une seule purge à la fois par membre, le refus dit où en est la première, et le verrou se rend à la fin", async () => {
     let release;
     const gate = new Promise((resolve) => (release = resolve));
-    const general = room("10", { history: [post(TARGET)] });
-    const read = general.messages.fetch;
-    general.messages.fetch = async (options) => {
+    const general = room("10", { history: [post(TARGET), post(OTHER)] });
+    const slow = room("11", { history: [post(TARGET)] });
+    const read = slow.messages.fetch;
+    slow.messages.fetch = async (options) => {
       await gate;
       return read(options);
     };
-    const guild = server([general]);
+    const guild = server([general, slow]);
     const bot = botFor();
 
     assert.match(payloadOf(await purgeMember(TARGET, guild, bot), "editReply").content, /lancée/);
-    const second = payloadOf(await purgeMember(TARGET, guild, bot), "editReply").content;
-    assert.match(second, new RegExp(`^❌ Une purge des messages de \\*\\*Dresseur ${TARGET}\\*\\* \\(\`${TARGET}\`\\) est déjà en cours\\.$`));
+    // #10 est fini, #11 attend encore : le refus donne l'avancement réel.
+    await eventually(async () => {
+      const second = payloadOf(await purgeMember(TARGET, guild, bot), "editReply").content;
+      assert.match(
+        second,
+        new RegExp(
+          `^❌ Une purge des messages de \\*\\*Dresseur ${TARGET}\\*\\* \\(\`${TARGET}\`\\) est déjà en cours depuis \\d+ s : ` +
+            `\\*\\*1\\*\\* message\\(s\\) supprimé\\(s\\) sur 2 lu\\(s\\), 1 salon\\(s\\) parcouru\\(s\\) sur 2\\.$`
+        )
+      );
+    });
+    assert.deepEqual(authors(slow), [TARGET], "le refus n'a rien lancé de plus");
     release();
     await eventually(() => assert.equal(bot.dms.length, 1));
-    assert.deepEqual(authors(general), []);
+    assert.deepEqual([authors(general), authors(slow)], [[OTHER], []]);
 
     assert.match(payloadOf(await purgeMember(TARGET, guild, bot), "editReply").content, /lancée/);
     await eventually(() => assert.equal(bot.dms.length, 2));
@@ -764,6 +776,138 @@ describe("/admin purge-membre", () => {
     }
     assert.deepEqual(authors(general), []);
     assert.ok(logged.some((line) => line.includes("• <#10> : 1")), "le bilan complet est journalisé");
+  });
+
+  // Un salon dont la lecture attend un signal : de quoi observer la purge en plein travail.
+  const held = (channel, gate) => {
+    const read = channel.messages.fetch;
+    channel.messages.fetch = async (options) => {
+      await gate;
+      return read(options);
+    };
+    return channel;
+  };
+  const opening = () => {
+    let release;
+    const gate = new Promise((resolve) => (release = resolve));
+    return { gate, release };
+  };
+
+  it("plusieurs salons à la fois, jamais plus que le réglage", async () => {
+    sandbox.writeConfig({ ...GEN1, purgeMember: { concurrency: 2 } });
+    const { gate, release } = opening();
+    let reading = 0;
+    let most = 0;
+    const channels = ["10", "11", "12", "13"].map((id) => {
+      const channel = room(id, { history: [post(TARGET), post(OTHER)] });
+      const read = channel.messages.fetch;
+      channel.messages.fetch = async (options) => {
+        reading += 1;
+        most = Math.max(most, reading);
+        await gate;
+        reading -= 1;
+        return read(options);
+      };
+      return channel;
+    });
+    const bot = botFor();
+
+    await purgeMember(TARGET, server(channels), bot);
+    await eventually(() => assert.equal(reading, 2));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(reading, 2, "les deux autres attendent leur tour");
+    release();
+    await eventually(() => assert.equal(bot.dms.length, 1));
+    assert.equal(most, 2);
+    for (const channel of channels) assert.deepEqual(authors(channel), [OTHER], `#${channel.id} purgé`);
+    assert.match(bot.dms[0].content, /\*\*4\*\* message\(s\) de /);
+    assert.match(bot.dms[0].content, /\n⏱️ \d+ s, 8 message\(s\) lu\(s\) dans 4 salon\(s\) et fil\(s\)\.\n/);
+  });
+
+  it("les suppressions commencent pendant la lecture, et ce qui a été trouvé avant une panne de lecture part quand même", async () => {
+    // Une page entière du membre, récents puis vieux, puis une seconde page qui ne viendra jamais.
+    const general = room("10", { history: [...posts(30, TARGET), ...posts(70, TARGET, 30), ...posts(20, TARGET, 40)] });
+    const { gate, release } = opening();
+    const read = general.messages.fetch;
+    general.messages.fetch = async (options) => {
+      if (options.before === undefined) return read(options);
+      await gate;
+      throw discordError("Missing Access", 50001);
+    };
+    const bot = botFor();
+
+    await purgeMember(TARGET, server([general]), bot);
+    await eventually(() => assert.equal(general.single.length, 70), "la première page est supprimée sans attendre la seconde");
+    // Passé les 14 jours, aucun récent ne viendra plus : le lot entamé part sans attendre la fin du salon.
+    assert.deepEqual(general.bulk, [30]);
+    assert.deepEqual(bot.dms, []);
+    release();
+    await eventually(() => assert.equal(bot.dms.length, 1));
+    assert.equal(general.history.length, 20, "la seconde page, jamais lue, reste");
+
+    const content = allDms(bot);
+    assert.match(content, /\*\*100\*\* message\(s\) de /);
+    assert.ok(content.includes("• <#10> : 100"), "le salon en panne garde le compte de ce qu'il a supprimé");
+    assert.match(content, /❌ Salons en erreur, à relancer :\n• <#10> : Missing Access/);
+  });
+
+  it("un fil qui s'archive de lui-même en pleine purge est rouvert, puis refermé", async () => {
+    const thread = room("20", { parentId: "10", history: posts(3, TARGET, 30) });
+    const remove = thread.messages.delete;
+    thread.messages.delete = async (messageId) => {
+      await remove(messageId);
+      // Supprimer n'est pas une activité : Discord archive le fil après la première suppression.
+      if (thread.single.length === 1) thread.archived = true;
+    };
+    const bot = botFor();
+
+    await purgeMember(TARGET, server([room("10")], [thread]), bot);
+    await eventually(() => assert.equal(bot.dms.length, 1));
+    assert.deepEqual(authors(thread), []);
+    assert.deepEqual(thread.archiving, [false, true], "rouvert une fois, refermé à la fin");
+    assert.equal(thread.archived, true);
+    assert.ok(bot.dms[0].content.includes("• <#20> : 3"));
+    assert.ok(!bot.dms[0].content.includes("impossible"));
+  });
+
+  it("un suivi au journal du bot : inventaire, points d'étape, attentes longues de Discord, fin", async () => {
+    sandbox.writeConfig({ ...GEN1, purgeMember: { progressLogSeconds: 0.02, rateLimitLogSeconds: 10 } });
+    const { gate, release } = opening();
+    const general = held(Object.assign(room("10", { history: [post(TARGET), post(OTHER)] }), { name: "général" }), gate);
+    const bot = Object.assign(botFor(), { rest: new EventEmitter() });
+    const logged = [];
+    const original = console.log;
+    console.log = (...args) => logged.push(args.map(String).join(" "));
+    const lines = (pattern) => logged.filter((line) => pattern.test(line));
+    const limited = (majorParameter, timeToReset) =>
+      bot.rest.emit("rateLimited", { global: false, majorParameter, timeToReset, method: "get", route: "/channels/:id/messages" });
+    try {
+      await purgeMember(TARGET, server([general]), bot);
+      await eventually(() => assert.ok(lines(/0\/1 salon\(s\) parcouru\(s\), 0 message\(s\) lu\(s\), 0 supprimé\(s\)\. En cours : #général 0 lu\(s\) \/ 0 supprimé\(s\)$/).length >= 2));
+      assert.equal(lines(/1 salon\(s\) et fil\(s\) actif\(s\) à parcourir, 6 à la fois, 0 ignoré\(s\) faute de droits/).length, 1);
+
+      limited("10", 30_000);
+      limited("10", 2_000);
+      limited("99", 30_000);
+      assert.deepEqual(
+        lines(/Discord fait patienter/).map((line) => line.replace(/^.* - /, "")),
+        [`/admin purge-membre (user-${TARGET}) : Discord fait patienter #général 30 s (GET /channels/:id/messages)`],
+        "seule l'attente longue d'un salon de la purge est journalisée"
+      );
+
+      release();
+      await eventually(() => assert.equal(bot.dms.length, 1));
+      assert.equal(lines(/#général terminé en \d+ s, 1 supprimé\(s\) sur 2 lu\(s\)$/).length, 1);
+      assert.equal(lines(/: terminée en \d+ s, 1 message\(s\) supprimé\(s\) sur 2 lu\(s\) dans 1 salon\(s\)$/).length, 1);
+      assert.equal(bot.rest.listenerCount("rateLimited"), 0, "plus d'écoute une fois la purge finie");
+      const steps = lines(/écoulées/).length;
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      assert.equal(lines(/écoulées/).length, steps, "plus de point d'étape une fois la purge finie");
+    } finally {
+      console.log = original;
+    }
+    // Rien sur Discord, hormis le bilan en MP.
+    assert.deepEqual(general.sent, []);
   });
 });
 

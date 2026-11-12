@@ -694,6 +694,18 @@ export const DEFAULTS = {
     // ne cotisent pas, mais reçoivent leur part comme les autres.
     contributionPercent: 5,
   },
+  // /admin purge-membre : relu au lancement de chaque purge.
+  purgeMember: {
+    // Salons parcourus en même temps. Discord limite la lecture et la
+    // suppression salon par salon : en ouvrir plusieurs multiplie le débit,
+    // mais tous partagent la limite globale du bot, dont le jeu a aussi besoin.
+    concurrency: 6,
+    // Cadence du point d'étape écrit au journal du bot.
+    progressLogSeconds: 30,
+    // Une attente imposée par Discord au-delà de ce seuil est journalisée :
+    // c'est elle qui fait passer une purge pour bloquée.
+    rateLimitLogSeconds: 10,
+  },
   // Anniversaires : l'heure d'envoi du message de fête, et le message lui-même.
   // {user} devient la mention du membre, {name} son pseudo — relus à chaque
   // tick, les deux se règlent sans redémarrage.
@@ -922,6 +934,11 @@ const BOUNDS = {
   // régénérer ce fichier, et rien d'autre ne doit avoir à suivre.
   "pokemon.generation": { min: 1, max: datasetMaxGeneration() },
   "birthday.hour": { min: 0, max: 23 },
+  // À 0, aucun salon ne serait parcouru et la purge attendrait sans fin. Au-delà,
+  // le bot saturerait sa limite globale chez Discord et le jeu en pâtirait.
+  "purgeMember.concurrency": { min: 1, max: 20 },
+  // À 0, le point d'étape tournerait en boucle et noierait le journal.
+  "purgeMember.progressLogSeconds": { min: 5, max: 3600 },
 };
 
 // Plancher déduit du défaut : un réglage dont la valeur par défaut est positive
