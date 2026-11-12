@@ -3045,5 +3045,16 @@
       ]
     }
   ],
-  "pending": []
+  "pending": [
+    {
+      "type": "enhancement",
+      "name": "Purge des messages d'un membre plus rapide",
+      "description": "/admin purge-membre parcourt plusieurs salons à la fois et supprime au fil de la lecture ; son avancement est suivi dans le journal du bot.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-11-12T00:17:10.000Z",
+      "branch": "dev/nifty-gauss-89lh5q"
+    }
+  ]
 }

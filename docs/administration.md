@@ -40,12 +40,19 @@
     serveur : salons textuels, annonces, chats vocaux, fils actifs et archivés, posts de forum. Rien
     n'est publié : la réponse privée confirme le lancement, puis le bilan arrive en MP à
     l'administrateur, avec le décompte par salon, ceux ignorés faute de droits et ceux en erreur.
-    Les messages de moins de 14 jours partent par lots, les plus anciens un par un, comme Discord
-    l'impose : sur un gros serveur, c'est long. Un fil archivé n'est rouvert que s'il contient des
-    messages du membre, puis refermé. Refusée pour un identifiant inconnu de Discord, pour celui du
-    bot, ou si une purge du même membre tourne déjà. Un redémarrage l'interrompt sans bilan : la
-    relancer reprend ce qui reste. Le bot a besoin de « Voir le salon », « Voir l'historique » et
-    « Gérer les messages », plus « Gérer les fils » pour les fils privés et verrouillés.
+    Plusieurs salons sont parcourus en même temps (`purgeMember.concurrency`, 6 par défaut), et les
+    messages du membre sont supprimés au fil de la lecture, sans attendre la fin du salon ; les fils
+    archivés s'inventorient pendant que les premiers salons se purgent. Les messages de moins de
+    14 jours partent par lots de cent, les plus anciens un par un, comme Discord l'impose : sur un
+    gros serveur, ça reste long. Un fil archivé n'est rouvert que s'il contient des messages du
+    membre, puis refermé ; de même pour un fil qui s'archive de lui-même en cours de purge. Le suivi va au journal du bot, jamais sur Discord : l'inventaire, un point
+    d'étape toutes les `purgeMember.progressLogSeconds` secondes (salons parcourus, messages lus et
+    supprimés, salons en cours avec leurs chiffres), chaque salon touché à sa fin, et toute attente
+    imposée par Discord d'au moins `purgeMember.rateLimitLogSeconds` secondes. Refusée pour un
+    identifiant inconnu de Discord, pour celui du bot, ou si une purge du même membre tourne déjà :
+    le refus dit alors où elle en est. Un redémarrage l'interrompt sans bilan : la relancer reprend
+    ce qui reste. Le bot a besoin de « Voir le salon », « Voir l'historique » et « Gérer les
+    messages », plus « Gérer les fils » pour les fils privés et verrouillés.
   - `/admin pokespawn [espece] [shiny] [annonce] [ping]` : déclenche une apparition (voir [Pokémon](pokemon/README.md)).
   - `/admin safarispawn [joueur] [pause]` : ouvre un parc safari (voir [Parc Safari](pokemon/safari.md)).
   - `/admin saison` : l'aperçu du bilan de la saison en cours, tel que le bot le publiera à l'ouverture
