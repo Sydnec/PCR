@@ -71,8 +71,12 @@ impl Db {
     }
 
     /// Attend les requêtes en cours puis ferme toutes les connexions (arrêt propre).
+    ///
+    /// Les lecteurs d'abord : la dernière connexion fermée est celle d'écriture, la seule qui puisse
+    /// reverser le WAL dans le fichier et le supprimer. La base reste alors un fichier unique, ce que
+    /// demandent la restauration et l'import.
     pub async fn close(&self) {
-        self.writer.close().await;
         self.reader.close().await;
+        self.writer.close().await;
     }
 }

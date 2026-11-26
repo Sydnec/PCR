@@ -93,19 +93,26 @@ async fn import_prod(instance: &Instance, file: &Path) -> anyhow::Result<()> {
 
     let dest = database_path(instance);
     let staging = dest.with_extension("db.importing");
-    let _ = std::fs::remove_file(&staging);
+    for leftover in ["db.importing", "db.importing-wal", "db.importing-shm"] {
+        let _ = std::fs::remove_file(dest.with_extension(leftover));
+    }
     pcr_db::backup::vacuum_into(file, &staging).await?;
+    // Migre la copie au schéma de ce binaire *avant* de remplacer quoi que ce soit : un échec laisse
+    // la base de dev intacte. Dès qu'une table référencera un salon, un message Discord ou une action
+    // envers des membres (spawns, échanges, rappels…), sa neutralisation s'ajoutera ici : le bot de
+    // dev ne doit ni éditer la prod ni écrire à de vrais membres.
+    let db = Db::open(&staging).await?;
+    db.close().await;
+    // La fermeture rapatrie le WAL dans le fichier ; s'il en restait un, le renommage perdrait des pages.
+    anyhow::ensure!(
+        !staging.with_extension("importing-wal").exists(),
+        "staging database still has a WAL file"
+    );
     // Un WAL resté de l'ancienne base ne doit pas être rejoué sur la nouvelle.
     for suffix in ["db-wal", "db-shm"] {
         let _ = std::fs::remove_file(dest.with_extension(suffix));
     }
     std::fs::rename(&staging, &dest).context("replacing pcr.db")?;
-
-    // Migre la copie au schéma de ce binaire. Dès qu'une table référencera un salon, un message
-    // Discord ou une action envers des membres (spawns, échanges, rappels…), sa neutralisation
-    // s'ajoutera ici : le bot de dev ne doit ni éditer la prod ni écrire à de vrais membres.
-    let db = Db::open(&dest).await?;
-    db.close().await;
     tracing::info!(from = %file.display(), "prod data imported");
     Ok(())
 }

@@ -23,8 +23,12 @@ fi
 
 systemctl stop pcr
 if ! runuser -u pcr -- /opt/pcr/current/pcr --config "$CONFIG" import-prod "$work/import.db"; then
+  # import-prod ne remplace pcr.db qu'après une migration réussie : l'ancienne base est intacte.
   systemctl start pcr
   exit 1
 fi
 systemctl start pcr
+# Garde les 3 dernières bases de dev mises de côté.
+find "$BACKUPS" -maxdepth 1 -name 'pre-import-*.db' -printf '%T@ %p\n' | sort -rn | cut -d' ' -f2- |
+  tail -n +4 | xargs -r rm -f
 echo "pcr-import-prod: done"
