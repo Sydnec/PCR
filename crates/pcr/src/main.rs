@@ -39,6 +39,15 @@ enum Command {
     /// Dev uniquement, bot arrêté : remplace `pcr.db` par une sauvegarde de prod, la migre et
     /// neutralise ce qui pointe vers la prod.
     ImportProd { file: PathBuf },
+    /// Bot arrêté : convertit les données v1 de `<V1_DIR>` (`points.db`, `botdata-<année>.db`,
+    /// `config.json`) en `pcr.db` et `stats-<année>.db`, et écrit le rapport à côté. Sur dev,
+    /// neutralise en plus ce qui pointe vers la prod.
+    MigrateV1 {
+        v1_dir: PathBuf,
+        /// Année du fichier `botdata-<année>.db` à reprendre (par défaut l'année en cours à Paris).
+        #[arg(long)]
+        year: Option<i16>,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -63,6 +72,9 @@ fn main() -> anyhow::Result<()> {
         }
         Command::ImportProd { file } => {
             tokio::runtime::Runtime::new()?.block_on(import_prod(&instance, &file))
+        }
+        Command::MigrateV1 { v1_dir, year } => {
+            tokio::runtime::Runtime::new()?.block_on(migrate_v1(&instance, &v1_dir, year))
         }
     }
 }
@@ -116,6 +128,47 @@ async fn import_prod(instance: &Instance, file: &Path) -> anyhow::Result<()> {
     }
     std::fs::rename(&staging, &dest).context("replacing pcr.db")?;
     tracing::info!(from = %file.display(), "prod data imported");
+    Ok(())
+}
+
+async fn migrate_v1(instance: &Instance, v1_dir: &Path, year: Option<i16>) -> anyhow::Result<()> {
+    use pcr_db::migrate_v1::{Options, Sources, Targets, migrate};
+
+    let clock = SystemClock;
+    let year = year.unwrap_or_else(|| clock.today().year());
+    let config = v1_dir.join("config.json");
+    let sources = Sources {
+        points: v1_dir.join("points.db"),
+        botdata: v1_dir.join(format!("botdata-{year}.db")),
+        // Absent quand personne n'a jamais rien réglé à chaud : rien à reprendre.
+        config: config.exists().then_some(config),
+    };
+    for file in [&sources.points, &sources.botdata] {
+        anyhow::ensure!(file.exists(), "no v1 file at {}", file.display());
+    }
+    std::fs::create_dir_all(&instance.data_dir)
+        .with_context(|| format!("creating {}", instance.data_dir.display()))?;
+    let targets = Targets {
+        pcr_db: database_path(instance),
+        stats_db: instance.data_dir.join(format!("stats-{year}.db")),
+    };
+    let options = Options {
+        now_ms: clock.now_ms(),
+        neutralize: instance.env == Env::Dev,
+    };
+
+    let report = migrate(&sources, &targets, options).await?;
+    let path = instance.data_dir.join("migrate-v1-report.txt");
+    std::fs::write(&path, report.to_string())
+        .with_context(|| format!("writing {}", path.display()))?;
+    if report.is_clean() {
+        tracing::info!(report = %path.display(), "v1 data migrated");
+    } else {
+        tracing::warn!(
+            report = %path.display(),
+            "v1 data migrated with gaps: read the report before starting the bot"
+        );
+    }
     Ok(())
 }
 

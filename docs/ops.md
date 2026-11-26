@@ -199,4 +199,27 @@ La dernière sauvegarde quotidienne de prod transite par ta machine (les VM ne s
 
 Chaque copie prouve au passage qu'une sauvegarde se restaure.
 
-> `pcr import-prod` refuse de tourner sur une instance `env = "prod"`. Avant la bascule v2, la prod est encore en v1 : sa copie vers dev passera par `pcr migrate-v1` (P2).
+> `pcr import-prod` refuse de tourner sur une instance `env = "prod"`.
+
+**Tant que la prod est en v1**, sa copie vers dev passe par `pcr migrate-v1`. Récupère sur ta machine
+`points.db`, `botdata-<année>.db` et `config.json` (s'il existe) depuis le dossier de données v1, de
+préférence bot v1 arrêté, copie-les sur dev, puis :
+
+```bash
+sudo install -d -o pcr -g pcr /var/lib/pcr/v1
+sudo install -o pcr -g pcr -m 0640 points.db botdata-2026.db config.json /var/lib/pcr/v1/
+sudo systemctl stop pcr
+sudo mv /var/lib/pcr/pcr.db /var/lib/pcr/pcr.db.avant-migrate-v1
+sudo rm -f /var/lib/pcr/pcr.db-wal /var/lib/pcr/pcr.db-shm /var/lib/pcr/stats-2026.db
+sudo runuser -u pcr -- /opt/pcr/current/pcr --config /etc/pcr/instance.toml migrate-v1 /var/lib/pcr/v1
+less /var/lib/pcr/migrate-v1-report.txt
+sudo systemctl start pcr
+```
+
+- `migrate-v1` lit des copies des fichiers v1, refuse un schéma v1 qui n'est pas celui de la v1 gelée
+  (v1.22.1) et ne remplace jamais une base v2 existante. En cas d'échec, rien n'est écrit.
+- Sur dev, il neutralise la copie comme `import-prod`.
+- Le rapport liste, table par table, les lignes lues, écrites, écartées ou corrigées, puis des
+  contrôles (soldes, collections, paris ouverts, rappels, totaux du serveur). Un `ÉCART` dit ce qui
+  manque : à comprendre avant de démarrer le bot.
+
