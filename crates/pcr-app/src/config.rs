@@ -2,8 +2,9 @@
 //! gardées en mémoire et remplacées d'un bloc à chaque modification (`ArcSwap`) : un cas d'usage lit
 //! une configuration cohérente, jamais une moitié d'ancienne et une moitié de nouvelle.
 //!
-//! La base est la seule source de vérité : après chaque écriture, tout est relu et reconstruit, si
-//! bien que deux réglages modifiés en même temps ne s'écrasent pas en mémoire.
+//! La base est la seule source de vérité : après chaque écriture, tout est relu et reconstruit. Les
+//! modifications passent une à une (`App::config_writes`) : sans cela, deux `/admin config`
+//! simultanés pouvaient remettre en service une lecture qui ignorait l'écriture de l'autre.
 
 use std::sync::Arc;
 
@@ -71,6 +72,7 @@ pub async fn reload(app: &App) -> Result<(), DbError> {
 /// et la met en service.
 pub async fn set(app: &App, path: &str, raw: &str, by: u64) -> Result<Change, SetError> {
     let (path, value) = edit::parse(path, raw).map_err(SetError::Refused)?;
+    let _one_at_a_time = app.config_writes.lock().await;
 
     // Avec les autres surcharges : une liste mal formée, ou un nombre trop grand pour son type, ne se
     // voit qu'à la relecture de la configuration entière.

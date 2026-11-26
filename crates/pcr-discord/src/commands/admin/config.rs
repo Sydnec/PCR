@@ -128,14 +128,18 @@ pub fn choices(ctx: &Ctx, typed: &str) -> Vec<CommandOptionChoice> {
 fn list_branch(tree: &Value, prefix: &str) -> String {
     let entries = edit::leaves(tree, prefix);
     let mut body = String::new();
+    // Discord compte en caractères, pas en octets : les accents ne doivent pas couper plus tôt.
+    let mut length = 0;
     let mut shown = 0;
     for (path, current) in &entries {
         let line = format!("`{path}` = {}", render::preview(current));
-        if body.len() + line.len() + 1 > MAX_BODY {
+        let line_length = line.chars().count() + 1;
+        if length + line_length > MAX_BODY {
             break;
         }
         body.push_str(&line);
         body.push('\n');
+        length += line_length;
         shown += 1;
     }
     let rest = entries.len() - shown;

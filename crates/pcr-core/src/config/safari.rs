@@ -27,9 +27,10 @@ section! {
         wild_flee_chance "wildFleeChance": f64 = 0.05,
         wild_flee_chance_per_bait "wildFleeChancePerBait": f64 = 0.03,
         shiny_odds "shinyOdds": u32 = 250,
-        weights_by_stage "weightsByStage": Stages = Stages { first: 50, second: 60, third: 40 },
-        very_rare_weight "veryRareWeight": u32 = 30,
-        legendary_weight "legendaryWeight": u32 = 24,
+        weights_by_stage "weightsByStage": Stages =
+            Stages { first: 50.0, second: 60.0, third: 40.0 },
+        very_rare_weight "veryRareWeight": f64 = 30.0,
+        legendary_weight "legendaryWeight": f64 = 24.0,
         species_factors "speciesFactors": BTreeMap<u16, f64> = BTreeMap::from([(201, 2.0)]),
     }
 }

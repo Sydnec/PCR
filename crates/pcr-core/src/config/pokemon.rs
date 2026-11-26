@@ -47,9 +47,10 @@ section! {
         legendary_flee_multiplier "legendaryFleeMultiplier": f64 = 2.0,
         /// Une chance sur `shinyOdds`.
         shiny_odds "shinyOdds": u32 = 500,
-        weights_by_stage "weightsByStage": Stages = Stages { first: 70, second: 60, third: 25 },
-        very_rare_weight "veryRareWeight": u32 = 18,
-        legendary_weight "legendaryWeight": u32 = 8,
+        weights_by_stage "weightsByStage": Stages =
+            Stages { first: 70.0, second: 60.0, third: 25.0 },
+        very_rare_weight "veryRareWeight": f64 = 18.0,
+        legendary_weight "legendaryWeight": f64 = 8.0,
         /// Multiplie le poids des espèces de la dernière génération ouverte.
         generation_boost "generationBoost": f64 = 2.0,
         /// Facteur de poids par espèce (Zarbi, 201 : ses 26 formes se partagent une seule entrée).
@@ -71,11 +72,12 @@ section! {
 }
 
 section! {
-    /// Un poids par stade d'évolution (1 : base).
+    /// Un poids par stade d'évolution (1 : base). Un poids est une part d'un total, pas un compteur :
+    /// comme en v1, il peut être fractionnaire.
     pub struct Stages {
-        first "1": u32 = 0,
-        second "2": u32 = 0,
-        third "3": u32 = 0,
+        first "1": f64 = 0.0,
+        second "2": f64 = 0.0,
+        third "3": f64 = 0.0,
     }
 }
 
@@ -84,7 +86,8 @@ section! {
         /// Le seul levier global pour durcir (sous 1) ou faciliter les captures.
         global_multiplier "globalMultiplier": f64 = 1.0,
         min_catch_rate "minCatchRate": u32 = 10,
-        throw_cooldown_seconds "throwCooldownSeconds": u32 = 3,
+        /// Fractionnaire comme en v1 (1,5 s est un réglage plausible).
+        throw_cooldown_seconds "throwCooldownSeconds": f64 = 3.0,
         balls "balls": Balls = Balls::default(),
         special_balls "specialBalls": SpecialBalls = SpecialBalls::default(),
     }

@@ -12,33 +12,33 @@ use super::{pokemon::Range, section::section};
 section! {
     pub struct Items {
         ball_poke "ball_poke": Item = Item {
-            drop_weight: Some(400),
-            lottery_weight: Some(640),
+            drop_weight: Some(400.0),
+            lottery_weight: Some(640.0),
             lot: Some(Range { min: 1, max: 5 }),
             ..Item::free_ball("poke")
         },
         ball_super "ball_super": Item = Item {
-            drop_weight: Some(200),
-            lottery_weight: Some(330),
+            drop_weight: Some(200.0),
+            lottery_weight: Some(330.0),
             lot: Some(Range { min: 1, max: 3 }),
             ..Item::free_ball("super")
         },
         super_bonbon "super_bonbon": Item = Item {
             sell_value: Some(300),
-            drop_weight: Some(120),
+            drop_weight: Some(120.0),
             evolution: Some(EvolutionItem { copies: 1, quantity: 3, ..EvolutionItem::default() }),
             lot: Some(Range { min: 1, max: 3 }),
             ..Item::named("Super Bonbon", "🍬", "rare-candy",
                 "Trois d'entre eux tiennent lieu d'un sacrifice dans une évolution.")
         },
         ball_hyper "ball_hyper": Item = Item {
-            drop_weight: Some(80),
+            drop_weight: Some(80.0),
             lot: Some(Range { min: 1, max: 2 }),
             ..Item::free_ball("hyper")
         },
         evolyte "evolyte": Item = Item {
             sell_value: Some(500),
-            drop_weight: Some(20),
+            drop_weight: Some(20.0),
             evolution: Some(EvolutionItem {
                 copies: 1,
                 quantity: 1,
@@ -66,18 +66,18 @@ section! {
         ),
         pepite "pepite": Item = Item {
             sell_value: Some(4000),
-            drop_weight: Some(50),
+            drop_weight: Some(50.0),
             ..Item::named("Pépite", "💎", "nugget", "Ça brille, et ça ne sert qu'à ça : se revendre.")
         },
         ticket_safari "ticket_safari": Item = Item {
-            drop_weight: Some(20),
+            drop_weight: Some(20.0),
             ..Item::named("Ticket Safari", "🎟️", "pass", "Une entrée pour le parc safari.")
         },
         ball_master "ball_master": Item = Item {
             description: Some(
                 "La capture garantie, offerte. Autant dire qu'elle ne se trouve pas.".into(),
             ),
-            lottery_weight: Some(2),
+            lottery_weight: Some(2.0),
             max_held: Some(1),
             overflow_value: Some(10_000),
             ..Item::free_ball("master")
@@ -87,8 +87,8 @@ section! {
             ..Item::named("Canne", "🎣", "old-rod", "La canne de base : surtout des Magicarpe.")
         },
         super_canne "super_canne": Item = Item {
-            drop_weight: Some(20),
-            lottery_weight: Some(60),
+            drop_weight: Some(20.0),
+            lottery_weight: Some(60.0),
             lot: Some(Range { min: 1, max: 1 }),
             max_held: Some(1),
             overflow_value: Some(500),
@@ -97,8 +97,8 @@ section! {
             ..Item::named("Super Canne", "🎣", "good-rod", "Des prises plus variées.")
         },
         mega_canne "mega_canne": Item = Item {
-            drop_weight: Some(8),
-            lottery_weight: Some(25),
+            drop_weight: Some(8.0),
+            lottery_weight: Some(25.0),
             lot: Some(Range { min: 1, max: 1 }),
             max_held: Some(1),
             overflow_value: Some(1000),
@@ -134,9 +134,9 @@ section! {
         #[serde(skip_serializing_if = "Option::is_none")]
         sell_value "sellValue": Option<u32> = None,
         #[serde(skip_serializing_if = "Option::is_none")]
-        drop_weight "dropWeight": Option<u32> = None,
+        drop_weight "dropWeight": Option<f64> = None,
         #[serde(skip_serializing_if = "Option::is_none")]
-        lottery_weight "lotteryWeight": Option<u32> = None,
+        lottery_weight "lotteryWeight": Option<f64> = None,
         /// Combien en donne un lot de loterie.
         #[serde(skip_serializing_if = "Option::is_none")]
         lot "lot": Option<Range> = None,
@@ -185,7 +185,7 @@ impl Item {
     fn evolution_stone(named: Self, targets: &[(u16, u16)]) -> Self {
         Self {
             sell_value: Some(500),
-            drop_weight: Some(20),
+            drop_weight: Some(20.0),
             generation: Some(2),
             evolution: Some(EvolutionItem {
                 copies: 1,

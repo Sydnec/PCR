@@ -22,7 +22,8 @@
     compte.
   - `/admin config <cle> <valeur>` : modifie un réglage **à chaud**, sans redémarrage.
     L'autocomplétion propose les chemins avec leur valeur courante et leur type ; le type attendu
-    vient de la valeur par défaut (un compteur, un prix ou une durée sont des entiers), une clé hors
+    vient de la valeur par défaut (un compteur, un prix, des minutes ou des heures sont des entiers ;
+    un poids, une chance ou un multiplicateur peuvent être fractionnaires), une clé hors
     schéma est refusée et les réglages dangereux sont bornés. Une liste se saisit séparée par des
     virgules, ou en JSON (`[…]`) quand ses éléments sont des structures (les paliers de starter). Le
     réglage est enregistré en base puis appliqué d'un bloc : aucune action ne voit une configuration

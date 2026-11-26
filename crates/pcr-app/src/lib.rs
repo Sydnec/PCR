@@ -26,6 +26,9 @@ pub struct App {
     pub health: Arc<Health>,
     /// La configuration de jeu en service ; `config::reload` la (re)lit en base.
     pub config: Arc<ArcSwap<config::Snapshot>>,
+    /// Une modification de la config à la fois : valider, écrire et recharger d'un tenant, pour
+    /// qu'un rechargement lent ne remette pas en service une lecture antérieure à une autre écriture.
+    pub(crate) config_writes: Arc<tokio::sync::Mutex<()>>,
 }
 
 impl App {
@@ -36,6 +39,7 @@ impl App {
             instance: Arc::new(instance),
             health: Arc::default(),
             config: Arc::default(),
+            config_writes: Arc::default(),
         }
     }
 

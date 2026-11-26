@@ -158,9 +158,12 @@ traduction. Ceux des panneaux éphémères sont remplacés par les panneaux `pk:
 
 Toutes déclarées dans `crates/pcr-core/src/config/` avec les défauts v1 (test d'égalité avec le
 `DEFAULTS` v1). `migrate-v1` reprend `config.json` tel quel dans `config_overrides` (chemins v1) ; une
-surcharge que GameConfig refuse est ignorée, journalisée et signalée par `/admin config-voir`. Écarts :
-les compteurs, prix et durées sont des entiers ; le plafond de `pokemon.generation` (dernière
-génération des données d'espèces) arrive avec ces données (P4).
+surcharge que GameConfig refuse est ignorée, journalisée et signalée par `/admin config-voir`. Écarts
+assumés : les compteurs, prix, minutes et heures sont des entiers (les poids de tirage, chances,
+multiplicateurs et `throwCooldownSeconds` restent fractionnaires) ; une saisie vide ou hexadécimale
+n'est plus prise pour un nombre ; « Chemin interdit. » disparaît (aucune pollution de prototype
+possible en Rust) ; le plafond de `pokemon.generation` (dernière génération des données d'espèces)
+arrive avec ces données (P4).
 
 - [x] `messagePointsDistribution` (7) : `1`, `2`, `3`, `4`, `5`, `6`, `default`
 - [x] `pokemon` (3) : `enabled`, `generation`, `starterLines`
