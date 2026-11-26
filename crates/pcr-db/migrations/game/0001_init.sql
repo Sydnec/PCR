@@ -13,6 +13,81 @@ CREATE TABLE meta (
     value TEXT NOT NULL
 ) STRICT;
 
+-- ================== FONCTIONNEMENT ==================
+
+-- Les réglages de jeu modifiés à chaud (`/admin config`, page d'administration) : seulement ce qui
+-- diffère des valeurs par défaut du code, en JSON, sous le chemin pointé du réglage
+-- (« pokemon.spawn.shinyOdds »). Un défaut qui change dans le code s'applique donc partout où personne
+-- ne l'a surchargé, et supprimer une ligne revient au défaut. Aucun identifiant Discord ici : une copie
+-- prod → dev reste inerte. `updated_by` : l'administrateur, NULL pour une surcharge reprise de la v1.
+CREATE TABLE config_overrides (
+    key        TEXT    PRIMARY KEY,
+    value      TEXT    NOT NULL CHECK (json_valid(value)),
+    updated_at INTEGER NOT NULL,
+    updated_by INTEGER
+) STRICT;
+
+-- Les passages des tâches planifiées : une ligne par tâche et par période (« 2026-11-26 » pour une tâche
+-- quotidienne, « 2026-W48 » pour une hebdomadaire…). La ligne est la revendication : la clé primaire
+-- interdit deux passages pour la même période, même après un redémarrage, et une période échue sans
+-- ligne est une échéance manquée, à rattraper. `done_at` NULL : passage commencé mais pas terminé ;
+-- `claimed_at` sert alors de bail, pour qu'un arrêt en plein passage n'empêche pas de le reprendre, et
+-- `attempts` espace les reprises.
+CREATE TABLE job_runs (
+    job        TEXT    NOT NULL,
+    period_key TEXT    NOT NULL,
+    claimed_at INTEGER NOT NULL,
+    attempts   INTEGER NOT NULL DEFAULT 1 CHECK (attempts >= 1),
+    done_at    INTEGER,
+    PRIMARY KEY (job, period_key)
+) STRICT, WITHOUT ROWID;
+
+-- Les messages publics que le bot poste puis réécrit au fil de la partie : annonce d'apparition, offre
+-- d'échange, objet au sol, parc safari, direct d'une visite, bilan de saison. Une ligne par message,
+-- désignée par la ligne de jeu qu'il montre (`kind`, `entity_id`) ; les tables de jeu ne portent ni
+-- salon ni message.
+--
+-- Le cas d'usage qui change l'état de jeu monte `version` dans sa transaction. Après le commit, le
+-- worker relit la base, construit le contenu, l'écrit sur Discord puis pose `synced_version`. Un message
+-- en retard (`synced_version < version`) se voit donc en SQL : une panne de Discord ou un arrêt au
+-- mauvais moment se rattrapent sans rien perdre, et une réécriture lente ne repose jamais un état
+-- périmé par-dessus un plus récent (elle n'avance `synced_version` que jusqu'à la version qu'elle a lue).
+--
+-- `message_id` : NULL tant que le message n'est pas posté. `gone_at` : Discord a répondu que ce message
+-- ne se réécrira plus (supprimé, salon perdu, droits retirés) ; il sort du rattrapage. `pcr import-prod`
+-- le pose aussi sur tout ce qui vient de la prod.
+CREATE TABLE public_messages (
+    id             INTEGER PRIMARY KEY,
+    kind           TEXT    NOT NULL CHECK (kind IN (
+                       'spawn', 'trade', 'drop', 'safari_park', 'safari_live', 'season_recap')),
+    entity_id      INTEGER NOT NULL,
+    channel_id     INTEGER NOT NULL,
+    message_id     INTEGER,
+    version        INTEGER NOT NULL DEFAULT 1,
+    synced_version INTEGER NOT NULL DEFAULT 0,
+    changed_at     INTEGER NOT NULL,
+    gone_at        INTEGER,
+    UNIQUE (kind, entity_id),
+    CHECK (synced_version BETWEEN 0 AND version)
+) STRICT;
+CREATE INDEX public_messages_pending ON public_messages (changed_at)
+    WHERE synced_version < version AND gone_at IS NULL;
+
+-- Sessions du site. Le cookie porte un jeton aléatoire ; seule son empreinte SHA-256 est gardée, si bien
+-- qu'une copie de la base ne donne aucune session. L'identité Discord (pseudo, avatar) est figée à la
+-- connexion, comme dans le jeton signé de la v1. Une ligne par connexion : se déconnecter, ou expirer,
+-- n'en supprime qu'une.
+CREATE TABLE web_sessions (
+    token_hash BLOB    PRIMARY KEY CHECK (length(token_hash) = 32),
+    user_id    INTEGER NOT NULL,
+    username   TEXT    NOT NULL,
+    avatar     TEXT,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL CHECK (expires_at > created_at)
+) STRICT;
+CREATE INDEX web_sessions_user ON web_sessions (user_id);
+CREATE INDEX web_sessions_expiry ON web_sessions (expires_at);
+
 -- ================== ÉCONOMIE ==================
 
 -- Le solde et le compteur des gains de messages. Le solde peut passer sous zéro : `/admin points` retire
