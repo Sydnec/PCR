@@ -22,17 +22,19 @@ pub async fn vacuum_into(src: &Path, dest: &Path) -> Result<(), DbError> {
     Ok(())
 }
 
-/// Vrai si `path` est une base PCR v2 : elle porte la table de migrations de sqlx. Évite de
-/// restaurer par erreur une base v1 ou un fichier quelconque à la place de `pcr.db`.
+/// Vrai si `path` est une base permanente PCR v2 : elle porte la table de migrations de sqlx et la
+/// table `meta`. Évite de restaurer par erreur une base v1, une base de stats annuelle (qui a aussi
+/// ses migrations sqlx, mais `stats_meta`) ou un fichier quelconque à la place de `pcr.db`.
 pub async fn is_pcr_database(path: &Path) -> Result<bool, DbError> {
     let mut conn = open_read_only(path).await?;
     let found = sqlx::query_scalar::<_, i64>(
-        "SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = '_sqlx_migrations'",
+        "SELECT count(*) FROM sqlite_master
+          WHERE type = 'table' AND name IN ('_sqlx_migrations', 'meta')",
     )
     .fetch_one(&mut conn)
     .await?;
     conn.close().await?;
-    Ok(found == 1)
+    Ok(found == 2)
 }
 
 async fn open_read_only(path: &Path) -> Result<SqliteConnection, DbError> {
@@ -45,7 +47,7 @@ async fn open_read_only(path: &Path) -> Result<SqliteConnection, DbError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Db, meta};
+    use crate::{Db, StatsDb, meta};
 
     #[tokio::test]
     async fn backup_is_a_readable_pcr_database_with_the_same_data() {
@@ -71,6 +73,19 @@ mod tests {
             Some("2.0.0")
         );
         restored.close().await;
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn a_yearly_stats_database_is_not_taken_for_pcr_db() {
+        let dir = std::env::temp_dir().join(format!("pcr-db-stats-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        let path = dir.join("stats-2026.db");
+
+        let stats = StatsDb::open(&path).await.expect("stats migrations apply");
+        stats.close().await;
+
+        assert!(!is_pcr_database(&path).await.expect("inspect"));
         std::fs::remove_dir_all(&dir).ok();
     }
 }

@@ -92,7 +92,7 @@ traduction. Ceux des panneaux éphémères sont remplacés par les panneaux `pk:
 
 - [ ] Calendrier de l'Avent (`ADVENT_CRON_TIMER`, 1er–24 décembre)
 - [ ] Saints et fêtes du jour (`COTD_CRON_TIMER`)
-- [ ] Rappels échus envoyés en MP (chaque minute)
+- [ ] Rappels échus envoyés en MP (chaque minute) ; purge des rappels envoyés depuis plus de 7 jours
 - [ ] Fuite des Pokémon (chaque minute)
 - [ ] Réparation des messages publics (toutes les 5 min, et au démarrage)
 - [ ] Éclosion des œufs (chaque minute)
@@ -102,6 +102,7 @@ traduction. Ceux des panneaux éphémères sont remplacés par les panneaux `pk:
 - [ ] Anniversaires (à `birthday.hour`, heure de Paris)
 - [ ] Au démarrage : message des rôles, annonce de version, nettoyage `voice_time`
 - [ ] **Nouveau** : bascule de la base de stats au 1er janvier, récap annuel
+- [ ] **Nouveau** : purge des sessions du site expirées (`web_sessions`)
 
 ## 6. Routes web (formes JSON v1 conservées)
 
@@ -186,16 +187,60 @@ traduction. Ceux des panneaux éphémères sont remplacés par les panneaux `pk:
 
 ## 8. Tables v1 → v2
 
+Schéma : `crates/pcr-db/migrations/{game,stats}/0001_init.sql`. La conversion des données est P2c.
+
 `pcr.db` (persistante) :
 
-- [ ] `bet_options` · `bet_participations` · `bets` · `birthdays` · `economy_state` · `points` · `points_log` · `points_redistributions` · `pokemon_ball_units` · `pokemon_drops` · `pokemon_eggs` · `pokemon_fusions` · `pokemon_generations` · `pokemon_inventory` · `pokemon_item_log` · `pokemon_lottery` · `pokemon_lottery_draws` · `pokemon_owned` · `pokemon_pc_boxes` · `pokemon_safari_catches` · `pokemon_safari_events` · `pokemon_safari_parks` · `pokemon_safari_sessions` · `pokemon_sales` · `pokemon_season_recaps` · `pokemon_shop_daily` · `pokemon_shop_purchases` · `pokemon_showcase_shares` · `pokemon_spawns` · `pokemon_starter_rewards` · `pokemon_starters` · `pokemon_state` · `pokemon_throws` · `pokemon_trade_drafts` · `pokemon_trades`
-- [ ] `reminders` (venait de `botdata-<année>.db`, perdait les rappels au 1er janvier)
+- [x] `bet_options` · `bet_participations` · `bets` · `birthdays` · `economy_state` · `points` · `points_log` · `points_redistributions` · `pokemon_ball_units` · `pokemon_drops` · `pokemon_eggs` · `pokemon_fusions` · `pokemon_generations` · `pokemon_inventory` · `pokemon_item_log` · `pokemon_lottery` · `pokemon_lottery_draws` · `pokemon_owned` · `pokemon_pc_boxes` · `pokemon_safari_catches` · `pokemon_safari_events` · `pokemon_safari_parks` · `pokemon_safari_sessions` · `pokemon_sales` · `pokemon_season_recaps` · `pokemon_shop_daily` · `pokemon_shop_purchases` · `pokemon_showcase_shares` · `pokemon_spawns` · `pokemon_starter_rewards` · `pokemon_starters` · `pokemon_state` · `pokemon_throws` · `pokemon_trade_drafts` · `pokemon_trades`
+- [x] `reminders` (venait de `botdata-<année>.db`, perdait les rappels au 1er janvier)
+- [x] **Nouvelles** : `config_overrides` (remplace `config.json`), `job_runs`, `public_messages`, `web_sessions`
 - ~~`pokemon_data_migrations`, `pokemon_migrations`~~ (marqueurs v1)
 
 `stats-<année>.db` (annuelle, jamais supprimée automatiquement) :
 
-- [ ] `bet_stats` · `command_stats` · `emoji_stats` · `message_reactions` · `message_stats` · `pokemon_ball_stats` · `pokemon_daily_stats` · `pokemon_highlights` · `pokemon_species_stats` · `pokemon_stats` · `randomizabaise_stats` · `reaction_stats` · `voice_time` · `word_stats`
+- [x] `bet_stats` · `command_stats` · `emoji_stats` · `message_reactions` · `message_stats` · `pokemon_ball_stats` · `pokemon_daily_stats` · `pokemon_highlights` · `pokemon_species_stats` · `pokemon_stats` · `randomizabaise_stats` · `reaction_stats` · `voice_time` · `word_stats`
 - ~~`messages`~~ (autodel abandonnée) · ~~`progress`~~ (curseur v1)
+
+### Écarts de schéma à convertir (P2c)
+
+Partout : identifiants Discord `TEXT` → `INTEGER` ; booléens et statuts fermés par `CHECK` ; clés
+étrangères actives. Les jours historiques restent tels quels (UTC en v1, Paris ensuite) : migrer hors de
+22 h–2 h UTC, sinon `messages_day`, `pokemon_shop_daily.day` et `pokemon_lottery.last_day` du jour de
+la bascule se décalent d'un jour.
+
+- **Messages publics** : `channel_id`, `message_id`, `message_closed_at` de `pokemon_spawns`,
+  `pokemon_trades`, `pokemon_drops`, `pokemon_safari_parks`, les `live_*` de `pokemon_safari_sessions`
+  (sauf `live_author`) et `channel_id`/`message_id` de `pokemon_season_recaps` → une ligne
+  `public_messages` (`kind`, `entity_id`, `version = 1`). Sans salon ou sans message (touches de pêche,
+  envoi jamais abouti) : pas de ligne. `synced_version = 1` si `message_closed_at` est posé ou si
+  l'entité est encore ouverte ; `0` pour une entité terminée dont la fin n'a pas été écrite, que le
+  worker réécrira.
+- `points` : `messages_today_count` → `messages_today`, `last_reset_date` → `messages_day` (`''` → `NULL`).
+- `points_log` : `source = 'v1'` pour l'historique ; les déclencheurs v1 disparaissent (journal écrit
+  par le code, à l'heure de `Clock`).
+- `points_redistributions` : `rate` → `percent`, `triggered_by = 'auto'` → `NULL`, `failures` supprimée
+  (le rapport compte les pots v1 qui avaient des échecs).
+- `bets` : `winning_option_index` → `winning_option` (pari classique) ou `estimate_result` (estimation) ;
+  `bet_options.id` supprimée ; `bet_participations.prediction_value` → `prediction`, `option_index` 0
+  d'une estimation → `NULL`.
+- `reminders` : `guild_id` supprimée ; `sent` → `sent_at` (un rappel envoyé sans date prend `trigger_at`).
+- `pokemon_state.spawning` supprimée (apparition et revendication dans une même transaction).
+- `pokemon_spawns.rarity` `NULL` → recalculée depuis l'espèce (la v2 l'exige).
+- `pokemon_trades` : espèce `0` (« pas de Pokémon ») → `NULL`, `to_user_id = ''` (offre ouverte) → `NULL` ;
+  de même `pokemon_trade_drafts.to_user_id = ''` → `NULL`.
+- `pokemon_fusions` → `pokemon_evolutions`.
+- `pokemon_owned.pc_pos` négatif → `NULL` (la v1 l'ignorait déjà) ; `pokemon_pc_boxes.name = ''` →
+  `NULL` ; `pokemon_lottery.last_day = ''` → `NULL`.
+- `config.json` (arbre imbriqué) → `config_overrides` (une ligne par chemin pointé, valeur JSON).
+- Stats : lignes `__global__` supprimées (totaux = agrégats ; échanges du serveur = lignes `ACCEPTED`
+  de `pokemon_trades` résolues dans l'année) ; `date` → `day` ; `voice_time.longest_session` →
+  `longest_session_ms`, `join_time` → `joined_at` (remis à `NULL`) ; `pokemon_stats.fusions`/
+  `fusion_points` → `evolutions`/`evolution_points`.
+- **Plus strict que la v1**, à contrôler avant d'insérer et à lister dans le rapport d'invariants :
+  `pokemon_lottery.wins <= draws` ; `emoji_stats.emoji` `NULL` (réaction d'un emoji serveur supprimé,
+  ligne écartée) ; `randomizabaise_stats.user_a`/`user_b` `NULL` ; orphelins des nouvelles clés
+  étrangères (`pokemon_throws.spawn_id`, `pokemon_drops.spawn_id`, `counter_of` des échanges et
+  brouillons, `pokemon_safari_*`, `pokemon_starter_rewards` → `pokemon_starters`, options de paris).
 
 ## 9. Correctifs v1 postérieurs au gel
 
