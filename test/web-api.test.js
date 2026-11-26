@@ -3,7 +3,7 @@
 // surtout que la route ne s'écarte pas de la commande qu'elle double.
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { createSandbox, openDatabases, dbRun, withRandom, speciesByName } from "./helpers.js";
+import { createSandbox, openDatabases, dbRun, dbGet, withRandom, speciesByName } from "./helpers.js";
 
 const sandbox = createSandbox({
   config: { pokemon: { generationOpenings: { 2: "2999-01-01T00:00:00+01:00" } } },
@@ -56,7 +56,7 @@ const own = (name, { shiny = 0, count = 1 } = {}) =>
   );
 
 beforeEach(async () => {
-  for (const table of ["points", "pokemon_owned", "pokemon_inventory", "pokemon_item_log", "pokemon_sales", "pokemon_safari_sessions", "points_log"]) {
+  for (const table of ["points", "pokemon_owned", "pokemon_inventory", "pokemon_item_log", "pokemon_sales", "pokemon_safari_sessions", "pokemon_safari_catches", "points_log"]) {
     await dbRun(points, `DELETE FROM ${table}`);
   }
 });
@@ -274,14 +274,14 @@ describe("la lignée sur le site", () => {
 });
 
 describe("parc safari : la visite et sa lignée", () => {
-  async function seedVisit(name, { bait = 0 } = {}) {
+  async function seedVisit(name, { bait = 0, actionsLeft = 25 } = {}) {
     await dbRun(
       points,
       `INSERT INTO pokemon_safari_sessions
          (id, user_id, status, actions_left, started_at, expires_at, encounter_no,
           encounter_species_id, encounter_is_shiny, encounter_catch_rate, encounter_bait)
-       VALUES (1, 'u1', 'ACTIVE', 25, 1, ?, 1, ?, 0, ?, ?)`,
-      [Date.now() + 3_600_000, species(name).id, species(name).catchRate, bait]
+       VALUES (1, 'u1', 'ACTIVE', ?, 1, ?, 1, ?, 0, ?, ?)`,
+      [actionsLeft, Date.now() + 3_600_000, species(name).id, species(name).catchRate, bait]
     );
   }
 
@@ -331,6 +331,43 @@ describe("parc safari : la visite et sa lignée", () => {
     );
     assert.equal(result.visit.encounter.lineage.find((link) => link.speciesId === 134).owned.normal, 1);
     assert.equal(result.visit.actionsLeft, 24);
+  });
+
+  it("une visite finie porte l'état de chaque prise, pour le récapitulatif", async () => {
+    await seedVisit("Mewtwo", { actionsLeft: 1 });
+    // Une prise d'avant le lien avec la boîte : elle s'affiche, sans individu à désigner.
+    // Une autre, revendue depuis : son individu n'est plus dans la boîte.
+    await dbRun(
+      points,
+      "INSERT INTO pokemon_safari_catches (session_id, species_id, is_shiny, caught_at, pokemon_id) VALUES (1, ?, 0, 1, NULL), (1, ?, 0, 2, 99999)",
+      [species("Roucool").id, species("Rattata").id]
+    );
+    const result = await withRandom(0, () =>
+      call("POST", "/api/safari/action", { body: { sessionId: 1, token: 1, action: "BALL" } })
+    );
+    assert.equal(result.outcome, "CATCH");
+    assert.equal(result.visit.finished, true);
+    const [old, sold, caught] = result.visit.catches;
+    assert.equal(old.pokemonId, null);
+    assert.equal("individual" in old, false);
+    assert.equal(sold.pokemonId, 99999);
+    assert.equal(sold.individual, null);
+    const { id } = await dbGet(points, "SELECT id FROM pokemon_owned WHERE user_id = 'u1' AND species_id = ?", [species("Mewtwo").id]);
+    assert.equal(caught.pokemonId, id);
+    // Un légendaire arrive verrouillé, et c'est le seul Mewtwo : il ne part pas.
+    assert.equal(caught.individual.id, id);
+    assert.equal(caught.individual.locked, true);
+    assert.equal(caught.individual.last, true);
+  });
+
+  it("une visite en cours ne relit pas la boîte : ses prises n'ont pas d'état", async () => {
+    await seedVisit("Roucool");
+    const result = await withRandom(0, () =>
+      call("POST", "/api/safari/action", { body: { sessionId: 1, token: 25, action: "BALL" } })
+    );
+    assert.equal(result.visit.finished, false);
+    assert.ok(result.visit.catches[0].pokemonId > 0);
+    assert.equal("individual" in result.visit.catches[0], false);
   });
 
   // Les entrées invalides d'une action (400) sont validées dans web-routes.test.js ; ici, seul

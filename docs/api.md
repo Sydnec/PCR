@@ -65,6 +65,7 @@ Toutes les réponses sont en JSON. `:userId` vaut `me` ou un identifiant Discord
 | `GET /api/spawn` 🔒 | `{ refreshSeconds, cooldownSeconds, pausedUntil, wallet, safari, spawn, fishing, last, drops }` — l'apparition du salon. `spawn.charm` (ou `null`) : elle ne brille que pour les porteurs du Charme Chroma de sa génération (`label`, `image`, `mine` : le visiteur en est un, et `spawn.shiny` est alors vrai pour lui) |
 | `GET /api/safari` 🔒 | `{ offer, visit }` — ce que le dresseur peut faire du parc, et sa visite en cours (`null` sinon) |
 | `GET /api/me/pc` 🔒 | `{ slotsPerBox, columns, maxBoxes, boxNameLength, nicknameLength, boxes, pokemon }` — la boîte PC ; chaque boîte porte `archived` |
+| `GET /api/me/pokemon?ids=12,15` 🔒 | `{ pokemon }` — ces individus du dresseur, comme dans `/box` ; ceux qui ne sont plus à lui sont omis |
 | `GET /api/admin/config` 🔑 | `{ status, tree }` — la configuration en arbre |
 | `GET /api/admin/points?days` 🔑 | `{ from, to, times, trainers: [{ id, name, balance, values }] }` — la courbe des soldes : `values[i]` est le solde à `times[i]` (240 intervalles ; avant son premier mouvement, le solde d'avant, 0 pour un nouveau venu), du plus riche au plus pauvre. `days` (1 à 3650) borne la période ; sans lui, tout le journal |
 
@@ -112,6 +113,9 @@ encounter }`. `encounter` (`null` une fois la visite finie) porte l'espèce, `sh
 rareté, `probability`, `bait` (appâts avalés), `baitFactor`, `baitCapped` (un appât de plus ne
 servirait à rien), `fleeRisk`, `owned`, `lineage` (la lignée, `[{ speciesId, stage, owned }]`, comme celle d'une
 apparition ; `null` sur une collection illisible) et `forms` (comme pour une apparition). `token` se renvoie avec chaque action.
+Chaque prise de `catches` porte `pokemonId`, l'individu crédité (`null` pour une prise d'avant ce
+lien) ; une fois la visite finie, `individual` donne son état actuel (comme dans `/box`), `null`
+s'il n'est plus dans la boîte, absent sur une collection illisible.
 
 Dans la boîte PC, `boxes` liste `{ box, name, custom, defaultName }` et chaque Pokémon est un
 individu avec sa case, `pos` (boîte = `pos / slotsPerBox`). Un Pokémon sans place reçoit la
@@ -131,6 +135,7 @@ ou par un groupe `{ "speciesId": 25, "isShiny": false, "sex": "F" }` — les deu
 | Route | Corps | Réponse |
 |---|---|---|
 | `POST /api/me/sell` | Pokémon, `quantity` pour un groupe | `{ sold, unit, points }` |
+| `POST /api/me/sell-many` | `{ pokemonIds }` | `{ sold, points, refused, failed }` — chacun comme `POST /api/me/sell` d'un individu ; `sold` liste les vendus, `refused` les autres avec leur raison (`{ id, reason }`), `failed` une erreur de base qui a arrêté la suite |
 | `POST /api/me/sell-item` | `{ key, quantity? }` (1 par défaut) | `{ sold, unit, points }` — comme `/pk revendre objet` : `409` pour un objet qui ne se revend pas ou qu'on n'a pas en assez d'exemplaires |
 | `POST /api/me/evolve` | Pokémon (celui qui évolue, avec `speciesId` son espèce attendue : refus s'il a déjà évolué), `targetId?`, `helper?` (clé d'un objet, ou `metamorph`), `confirmLocked?` (obligatoire pour un verrouillé, sinon 409) | `{ pokemon, sacrificesSpent, dittosSpent, shiniesSacrificed, pointsSpent, helper }` — `pokemon` est le même individu, sous sa nouvelle forme |
 | `POST /api/me/eggs` | `{ parent1, parent2 }` | `{ egg }` |
@@ -151,6 +156,7 @@ ou par un groupe `{ "speciesId": 25, "isShiny": false, "sex": "F" }` — les deu
 | `POST /api/me/showcase` | `{ pokemonId, shown, place? }` | la vitrine (comme `GET …/showcase`) — `shown` vrai l'expose (au bout, ou à la place `place`), faux le retire ; 409 si la vitrine est pleine ou s'il n'y est pas |
 | `POST /api/me/showcase/order` | `{ order }` (identifiants, dans l'ordre voulu) | la vitrine — seuls les Pokémon encore exposés bougent |
 | `POST /api/me/pokemon/:id/lock` | `{ locked }` (booléen) | `{ id, locked }` — verrouillé, il ne part plus (ni revente, ni échange, ni sacrifice) |
+| `POST /api/me/pokemon/lock-many` | `{ pokemonIds, locked }` | `{ locked, changed, skipped }` — `skipped` : ceux qui ne sont pas (ou plus) au dresseur |
 | `POST /api/admin/config` 🔑 | `{ path, value }` | `{ path, before, after }` — comme `/admin config` |
 
 Un lancer répond toujours `200` : un raté ou un « trop tard » sont des issues du jeu, pas des
