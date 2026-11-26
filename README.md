@@ -44,4 +44,4 @@ xtask/  automatisation · deploy/  VM et systemd · data/  données statiques ·
 - `dev` déploie automatiquement le **bot de dev** (2ᵉ application Discord, serveur de test).
 - `main` déploie automatiquement la **production**.
 - GitHub Actions construit et signe le binaire ; chaque VM Proxmox le récupère, contrôle sa santé et
-  revient en arrière en cas d'échec. Guide d'exploitation : `docs/ops.md` (à venir).
+  revient en arrière en cas d'échec. → [Guide d'exploitation](docs/ops.md)

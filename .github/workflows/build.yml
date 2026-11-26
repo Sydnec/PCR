@@ -1,0 +1,101 @@
+name: Build
+
+# Chaque push sur main (prod) ou dev (bot de dev) : CI, binaire de release, signature, publication.
+# Les VM récupèrent elles-mêmes la version publiée (deploy/bin/pcr-update.sh) : aucun runner ne
+# tourne sur nos machines, le dépôt étant public.
+on:
+  push:
+    branches: [main, dev]
+
+permissions:
+  contents: read
+
+# Deux publications de la même branche ne se chevauchent jamais ; la plus récente passe ensuite.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  ASSET: pcr-x86_64-linux
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  build:
+    needs: ci
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: release
+      - name: Build
+        run: |
+          export PCR_GIT_SHA="${GITHUB_SHA::7}"
+          cargo build --release --locked -p pcr
+      - name: Package
+        run: |
+          mkdir dist
+          cp target/release/pcr "dist/$ASSET"
+          version=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "pcr") | .version')
+          # Empreinte des migrations : un retour arrière ne restaure la base que si elles ont changé.
+          migrations=$(find crates/pcr-db/migrations -name '*.sql' -type f | sort | xargs sha256sum | sha256sum | cut -d' ' -f1)
+          jq -n \
+            --arg version "$version" \
+            --arg commit "$GITHUB_SHA" \
+            --arg branch "$GITHUB_REF_NAME" \
+            --arg sha256 "$(sha256sum "dist/$ASSET" | cut -d' ' -f1)" \
+            --arg migrations "$migrations" \
+            --arg built_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            '{version: $version, commit: $commit, branch: $branch, binary: env.ASSET,
+              sha256: $sha256, migrations: $migrations, built_at: $built_at}' > dist/manifest.json
+          cat dist/manifest.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: dist/
+          retention-days: 7
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write # créer la release
+      id-token: write # signature sans clé : identité = ce workflow + cette branche
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist
+      - uses: sigstore/cosign-installer@881c63bd87e38389154debd8331404ce7ca8a3ab # v4.1.4
+        with:
+          cosign-release: v3.1.6
+      - name: Sign
+        run: cosign sign-blob --yes --bundle "dist/$ASSET.sigstore.json" "dist/$ASSET"
+      - name: Publish dev-latest
+        if: github.ref == 'refs/heads/dev'
+        run: |
+          # Pré-release glissante : la VM dev lit releases/download/dev-latest/manifest.json.
+          gh release delete dev-latest --yes --cleanup-tag || true
+          gh release create dev-latest dist/* \
+            --prerelease --target "$GITHUB_SHA" \
+            --title "dev ${GITHUB_SHA::7}" \
+            --notes "Build automatique de la branche dev @ ${GITHUB_SHA::7}."
+      - name: Publish release
+        if: github.ref == 'refs/heads/main'
+        run: |
+          version=$(jq -r .version dist/manifest.json)
+          # Une version ne se republie jamais : la PR vers main doit l'avoir montée (xtask release).
+          if gh release view "v$version" >/dev/null 2>&1; then
+            echo "::error::v$version already released; bump the version with cargo xtask release" && exit 1
+          fi
+          gh release create "v$version" dist/* \
+            --latest --target "$GITHUB_SHA" \
+            --title "PCR $version" \
+            --notes "Release $version @ ${GITHUB_SHA::7}."

@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily PCR database backup
+
+[Timer]
+# 04:20 heure de la VM : hors de la plage 02 h-03 h des changements d'heure.
+OnCalendar=*-*-* 04:20:00
+Persistent=true
+RandomizedDelaySec=10min
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,16 @@
+# Sauvegarde quotidienne de pcr.db, compressée, gardée 14 jours.
+[Unit]
+Description=PCR daily database backup
+
+[Service]
+Type=oneshot
+User=pcr
+Group=pcr
+Environment=PCR_INSTANCE=/etc/pcr/instance.toml
+ExecStart=/usr/local/sbin/pcr-backup
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+# Lire une base en WAL demande d'écrire son fichier -shm : le dossier de données reste inscriptible.
+ReadWritePaths=/var/lib/pcr /var/backups/pcr

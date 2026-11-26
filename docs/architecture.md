@@ -61,7 +61,7 @@ Discord et le site appellent les mêmes cas d'usage : une règle n'existe qu'à 
 
 - Deux VM Proxmox : prod (suit `main`) et dev (suit `dev`, 2ᵉ application Discord, serveur de test).
 - GitHub Actions construit et signe le binaire ; chaque VM le récupère elle-même (pas de runner sur les
-  VM) et revient en arrière si `/healthz` échoue. Voir [ADR 0004](adr/0004-deploiement-pull.md) et `docs/ops.md` (P1).
+  VM) et revient en arrière si `/healthz` échoue. Voir [ADR 0004](adr/0004-deploiement-pull.md) et [ops](ops.md).
 
 ## Décisions
 

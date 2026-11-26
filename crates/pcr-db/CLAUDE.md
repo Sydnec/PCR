@@ -12,3 +12,5 @@
 - Un module par fonctionnalité, fonctions `async fn x(db: &Db | &mut SqliteConnection, …)`. Les cas
   d'usage multi-étapes reçoivent la transaction ouverte par `pcr-app`.
 - Invariants en SQL (index uniques partiels, `CHECK`, `STRICT`), montants `INTEGER`, horodatages en ms.
+- `backup` : `vacuum_into` (copie cohérente, bot en marche) et `is_pcr_database`. Toute table qui stocke un
+  salon/message Discord ou une action envers des membres doit être neutralisée par `pcr import-prod`.
