@@ -83,11 +83,14 @@ impl DiscordPublicMessages {
                     .await
             }
         };
+        let posting = message.message_id.is_none();
+        // Discord a accepté : réessayer tout de suite reposterait un second message. Le rattrapage
+        // retentera plus tard, au risque d'un doublon, moins grave qu'un message perdu.
         let posted = response
-            .map_err(|error| classify(&error))?
+            .map_err(|error| classify(&error, posting))?
             .model()
             .await
-            .map_err(|error| WriteError::Transient(error.to_string()))?;
+            .map_err(|error| WriteError::Permanent(error.to_string()))?;
         Ok(Written::Done {
             message_id: i64::try_from(posted.id.get()).unwrap_or(i64::MAX),
         })
@@ -95,13 +98,18 @@ impl DiscordPublicMessages {
 }
 
 /// Une panne passagère (limite de débit, 5xx, coupure) se réessaie ; un autre refus 4xx ne passera pas
-/// mieux au deuxième essai.
-fn classify(error: &twilight_http::Error) -> WriteError {
+/// mieux au deuxième essai. Pour un message à poster, un droit manquant (50001, 50013) n'est pas une
+/// disparition : la v1 ne tirait cette conclusion que d'une édition, et le droit peut revenir.
+fn classify(error: &twilight_http::Error, posting: bool) -> WriteError {
     match error.kind() {
         ErrorType::Response {
             error: ApiError::General(general),
             ..
-        } if MESSAGE_GONE.contains(&general.code) => WriteError::Gone,
+        } if MESSAGE_GONE.contains(&general.code)
+            && !(posting && matches!(general.code, 50001 | 50013)) =>
+        {
+            WriteError::Gone
+        }
         ErrorType::Response { status, .. } if status.is_client_error() && status.get() != 429 => {
             WriteError::Permanent(error.to_string())
         }

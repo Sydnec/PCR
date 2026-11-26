@@ -6,7 +6,8 @@
 //! le fichier de l'année écoulée n'est jamais supprimé par le bot.
 //!
 //! Le tampon est un cache, pas de l'état de jeu : un arrêt brutal perd au plus un lot de compteurs.
-//! L'arrêt normal vide tout.
+//! L'arrêt normal vide tout. Un retrait et un ajout d'un même lot se compensent avant d'atteindre le
+//! plancher de zéro : au pire un d'écart sur un compteur, dans ce seul cas limite.
 
 use std::{
     collections::HashMap,

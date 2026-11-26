@@ -18,6 +18,8 @@ pub struct PublicMessage {
     /// `None` tant qu'il n'est pas posté.
     pub message_id: Option<i64>,
     pub version: i64,
+    /// Le dernier changement : avec `id`, le curseur qui parcourt les messages en retard.
+    pub changed_at: i64,
 }
 
 /// Déclare le message public d'une entité, à poster dans `channel_id` (dans la transaction qui la crée).
@@ -61,20 +63,27 @@ pub async fn touch(
 }
 
 /// Les messages en retard dont le dernier changement tombe dans `[changed_from, changed_to]`, les plus
-/// anciens d'abord.
+/// anciens d'abord, après le curseur `after` (`changed_at`, `id`) s'il est donné.
 pub async fn behind(
     db: &Db,
     changed_from: i64,
     changed_to: i64,
+    after: Option<(i64, i64)>,
     limit: i64,
 ) -> Result<Vec<PublicMessage>, DbError> {
+    let (after_changed, after_id) = after.unwrap_or((i64::MIN, i64::MIN));
     let rows = sqlx::query!(
-        "SELECT id, kind, entity_id, channel_id, message_id, version FROM public_messages
+        "SELECT id, kind, entity_id, channel_id, message_id, version, changed_at
+           FROM public_messages
           WHERE synced_version < version AND gone_at IS NULL
             AND changed_at BETWEEN ? AND ?
+            AND (changed_at > ? OR (changed_at = ? AND id > ?))
           ORDER BY changed_at, id LIMIT ?",
         changed_from,
         changed_to,
+        after_changed,
+        after_changed,
+        after_id,
         limit
     )
     .fetch_all(db.reader())
@@ -88,6 +97,7 @@ pub async fn behind(
             channel_id: row.channel_id,
             message_id: row.message_id,
             version: row.version,
+            changed_at: row.changed_at,
         })
         .collect())
 }
@@ -99,6 +109,19 @@ pub async fn synced(db: &Db, id: i64, version: i64, message_id: i64) -> Result<(
           WHERE id = ? AND synced_version < ?",
         version,
         message_id,
+        id,
+        version
+    )
+    .execute(db.writer())
+    .await?;
+    Ok(())
+}
+
+/// Rien à écrire pour la version `version` (type de message sans rendu) : elle compte comme montrée.
+pub async fn skipped(db: &Db, id: i64, version: i64) -> Result<(), DbError> {
+    sqlx::query!(
+        "UPDATE public_messages SET synced_version = ? WHERE id = ? AND synced_version < ?",
+        version,
         id,
         version
     )
@@ -137,8 +160,14 @@ mod tests {
             .expect("create");
         drop(conn);
 
-        let pending = behind(&db, 0, 2_000, 10).await.expect("behind");
+        let pending = behind(&db, 0, 2_000, None, 10).await.expect("behind");
         assert_eq!(pending.len(), 2);
+        // Une page d'un message, puis la suivante derrière le curseur.
+        let first = behind(&db, 0, 2_000, None, 1).await.expect("page");
+        let next = behind(&db, 0, 2_000, Some((first[0].changed_at, first[0].id)), 1)
+            .await
+            .expect("next page");
+        assert_eq!((first[0].id, next[0].id), (pending[0].id, pending[1].id));
         let spawn = pending[0].clone();
         assert_eq!((spawn.message_id, spawn.version), (None, 1));
 
@@ -150,7 +179,7 @@ mod tests {
             .await
             .expect("synced");
 
-        let pending = behind(&db, 0, 2_000, 10).await.expect("behind");
+        let pending = behind(&db, 0, 2_000, None, 10).await.expect("behind");
         let spawn = pending
             .iter()
             .find(|m| m.kind == "spawn")
@@ -164,7 +193,7 @@ mod tests {
             .expect("trade")
             .id;
         assert!(
-            behind(&db, 1_200, 2_000, 10)
+            behind(&db, 1_200, 2_000, None, 10)
                 .await
                 .expect("window")
                 .iter()
@@ -172,7 +201,7 @@ mod tests {
         );
         gone(&db, trade, 1_600).await.expect("gone");
         assert!(
-            behind(&db, 0, 2_000, 10)
+            behind(&db, 0, 2_000, None, 10)
                 .await
                 .expect("behind")
                 .iter()

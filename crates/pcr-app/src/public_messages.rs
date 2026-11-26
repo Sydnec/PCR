@@ -11,6 +11,8 @@
 
 use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
 
+use tokio::time::Instant;
+
 use pcr_db::public_messages;
 pub use pcr_db::public_messages::PublicMessage;
 use tokio::sync::watch;
@@ -49,20 +51,36 @@ pub trait PublicMessagePort: Send + Sync + std::fmt::Debug {
     fn write<'a>(&'a self, message: &'a PublicMessage) -> WriteFuture<'a>;
 }
 
-/// Écrit les messages en retard jusqu'à l'arrêt.
+/// Écrit les messages en retard jusqu'à l'arrêt. Le rattrapage a une échéance fixe : des réveils
+/// rapprochés ne doivent pas le repousser indéfiniment.
 pub async fn run(app: App, port: Arc<dyn PublicMessagePort>, mut shutdown: watch::Receiver<bool>) {
-    let mut repair = true;
+    let mut next_repair = Instant::now();
     loop {
-        sweep(&app, &*port, repair).await;
-        repair = tokio::select! {
-            () = app.public_messages.notified() => false,
-            () = tokio::time::sleep(REPAIR_EVERY) => true,
+        let repair = Instant::now() >= next_repair;
+        if repair {
+            next_repair = Instant::now() + REPAIR_EVERY;
+        }
+        sweep(&app, &*port, repair, &shutdown).await;
+        if *shutdown.borrow() {
+            return;
+        }
+        tokio::select! {
+            () = app.public_messages.notified() => {}
+            () = tokio::time::sleep_until(next_repair) => {}
             _ = shutdown.wait_for(|stop| *stop) => return,
-        };
+        }
     }
 }
 
-async fn sweep(app: &App, port: &dyn PublicMessagePort, repair: bool) {
+/// Parcourt les messages en retard par pages, derrière un curseur : ceux qui restent en échec ne
+/// cachent pas les suivants. S'arrête entre deux messages si l'arrêt est demandé : un message posté
+/// doit pouvoir être noté avant la fermeture de la base.
+async fn sweep(
+    app: &App,
+    port: &dyn PublicMessagePort,
+    repair: bool,
+    shutdown: &watch::Receiver<bool>,
+) {
     let settings = app.game_config().public_messages.clone();
     let now = app.clock.now_ms();
     let grace_ms = i64::from(settings.repair_grace_seconds) * 1000;
@@ -72,15 +90,27 @@ async fn sweep(app: &App, port: &dyn PublicMessagePort, repair: bool) {
     } else {
         (now - grace_ms, now)
     };
-    let pending = match public_messages::behind(&app.db, from, to, BATCH).await {
-        Ok(pending) => pending,
-        Err(error) => {
-            tracing::error!(?error, "reading public messages failed");
-            return;
+    let mut after = None;
+    loop {
+        let page = match public_messages::behind(&app.db, from, to, after, BATCH).await {
+            Ok(page) => page,
+            Err(error) => {
+                tracing::error!(?error, "reading public messages failed");
+                return;
+            }
+        };
+        for message in &page {
+            if *shutdown.borrow() {
+                return;
+            }
+            write_one(app, port, message, &settings, shutdown).await;
         }
-    };
-    for message in pending {
-        write_one(app, port, &message, &settings).await;
+        match page.last() {
+            Some(last) if i64::try_from(page.len()).unwrap_or(i64::MAX) == BATCH => {
+                after = Some((last.changed_at, last.id));
+            }
+            _ => return,
+        }
     }
 }
 
@@ -89,14 +119,21 @@ async fn write_one(
     port: &dyn PublicMessagePort,
     message: &PublicMessage,
     settings: &pcr_core::config::PublicMessages,
+    shutdown: &watch::Receiver<bool>,
 ) {
     let mut attempt = 0;
     let outcome = loop {
         match port.write(message).await {
+            // Le worker est seul : une panne passagère retient les messages suivants le temps des
+            // réessais, mais l'arrêt, lui, n'attend pas.
             Err(WriteError::Transient(reason)) if attempt < settings.retries => {
                 let delay = u64::from(settings.retry_delay_ms) << attempt.min(16);
                 tracing::debug!(%reason, id = message.id, attempt, "public message write retried");
-                tokio::time::sleep(Duration::from_millis(delay)).await;
+                let mut shutdown = shutdown.clone();
+                tokio::select! {
+                    () = tokio::time::sleep(Duration::from_millis(delay)) => {}
+                    _ = shutdown.wait_for(|stop| *stop) => break Err(WriteError::Transient(reason)),
+                }
                 attempt += 1;
             }
             other => break other,
@@ -106,7 +143,10 @@ async fn write_one(
         Ok(Written::Done { message_id }) => {
             public_messages::synced(&app.db, message.id, message.version, message_id).await
         }
-        Ok(Written::Skipped) => Ok(()),
+        // Rien à écrire pour ce type : le noter fait, plutôt que de le relire à chaque passage.
+        Ok(Written::Skipped) => {
+            public_messages::skipped(&app.db, message.id, message.version).await
+        }
         Err(WriteError::Gone) => {
             public_messages::gone(&app.db, message.id, app.clock.now_ms()).await
         }

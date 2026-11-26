@@ -58,8 +58,9 @@ pub async fn run(
         application_id,
         started: Arc::default(),
     };
-    // Le worker vit avec la connexion Discord : sans elle, il n'aurait rien à écrire.
-    tokio::spawn(pcr_app::public_messages::run(
+    // Le worker vit avec la connexion Discord : sans elle, il n'aurait rien à écrire. Il est attendu
+    // avant de rendre la main, donc avant la fermeture de la base : un message posté est toujours noté.
+    let worker = tokio::spawn(pcr_app::public_messages::run(
         ctx.app.clone(),
         Arc::new(public_messages::DiscordPublicMessages {
             app: ctx.app.clone(),
@@ -67,8 +68,22 @@ pub async fn run(
         }),
         shutdown.clone(),
     ));
+    let result = gateway(&ctx, guild_id, token, &mut shutdown).await;
+    if let Err(error) = worker.await {
+        tracing::error!(?error, "public messages worker panicked");
+    }
+    result
+}
+
+/// La gateway jusqu'à l'arrêt demandé (ou une fermeture définitive, puis l'arrêt).
+async fn gateway(
+    ctx: &Ctx,
+    guild_id: Id<GuildMarker>,
+    token: String,
+    shutdown: &mut watch::Receiver<bool>,
+) -> anyhow::Result<()> {
     // Une panne de Discord ne doit pas faire tomber le site : on réessaie jusqu'à réponse ou arrêt.
-    if !register_commands(&ctx, guild_id, &mut shutdown).await {
+    if !register_commands(ctx, guild_id, shutdown).await {
         return Ok(());
     }
     let mut shard = Shard::new(ShardId::ONE, token, INTENTS);
@@ -76,21 +91,21 @@ pub async fn run(
     loop {
         let event = tokio::select! {
             event = shard.next_event(EventTypeFlags::all()) => event,
-            () = stop_requested(&mut shutdown) => {
+            () = stop_requested(shutdown) => {
                 close_gracefully(&mut shard).await;
                 ctx.app.health.set_discord_ready(false);
                 return Ok(());
             }
         };
         match event {
-            Some(Ok(event)) => handle_event(&ctx, event),
+            Some(Ok(event)) => handle_event(ctx, event),
             Some(Err(source)) => tracing::warn!(?source, "gateway event error"),
             None => {
                 // Fermeture définitive (jeton refusé, intents non autorisés) : le site continue de
                 // tourner, `/healthz` signale `discord: false`, et on attend l'arrêt demandé.
                 ctx.app.health.set_discord_ready(false);
                 tracing::error!("discord gateway closed for good, check the token and intents");
-                stop_requested(&mut shutdown).await;
+                stop_requested(shutdown).await;
                 return Ok(());
             }
         }

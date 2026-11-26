@@ -70,7 +70,12 @@ async fn run_due(app: &App, job: &Job) {
         }
     }
     tracing::info!(job = job.name, %period, "job started");
-    match (job.run)(app.clone(), period.clone()).await {
+    // Une tâche par passage : un panic ne fait tomber que ce passage, pas la boucle de toutes les
+    // tâches.
+    let outcome = tokio::spawn((job.run)(app.clone(), period.clone()))
+        .await
+        .unwrap_or_else(|panic| Err(format!("job panicked: {panic}").into()));
+    match outcome {
         Ok(()) => {
             let done = app.clock.now_ms();
             if let Err(error) = pcr_db::jobs::finish(&app.db, job.name, &period, done).await {

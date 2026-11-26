@@ -4,7 +4,9 @@
 //! un jour, ou une année. Chaque période porte une clé (« 2026-11-26 », « 2026 ») : c'est elle que
 //! `job_runs` revendique, si bien qu'une échéance ne s'exécute jamais deux fois, et qu'une échéance
 //! manquée (bot arrêté à l'heure dite) se rattrape au démarrage, tant que sa période dure. Hors de sa
-//! période, elle est perdue : des vœux d'anniversaire envoyés le lendemain seraient faux.
+//! période, elle est perdue : des vœux d'anniversaire envoyés le lendemain seraient faux. Une échéance
+//! annuelle se rattrape donc jusqu'au 31 décembre : c'est voulu pour le récap de l'année, qui reste
+//! valable en février ; une tâche qui ne vaut que le jour J est quotidienne et vérifie sa date.
 //!
 //! Aucune échéance entre 2 h et 3 h : la nuit du changement d'heure, cette heure-là n'existe pas ou
 //! existe deux fois à Paris.
