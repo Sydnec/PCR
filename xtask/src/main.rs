@@ -1,7 +1,11 @@
 //! Automatisation du projet, lancée par `cargo xtask <tâche>`.
 //!
-//! `check` passe tous les contrôles de la CI et n'affiche que les échecs : un agent reçoit une réponse
-//! courte et exploitable au lieu de milliers de lignes de compilation.
+//! - `check` passe tous les contrôles de la CI et n'affiche que les échecs : un agent reçoit une
+//!   réponse courte et exploitable au lieu de milliers de lignes de compilation.
+//! - `release <patch|minor|major>` replie `changelog/unreleased/` dans `changelog/releases.toml` et
+//!   monte la version du workspace.
+
+mod release;
 
 use std::{
     env,
@@ -13,11 +17,25 @@ use std::{
 const SHOWN_LINES: usize = 80;
 
 fn main() -> ExitCode {
-    if let Some("check") = env::args().nth(1).as_deref() {
-        check()
-    } else {
-        eprintln!("usage: cargo xtask check");
-        ExitCode::FAILURE
+    let args: Vec<String> = env::args().skip(1).collect();
+    match args
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>()
+        .as_slice()
+    {
+        ["check"] => check(),
+        ["release", level] => match release::run(level) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("release: {error}");
+                ExitCode::FAILURE
+            }
+        },
+        _ => {
+            eprintln!("usage: cargo xtask check | cargo xtask release <patch|minor|major>");
+            ExitCode::FAILURE
+        }
     }
 }
 

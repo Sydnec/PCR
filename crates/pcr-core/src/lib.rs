@@ -4,5 +4,6 @@
 //! Les adaptateurs (Discord, site) vivent dans leurs propres crates.
 
 pub mod build;
+pub mod changelog;
 pub mod clock;
 pub mod instance;

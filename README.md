@@ -4,7 +4,7 @@ PCR anime le serveur : un jeu de capture de Pokémon, une économie de points, d
 rappels, des anniversaires, et un site compagnon pour jouer depuis le navigateur.
 
 > **PCR 2.0 est en cours de réécriture en Rust** (branche `dev`). La v1 (Node.js) tourne en production
-> depuis `main` jusqu'à la bascule. Avancement : [`docs/parity.md`](docs/parity.md).
+> depuis `main` jusqu'à la bascule. → [Feuille de route](docs/roadmap.md) · [Parité v1](docs/parity.md)
 
 ## Fonctionnalités
 

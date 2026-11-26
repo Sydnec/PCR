@@ -4,11 +4,18 @@
 //! le résultat. Chaque handler de composant relit son état en base : les boutons marchent encore
 //! après un redémarrage.
 
+mod announce;
 mod commands;
 mod interactions;
 mod ui;
 
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Duration,
+};
 
 use pcr_app::App;
 use tokio::sync::watch;
@@ -27,6 +34,8 @@ pub(crate) struct Ctx {
     pub app: App,
     pub http: Arc<Client>,
     pub application_id: Id<ApplicationMarker>,
+    /// Les tâches de démarrage ne partent qu'au premier READY, pas à chaque reconnexion.
+    pub started: Arc<AtomicBool>,
 }
 
 /// Seulement ce que le bot utilise : les intents privilégiés arrivent avec les fonctionnalités qui en ont besoin.
@@ -46,6 +55,7 @@ pub async fn run(
         app,
         http,
         application_id,
+        started: Arc::default(),
     };
     // Une panne de Discord ne doit pas faire tomber le site : on réessaie jusqu'à réponse ou arrêt.
     if !register_commands(&ctx, guild_id, &mut shutdown).await {
@@ -138,7 +148,13 @@ async fn register_commands(
 
 fn handle_event(ctx: &Ctx, event: Event) {
     match event {
-        Event::Ready(_) | Event::Resumed => ctx.app.health.set_discord_ready(true),
+        Event::Ready(_) => {
+            ctx.app.health.set_discord_ready(true);
+            if !ctx.started.swap(true, Ordering::Relaxed) {
+                tokio::spawn(announce::run(ctx.clone()));
+            }
+        }
+        Event::Resumed => ctx.app.health.set_discord_ready(true),
         Event::GatewayClose(_) => ctx.app.health.set_discord_ready(false),
         Event::InteractionCreate(interaction) => {
             // Chaque interaction a sa tâche : le délai de réponse de 3 s ne doit jamais attendre

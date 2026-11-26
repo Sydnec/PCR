@@ -1,0 +1,3 @@
+# Versions publiées, de la plus récente à la plus ancienne. Écrit par `cargo xtask release` à partir
+# de changelog/unreleased/*.toml : ne pas modifier à la main. Embarqué dans le binaire, qui annonce
+# sur Discord les entrées `announce = true` de sa version au premier démarrage.

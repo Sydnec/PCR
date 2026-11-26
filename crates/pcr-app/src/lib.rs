@@ -4,6 +4,7 @@
 //! renvoient ce qui s'est passé, plus les événements à publier une fois le commit fait. Les
 //! adaptateurs se contentent de traduire les entrées et de rendre les résultats.
 
+pub mod announcements;
 pub mod health;
 
 use std::sync::Arc;
