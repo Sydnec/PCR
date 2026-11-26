@@ -1,5 +1,0 @@
-import { handleException, log } from '../../modules/utils.js';
-
-export default (bot) => {
-    bot.example = async () => {};
-};
