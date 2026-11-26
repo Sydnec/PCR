@@ -13,8 +13,10 @@ pub mod import_prod;
 pub mod jobs;
 pub mod meta;
 pub mod migrate_v1;
+pub mod points;
 mod pool;
 pub mod public_messages;
+pub mod redistribution;
 pub mod stats;
 
 pub use pool::{Db, DbError, StatsDb};
