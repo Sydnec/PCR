@@ -42,3 +42,22 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: shellcheck deploy/*.sh deploy/bin/*.sh
+
+  # Une PR vers main est une release : changelog replié, version montée, jamais republiée.
+  release-guard:
+    name: release ready
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: |
+          if compgen -G "changelog/unreleased/*.toml" >/dev/null; then
+            echo "::error::changelog/unreleased still has entries: run cargo xtask release" && exit 1
+          fi
+          version=$(sed -n '/^\[workspace.package\]/,/^\[/{s/^version = "\(.*\)"/\1/p}' Cargo.toml)
+          case "$version" in
+            "" | *-*) echo "::error::'$version' is not a release version" && exit 1 ;;
+          esac
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null; then
+            echo "::error::v$version is already released" && exit 1
+          fi
