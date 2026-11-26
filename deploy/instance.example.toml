@@ -9,6 +9,8 @@ guild_id = 222222222222222222
 admin_user_id = 333333333333333333
 # Dev only: DMs go exclusively to these users (empty = no restriction).
 dm_allowlist = [333333333333333333]
+# Annonces de version (prod) ou aperçus des annonces à venir (dev).
+changelog_channel_id = 444444444444444444
 
 [web]
 listen = "0.0.0.0:8080"

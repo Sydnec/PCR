@@ -10,3 +10,4 @@
 - Un handler décode, appelle `pcr-app`, rend le résultat. Pas de règle de jeu ici.
 - Délai de 3 s : différer (`defer`) avant tout travail lent ; images dans `spawn_blocking`.
 - Intents : seulement ceux qu'une fonctionnalité utilise (membres et contenu des messages sont privilégiés).
+- `announce.rs` : au premier READY, annonce de version (prod) ou aperçu des fragments en attente (dev).
