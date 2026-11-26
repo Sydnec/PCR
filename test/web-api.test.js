@@ -92,7 +92,8 @@ describe("référentiels", () => {
     const by = (name) => list.find((entry) => entry.name === name);
     assert.ok(by("Roucool").sellValue > 0);
     assert.equal(by("Roucool").sellValueShiny, 0);
-    assert.equal(by("Mewtwo").sellValue, 0);
+    assert.equal(by("Mewtwo").sellValue, getPokemonConfig().sell.byRarity.LEGENDAIRE);
+    assert.equal(by("Mewtwo").sellValueShiny, 0);
   });
 
   it("une fiche d'espèce porte sa lignée ; une espèce fermée ou inconnue est introuvable", async () => {

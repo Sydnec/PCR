@@ -3055,6 +3055,16 @@
       "commit": "pending",
       "timestamp": "2026-11-12T00:17:10.000Z",
       "branch": "dev/nifty-gauss-89lh5q"
+    },
+    {
+      "type": "enhancement",
+      "name": "Revente des légendaires",
+      "description": "Un légendaire en double se revend désormais 3 500 points avec /pk revendre, une fois déverrouillé.",
+      "announce": true,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-11-26T10:00:00.000Z",
+      "branch": "claude/dazzling-wright-t0ovt6"
     }
   ]
 }

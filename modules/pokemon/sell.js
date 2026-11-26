@@ -25,8 +25,7 @@ import { consumeItem, getItem, grantItem, itemSellValue } from "./items.js";
 
 // Ce que vaut un exemplaire. Un tarif absent vaut zéro, donc invendable : mieux
 // vaut une espèce qu'on ne peut pas revendre qu'un prix inventé. C'est ce qui
-// met les légendaires hors commerce — leur rareté n'a pas de ligne au barème —
-// et les shinies avec, via un multiplicateur nul.
+// met les shinies hors commerce, via un multiplicateur nul.
 export function pokemonSellValue(species, isShiny) {
   if (!species) return 0;
   const config = getPokemonConfig().sell ?? {};

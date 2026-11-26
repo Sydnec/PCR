@@ -467,14 +467,16 @@ describe("revente d'un Pokémon", () => {
   const sellGroup = (name, quantity, options = {}) =>
     call(sell.sellPokemon, "u1", { speciesId: species(name).id, isShiny: false, ...options }, quantity);
 
-  it("le barème suit la rareté, les shiny et les légendaires ne se revendent pas", () => {
+  it("le barème suit la rareté, légendaires compris, et les shiny ne se revendent pas", () => {
     const { byRarity } = getPokemonConfig().sell;
     assert.equal(sell.pokemonSellValue(species("Roucool"), false), byRarity.COMMUN);
     assert.equal(sell.pokemonSellValue(species("Roucoups"), false), byRarity.PEU_COMMUN);
     assert.equal(sell.pokemonSellValue(species("Roucarnage"), false), byRarity.RARE);
     assert.equal(sell.pokemonSellValue(species("Dracaufeu"), false), byRarity.TRES_RARE);
+    assert.equal(sell.pokemonSellValue(species("Mewtwo"), false), 3500);
+    assert.equal(sell.pokemonSellValue(species("Mew"), false), byRarity.LEGENDAIRE, "un fabuleux aussi");
     assert.equal(sell.pokemonSellValue(species("Roucool"), true), 0);
-    assert.equal(sell.pokemonSellValue(species("Mewtwo"), false), 0);
+    assert.equal(sell.pokemonSellValue(species("Mewtwo"), true), 0);
     assert.equal(sell.pokemonSellValue(null, false), 0);
   });
 
@@ -561,14 +563,32 @@ describe("revente d'un Pokémon", () => {
     assert.equal((await owned("Roucool", "autre")).length, 2);
   });
 
-  it("un shiny ou un légendaire ne se revend pas, même en double", async () => {
+  it("un shiny ne se revend pas, même en double", async () => {
     await give("Roucool", { shiny: 1 });
     await give("Roucool", { shiny: 1 });
-    await give("Mewtwo");
-    await give("Mewtwo");
+    await give("Mewtwo", { shiny: 1 });
+    await give("Mewtwo", { shiny: 1 });
     assert.match((await sellGroup("Roucool", 1, { isShiny: true })).reason, /ne se revend pas/);
-    assert.match((await sellGroup("Mewtwo", 1)).reason, /ne se revend pas/);
+    assert.match((await sellGroup("Mewtwo", 1, { isShiny: true })).reason, /ne se revend pas/);
     assert.equal((await owned("Mewtwo")).length, 2);
+    assert.equal(await balance(), 0);
+  });
+
+  it("un légendaire en double se revend, une fois déverrouillé", async () => {
+    // Il arrive verrouillé : le verrou est la seule chose qui le protège d'un clic.
+    await give("Mewtwo", { obtained: 1, locked: 1 });
+    const spare = await give("Mewtwo", { obtained: 2, locked: 1 });
+    const target = { speciesId: species("Mewtwo").id, isShiny: false, pokemonId: spare };
+    assert.match((await call(sell.sellPokemon, "u1", target, 1)).reason, /verrouillé/);
+    assert.equal((await owned("Mewtwo")).length, 2);
+    assert.equal(await balance(), 0);
+
+    await dbRun(points, "UPDATE pokemon_owned SET locked = 0 WHERE id = ?", [spare]);
+    const result = await call(sell.sellPokemon, "u1", target, 1);
+    assert.equal(result.ok, true);
+    assert.equal(result.points, getPokemonConfig().sell.byRarity.LEGENDAIRE);
+    assert.equal((await owned("Mewtwo")).length, 1);
+    assert.equal(await balance(), result.points);
   });
 
   it("refuse une espèce inconnue ou une quantité invalide", async () => {
