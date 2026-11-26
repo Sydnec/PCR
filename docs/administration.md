@@ -20,19 +20,23 @@
     retrait a un plancher : un inventaire ne descend pas sous zéro. Sur un dresseur, la commande
     refuse plutôt que de creuser ; sur un rôle, elle épargne ceux qui n'en ont pas assez et les
     compte.
-  - `/admin config <cle> <valeur>` : modifie un réglage **à chaud**, sans redémarrage (voir
-    [Configuration](configuration.md)). L'autocomplétion propose les chemins avec leur
-    valeur courante et leur type ; le type attendu vient de la valeur par défaut, une clé hors
-    schéma est refusée, les réglages dangereux sont bornés, et l'écriture est atomique (fichier
-    temporaire relu puis renommé) pour que le bot n'en voie jamais une version tronquée.
+  - `/admin config <cle> <valeur>` : modifie un réglage **à chaud**, sans redémarrage.
+    L'autocomplétion propose les chemins avec leur valeur courante et leur type ; le type attendu
+    vient de la valeur par défaut (un compteur, un prix ou une durée sont des entiers), une clé hors
+    schéma est refusée et les réglages dangereux sont bornés. Une liste se saisit séparée par des
+    virgules, ou en JSON (`[…]`) quand ses éléments sont des structures (les paliers de starter). Le
+    réglage est enregistré en base puis appliqué d'un bloc : aucune action ne voit une configuration
+    à moitié modifiée.
   - `/admin poids [table]` : convertit les poids de tirage en probabilités réelles — apparitions
     sauvages, rencontres du parc, butin des Pokémon, loterie. Un poids n'est pas un pourcentage mais
     une part d'un total qui bouge à chaque ligne ajoutée, et la table se construit avec les
     **mêmes** fonctions que les tirages : elle ne peut pas diverger de ce qu'elle décrit. Les objets
     hors tirage (charmes, objets d'une génération fermée) sont nommés sous le titre plutôt que listés,
     et un tableau trop long pour Discord se poursuit dans un champ « suite », voire un second message.
-  - `/admin config-voir [cle]` : valeur courante face à la valeur par défaut. Sans clé, le fichier
-    entier. Le [site](site.md#administration) offre les deux en arbre, pour `SYDNEC_USER_ID`.
+  - `/admin config-voir [cle]` : valeur courante face à la valeur par défaut. Sans clé, tous les
+    réglages. Un réglage en base qui ne convient plus (disparu, ou d'une valeur refusée) est signalé
+    en tête : sa valeur par défaut s'applique. Le [site](site.md#administration) offre les deux en
+    arbre, pour `SYDNEC_USER_ID`.
   - `/admin potcommun [simulation]` : déclenche un pot commun hors calendrier, ou simule le
     prochain sans toucher aux soldes. L'échéance hebdomadaire n'en est pas décalée.
   - `/admin purge [lien] [nombre]` : suppression de messages en masse.
