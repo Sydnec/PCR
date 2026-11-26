@@ -1,7 +1,44 @@
 {
-  "version": "1.22.1",
-  "lastUpdated": "2026-11-11T23:00:50.218Z",
+  "version": "1.22.2",
+  "lastUpdated": "2026-11-26T20:55:39.767Z",
   "releases": [
+    {
+      "version": "1.22.2",
+      "date": "2026-11-26",
+      "title": "Release 1.22.2",
+      "features": [
+        {
+          "type": "enhancement",
+          "name": "Purge des messages d'un membre plus rapide",
+          "description": "/admin purge-membre parcourt plusieurs salons à la fois et supprime au fil de la lecture ; son avancement est suivi dans le journal du bot.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-11-12T00:17:10.000Z",
+          "branch": "dev/nifty-gauss-89lh5q"
+        },
+        {
+          "type": "enhancement",
+          "name": "Revente des légendaires",
+          "description": "Un légendaire en double se revend désormais 3 500 points avec /pk revendre, une fois déverrouillé.",
+          "announce": true,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-11-26T10:00:00.000Z",
+          "branch": "claude/dazzling-wright-t0ovt6"
+        },
+        {
+          "type": "feature",
+          "name": "Récapitulatif de fin de safari sur le site",
+          "description": "À la sortie du parc safari, le site liste tes prises : coche-les pour les verrouiller, les déverrouiller ou les revendre d'un coup.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-11-26T11:00:00.000Z",
+          "branch": "claude/dazzling-wright-t0ovt6"
+        }
+      ]
+    },
     {
       "version": "1.22.1",
       "date": "2026-11-11",
@@ -3045,36 +3082,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "enhancement",
-      "name": "Purge des messages d'un membre plus rapide",
-      "description": "/admin purge-membre parcourt plusieurs salons à la fois et supprime au fil de la lecture ; son avancement est suivi dans le journal du bot.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-11-12T00:17:10.000Z",
-      "branch": "dev/nifty-gauss-89lh5q"
-    },
-    {
-      "type": "enhancement",
-      "name": "Revente des légendaires",
-      "description": "Un légendaire en double se revend désormais 3 500 points avec /pk revendre, une fois déverrouillé.",
-      "announce": true,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-11-26T10:00:00.000Z",
-      "branch": "claude/dazzling-wright-t0ovt6"
-    },
-    {
-      "type": "feature",
-      "name": "Récapitulatif de fin de safari sur le site",
-      "description": "À la sortie du parc safari, le site liste tes prises : coche-les pour les verrouiller, les déverrouiller ou les revendre d'un coup.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-11-26T11:00:00.000Z",
-      "branch": "claude/dazzling-wright-t0ovt6"
-    }
-  ]
+  "pending": []
 }
