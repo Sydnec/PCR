@@ -12,7 +12,7 @@ en donne le lien, en réponse privée (ou dit que le site n'est pas en ligne, ou
 | Page | Contenu |
 |---|---|
 | **Capture** (accueil) | Le Pokémon qui apparaît dans le salon Discord, en direct, avec son sexe et ses balls juste en dessous : rareté, types et difficulté en couleur, chances par ball, ton solde et tes balls en poche, et sa lignée avec ce que tu en possèdes (la fiche du bouton « Infos du Pokémon »). Une ball hors de portée est grisée, sauf si tu en as en poche. On lui **lance ses balls** comme depuis Discord. Un Zarbi dit si tu as déjà sa lettre, et ses 26 lettres s'affichent sous sa lignée, la sienne cerclée. Une apparition qui ne brille que pour les porteurs du [Charme Chroma](pokemon/charme.md) le dit, et s'affiche shiny pour eux. Ce qu'un Pokémon a laissé tomber s'affiche **au sol**, sous les balls (ou sous le dernier Pokémon parti), à **ramasser**. Sur le côté : le journal des lancers, la **Pêche** (2ᵉ génération) et le bouton du **parc safari**. Quand ça mord, la touche réservée à toi passe en tête de page, avec le temps qu'il lui reste. |
-| **Parc safari** | La visite du parc, ouverte depuis la Capture : la rencontre, ses chances et le risque qu'elle détale, la lignée du Pokémon avec ce que tu en possèdes (comme sur la Capture, lettre de Zarbi comprise), et les trois actions de Discord (Safari Ball, appât, fuite). Tes prises s'affichent sur le côté, et le bilan à la fin. |
+| **Parc safari** | La visite du parc, ouverte depuis la Capture : la rencontre, ses chances et le risque qu'elle détale, la lignée du Pokémon avec ce que tu en possèdes (comme sur la Capture, lettre de Zarbi comprise), et les trois actions de Discord (Safari Ball, appât, fuite). Tes prises s'affichent sur le côté, et le récapitulatif à la fin, où elles se verrouillent ou se revendent par lot. |
 | **Boîte** | Ton PC : des boîtes de cases où tu ranges tes Pokémon comme tu veux. Une case ne montre que le sprite ; un clic ouvre la fiche (provenance, place, lignée, valeur), d'où l'on **surnomme**, **déplace**, **verrouille**, **expose en vitrine**, **revend** ou **fait évoluer** le Pokémon. |
 | **Pokédex** | Toutes les espèces des générations ouvertes, celles qu'on possède en couleur, avec une recherche et des **filtres** (rareté, génération, type, obtention, shiny possédé) rangés sous le bouton « Filtres », qui dit combien sont posés, et qui restent dans l'adresse. La fiche d'une espèce montre sa lignée, ce que tu en possèdes et les sexes que tu en as déjà. |
 | **Boutique** | Les balls spéciales (Appât Ball, Catalyseur Ball), comme `/pk boutique` : prix, effet, ce que tu en as sur le maximum, ce que tu en as acheté aujourd'hui sur le quota du jour, et l'achat par quantité. L'onglet n'apparaît qu'à l'ouverture de la 2ᵉ génération. Sur la Capture, toutes les balls s'affichent d'un coup, sans le bouton **Balls spéciales** de Discord, dans le même ordre : les ordinaires, la Master Ball, puis ces balls. |
@@ -59,7 +59,16 @@ La visite est **la même** que sur Discord : une visite commencée sur le site s
 `/pk safari`, et inversement. Chaque action passe par le même chemin que les boutons, avec le même
 jeton : un double clic ne joue qu'une fois, et une action déjà jouée ailleurs est refusée.
 
-À la fin de la visite, le bouton **« Partager dans le salon Pokémon »** publie le bilan : c'est le bot
+À la fin de la visite, le **récapitulatif** liste tes prises, chacune avec son numéro et ce qu'elle
+deviendrait à la revente : son prix, ou pourquoi elle ne part pas (verrouillée, dernière de son
+espèce, shiny). On les coche (ou « Tout »), puis on les **verrouille**, les **déverrouille** ou les
+**revend** d'un coup. La revente demande confirmation, avec le total : un « jusqu'à » quand deux
+Pokémon de la même espèce pourraient buter sur le dernier exemplaire. Chacun passe par le chemin de
+`/pk verrou` et `/pk revendre` avec son `#id` : ce qui ne peut pas partir reste, et sa raison
+s'affiche sous la liste. Une prise revendue ou échangée depuis reste au bilan, grisée. Comme le
+partage, le récapitulatif ne vit que sur l'écran de fin : ensuite, c'est la boîte.
+
+Le bouton **« Partager dans le salon Pokémon »** publie le bilan : c'est le bot
 qui poste, signé de ton pseudo et de ton avatar, comme avec le bouton Discord. Le verrou est le même :
 un bilan partagé d'un côté ne l'est plus de l'autre. Le bouton n'est là que sur l'écran de fin, un
 rechargement de la page le fait disparaître.

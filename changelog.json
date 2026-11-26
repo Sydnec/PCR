@@ -3065,6 +3065,16 @@
       "commit": "pending",
       "timestamp": "2026-11-26T10:00:00.000Z",
       "branch": "claude/dazzling-wright-t0ovt6"
+    },
+    {
+      "type": "feature",
+      "name": "Récapitulatif de fin de safari sur le site",
+      "description": "À la sortie du parc safari, le site liste tes prises : coche-les pour les verrouiller, les déverrouiller ou les revendre d'un coup.",
+      "announce": false,
+      "author": "Sydnec",
+      "commit": "pending",
+      "timestamp": "2026-11-26T11:00:00.000Z",
+      "branch": "claude/dazzling-wright-t0ovt6"
     }
   ]
 }
