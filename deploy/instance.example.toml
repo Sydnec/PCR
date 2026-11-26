@@ -1,0 +1,16 @@
+# /etc/pcr/instance.toml — non-secret settings of one instance (prod or dev).
+# Secrets (DISCORD_TOKEN, DISCORD_CLIENT_SECRET) go in /etc/pcr/pcr.env, read by systemd.
+env = "dev"
+data_dir = "/var/lib/pcr"
+
+[discord]
+application_id = 111111111111111111
+guild_id = 222222222222222222
+admin_user_id = 333333333333333333
+# Dev only: DMs go exclusively to these users (empty = no restriction).
+dm_allowlist = [333333333333333333]
+
+[web]
+listen = "0.0.0.0:8080"
+public_url = "https://dev.example.org"
+trusted_proxy = "192.168.1.10"

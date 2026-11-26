@@ -1,18 +1,21 @@
-# Mises à jour des dépendances proposées en PR chaque semaine. Les versions
-# mineures et correctives arrivent groupées en une seule PR, pour ne pas noyer
-# le dépôt ; une version majeure arrive seule, puisqu'elle peut casser l'API.
+# Mises à jour groupées chaque semaine, ouvertes vers dev : elles passent par le bot de dev avant la prod.
 version: 2
 updates:
-  - package-ecosystem: npm
+  - package-ecosystem: cargo
     directory: /
+    target-branch: dev
     schedule:
       interval: weekly
     groups:
-      mineures:
+      minor-and-patch:
         update-types: [minor, patch]
     open-pull-requests-limit: 5
 
   - package-ecosystem: github-actions
     directory: /
+    target-branch: dev
     schedule:
       interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]

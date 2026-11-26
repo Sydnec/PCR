@@ -1,49 +1,37 @@
-name: CI - Lint & Test
+name: CI
 
 on:
-  push:
-    branches: ["main"]
   pull_request:
-    branches: ["main"]
+  push:
+    branches: [main, dev]
 
-# Lecture seule : la CI vérifie, elle n'écrit rien dans le dépôt.
+# Dépôt public : la CI ne fait que lire, et ne tourne jamais sur une machine auto-hébergée.
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        node-version: [24.x]
-
+  rust:
+    name: fmt · clippy · test
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # rust-toolchain.toml épingle la version ; rustup l'installe.
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --workspace --locked
 
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v7
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
-
-      # Les règles recommandées d'ESLint sur tout le code.
-      - name: Lint
-        run: npm run lint
-
-      # La mise en forme du site (web/), déjà entièrement passé par Prettier.
-      - name: Format
-        run: npm run format:check
-
-      # Une dépendance vulnérable (gravité haute ou critique) bloque la PR.
-      - name: Audit des dépendances
-        run: npm audit --audit-level=high
-
-      # La suite de tests (node:test) : jeu, économie, site, commandes, boutons.
-      # Elle travaille dans un dossier jetable (PCR_DATA_DIR) : aucun .env, aucune
-      # base ni config.json n'est nécessaire.
-      - name: Tests automatiques
-        run: npm test
+  deny:
+    name: cargo deny
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: EmbarkStudios/cargo-deny-action@81891abc19297b21343b15ef67dc61e4aea74fda # v2.1.4

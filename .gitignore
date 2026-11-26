@@ -1,19 +1,6 @@
-node_modules
-.env
-commands/test.js
+/target
 *.db
-backups
-
-# Generated files
-CHANGELOG.md
-last-announced-version.txt
-.env.dev
-.env.prod
-.env.local
-
-# Réglages à chaud, écrits par /admin config depuis Discord. Ils doivent rester
-# hors de git : le déploiement fait `git checkout main && git pull` sous
-# `set -e`, et un fichier suivi modifié sur le serveur le ferait échouer.
-config.json*
-# Ancien nom de ce fichier, repris comme config.json au premier démarrage.
-config.local.json*
+*.db-shm
+*.db-wal
+.env*
+/web/node_modules

@@ -1,0 +1,67 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "xtask"]
+default-members = ["crates/*"]
+
+[workspace.package]
+version = "2.0.0-dev"
+edition = "2024"
+rust-version = "1.97"
+license = "ISC"
+repository = "https://github.com/Sydnec/PCR"
+publish = false
+
+[workspace.dependencies]
+pcr-core = { path = "crates/pcr-core" }
+pcr-db = { path = "crates/pcr-db" }
+pcr-app = { path = "crates/pcr-app" }
+pcr-discord = { path = "crates/pcr-discord" }
+pcr-web = { path = "crates/pcr-web" }
+
+anyhow = "1.0.105"
+arc-swap = "1.9.5"
+axum = "0.8.9"
+# chrono n'est plus maintenu (RUSTSEC-2026-0543) ; jiff embarque la base des fuseaux : des jours reproductibles.
+jiff = { version = "1.0.3", features = ["tzdb-bundle-always"] }
+clap = { version = "4.6.10", features = ["derive", "env"] }
+# TLS de twilight (gateway + REST) ; ring ne demande pas de chaîne C, contrairement à aws-lc.
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sqlx = { version = "0.9.1", default-features = false, features = ["runtime-tokio", "sqlite", "macros", "migrate"] }
+thiserror = "2.0.21"
+tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }
+toml = "1.2.3"
+tower-http = { version = "0.7.1", features = ["trace", "timeout"] }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+twilight-cache-inmemory = "0.18.0"
+twilight-gateway = "0.18.0"
+twilight-http = "0.18.0"
+twilight-interactions = "0.18.0"
+twilight-model = "0.18.0"
+twilight-util = { version = "0.18.0", features = ["builder"] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+must_use_candidate = "allow"
+dbg_macro = "warn"
+todo = "warn"
+unwrap_used = "warn"
+print_stdout = "warn"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+
+[profile.dev.package."*"]
+opt-level = 1

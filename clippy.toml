@@ -1,0 +1,8 @@
+doc-valid-idents = ["SQLite", "OAuth2", "PokéAPI", ".."]
+
+# Le temps ne se lit que par pcr_core::clock : chaque « jour » est un jour de Paris et les tests le figent.
+disallowed-methods = [
+  { path = "jiff::Timestamp::now", reason = "use pcr_core::clock::Clock" },
+  { path = "jiff::ZonedDateTime::now", reason = "use pcr_core::clock::Clock" },
+  { path = "std::time::SystemTime::now", reason = "use pcr_core::clock::Clock" },
+]
