@@ -1320,6 +1320,7 @@ dependencies = [
  "jiff",
  "pcr-core",
  "pcr-db",
+ "rand",
  "serde_json",
  "sqlx",
  "thiserror",

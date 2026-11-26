@@ -8,8 +8,13 @@ pub mod announcements;
 pub mod config;
 pub mod health;
 pub mod jobs;
+pub mod members;
+pub mod points;
 pub mod public_messages;
+pub mod redistribution;
 pub mod stats;
+#[cfg(test)]
+mod testing;
 
 use std::sync::Arc;
 

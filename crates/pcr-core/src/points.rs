@@ -10,6 +10,7 @@ use jiff::{Timestamp, civil::Date};
 use crate::{
     clock::{next_paris_midnight, paris_date},
     config::{MessagePoints, MessagePointsRules},
+    refusal::Refusal,
 };
 
 /// Ce que la base retient des gains de messages d'un dresseur.
@@ -47,6 +48,14 @@ pub fn points_for_rank(distribution: &MessagePoints, rank: u32) -> u32 {
     } else {
         distribution.rest
     }
+}
+
+/// `/admin points` : un montant nul ne changerait rien.
+pub fn check_admin_amount(amount: i64) -> Result<(), Refusal> {
+    if amount == 0 {
+        return Err(Refusal::new("Un montant de 0 ne changerait rien."));
+    }
+    Ok(())
 }
 
 fn cooldown_ms(rules: &MessagePointsRules) -> i64 {
@@ -227,6 +236,15 @@ mod tests {
             ..only_first_pays()
         };
         assert_eq!(points_for_rank(&with_default, 2), 7);
+    }
+
+    #[test]
+    fn an_admin_amount_of_zero_is_refused() {
+        assert_eq!(
+            check_admin_amount(0).expect_err("zero").text(),
+            "Un montant de 0 ne changerait rien."
+        );
+        assert!(check_admin_amount(-5).is_ok());
     }
 
     #[test]
