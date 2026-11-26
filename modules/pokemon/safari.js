@@ -112,7 +112,7 @@ export function findFreeParkFor(userId, cb) {
 
 export function getSessionCatches(sessionId, cb) {
   db.all(
-    `SELECT species_id, is_shiny, form FROM pokemon_safari_catches
+    `SELECT species_id, is_shiny, form, pokemon_id FROM pokemon_safari_catches
       WHERE session_id = ? ORDER BY id`,
     [sessionId],
     (err, rows) => cb(err, rows || [])
@@ -1076,7 +1076,7 @@ function resolveAction({ session, species, action, config }, cb) {
   }
 
   const options = { ball: "safari", origin: "safari", sex, form };
-  creditSpecies(session.user_id, species.id, isShiny, options, (err) => {
+  creditSpecies(session.user_id, species.id, isShiny, options, (err, credited) => {
     if (err) return cb(err);
     recordSafariCatch({ userId: session.user_id, species, isShiny });
     pseudo(session.user_id).then((name) =>
@@ -1087,9 +1087,9 @@ function resolveAction({ session, species, action, config }, cb) {
     );
 
     db.run(
-      `INSERT INTO pokemon_safari_catches (session_id, species_id, is_shiny, caught_at, form)
-       VALUES (?, ?, ?, ?, ?)`,
-      [session.id, species.id, isShiny ? 1 : 0, Date.now(), form],
+      `INSERT INTO pokemon_safari_catches (session_id, species_id, is_shiny, caught_at, form, pokemon_id)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [session.id, species.id, isShiny ? 1 : 0, Date.now(), form, credited.id],
       (err) => {
         if (err) handleException("Enregistrement d'une capture du parc safari :", err);
         db.run(

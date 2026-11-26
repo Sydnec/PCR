@@ -115,13 +115,18 @@ describe("lancer la Safari Ball", () => {
     // fuite n'est tirée qu'après un raté.
     const result = await play("BALL", 0);
     assert.equal(result.outcome, "CATCH");
-    const owned = await dbAll(points, "SELECT species_id, is_shiny, origin FROM pokemon_owned");
-    assert.deepEqual(owned, [{ species_id: id("Bulbizarre"), is_shiny: 0, origin: "safari" }]);
+    const owned = await dbAll(points, "SELECT id, species_id, is_shiny, origin FROM pokemon_owned");
+    assert.deepEqual(
+      owned.map((row) => [row.species_id, row.is_shiny, row.origin]),
+      [[id("Bulbizarre"), 0, "safari"]]
+    );
     const row = await session();
     assert.equal(row.catches, 1);
     assert.equal(row.encounter_no, 2, "la rencontre suivante est tirée");
     assert.equal(row.encounter_bait, 0);
-    assert.equal((await dbAll(points, "SELECT * FROM pokemon_safari_catches")).length, 1);
+    // La prise pointe vers l'individu crédité : c'est lui que le récapitulatif du site désigne.
+    const catches = await dbAll(points, "SELECT pokemon_id FROM pokemon_safari_catches");
+    assert.deepEqual(catches, [{ pokemon_id: owned[0].id }]);
   });
 
   it("un shiny rencontré est un shiny capturé", async () => {

@@ -911,7 +911,9 @@ const db = new sqlite3.Database(dbPath, (err) => {
       }
     );
 
-    // Captures du parc : alimente le bilan de fin de session.
+    // Captures du parc : alimente le bilan de fin de session. `pokemon_id` est
+    // l'individu crédité dans la boîte, que le récapitulatif du site verrouille
+    // ou revend ; les prises d'avant la colonne n'en ont pas.
     db.run(
       `CREATE TABLE IF NOT EXISTS pokemon_safari_catches (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -919,11 +921,13 @@ const db = new sqlite3.Database(dbPath, (err) => {
         species_id INTEGER NOT NULL,
         is_shiny INTEGER NOT NULL DEFAULT 0,
         caught_at INTEGER NOT NULL,
-        form TEXT
+        form TEXT,
+        pokemon_id INTEGER
       )`,
       (err) => {
         if (err) return handleException("Erreur création table pokemon_safari_catches :", err);
         addColumn("pokemon_safari_catches", "form", "TEXT");
+        addColumn("pokemon_safari_catches", "pokemon_id", "INTEGER");
         db.run(
           `CREATE INDEX IF NOT EXISTS idx_pokemon_safari_catches_session
              ON pokemon_safari_catches(session_id, id)`,
