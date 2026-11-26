@@ -1,4 +1,4 @@
-//! Liveness flags reported by `/healthz`.
+//! Indicateurs de vie rapportés par `/healthz`.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -8,7 +8,7 @@ pub struct Health {
 }
 
 impl Health {
-    /// Set by the gateway on READY / RESUMED, cleared on disconnect.
+    /// Levé par la gateway sur READY / RESUMED, baissé à la déconnexion.
     pub fn set_discord_ready(&self, ready: bool) {
         self.discord_ready.store(ready, Ordering::Relaxed);
     }

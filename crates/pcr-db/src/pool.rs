@@ -8,7 +8,7 @@ use sqlx::{
 
 static GAME_MIGRATIONS: Migrator = sqlx::migrate!("./migrations/game");
 
-/// How many concurrent readers the bot and the website may use.
+/// Nombre de lecteurs simultanés pour le bot et le site.
 const READERS: u32 = 4;
 
 #[derive(Debug, thiserror::Error)]
@@ -19,11 +19,12 @@ pub enum DbError {
     Migrate(#[from] sqlx::migrate::MigrateError),
 }
 
-/// The persistent database.
+/// La base permanente.
 ///
-/// A single writer connection serialises every write: SQLite allows one writer anyway, and a
-/// pool of writers would turn read-then-write transactions into `SQLITE_BUSY` errors that a busy
-/// timeout cannot resolve. Readers stay concurrent thanks to WAL.
+/// Une seule connexion d'écriture sérialise toutes les écritures : SQLite n'accepte de toute façon
+/// qu'un écrivain, et plusieurs connexions d'écriture changeraient les transactions lecture→écriture
+/// en erreurs `SQLITE_BUSY` qu'aucun délai d'attente ne résout. Les lecteurs restent simultanés
+/// grâce au WAL.
 #[derive(Debug, Clone)]
 pub struct Db {
     writer: SqlitePool,
@@ -31,7 +32,7 @@ pub struct Db {
 }
 
 impl Db {
-    /// Opens (or creates) the database and applies pending migrations.
+    /// Ouvre (ou crée) la base et applique les migrations en attente.
     pub async fn open(path: &Path) -> Result<Self, DbError> {
         let options = SqliteConnectOptions::new()
             .filename(path)
@@ -63,13 +64,13 @@ impl Db {
         &self.reader
     }
 
-    /// Cheap liveness probe used by `/healthz`.
+    /// Sonde de vie peu coûteuse, utilisée par `/healthz`.
     pub async fn ping(&self) -> Result<(), DbError> {
         sqlx::query("SELECT 1").execute(&self.reader).await?;
         Ok(())
     }
 
-    /// Waits for in-flight queries, then closes every connection (graceful shutdown).
+    /// Attend les requêtes en cours puis ferme toutes les connexions (arrêt propre).
     pub async fn close(&self) {
         self.writer.close().await;
         self.reader.close().await;

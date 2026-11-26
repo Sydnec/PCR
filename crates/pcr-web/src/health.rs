@@ -1,7 +1,7 @@
-//! `/healthz`: what the deploy script checks before keeping a new release.
+//! `/healthz` : ce que vérifie le script de déploiement avant de garder une version.
 //!
-//! Only HTTP and the database gate the answer. Discord readiness is reported but never fails
-//! the check, so a Discord outage cannot trigger a rollback.
+//! Seuls HTTP et la base décident de la réponse. L'état de Discord est rapporté sans jamais faire
+//! échouer le contrôle : une panne de Discord ne peut pas déclencher de retour arrière.
 
 use axum::{Json, extract::State, http::StatusCode};
 use pcr_app::App;

@@ -21,10 +21,10 @@ pcr-web = { path = "crates/pcr-web" }
 anyhow = "1.0.105"
 arc-swap = "1.9.5"
 axum = "0.8.9"
-# chrono is unmaintained (RUSTSEC-2026-0543); jiff bundles the tz database for reproducible days.
+# chrono n'est plus maintenu (RUSTSEC-2026-0543) ; jiff embarque la base des fuseaux : des jours reproductibles.
 jiff = { version = "1.0.3", features = ["tzdb-bundle-always"] }
 clap = { version = "4.6.10", features = ["derive", "env"] }
-# TLS for twilight (gateway + REST); ring needs no C toolchain, unlike aws-lc.
+# TLS de twilight (gateway + REST) ; ring ne demande pas de chaîne C, contrairement à aws-lc.
 rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"

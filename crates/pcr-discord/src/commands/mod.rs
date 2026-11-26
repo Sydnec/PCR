@@ -1,4 +1,4 @@
-//! Guild slash commands, registered in bulk at startup (idempotent overwrite).
+//! Slash commands de guilde, enregistrées en bloc au démarrage (remplacement idempotent).
 
 pub mod version;
 

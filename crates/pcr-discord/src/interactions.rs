@@ -1,4 +1,4 @@
-//! Routes every interaction to its handler and always answers, even on failure.
+//! Route chaque interaction vers son handler et répond toujours, même en cas d'échec.
 
 use twilight_model::{
     application::interaction::{Interaction, InteractionData},
@@ -39,7 +39,7 @@ async fn route(ctx: &Ctx, interaction: &Interaction) -> anyhow::Result<Interacti
         },
         Some(InteractionData::MessageComponent(component)) => match component.custom_id.as_str() {
             version::REFRESH => ui::update_panel(version::panel(ctx).await),
-            // Unknown ids come from panels of an older version: say so instead of failing.
+            // Un id inconnu vient d'un panneau d'une version précédente : le dire plutôt qu'échouer.
             _ => ui::ephemeral_text(EXPIRED),
         },
         _ => ui::ephemeral_text(EXPIRED),

@@ -1,14 +1,14 @@
-//! The only time source of the bot.
+//! L'unique source de temps du bot.
 //!
-//! Every game "day" (daily rewards, lottery, shop quota, birthdays) is a calendar day in
-//! Europe/Paris, so resets happen at midnight for players. Reading the wall clock anywhere else
-//! is forbidden by `clippy.toml`.
+//! Chaque « jour » du jeu (gains quotidiens, loterie, quota de boutique, anniversaires) est un jour
+//! calendaire à Paris : les remises à zéro tombent à minuit pour les joueurs. Lire l'horloge ailleurs
+//! est interdit par `clippy.toml`.
 
 use std::sync::LazyLock;
 
 use jiff::{Timestamp, civil::Date, tz::TimeZone};
 
-/// The bundled tz database always knows Europe/Paris, whatever the host has installed.
+/// La base de fuseaux embarquée connaît toujours Europe/Paris, quoi que l'hôte ait installé.
 static PARIS: LazyLock<TimeZone> =
     LazyLock::new(|| TimeZone::get("Europe/Paris").expect("bundled tzdb has Europe/Paris"));
 
@@ -19,7 +19,7 @@ pub trait Clock: Send + Sync + std::fmt::Debug {
         self.now().as_millisecond()
     }
 
-    /// Today's date in Paris.
+    /// La date du jour à Paris.
     fn today(&self) -> Date {
         paris_date(self.now())
     }
@@ -29,7 +29,7 @@ pub fn paris() -> &'static TimeZone {
     &PARIS
 }
 
-/// The Paris calendar date of an instant.
+/// La date calendaire à Paris d'un instant.
 pub fn paris_date(at: Timestamp) -> Date {
     PARIS.to_datetime(at).date()
 }
@@ -38,13 +38,13 @@ pub fn paris_date(at: Timestamp) -> Date {
 pub struct SystemClock;
 
 impl Clock for SystemClock {
-    #[allow(clippy::disallowed_methods)] // The single place allowed to read the wall clock.
+    #[allow(clippy::disallowed_methods)] // Le seul endroit autorisé à lire l'horloge.
     fn now(&self) -> Timestamp {
         Timestamp::now()
     }
 }
 
-/// A frozen clock for tests.
+/// Une horloge figée pour les tests.
 #[derive(Debug, Clone, Copy)]
 pub struct FixedClock(pub Timestamp);
 
@@ -66,20 +66,20 @@ mod tests {
 
     #[test]
     fn day_changes_at_paris_midnight_in_winter_and_summer() {
-        // Winter (UTC+1): 23:00 UTC is already midnight the next day in Paris.
+        // Hiver (UTC+1) : 23 h UTC, c'est déjà minuit le lendemain à Paris.
         assert_eq!(paris_date(at("2026-01-14T22:59:59Z")), date(2026, 1, 14));
         assert_eq!(paris_date(at("2026-01-14T23:00:00Z")), date(2026, 1, 15));
-        // Summer (UTC+2): the boundary moves to 22:00 UTC.
+        // Été (UTC+2) : la limite passe à 22 h UTC.
         assert_eq!(paris_date(at("2026-07-14T21:59:59Z")), date(2026, 7, 14));
         assert_eq!(paris_date(at("2026-07-14T22:00:00Z")), date(2026, 7, 15));
     }
 
     #[test]
     fn dst_switch_nights_keep_a_single_day_boundary() {
-        // Spring forward (29 March 2026, 02:00 → 03:00 Paris).
+        // Passage à l'heure d'été (29 mars 2026, 2 h → 3 h à Paris).
         assert_eq!(paris_date(at("2026-03-28T22:59:59Z")), date(2026, 3, 28));
         assert_eq!(paris_date(at("2026-03-29T01:30:00Z")), date(2026, 3, 29));
-        // Fall back (25 October 2026, 03:00 → 02:00 Paris).
+        // Retour à l'heure d'hiver (25 octobre 2026, 3 h → 2 h à Paris).
         assert_eq!(paris_date(at("2026-10-24T21:59:59Z")), date(2026, 10, 24));
         assert_eq!(paris_date(at("2026-10-25T01:30:00Z")), date(2026, 10, 25));
     }

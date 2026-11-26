@@ -1,8 +1,9 @@
-//! Per-instance settings (prod or dev), read from `instance.toml`.
+//! Réglages propres à une instance (prod ou dev), lus dans `instance.toml`.
 //!
-//! Only non-secret values live here: Discord IDs, URLs, listen address. Secrets come from the
-//! environment (`DISCORD_TOKEN`…), set by systemd's `EnvironmentFile`. Discord IDs never go into
-//! the hot game config, so copying prod data to dev cannot make the dev bot talk to prod channels.
+//! Seules les valeurs non secrètes vivent ici : IDs Discord, URL, adresse d'écoute. Les secrets
+//! viennent de l'environnement (`DISCORD_TOKEN`…), posé par l'`EnvironmentFile` de systemd. Les IDs
+//! Discord n'entrent jamais dans la config de jeu à chaud : une copie prod → dev ne peut pas faire
+//! parler le bot de dev dans les salons de prod.
 
 use std::net::{IpAddr, SocketAddr};
 
@@ -19,7 +20,7 @@ pub enum Env {
 #[serde(deny_unknown_fields)]
 pub struct Instance {
     pub env: Env,
-    /// Directory holding `pcr.db`, the yearly stats files and caches.
+    /// Dossier de `pcr.db`, des bases de stats annuelles et des caches.
     pub data_dir: std::path::PathBuf,
     pub discord: Discord,
     pub web: Web,
@@ -30,10 +31,10 @@ pub struct Instance {
 pub struct Discord {
     pub application_id: u64,
     pub guild_id: u64,
-    /// Owner of the bot: website admin and target of operational DMs.
+    /// Propriétaire du bot : admin du site et destinataire des MP d'exploitation.
     pub admin_user_id: u64,
-    /// Dev safety net: when non-empty, DMs are only sent to these users, so a copy of prod data
-    /// never makes the dev bot message real members.
+    /// Garde-fou du dev : non vide, seuls ces utilisateurs reçoivent des MP, pour qu'une copie des
+    /// données de prod ne fasse jamais écrire le bot de dev à de vrais membres.
     #[serde(default)]
     pub dm_allowlist: Vec<u64>,
 }
@@ -42,9 +43,9 @@ pub struct Discord {
 #[serde(deny_unknown_fields)]
 pub struct Web {
     pub listen: SocketAddr,
-    /// Public URL without trailing slash; the OAuth2 callback lives under it.
+    /// URL publique sans barre finale ; le retour OAuth2 vit dessous.
     pub public_url: String,
-    /// `X-Forwarded-For` is trusted only from this address (the reverse proxy).
+    /// `X-Forwarded-For` n'est cru que venant de cette adresse (le reverse proxy).
     pub trusted_proxy: Option<IpAddr>,
 }
 

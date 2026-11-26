@@ -1,4 +1,4 @@
-//! Small key/value facts about this instance (last announced version, command hash…).
+//! Petits faits clé/valeur sur l'instance (dernière version annoncée, empreinte des commandes…).
 
 use crate::{Db, DbError};
 

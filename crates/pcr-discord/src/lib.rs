@@ -1,8 +1,8 @@
-//! Discord adapter: gateway loop, slash commands, buttons/menus/modals, public messages.
+//! Adaptateur Discord : boucle de la gateway, slash commands, boutons/menus/modals, messages publics.
 //!
-//! Handlers stay thin: decode the interaction, call a `pcr-app` use-case, render the outcome.
-//! Every component handler re-reads its state from the database, so buttons keep working
-//! after a restart.
+//! Les handlers restent minces : décoder l'interaction, appeler un cas d'usage de `pcr-app`, rendre
+//! le résultat. Chaque handler de composant relit son état en base : les boutons marchent encore
+//! après un redémarrage.
 
 mod commands;
 mod interactions;
@@ -21,7 +21,7 @@ use twilight_model::id::{
     marker::{ApplicationMarker, GuildMarker},
 };
 
-/// Shared by every handler.
+/// Partagé par tous les handlers.
 #[derive(Debug, Clone)]
 pub(crate) struct Ctx {
     pub app: App,
@@ -29,10 +29,10 @@ pub(crate) struct Ctx {
     pub application_id: Id<ApplicationMarker>,
 }
 
-/// Only what the bot uses: privileged intents are added with the features that need them.
+/// Seulement ce que le bot utilise : les intents privilégiés arrivent avec les fonctionnalités qui en ont besoin.
 const INTENTS: Intents = Intents::GUILDS;
 
-/// Connects to Discord, registers the guild commands and handles events until `shutdown` flips.
+/// Se connecte à Discord, enregistre les commandes de guilde et traite les événements jusqu'à l'arrêt.
 pub async fn run(
     app: App,
     token: String,
@@ -47,7 +47,7 @@ pub async fn run(
         http,
         application_id,
     };
-    // A Discord outage must not take the website down: retry until it answers or we stop.
+    // Une panne de Discord ne doit pas faire tomber le site : on réessaie jusqu'à réponse ou arrêt.
     if !register_commands(&ctx, guild_id, &mut shutdown).await {
         return Ok(());
     }
@@ -71,8 +71,8 @@ pub async fn run(
     }
 }
 
-/// Bulk-overwrites the guild commands, retrying with exponential backoff.
-/// Returns `false` if shutdown was requested first.
+/// Remplace en bloc les commandes de guilde, en réessayant avec un délai croissant.
+/// Renvoie `false` si l'arrêt a été demandé avant.
 async fn register_commands(
     ctx: &Ctx,
     guild_id: Id<GuildMarker>,
@@ -108,8 +108,8 @@ fn handle_event(ctx: &Ctx, event: Event) {
         Event::Ready(_) | Event::Resumed => ctx.app.health.set_discord_ready(true),
         Event::GatewayClose(_) => ctx.app.health.set_discord_ready(false),
         Event::InteractionCreate(interaction) => {
-            // Each interaction runs on its own task: the 3-second ack deadline must never wait
-            // behind another handler.
+            // Chaque interaction a sa tâche : le délai de réponse de 3 s ne doit jamais attendre
+            // derrière un autre handler.
             tokio::spawn(interactions::handle(ctx.clone(), interaction.0));
         }
         _ => {}

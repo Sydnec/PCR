@@ -1,4 +1,4 @@
-//! `pcr`: runs the bot and the website, plus maintenance commands.
+//! `pcr` : lance le bot et le site, et porte les commandes de maintenance.
 
 use std::{path::PathBuf, sync::Arc};
 
@@ -12,7 +12,7 @@ use tokio::sync::watch;
 #[derive(Debug, Parser)]
 #[command(version, about = "PCR Discord bot")]
 struct Cli {
-    /// Instance settings (non-secret). Secrets are read from the environment.
+    /// Réglages de l'instance (non secrets). Les secrets sont lus dans l'environnement.
     #[arg(long, env = "PCR_INSTANCE", default_value = "/etc/pcr/instance.toml")]
     config: PathBuf,
     #[command(subcommand)]
@@ -21,9 +21,9 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Command {
-    /// Run the bot and the website (default).
+    /// Lance le bot et le site (par défaut).
     Serve,
-    /// Validate the instance file and exit.
+    /// Valide le fichier d'instance puis s'arrête.
     CheckConfig,
 }
 
@@ -53,7 +53,7 @@ fn init_tracing() {
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
     tracing_subscriber::fmt()
         .with_env_filter(filter)
-        // journald adds its own timestamps and does not render colours.
+        // journald ajoute ses propres horodatages et n'affiche pas les couleurs.
         .with_ansi(std::io::stderr().is_terminal())
         .with_writer(std::io::stderr)
         .init();
@@ -79,7 +79,7 @@ async fn serve(instance: Instance) -> anyhow::Result<()> {
 
     let web = tokio::spawn(pcr_web::serve(app.clone(), changed(stopped.clone())));
     let discord = pcr_discord::run(app, token, stopped).await;
-    // Whatever ended the Discord loop (signal or fatal error), stop the website too.
+    // Quelle que soit la fin de la boucle Discord (signal ou erreur fatale), on arrête aussi le site.
     stop.send_replace(true);
     let web = web.await.context("web task panicked")?;
 
@@ -88,7 +88,7 @@ async fn serve(instance: Instance) -> anyhow::Result<()> {
     web.context("web server failed")
 }
 
-/// Resolves once the stop flag is raised.
+/// Se résout dès que le drapeau d'arrêt est levé.
 async fn changed(mut stopped: watch::Receiver<bool>) {
     let _ = stopped.wait_for(|stop| *stop).await;
 }

@@ -1,7 +1,7 @@
-//! Pure domain: game rules, formulas, configuration types and the clock.
+//! Domaine pur : règles du jeu, formules, types de configuration et horloge.
 //!
-//! No I/O and no async here, so every rule can be unit-tested with a frozen clock and a
-//! seeded RNG. Adapters (Discord, website) live in their own crates.
+//! Ni I/O ni async ici : chaque règle se teste avec une horloge figée et un RNG à graine fixe.
+//! Les adaptateurs (Discord, site) vivent dans leurs propres crates.
 
 pub mod build;
 pub mod clock;

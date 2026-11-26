@@ -1,4 +1,4 @@
-# cargo deny check: known vulnerabilities, licenses compatible with the project, trusted sources.
+# cargo deny check : vulnérabilités connues, licences compatibles, sources de confiance.
 
 [graph]
 all-features = false
@@ -27,7 +27,7 @@ allow = [
 [bans]
 multiple-versions = "allow"
 wildcards = "deny"
-# Internal path dependencies of this unpublished workspace.
+# Dépendances internes (par chemin) de ce workspace non publié.
 allow-wildcard-paths = true
 
 [sources]

@@ -1,7 +1,7 @@
-//! Project automation, run as `cargo xtask <task>`.
+//! Automatisation du projet, lancée par `cargo xtask <tâche>`.
 //!
-//! `check` runs every gate CI runs and prints only what failed, so a coding agent gets a short,
-//! actionable answer instead of thousands of lines of build output.
+//! `check` passe tous les contrôles de la CI et n'affiche que les échecs : un agent reçoit une réponse
+//! courte et exploitable au lieu de milliers de lignes de compilation.
 
 use std::{
     env,
@@ -9,7 +9,7 @@ use std::{
     process::{Command, ExitCode},
 };
 
-/// Lines of a failing step's output that are shown (the end holds the useful part).
+/// Lignes affichées pour une étape en échec (la fin contient l'essentiel).
 const SHOWN_LINES: usize = 80;
 
 fn main() -> ExitCode {
@@ -23,7 +23,7 @@ fn main() -> ExitCode {
 
 fn check() -> ExitCode {
     let mut steps: Vec<(&str, Command)> = vec![
-        // `-l` lists the unformatted files only; `cargo fmt --all` fixes them.
+        // `-l` liste seulement les fichiers mal formatés ; `cargo fmt --all` les corrige.
         ("fmt", cargo(&["fmt", "--all", "--", "--check", "-l"])),
         (
             "clippy",

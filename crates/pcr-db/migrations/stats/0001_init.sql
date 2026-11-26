@@ -1,5 +1,5 @@
--- Yearly statistics database (stats-<YEAR>.db). A new file starts every 1 January (Paris);
--- old files are kept until a human deletes them.
+-- Base des statistiques de l'année (stats-<ANNÉE>.db). Un nouveau fichier démarre chaque 1er janvier
+-- (Paris) ; les anciens restent jusqu'à ce qu'un humain les supprime.
 
 CREATE TABLE stats_meta (
     key   TEXT PRIMARY KEY,

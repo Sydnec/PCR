@@ -1,4 +1,4 @@
-# Weekly grouped updates, opened against dev so they reach the dev bot before production.
+# Mises à jour groupées chaque semaine, ouvertes vers dev : elles passent par le bot de dev avant la prod.
 version: 2
 updates:
   - package-ecosystem: cargo

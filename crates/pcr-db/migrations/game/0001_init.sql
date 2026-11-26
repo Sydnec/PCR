@@ -1,5 +1,5 @@
--- Persistent database (pcr.db): everything that carries over from one year to the next.
--- Until the v2 cut-over this single file is edited in place; afterwards, additive migrations only.
+-- Base permanente (pcr.db) : tout ce qui traverse les années.
+-- Jusqu'à la bascule v2, ce fichier unique est modifié sur place ; ensuite, migrations additives seulement.
 
 CREATE TABLE meta (
     key   TEXT PRIMARY KEY,

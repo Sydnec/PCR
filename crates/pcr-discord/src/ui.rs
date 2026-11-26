@@ -1,5 +1,5 @@
-//! Response helpers. Panels use Discord's components v2 (containers, sections, thumbnails), and
-//! navigating a panel edits the same ephemeral message instead of posting a new one.
+//! Aides de réponse. Les panneaux utilisent les composants v2 de Discord (conteneurs, sections,
+//! vignettes), et naviguer dans un panneau édite le même message éphémère au lieu d'en poster un autre.
 
 use twilight_model::{
     channel::message::{Component, MessageFlags},
@@ -7,7 +7,7 @@ use twilight_model::{
 };
 use twilight_util::builder::interaction_response::{ChannelMessageBuilder, UpdateMessageBuilder};
 
-/// A new personal panel, visible only to the user who clicked or typed.
+/// Un nouveau panneau personnel, visible du seul utilisateur qui a cliqué ou tapé.
 pub fn ephemeral_panel(components: Vec<Component>) -> InteractionResponse {
     ChannelMessageBuilder::new()
         .components(components)
@@ -15,12 +15,12 @@ pub fn ephemeral_panel(components: Vec<Component>) -> InteractionResponse {
         .build()
 }
 
-/// Replaces the panel the clicked component belongs to.
+/// Remplace le panneau auquel appartient le composant cliqué.
 pub fn update_panel(components: Vec<Component>) -> InteractionResponse {
     UpdateMessageBuilder::new().components(components).build()
 }
 
-/// A plain ephemeral text answer (refusals, errors).
+/// Une simple réponse texte éphémère (refus, erreurs).
 pub fn ephemeral_text(text: impl Into<String>) -> InteractionResponse {
     ChannelMessageBuilder::new()
         .content(text)

@@ -1,4 +1,4 @@
-//! `/version`: what is running, where, and whether it is healthy.
+//! `/version` : ce qui tourne, où, et en quel état.
 
 use pcr_core::{
     build::{GIT_SHA, VERSION},

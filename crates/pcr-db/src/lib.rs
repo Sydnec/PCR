@@ -1,11 +1,11 @@
-//! SQLite storage.
+//! Stockage SQLite.
 //!
-//! Two databases live side by side:
-//! - `pcr.db`, persistent: economy, game, reminders, sessions, config overrides ([`Db`]);
-//! - `stats-<YEAR>.db`, yearly statistics (added in P2).
+//! Deux bases cohabitent :
+//! - `pcr.db`, permanente : économie, jeu, rappels, sessions, surcharges de config ([`Db`]) ;
+//! - `stats-<ANNÉE>.db`, statistiques de l'année (ajoutée en P2).
 //!
-//! Every query goes through `sqlx::query!`, checked at compile time against the schema built
-//! by `build.rs` from `migrations/`. Rule: never await Discord or HTTP inside a transaction.
+//! Toute requête passe par `sqlx::query!`, vérifiée à la compilation contre le schéma que `build.rs`
+//! construit depuis `migrations/`. Règle : jamais d'`await` Discord ou HTTP dans une transaction.
 
 pub mod meta;
 mod pool;

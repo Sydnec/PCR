@@ -1,4 +1,4 @@
-//! The website: JSON API, Discord OAuth2, sessions, live updates and the embedded front.
+//! Le site : API JSON, OAuth2 Discord, sessions, mises à jour en direct et front embarqué.
 
 mod health;
 
@@ -8,7 +8,7 @@ use axum::{Router, http::StatusCode, routing::get};
 use pcr_app::App;
 use tower_http::{timeout::TimeoutLayer, trace::TraceLayer};
 
-/// Upper bound for any request; SSE streams will get their own route without it.
+/// Durée maximale d'une requête ; les flux SSE auront leur route, sans cette limite.
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
 
 pub fn router(app: App) -> Router {
@@ -22,7 +22,7 @@ pub fn router(app: App) -> Router {
         .with_state(app)
 }
 
-/// Serves until `shutdown` resolves, then lets in-flight requests finish.
+/// Sert jusqu'à ce que `shutdown` se résolve, puis laisse finir les requêtes en cours.
 pub async fn serve(
     app: App,
     shutdown: impl Future<Output = ()> + Send + 'static,

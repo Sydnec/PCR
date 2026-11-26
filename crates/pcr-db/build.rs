@@ -1,7 +1,7 @@
-//! Builds a throwaway schema database from the migrations so that every `sqlx::query!` is
-//! checked at compile time against the real schema, without a `DATABASE_URL` to set up or a
-//! `.sqlx/` cache to keep in sync. Game and stats tables share this check database (their names
-//! never collide); at runtime they live in two separate files.
+//! Construit une base de schéma jetable à partir des migrations : chaque `sqlx::query!` est ainsi
+//! vérifié à la compilation contre le vrai schéma, sans `DATABASE_URL` à préparer ni cache `.sqlx/`
+//! à tenir à jour. Tables de jeu et de stats partagent cette base de vérification (leurs noms ne se
+//! recoupent jamais) ; à l'exécution, elles vivent dans deux fichiers distincts.
 
 use std::{env, fs, path::PathBuf};
 
@@ -10,7 +10,7 @@ const MIGRATION_DIRS: [&str; 2] = ["migrations/game", "migrations/stats"];
 fn main() {
     let out = PathBuf::from(env::var_os("OUT_DIR").expect("cargo sets OUT_DIR"));
     let db = out.join("schema.db");
-    // A stale file would keep dropped tables alive and hide broken queries.
+    // Un fichier périmé garderait des tables supprimées et masquerait des requêtes cassées.
     let _ = fs::remove_file(&db);
     let conn = rusqlite::Connection::open(&db).expect("create schema.db");
 

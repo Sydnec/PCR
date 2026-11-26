@@ -13,7 +13,7 @@ thiserror.workspace = true
 tracing.workspace = true
 
 [build-dependencies]
-# Same libsqlite3-sys as sqlx (0.40): both may coexist in the build graph.
+# Même libsqlite3-sys que sqlx (0.40) : les deux coexistent dans le graphe de build.
 rusqlite = { version = "0.43.0", features = ["bundled"] }
 
 [dev-dependencies]

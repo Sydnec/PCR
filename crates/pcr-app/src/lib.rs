@@ -1,8 +1,8 @@
-//! Use-cases shared by the Discord bot and the website.
+//! Cas d'usage partagés par le bot Discord et le site.
 //!
-//! Each feature module exposes functions that run inside one DB transaction and return what
-//! happened plus the events to publish once committed. Adapters only translate inputs and
-//! render outcomes.
+//! Chaque module de fonctionnalité expose des fonctions qui tiennent dans une transaction et
+//! renvoient ce qui s'est passé, plus les événements à publier une fois le commit fait. Les
+//! adaptateurs se contentent de traduire les entrées et de rendre les résultats.
 
 pub mod health;
 
@@ -13,7 +13,7 @@ use pcr_db::Db;
 
 pub use health::Health;
 
-/// Everything a use-case needs, cheap to clone.
+/// Tout ce dont un cas d'usage a besoin, peu coûteux à cloner.
 #[derive(Debug, Clone)]
 pub struct App {
     pub db: Db,
