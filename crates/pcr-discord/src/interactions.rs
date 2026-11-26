@@ -1,11 +1,15 @@
 //! Route chaque interaction vers son handler et répond toujours, même en cas d'échec.
 
 use twilight_model::{
-    application::interaction::{Interaction, InteractionData},
+    application::interaction::{Interaction, InteractionData, InteractionType},
     http::interaction::InteractionResponse,
 };
 
-use crate::{Ctx, commands::version, ui};
+use crate::{
+    Ctx,
+    commands::{admin, version},
+    ui,
+};
 
 const GENERIC_ERROR: &str = "Une erreur est survenue, réessaie dans un instant.";
 const EXPIRED: &str = "Ce panneau a expiré, relance la commande.";
@@ -29,8 +33,19 @@ pub async fn handle(ctx: Ctx, interaction: Interaction) {
 }
 
 async fn route(ctx: &Ctx, interaction: &Interaction) -> anyhow::Result<InteractionResponse> {
+    // L'autocomplétion arrive avec les données d'une commande : c'est le type qui la distingue.
+    if interaction.kind == InteractionType::ApplicationCommandAutocomplete {
+        let choices = match &interaction.data {
+            Some(InteractionData::ApplicationCommand(command)) if command.name == "admin" => {
+                admin::autocomplete(ctx, interaction, command)
+            }
+            _ => Vec::new(),
+        };
+        return Ok(ui::autocomplete(choices));
+    }
     Ok(match &interaction.data {
         Some(InteractionData::ApplicationCommand(command)) => match command.name.as_str() {
+            "admin" => admin::run(ctx, interaction, command).await,
             "version" => ui::ephemeral_panel(version::panel(ctx).await),
             name => {
                 tracing::warn!(name, "unknown command");

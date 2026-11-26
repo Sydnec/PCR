@@ -89,6 +89,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2cb931c189b85683d69a5cfad41d4d418671e1ac413dd209f3f2fc31e3cfd902"
 
 [[package]]
+name = "arc-swap"
+version = "1.9.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "84a22b5d51209f6de83d37a0b33d320acb8da88823e42a94c075140708f032a5"
+dependencies = [
+ "rustversion",
+]
+
+[[package]]
 name = "atoi"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1307,8 +1316,10 @@ dependencies = [
 name = "pcr-app"
 version = "2.0.0-dev"
 dependencies = [
+ "arc-swap",
  "pcr-core",
  "pcr-db",
+ "serde_json",
  "thiserror",
  "tokio",
  "toml",
@@ -1321,6 +1332,7 @@ version = "2.0.0-dev"
 dependencies = [
  "jiff",
  "serde",
+ "serde_json",
  "thiserror",
  "toml",
 ]
@@ -1344,6 +1356,7 @@ dependencies = [
  "anyhow",
  "pcr-app",
  "pcr-core",
+ "serde_json",
  "tokio",
  "tracing",
  "twilight-cache-inmemory",
@@ -1714,6 +1727,8 @@ version = "1.0.154"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e7e9cc8b1b85264074fbcc02a88680c4096b1e47df8f739dceb03bf482f04bd6"
 dependencies = [
+ "foldhash",
+ "indexmap",
  "itoa",
  "memchr",
  "serde",

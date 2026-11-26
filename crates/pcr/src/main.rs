@@ -190,6 +190,8 @@ async fn serve(instance: Instance) -> anyhow::Result<()> {
         .with_context(|| format!("creating {}", instance.data_dir.display()))?;
     let db = Db::open(&instance.data_dir.join("pcr.db")).await?;
     let app = App::new(db.clone(), Arc::new(SystemClock), instance);
+    // Avant le bot et le site : aucune action ne doit partir avec les seules valeurs par défaut.
+    pcr_app::config::reload(&app).await?;
 
     let (stop, stopped) = watch::channel(false);
     let stop = Arc::new(stop);

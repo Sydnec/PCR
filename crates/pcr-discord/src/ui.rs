@@ -2,10 +2,13 @@
 //! vignettes), et naviguer dans un panneau édite le même message éphémère au lieu d'en poster un autre.
 
 use twilight_model::{
+    application::command::CommandOptionChoice,
     channel::message::{Component, MessageFlags},
     http::interaction::InteractionResponse,
 };
-use twilight_util::builder::interaction_response::{ChannelMessageBuilder, UpdateMessageBuilder};
+use twilight_util::builder::interaction_response::{
+    AutocompleteBuilder, ChannelMessageBuilder, UpdateMessageBuilder,
+};
 
 /// Un nouveau panneau personnel, visible du seul utilisateur qui a cliqué ou tapé.
 pub fn ephemeral_panel(components: Vec<Component>) -> InteractionResponse {
@@ -26,4 +29,9 @@ pub fn ephemeral_text(text: impl Into<String>) -> InteractionResponse {
         .content(text)
         .flags(MessageFlags::EPHEMERAL)
         .build()
+}
+
+/// Les propositions d'une autocomplétion.
+pub fn autocomplete(choices: Vec<CommandOptionChoice>) -> InteractionResponse {
+    AutocompleteBuilder::new(choices).build()
 }

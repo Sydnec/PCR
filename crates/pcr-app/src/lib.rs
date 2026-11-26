@@ -5,9 +5,12 @@
 //! adaptateurs se contentent de traduire les entrées et de rendre les résultats.
 
 pub mod announcements;
+pub mod config;
 pub mod health;
 
 use std::sync::Arc;
+
+use arc_swap::ArcSwap;
 
 use pcr_core::{clock::Clock, instance::Instance};
 use pcr_db::Db;
@@ -21,6 +24,11 @@ pub struct App {
     pub clock: Arc<dyn Clock>,
     pub instance: Arc<Instance>,
     pub health: Arc<Health>,
+    /// La configuration de jeu en service ; `config::reload` la (re)lit en base.
+    pub config: Arc<ArcSwap<config::Snapshot>>,
+    /// Une modification de la config à la fois : valider, écrire et recharger d'un tenant, pour
+    /// qu'un rechargement lent ne remette pas en service une lecture antérieure à une autre écriture.
+    pub(crate) config_writes: Arc<tokio::sync::Mutex<()>>,
 }
 
 impl App {
@@ -30,6 +38,14 @@ impl App {
             clock,
             instance: Arc::new(instance),
             health: Arc::default(),
+            config: Arc::default(),
+            config_writes: Arc::default(),
         }
+    }
+
+    /// La configuration de jeu à lire pour une action : une copie cohérente, même si un administrateur
+    /// la modifie pendant ce temps.
+    pub fn game_config(&self) -> Arc<pcr_core::config::GameConfig> {
+        Arc::clone(&self.config.load().config)
     }
 }

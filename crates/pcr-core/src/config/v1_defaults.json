@@ -1,0 +1,508 @@
+{
+  "messagePointsDistribution": {
+    "1": 750,
+    "2": 600,
+    "3": 500,
+    "4": 400,
+    "5": 350,
+    "6": 300,
+    "default": 300
+  },
+  "pokemon": {
+    "enabled": true,
+    "generation": 1,
+    "generationOpenings": {
+      "2": "2026-10-30T18:00:00+01:00"
+    },
+    "spawn": {
+      "messagesPerSpawn": 20,
+      "minDelayMinutes": 1,
+      "minDelayAfterEndMinutes": 0,
+      "fleeAfterMinutes": {
+        "min": 45,
+        "max": 90
+      },
+      "legendaryFleeMultiplier": 2,
+      "shinyOdds": 500,
+      "weightsByStage": {
+        "1": 70,
+        "2": 60,
+        "3": 25
+      },
+      "veryRareWeight": 18,
+      "legendaryWeight": 8,
+      "generationBoost": 2,
+      "speciesFactors": {
+        "201": 2
+      },
+      "pingRarities": [
+        "TRES_RARE",
+        "LEGENDAIRE"
+      ],
+      "throwLogSize": 8,
+      "heldItemChance": 0.15,
+      "itemDropChance": 0.2,
+      "embedRefreshMs": 2000
+    },
+    "capture": {
+      "globalMultiplier": 1,
+      "minCatchRate": 10,
+      "throwCooldownSeconds": 3,
+      "balls": {
+        "poke": {
+          "label": "Poké Ball",
+          "emoji": "<:pokeball:1551325915160514690>",
+          "sprite": "poke-ball",
+          "price": 100,
+          "multiplier": 1
+        },
+        "super": {
+          "label": "Super Ball",
+          "emoji": "<:superball:1551325951361679411>",
+          "sprite": "great-ball",
+          "price": 200,
+          "multiplier": 2
+        },
+        "hyper": {
+          "label": "Hyper Ball",
+          "emoji": "<:hyperball:1551326031431077898>",
+          "sprite": "ultra-ball",
+          "price": 400,
+          "multiplier": 4
+        },
+        "master": {
+          "label": "Master Ball",
+          "emoji": "<:masterball:1551326387455926432>",
+          "sprite": "master-ball",
+          "price": 10000,
+          "priceGrowth": 1.2,
+          "multiplier": 255,
+          "guaranteed": true
+        }
+      },
+      "specialBalls": {
+        "maxHeld": 10,
+        "dailyLimit": 10,
+        "appat": {
+          "label": "Appât Ball",
+          "emoji": "🎣",
+          "sprite": "lure-ball",
+          "price": 230,
+          "multiplier": 1,
+          "generation": 2,
+          "bonus": {
+            "fished": true,
+            "multiplier": 3
+          }
+        },
+        "catalyseur": {
+          "label": "Catalyseur Ball",
+          "emoji": "⚙️",
+          "sprite": "moon-ball",
+          "price": 300,
+          "multiplier": 1,
+          "generation": 2,
+          "bonus": {
+            "item": "catalyseur",
+            "multiplier": 4
+          }
+        }
+      }
+    },
+    "evolution": {
+      "2": {
+        "duplicates": 2,
+        "points": 1500
+      },
+      "3": {
+        "duplicates": 2,
+        "points": 3000
+      },
+      "branchChoicePoints": 3000,
+      "dittosPerCopy": 1
+    },
+    "trade": {
+      "expiryHours": 24,
+      "draftMinutes": 15
+    },
+    "lockByDefault": {
+      "shiny": true,
+      "legendary": true
+    },
+    "shinyCharm": {
+      "multiplier": 2
+    },
+    "starterLines": [
+      1,
+      4,
+      7,
+      152,
+      155,
+      158
+    ],
+    "starters": {
+      "choices": {
+        "2": [
+          152,
+          155,
+          158
+        ]
+      },
+      "rewards": [
+        {
+          "percent": 33,
+          "stage": 2,
+          "shiny": false
+        },
+        {
+          "percent": 66,
+          "stage": 3,
+          "shiny": false
+        },
+        {
+          "percent": 100,
+          "stage": 1,
+          "shiny": true
+        }
+      ]
+    },
+    "fishing": {
+      "generation": 2,
+      "fleeSeconds": 120,
+      "wildRarityFactor": 0.7
+    },
+    "eggs": {
+      "enabled": true,
+      "hatchHours": 120,
+      "hatchMessages": 200,
+      "perDay": 1,
+      "shinyParentMultiplier": 2
+    },
+    "pokedex": {
+      "pageSize": 30
+    },
+    "box": {
+      "pageSize": 15
+    },
+    "showcase": {
+      "slots": 6,
+      "shareCooldownMinutes": 60,
+      "imageCell": 128,
+      "imageTimeoutSeconds": 5
+    },
+    "unownText": {
+      "maxLetters": 80,
+      "lettersPerLine": 10,
+      "imageCell": 64,
+      "imageTimeoutSeconds": 5
+    },
+    "pc": {
+      "slotsPerBox": 30,
+      "columns": 6,
+      "minBoxes": 8,
+      "maxBoxes": 60,
+      "boxNameLength": 20,
+      "nicknameLength": 20
+    },
+    "items": {
+      "ball_poke": {
+        "ball": "poke",
+        "description": "Un lancer offert : tu la tiens déjà, elle ne te coûtera rien.",
+        "dropWeight": 400,
+        "lotteryWeight": 640,
+        "lot": {
+          "min": 1,
+          "max": 5
+        }
+      },
+      "ball_super": {
+        "ball": "super",
+        "description": "Un lancer offert : tu la tiens déjà, elle ne te coûtera rien.",
+        "dropWeight": 200,
+        "lotteryWeight": 330,
+        "lot": {
+          "min": 1,
+          "max": 3
+        }
+      },
+      "super_bonbon": {
+        "label": "Super Bonbon",
+        "emoji": "🍬",
+        "sprite": "rare-candy",
+        "description": "Trois d'entre eux tiennent lieu d'un sacrifice dans une évolution.",
+        "sellValue": 300,
+        "dropWeight": 120,
+        "evolution": {
+          "copies": 1,
+          "quantity": 3
+        },
+        "lot": {
+          "min": 1,
+          "max": 3
+        }
+      },
+      "ball_hyper": {
+        "ball": "hyper",
+        "description": "Un lancer offert : tu la tiens déjà, elle ne te coûtera rien.",
+        "dropWeight": 80,
+        "lot": {
+          "min": 1,
+          "max": 2
+        }
+      },
+      "evolyte": {
+        "label": "Évolyte",
+        "emoji": "🔮",
+        "sprite": "eviolite",
+        "description": "Un Évoli qui évolue avec lui prend la forme de ton choix, sans payer de points. Il tient lieu d'un sacrifice.",
+        "sellValue": 500,
+        "dropWeight": 20,
+        "evolution": {
+          "copies": 1,
+          "quantity": 1,
+          "choose": [
+            133
+          ],
+          "freePoints": true
+        }
+      },
+      "pierre_soleil": {
+        "label": "Pierre Soleil",
+        "emoji": "☀️",
+        "sprite": "sun-stone",
+        "description": "Un Ortide qui évolue avec elle devient Joliflor plutôt que Rafflesia. Elle tient lieu d'un sacrifice.",
+        "sellValue": 500,
+        "dropWeight": 20,
+        "generation": 2,
+        "evolution": {
+          "copies": 1,
+          "quantity": 1,
+          "targets": {
+            "44": 182
+          }
+        }
+      },
+      "roche_royale": {
+        "label": "Roche Royale",
+        "emoji": "👑",
+        "sprite": "kings-rock",
+        "description": "Têtarte devient Tarpaud plutôt que Tartard, Ramoloss devient Roigada plutôt que Flagadoss. Elle tient lieu d'un sacrifice.",
+        "sellValue": 500,
+        "dropWeight": 20,
+        "generation": 2,
+        "evolution": {
+          "copies": 1,
+          "quantity": 1,
+          "targets": {
+            "61": 186,
+            "79": 199
+          }
+        }
+      },
+      "catalyseur": {
+        "label": "Catalyseur",
+        "emoji": "⚙️",
+        "sprite": "up-grade",
+        "description": "Sans lui, Onix, Insécateur, Hypocéan et Porygon n'évoluent pas. Il tient lieu d'un sacrifice.",
+        "sellValue": 500,
+        "dropWeight": 20,
+        "generation": 2,
+        "evolution": {
+          "copies": 1,
+          "quantity": 1,
+          "targets": {
+            "95": 208,
+            "117": 230,
+            "123": 212,
+            "137": 233
+          }
+        }
+      },
+      "pepite": {
+        "label": "Pépite",
+        "emoji": "💎",
+        "sprite": "nugget",
+        "description": "Ça brille, et ça ne sert qu'à ça : se revendre.",
+        "sellValue": 4000,
+        "dropWeight": 50
+      },
+      "ticket_safari": {
+        "label": "Ticket Safari",
+        "emoji": "🎟️",
+        "sprite": "pass",
+        "description": "Une entrée pour le parc safari.",
+        "dropWeight": 20
+      },
+      "ball_master": {
+        "ball": "master",
+        "description": "La capture garantie, offerte. Autant dire qu'elle ne se trouve pas.",
+        "lotteryWeight": 2,
+        "maxHeld": 1,
+        "overflowValue": 10000
+      },
+      "canne": {
+        "label": "Canne",
+        "emoji": "🎣",
+        "sprite": "old-rod",
+        "description": "La canne de base : surtout des Magicarpe.",
+        "rod": {
+          "pool": "old",
+          "price": 100,
+          "base": true
+        }
+      },
+      "super_canne": {
+        "label": "Super Canne",
+        "emoji": "🎣",
+        "sprite": "good-rod",
+        "description": "Des prises plus variées.",
+        "dropWeight": 20,
+        "lotteryWeight": 60,
+        "lot": {
+          "min": 1,
+          "max": 1
+        },
+        "maxHeld": 1,
+        "overflowValue": 500,
+        "upgradesTo": "mega_canne",
+        "rod": {
+          "pool": "good",
+          "price": 100
+        }
+      },
+      "mega_canne": {
+        "label": "Méga Canne",
+        "emoji": "🎣",
+        "sprite": "super-rod",
+        "description": "Les prises les plus rares.",
+        "dropWeight": 8,
+        "lotteryWeight": 25,
+        "lot": {
+          "min": 1,
+          "max": 1
+        },
+        "maxHeld": 1,
+        "overflowValue": 1000,
+        "rod": {
+          "pool": "super",
+          "price": 100
+        }
+      },
+      "charme_chroma_1": {
+        "label": "Charme Chroma (1re gén.)",
+        "emoji": "🌟",
+        "sprite": "shiny-charm",
+        "description": "Pokédex de la 1re génération complété : chances de shiny doublées sur ses Pokémon.",
+        "charm": {
+          "generation": 1
+        }
+      },
+      "charme_chroma_2": {
+        "label": "Charme Chroma (2e gén.)",
+        "emoji": "🌟",
+        "sprite": "shiny-charm",
+        "description": "Pokédex de la 2e génération complété : chances de shiny doublées sur ses Pokémon.",
+        "charm": {
+          "generation": 2
+        }
+      }
+    },
+    "sell": {
+      "byRarity": {
+        "COMMUN": 250,
+        "PEU_COMMUN": 600,
+        "RARE": 1500,
+        "TRES_RARE": 2000
+      },
+      "shinyMultiplier": 0
+    },
+    "lottery": {
+      "enabled": true,
+      "winChance": 0.75,
+      "lotDecay": 0.5
+    },
+    "safari": {
+      "enabled": true,
+      "randomChancePerHour": 0.04,
+      "minHoursBetweenParks": 24,
+      "parkDurationHours": 24,
+      "spawnPauseHours": 4,
+      "sessionMinDurationMinutes": 60,
+      "actionsPerSession": 25,
+      "liveRecentActions": 5,
+      "liveRefreshMs": 1000,
+      "liveSettleMs": 3000,
+      "entryPrice": 5000,
+      "entryCooldownHours": 12,
+      "ball": {
+        "label": "Safari Ball",
+        "emoji": "<:safariball:1552972083909234811>",
+        "sprite": "safari-ball",
+        "multiplier": 1.5
+      },
+      "baitMultiplier": 2,
+      "baitMaxMultiplier": 4,
+      "fleeFailChance": 0.1,
+      "wildFleeChance": 0.05,
+      "wildFleeChancePerBait": 0.03,
+      "shinyOdds": 250,
+      "weightsByStage": {
+        "1": 50,
+        "2": 60,
+        "3": 40
+      },
+      "veryRareWeight": 30,
+      "legendaryWeight": 24,
+      "speciesFactors": {
+        "201": 2
+      }
+    },
+    "seasonRecap": {
+      "enabled": true,
+      "topSize": 5,
+      "podiumSize": 3,
+      "minThrowsForLuck": 30,
+      "minLotteryDraws": 5,
+      "minSpawnsForFleeRate": 5,
+      "publishWithinHours": 168,
+      "retryMinutes": 10,
+      "recordRetries": 3,
+      "recordRetryDelayMs": 500
+    }
+  },
+  "web": {
+    "sessionHours": 168,
+    "writesPerMinute": 60,
+    "accessDenialCacheSeconds": 60,
+    "spawnRefreshSeconds": 3
+  },
+  "publicMessages": {
+    "retries": 2,
+    "retryDelayMs": 1000,
+    "repairGraceSeconds": 120,
+    "repairWindowHours": 24
+  },
+  "links": {
+    "translation": {
+      "enabled": true,
+      "lookupTimeoutSeconds": 3,
+      "translateTimeoutSeconds": 10,
+      "maxTweets": 3
+    }
+  },
+  "redistribution": {
+    "enabled": true,
+    "intervalHours": 168,
+    "contributionPercent": 5
+  },
+  "purgeMember": {
+    "concurrency": 6,
+    "progressLogSeconds": 30,
+    "rateLimitLogSeconds": 10
+  },
+  "birthday": {
+    "enabled": true,
+    "hour": 9,
+    "message": "🎂 JOAAAAAAAAAAAAAAAAAAAAA {user} ! Passe une excellente journée !!!"
+  }
+}

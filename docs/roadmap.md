@@ -30,7 +30,7 @@ Réécriture en Rust, même résultat pour les joueurs. Le détail des choix est
 | P2a | Changelog (fragments, `xtask release`, annonce Discord, garde CI) | ✅ |
 | P2b | Schéma v2 des deux bases (toutes les tables v1 utiles, `public_messages`, `job_runs`, `config_overrides`, `web_sessions`) | ✅ |
 | P2c | `pcr migrate-v1` : empreinte du schéma v1, conversion, rapport d'invariants, fixture synthétique. **Gel de la v1.** | ✅ (v1 gelée à v1.22.1, `97c987a`) |
-| P2d | GameConfig (macro, défauts v1, bornes, surcharges en base, `ArcSwap`), `/admin config` et `config-voir` | à faire |
+| P2d | GameConfig (macro, défauts v1, bornes, surcharges en base, `ArcSwap`), `/admin config` et `config-voir` | ✅ |
 | P2e | Scheduler Paris + `job_runs`, stats tamponnées et bascule annuelle, worker `public_messages` | à faire |
 | P3 | Économie et communauté (tout le non-Pokémon de `parity.md` §1 et §3) | à faire |
 | P4 | Pokémon socle : spawn, lancers, shiny, objets, Centre Pokémon, Mon aventure, Boîte, `/pokedex` | à faire |
