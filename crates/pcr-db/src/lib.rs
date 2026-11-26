@@ -10,6 +10,7 @@
 pub mod backup;
 pub mod config;
 pub mod import_prod;
+pub mod jobs;
 pub mod meta;
 pub mod migrate_v1;
 mod pool;

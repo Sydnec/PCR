@@ -7,6 +7,7 @@
 pub mod announcements;
 pub mod config;
 pub mod health;
+pub mod jobs;
 
 use std::sync::Arc;
 
