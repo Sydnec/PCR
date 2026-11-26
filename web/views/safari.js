@@ -5,6 +5,10 @@
 //
 // Sans visite en cours, la page propose ce que propose l'onglet Capture :
 // entrer dans un parc ouvert ou acheter une entrée.
+//
+// À la sortie, le récapitulatif liste les prises avec leur état dans la boîte,
+// à cocher pour les verrouiller, les déverrouiller ou les revendre d'un coup :
+// chacune par le chemin de /pk verrou et /pk revendre.
 import { icon } from "../icons.js";
 import {
   api,
@@ -20,6 +24,7 @@ import {
   percent,
   pokemonName,
   progressBar,
+  richText,
   toast,
 } from "../lib.js";
 import { lineageView } from "../lineage.js";
@@ -43,6 +48,12 @@ export async function render(ctx) {
   let buying = false;
   let sharing = false;
   let goingLive = false;
+  // Le récapitulatif : les prises cochées (par individu), une action en cours,
+  // la revente en attente de confirmation, et les refus de la dernière revente.
+  const selected = new Set();
+  let busy = false;
+  let confirmingSale = false;
+  let refusals = [];
 
   const body = h("div", { class: "safari" });
   const draw = () => body.replaceChildren(visit ? visitView() : offerView());
@@ -267,6 +278,7 @@ export async function render(ctx) {
 
   function recapView() {
     const count = visit.catches.length;
+    const rows = choosable();
     return h(
       "div",
       { class: "spawn-empty safari-recap" },
@@ -279,6 +291,18 @@ export async function render(ctx) {
           ? `Tu ressors du parc avec ${fmt(count)} Pokémon, déjà rangés dans ta boîte.`
           : "Tu ressors du parc les mains vides. Ça arrive."
       ),
+      rows.length
+        ? h("p", { class: "muted small" }, "Coche ceux que tu veux verrouiller ou revendre.")
+        : null,
+      count ? h("ul", { class: "safari-recap-list" }, visit.catches.map(catchRow)) : null,
+      rows.length ? selectionBar(rows) : null,
+      refusals.length
+        ? h(
+            "div",
+            { class: "notice safari-recap-refusals" },
+            h("span", {}, richText(refusals.join("\n")))
+          )
+        : null,
       h(
         "div",
         { class: "confirm-actions" },
@@ -303,6 +327,257 @@ export async function render(ctx) {
             )
       )
     );
+  }
+
+  // ---------------------- Le récapitulatif ----------------------
+
+  // Les prises qu'on peut désigner : leur individu est encore dans la boîte.
+  // `individual` vaut null pour un Pokémon parti depuis, et manque quand l'API
+  // ne sait pas (prise d'avant le lien avec la boîte, lecture ratée).
+  const choosable = () => visit.catches.filter((row) => row.individual);
+  const chosen = () => choosable().filter((row) => selected.has(row.pokemonId));
+
+  // L'espèce et la forme d'aujourd'hui : une prise a pu évoluer depuis la
+  // visite, et c'est sous sa forme actuelle qu'elle se revend.
+  const speciesOf = (row) => row.individual?.speciesId ?? row.speciesId;
+  const formOf = (row) => (row.individual ? row.individual.form : row.form);
+
+  // Le prix que l'API calcule pour l'espèce, comme la fiche de la boîte.
+  function priceOf(row) {
+    const species = ctx.species.get(speciesOf(row));
+    return (row.individual.shiny ? species?.sellValueShiny : species?.sellValue) ?? 0;
+  }
+
+  // Ce que la revente laisserait partir : ni verrouillé, ni dernier de son
+  // espèce, ni invendable. Le jeu revalide chacun.
+  const sellableRow = (row) => !row.individual.locked && !row.individual.last && priceOf(row) > 0;
+
+  // Pourquoi il ne se revend pas, ou ce qu'il rapporterait.
+  function saleStatus(row) {
+    if (row.individual.locked) return "verrouillé";
+    if (row.individual.last) return "dernier de son espèce";
+    const price = priceOf(row);
+    return price > 0 ? `${fmt(price)} pts` : "ne se revend pas";
+  }
+
+  function catchRow(row) {
+    const species = ctx.species.get(speciesOf(row));
+    if (!species) return null;
+    const mon = row.individual;
+    const form = formOf(row);
+    const image = h("img", {
+      class: "sprite",
+      src: form?.icon ?? (row.shiny ? species.iconShiny : species.icon),
+      alt: "",
+      width: 48,
+      height: 48,
+    });
+    const name = (detail) =>
+      h(
+        "span",
+        { class: "safari-recap-name" },
+        pokemonName(species, row.shiny, mon?.sex ?? null, mon?.nickname ?? null, form),
+        detail ? h("span", { class: "muted small" }, detail) : null
+      );
+    if (!mon) {
+      return h(
+        "li",
+        { class: `safari-recap-row${mon === null ? " safari-recap-gone" : ""}` },
+        h(
+          "div",
+          { class: "safari-recap-item" },
+          // La place de la case à cocher : les sprites restent alignés.
+          h("span", { class: "safari-recap-check" }),
+          image,
+          name(mon === null ? "n'est plus dans ta boîte" : null)
+        )
+      );
+    }
+    const checked = selected.has(row.pokemonId);
+    return h(
+      "li",
+      { class: `safari-recap-row${checked ? " safari-recap-selected" : ""}` },
+      h(
+        "label",
+        { class: "safari-recap-item" },
+        h("input", {
+          type: "checkbox",
+          class: "safari-recap-check",
+          checked,
+          disabled: busy,
+          onchange: () => {
+            if (selected.has(row.pokemonId)) selected.delete(row.pokemonId);
+            else selected.add(row.pokemonId);
+            confirmingSale = false;
+            draw();
+          },
+        }),
+        image,
+        name(`#${mon.id}`),
+        mon.locked ? icon("shield", { label: "Verrouillé" }) : null,
+        h("span", { class: "muted small safari-recap-status" }, saleStatus(row))
+      )
+    );
+  }
+
+  function selectionBar(rows) {
+    const picked = chosen();
+    const sellable = picked.filter(sellableRow);
+    const total = sellable.reduce((sum, row) => sum + priceOf(row), 0);
+    // Deux de la même espèce peuvent buter sur « le dernier reste » : le total
+    // n'est alors qu'un plafond, et le compte rendu dira ce qui est parti.
+    const species = sellable.map(speciesOf);
+    const ceiling = new Set(species).size < species.length ? "jusqu'à " : "";
+    const pickAll = (ids) => {
+      selected.clear();
+      for (const id of ids) selected.add(id);
+      confirmingSale = false;
+      draw();
+    };
+    const button = (label, onclick, { kind = "ghost", disabled = false } = {}) =>
+      h("button", { class: `button small ${kind}`, disabled: busy || disabled, onclick }, label);
+
+    return h(
+      "div",
+      { class: "notice safari-recap-bar" },
+      h(
+        "span",
+        {},
+        picked.length
+          ? `${fmt(picked.length)} Pokémon sélectionné${picked.length > 1 ? "s" : ""}.`
+          : "Aucun Pokémon sélectionné."
+      ),
+      h(
+        "div",
+        { class: "safari-recap-actions" },
+        button("Tout", () => pickAll(rows.map((row) => row.pokemonId)), {
+          disabled: picked.length === rows.length,
+        }),
+        button("Aucun", () => pickAll([]), { disabled: !picked.length }),
+        button("Verrouiller", () => lockChosen(true), {
+          disabled: !picked.some((row) => !row.individual.locked),
+        }),
+        button("Déverrouiller", () => lockChosen(false), {
+          disabled: !picked.some((row) => row.individual.locked),
+        }),
+        button(
+          "Revendre",
+          () => {
+            confirmingSale = true;
+            draw();
+          },
+          { kind: "danger", disabled: !sellable.length || confirmingSale }
+        )
+      ),
+      confirmingSale && sellable.length
+        ? h(
+            "div",
+            { class: "safari-recap-confirm" },
+            h(
+              "p",
+              {},
+              "Revendre ",
+              h("strong", {}, `${fmt(sellable.length)} Pokémon`),
+              " pour ",
+              h("strong", {}, `${ceiling}${fmt(total)} pts`),
+              " ? Ils ne reviendront pas.",
+              picked.length > sellable.length
+                ? ` Les ${fmt(picked.length - sellable.length)} autres de ta sélection restent : ` +
+                    "verrouillés, derniers de leur espèce ou invendables."
+                : null
+            ),
+            h(
+              "div",
+              { class: "confirm-actions" },
+              button("Revendre", () => sellChosen(sellable), { kind: "danger" }),
+              button("Annuler", () => {
+                confirmingSale = false;
+                draw();
+              })
+            )
+          )
+        : null
+    );
+  }
+
+  // Le même verrou sur toute la sélection, par la route de /pk verrou en groupe.
+  async function lockChosen(locked) {
+    const ids = chosen()
+      .filter((row) => row.individual.locked !== locked)
+      .map((row) => row.pokemonId);
+    busy = true;
+    confirmingSale = false;
+    refusals = [];
+    draw();
+    try {
+      const result = await api("/api/me/pokemon/lock-many", {
+        method: "POST",
+        body: { pokemonIds: ids, locked },
+      });
+      const plural = result.changed > 1 ? "s" : "";
+      toast(
+        `${fmt(result.changed)} Pokémon ${locked ? "verrouillé" : "déverrouillé"}${plural}.` +
+          (result.skipped
+            ? ` ${fmt(result.skipped)} n'étai${result.skipped > 1 ? "en" : ""}t plus dans ta boîte.`
+            : ""),
+        "success"
+      );
+    } catch (error) {
+      toast(error.message, "error");
+    }
+    await refreshCatches();
+  }
+
+  // La revente des cochés qui peuvent partir : chacun par le chemin de
+  // /pk revendre. Les refus (un dernier de son espèce atteint en cours de
+  // route, un verrou posé depuis Discord) restent affichés sous la liste.
+  async function sellChosen(rows) {
+    busy = true;
+    confirmingSale = false;
+    refusals = [];
+    draw();
+    try {
+      const result = await api("/api/me/sell-many", {
+        method: "POST",
+        body: { pokemonIds: rows.map((row) => row.pokemonId) },
+      });
+      refusals = result.refused.map((row) => row.reason);
+      const sold = result.sold.length;
+      toast(
+        sold
+          ? `${fmt(sold)} Pokémon revendu${sold > 1 ? "s" : ""} pour ${fmt(result.points)} pts.`
+          : "Rien n'a été revendu.",
+        sold && !result.failed ? "success" : "error"
+      );
+      if (sold) ctx.refreshMe().catch(() => {});
+    } catch (error) {
+      toast(error.message, "error");
+    }
+    await refreshCatches();
+  }
+
+  // Relit l'état des prises après une action : un verrou, une revente, et le
+  // dernier de chaque espèce a pu changer. La visite finie ne se relit plus,
+  // ses Pokémon si. Un Pokémon parti sort de la sélection.
+  async function refreshCatches() {
+    const ids = visit.catches
+      .filter((row) => row.pokemonId && row.individual !== undefined)
+      .map((row) => row.pokemonId);
+    try {
+      const { pokemon } = ids.length
+        ? await api(`/api/me/pokemon?ids=${ids.join(",")}`)
+        : { pokemon: [] };
+      const byId = new Map(pokemon.map((mon) => [mon.id, mon]));
+      for (const row of visit.catches) {
+        if (row.individual !== undefined) row.individual = byId.get(row.pokemonId) ?? null;
+      }
+    } catch (error) {
+      toast(error.message, "error");
+    }
+    const still = new Set(choosable().map((row) => row.pokemonId));
+    for (const id of [...selected]) if (!still.has(id)) selected.delete(id);
+    busy = false;
+    draw();
   }
 
   // ---------------------- Sur le côté ----------------------

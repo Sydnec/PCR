@@ -81,4 +81,5 @@ visite. C'est le seul contenu Pokémon où les actions ne coûtent rien.
   double-clic ne peut pas jouer deux fois la même action.
 - **Sur le site** aussi, depuis l'onglet Capture : reprendre sa visite, entrer dans un parc ouvert
   ou acheter une entrée, puis jouer. C'est la même visite, qui se reprend d'un côté à l'autre (voir
-  [le site](../site.md#parc-safari)).
+  [le site](../site.md#parc-safari)). À la sortie, le site récapitule les prises, à verrouiller ou
+  revendre par lot ; sur Discord, `/pk verrou` et `/pk revendre` font de même, une par une.

@@ -705,6 +705,34 @@ describe("vendre un Pokémon (/api/me/sell)", () => {
   });
 });
 
+describe("vendre plusieurs Pokémon (/api/me/sell-many)", () => {
+  const sellMany = (body) => call("POST", "/api/me/sell-many", { body });
+
+  it("le corps est validé", async () => {
+    for (const pokemonIds of [undefined, [], "1", ["1"], [0], [1.5], Array.from({ length: 100_000 }, (_, i) => i + 1)]) {
+      await failure(sellMany({ pokemonIds }), 400);
+    }
+  });
+
+  it("chacun part ou reste avec sa raison, et le solde suit", async () => {
+    // Le dernier se compte par espèce, verrouillés compris : le verrouillé est un Roucool.
+    const [keep, spare] = await ownMany("Rattata", 2);
+    await own("Roucool");
+    const locked = await own("Roucool", { locked: 1 });
+    const stranger = await own("Rattata", { user: OTHER });
+    const result = await sellMany({ pokemonIds: [spare, locked, stranger, keep] });
+    assert.deepEqual(result.sold, [spare]);
+    assert.equal(result.points, getPokemonConfig().sell.byRarity.COMMUN);
+    assert.equal(result.failed, false);
+    assert.deepEqual(result.refused.map((row) => row.id), [locked, stranger, keep]);
+    assert.match(result.refused[0].reason, /verrouillé/);
+    assert.match(result.refused[2].reason, /dernier/);
+    assert.equal(await callback(economy.getBalance, USER), result.points);
+    assert.deepEqual((await dbAll(points, "SELECT id FROM pokemon_owned WHERE user_id = ? ORDER BY id", [USER])).map((row) => row.id), [keep, locked - 1, locked]);
+    assert.equal((await dbAll(points, "SELECT id FROM pokemon_owned WHERE user_id = ?", [OTHER])).length, 1);
+  });
+});
+
 describe("le PC (/api/me/pc)", () => {
   const pcMove = (body) => call("POST", "/api/me/pc/move", { body });
 
@@ -804,6 +832,33 @@ describe("le PC (/api/me/pc)", () => {
     await failure(lock("abc", { locked: true }), 400);
     await failure(lock(stranger, { locked: true }), 404);
     assert.equal((await dbGet(points, "SELECT locked FROM pokemon_owned WHERE id = ?", [stranger])).locked, 0);
+  });
+
+  it("verrouille plusieurs Pokémon d'un coup, sans toucher à ceux des autres", async () => {
+    const ids = await ownMany("Rattata", 2);
+    const stranger = await own("Rattata", { user: OTHER });
+    const lockMany = (body) => call("POST", "/api/me/pokemon/lock-many", { body });
+    await failure(lockMany({ pokemonIds: ids }), 400);
+    await failure(lockMany({ pokemonIds: ids, locked: "oui" }), 400);
+    await failure(lockMany({ pokemonIds: [], locked: true }), 400);
+    await failure(lockMany({ pokemonIds: ["x"], locked: true }), 400);
+    assert.deepEqual(await lockMany({ pokemonIds: [...ids, stranger], locked: true }), { locked: true, changed: 2, skipped: 1 });
+    const lockedOf = async (id) => (await dbGet(points, "SELECT locked FROM pokemon_owned WHERE id = ?", [id])).locked;
+    assert.deepEqual([await lockedOf(ids[0]), await lockedOf(ids[1]), await lockedOf(stranger)], [1, 1, 0]);
+    assert.deepEqual(await lockMany({ pokemonIds: [ids[0]], locked: false }), { locked: false, changed: 1, skipped: 0 });
+    assert.equal(await lockedOf(ids[0]), 0);
+  });
+
+  it("relit quelques Pokémon désignés, les siens seulement", async () => {
+    const [a, b] = await ownMany("Rattata", 2);
+    const stranger = await own("Rattata", { user: OTHER });
+    const read = (ids) => call("GET", "/api/me/pokemon", { query: ids === undefined ? {} : { ids } });
+    await failure(read(), 400);
+    await failure(read("abc"), 400);
+    await failure(read("1,-2"), 400);
+    const { pokemon } = await read(`${b},${stranger},${a}`);
+    assert.deepEqual(pokemon.map((entry) => entry.id).sort((x, y) => x - y), [a, b]);
+    assert.equal(pokemon[0].last, false);
   });
 });
 

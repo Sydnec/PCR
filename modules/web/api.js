@@ -22,6 +22,7 @@ import {
   describeHelper,
   evolutionHelpers,
   setLock,
+  setLockMany,
   usableHelpers,
   DITTO_HELPER,
 } from "../pokemon/collection.js";
@@ -118,7 +119,7 @@ import {
   overflowNotice,
   sortByCatalogue,
 } from "../pokemon/items.js";
-import { pokemonSellValue, sellItem, sellPokemon } from "../pokemon/sell.js";
+import { pokemonSellValue, sellIndividuals, sellItem, sellPokemon } from "../pokemon/sell.js";
 import { describeRules } from "../pokemon/rules.js";
 import { getCharms } from "../pokemon/charms.js";
 import {
@@ -286,6 +287,30 @@ function generationsOf(body) {
     throw new HttpError(400, "generations : une liste de générations.");
   }
   return list;
+}
+
+// Une liste d'individus dans le corps ou la requête : des entiers positifs, pas
+// plus que le PC n'en contient. Le jeu revalide chacun et ignore ce qui n'est
+// pas au dresseur ; ici, on ne laisse passer qu'une liste bornée.
+function pokemonIdsOf(list) {
+  const { maxBoxes, slotsPerBox } = pcConfig();
+  if (
+    !Array.isArray(list) ||
+    !list.length ||
+    list.length > maxBoxes * slotsPerBox ||
+    !list.every((id) => Number.isInteger(id) && id > 0)
+  ) {
+    throw new HttpError(400, "pokemonIds : une liste de Pokémon.");
+  }
+  return list;
+}
+
+// Les individus d'un dresseur désignés par leur identifiant, tels que la boîte
+// les montre : ceux qui ne sont plus à lui (revendus, échangés) n'y sont pas.
+async function individualsByIds(userId, ids) {
+  const wanted = new Set(ids);
+  const rows = await promise((cb) => getIndividuals(userId, cb));
+  return rows.filter((row) => wanted.has(row.id)).map(individualJson);
 }
 
 // Le résultat d'une action du jeu : { ok, reason } devient un 409 quand le jeu
@@ -525,6 +550,20 @@ async function visitJson(session, owned, lineageOwned, forms) {
   const species = finished ? null : getSpecies(session.encounter_species_id);
   const catches = await promise((cb) => getSessionCatches(session.id, cb));
   const bait = session.encounter_bait;
+  // Le récapitulatif de fin : chaque prise avec l'état actuel de son individu
+  // (verrou, dernier de son espèce), pour le verrouiller ou le revendre d'ici.
+  // Collection illisible : l'état est omis plutôt que deviné.
+  let individuals = null;
+  if (finished) {
+    const ids = catches.map((row) => row.pokemon_id).filter(Boolean);
+    try {
+      individuals = new Map(
+        (await individualsByIds(session.user_id, ids)).map((entry) => [entry.id, entry])
+      );
+    } catch (error) {
+      handleException("Récapitulatif du parc safari :", error);
+    }
+  }
   return {
     id: session.id,
     token: session.actions_left,
@@ -537,9 +576,16 @@ async function visitJson(session, owned, lineageOwned, forms) {
     // La visite suivie en direct dans un salon : le même verrou, un message à part.
     live: Boolean(session.live_message_id),
     catches: catches.map((row) => ({
+      // null pour une prise d'avant le lien avec la boîte : elle ne se désigne pas.
+      pokemonId: row.pokemon_id ?? null,
       speciesId: row.species_id,
       shiny: Boolean(row.is_shiny),
       form: formJson(getSpecies(row.species_id), row.form, Boolean(row.is_shiny)),
+      // Visite finie seulement : l'individu tel qu'il est, null s'il n'est plus
+      // dans la boîte. Absent quand on ne sait pas.
+      ...(individuals && row.pokemon_id
+        ? { individual: individuals.get(row.pokemon_id) ?? null }
+        : {}),
     })),
     ball: withImage(config.ball),
     encounter: species
@@ -955,6 +1001,24 @@ export const routes = [
     handler: (ctx) => pcJson(ctx.user.id),
   },
 
+  // Quelques Pokémon du dresseur, désignés : `?ids=12,15`. Le récapitulatif du
+  // parc s'en sert pour relire ses prises après un verrou ou une revente — le
+  // dernier de son espèce a pu changer. Ceux qui ne sont plus à lui sont omis.
+  {
+    method: "GET",
+    path: "/api/me/pokemon",
+    auth: true,
+    handler: async (ctx) => {
+      const ids = pokemonIdsOf(
+        String(ctx.query.ids ?? "")
+          .split(",")
+          .filter(Boolean)
+          .map(Number)
+      );
+      return { pokemon: await individualsByIds(ctx.user.id, ids) };
+    },
+  },
+
   // ---------------------- Actions ----------------------
 
   // Entrer dans un parc ouvert, gratuitement : le bouton du message de parc.
@@ -1184,6 +1248,28 @@ export const routes = [
       const changed = await promise((cb) => setLock(ctx.user.id, pokemonId, ctx.body.locked, cb));
       if (!changed) throw new HttpError(404, `Le Pokémon #${pokemonId} n'est pas dans ta boîte.`);
       return { id: pokemonId, locked: ctx.body.locked };
+    },
+  },
+
+  // Le même verrou sur plusieurs Pokémon, depuis le récapitulatif du parc :
+  // une seule écriture, gardée par le propriétaire. `skipped` compte ceux qui
+  // ne sont pas (ou plus) dans sa boîte.
+  {
+    method: "POST",
+    path: "/api/me/pokemon/lock-many",
+    auth: true,
+    write: true,
+    handler: async (ctx) => {
+      const ids = pokemonIdsOf(ctx.body.pokemonIds);
+      if (typeof ctx.body.locked !== "boolean") {
+        throw new HttpError(400, "locked : true ou false.");
+      }
+      const touched = await promise((cb) => setLockMany(ctx.user.id, ids, ctx.body.locked, cb));
+      return {
+        locked: ctx.body.locked,
+        changed: touched.length,
+        skipped: new Set(ids).size - touched.length,
+      };
     },
   },
 
@@ -1435,6 +1521,26 @@ export const routes = [
       const quantity = selector.pokemonId ? 1 : intParam(ctx.body.quantity, 1, { min: 1 });
       const result = await promise((cb) => sellPokemon(ctx.user.id, selector, quantity, cb));
       return outcome(result, ({ quantity: sold, unit, points }) => ({ sold, unit, points }));
+    },
+  },
+
+  // Revendre plusieurs Pokémon désignés, depuis le récapitulatif du parc :
+  // chacun par le chemin de /pk revendre, avec sa garde et sa compensation. Une
+  // vente refusée n'arrête pas les autres, d'où une réponse qui dit les deux.
+  {
+    method: "POST",
+    path: "/api/me/sell-many",
+    auth: true,
+    write: true,
+    handler: async (ctx) => {
+      const ids = pokemonIdsOf(ctx.body.pokemonIds);
+      const report = await promise((cb) => sellIndividuals(ctx.user.id, ids, cb));
+      return {
+        sold: report.sold.map((row) => row.id),
+        points: report.points,
+        refused: report.refused,
+        failed: report.failed,
+      };
     },
   },
 

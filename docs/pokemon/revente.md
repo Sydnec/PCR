@@ -14,15 +14,17 @@ objet depuis le Sac, qui affiche son prix à l'unité : les mêmes règles, la m
   `quantite` normaux de l'espèce, les stériles d'abord, puis les plus récents. Un shiny ne part
   jamais dans le lot.
 - **Le barème suit la rareté** (`pokemon.sell.byRarity`) : **250** points pour un commun, **600**
-  pour un peu commun, **1 500** pour un rare, **2 000** pour un très rare. La règle qui le gouverne : **aucun tarif ne doit
+  pour un peu commun, **1 500** pour un rare, **2 000** pour un très rare, **3 500** pour un
+  légendaire (fabuleux compris). La règle qui le gouverne : **aucun tarif ne doit
   dépasser le coût espéré d'une capture**, sans quoi la chasse devient une imprimerie à points. Ce
-  coût, à l'Hyper Ball et au taux moyen de chaque tranche, vaut ~510, ~1 030 et ~1 690 points, soit
-  une revente à 49 %, 58 % et 89 %. Le très rare est l'exception décidée : sa capture espérée vaut
-  ~1 700 points, il se revend un peu plus (×1,2 au plus, vérifié par les tests), mais il ne sort
-  qu'à poids 18.
-- **Les légendaires et les shinies ne se revendent pas.** Les premiers n'ont pas de ligne au barème,
-  les seconds un multiplicateur nul : ce sont des Pokémon qu'on ne retrouve pas, et personne ne
-  doit pouvoir les brader d'un clic.
+  coût, à l'Hyper Ball et au taux moyen de chaque tranche, vaut ~510, ~1 030, ~1 690 et ~7 190
+  points, soit une revente à 49 %, 58 %, 89 % et 49 %. Le très rare est l'exception décidée : sa
+  capture espérée vaut ~1 700 points, il se revend un peu plus (×1,2 au plus, vérifié par les
+  tests), mais il ne sort qu'à poids 18.
+- **Un légendaire arrive verrouillé** (voir [Individus](individus.md)) : pour revendre un doublon,
+  on le déverrouille d'abord avec `/pk verrou`. Personne ne le brade d'un clic.
+- **Les shinies ne se revendent pas**, légendaires compris : leur multiplicateur est nul. Ce sont
+  des Pokémon qu'on ne retrouve pas.
 - **On retire d'abord, on crédite ensuite**, et on rend ce qu'on a retiré si le crédit échoue.
   L'inverse paierait deux fois celui qui clique deux fois.
 - **Les ventes de Pokémon sont journalisées** dans `pokemon_sales` : une vente détruit des

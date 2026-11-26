@@ -510,13 +510,16 @@ const POKEMON = {
   //
   // Le barème suit la rareté affichée partout ailleurs (la pastille de couleur)
   // plutôt que le taux de capture : c'est le repère que les dresseurs ont déjà.
-  // Une rareté absente du barème ne se revend pas — c'est le cas des
-  // légendaires, qu'on ne monnaie pas.
+  // Une rareté absente du barème ne se revend pas.
   sell: {
     // Le très rare est l'exception assumée : 2 000 points, un peu plus que sa capture
     // espérée (~1 700 à l'Hyper Ball). Il ne sort qu'à poids 18, ce qui borne ce
     // qu'une chasse aux starters peut rapporter.
-    byRarity: { COMMUN: 250, PEU_COMMUN: 600, RARE: 1500, TRES_RARE: 2000 },
+    //
+    // Le légendaire se revend à 3 500, la moitié de sa capture espérée (~7 190 à
+    // l'Hyper Ball) : c'est le doublon qui rapporte le plus, sans devenir une
+    // rente. Il arrive verrouillé, donc on ne le brade pas d'un clic.
+    byRarity: { COMMUN: 250, PEU_COMMUN: 600, RARE: 1500, TRES_RARE: 2000, LEGENDAIRE: 3500 },
     // 0 : un shiny ne se revend pas. C'est une entrée de Pokédex qu'on ne
     // retrouve pas, et personne ne doit pouvoir la brader d'un clic.
     shinyMultiplier: 0,
