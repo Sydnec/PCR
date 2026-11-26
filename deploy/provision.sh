@@ -27,14 +27,14 @@ while [ $# -gt 0 ]; do
     *) usage ;;
   esac
 done
-[ -n "$proxy_ip" ] && [ -n "$admin_net" ] || usage
+if [ -z "$proxy_ip" ] || [ -z "$admin_net" ]; then usage; fi
 [[ "$port" =~ ^[0-9]+$ ]] || usage
 [ "$(id -u)" -eq 0 ] || { echo "run as root" >&2 && exit 1; }
 here=$(cd "$(dirname "$0")" && pwd)
 
 # shellcheck source=/dev/null
 . /etc/os-release
-[ "${ID:-}" = debian ] && [ "${VERSION_ID:-}" = 13 ] || echo "warning: tested on Debian 13 only" >&2
+if [ "${ID:-}" != debian ] || [ "${VERSION_ID:-}" != 13 ]; then echo "warning: tested on Debian 13 only" >&2; fi
 
 echo "== packages"
 apt-get update -q
