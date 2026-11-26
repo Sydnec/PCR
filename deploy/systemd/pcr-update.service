@@ -7,4 +7,8 @@ After=network-online.target
 [Service]
 Type=oneshot
 EnvironmentFile=/etc/pcr/update.env
+# cosign garde sa racine de confiance Sigstore (TUF) en cache : un service root sans User= n'a pas de
+# HOME, on lui donne donc un dossier explicite.
+StateDirectory=pcr-update
+Environment=HOME=/root TUF_ROOT=/var/lib/pcr-update/tuf
 ExecStart=/usr/local/sbin/pcr-update
