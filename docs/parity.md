@@ -94,7 +94,7 @@ traduction. Ceux des panneaux éphémères sont remplacés par les panneaux `pk:
 - [ ] Saints et fêtes du jour (`COTD_CRON_TIMER`)
 - [ ] Rappels échus envoyés en MP (chaque minute) ; purge des rappels envoyés depuis plus de 7 jours
 - [ ] Fuite des Pokémon (chaque minute)
-- [ ] Réparation des messages publics (toutes les 5 min, et au démarrage)
+- [ ] Réparation des messages publics (toutes les 5 min, et au démarrage) : lignes `public_messages` en retard dont `changed_at` tombe dans `repairWindowHours`, passé `repairGraceSeconds` (les vieux messages v1 restés sans fin n'y entrent pas)
 - [ ] Éclosion des œufs (chaque minute)
 - [ ] Ouverture des générations + récap de saison (chaque minute)
 - [ ] Parc safari : balayage + tirage horaire (chaque heure)
@@ -156,6 +156,9 @@ traduction. Ceux des panneaux éphémères sont remplacés par les panneaux `pk:
 
 ## 7. Clés de configuration (`DEFAULTS` v1 → GameConfig)
 
+`migrate-v1` reprend `config.json` tel quel dans `config_overrides` (chemins v1). P2d : signaler les
+clés inconnues de GameConfig plutôt que de les ignorer en silence.
+
 - [ ] `messagePointsDistribution` (7) : `1`, `2`, `3`, `4`, `5`, `6`, `default`
 - [ ] `pokemon` (3) : `enabled`, `generation`, `starterLines`
 - [ ] `pokemon.generationOpenings` (1) : `2`
@@ -187,7 +190,8 @@ traduction. Ceux des panneaux éphémères sont remplacés par les panneaux `pk:
 
 ## 8. Tables v1 → v2
 
-Schéma : `crates/pcr-db/migrations/{game,stats}/0001_init.sql`. La conversion des données est P2c.
+Schéma : `crates/pcr-db/migrations/{game,stats}/0001_init.sql`. Conversion : `pcr migrate-v1`
+(`crates/pcr-db/src/migrate_v1/`), contre le schéma v1 gelé à v1.22.1 (`v1_points.sql`, `v1_botdata.sql`).
 
 `pcr.db` (persistante) :
 
@@ -201,7 +205,7 @@ Schéma : `crates/pcr-db/migrations/{game,stats}/0001_init.sql`. La conversion d
 - [x] `bet_stats` · `command_stats` · `emoji_stats` · `message_reactions` · `message_stats` · `pokemon_ball_stats` · `pokemon_daily_stats` · `pokemon_highlights` · `pokemon_species_stats` · `pokemon_stats` · `randomizabaise_stats` · `reaction_stats` · `voice_time` · `word_stats`
 - ~~`messages`~~ (autodel abandonnée) · ~~`progress`~~ (curseur v1)
 
-### Écarts de schéma à convertir (P2c)
+### Écarts de schéma convertis par `migrate-v1`
 
 Partout : identifiants Discord `TEXT` → `INTEGER` ; booléens et statuts fermés par `CHECK` ; clés
 étrangères actives. Les jours historiques restent tels quels (UTC en v1, Paris ensuite) : migrer hors de
@@ -225,7 +229,8 @@ la bascule se décalent d'un jour.
   d'une estimation → `NULL`.
 - `reminders` : `guild_id` supprimée ; `sent` → `sent_at` (un rappel envoyé sans date prend `trigger_at`).
 - `pokemon_state.spawning` supprimée (apparition et revendication dans une même transaction).
-- `pokemon_spawns.rarity` `NULL` → recalculée depuis l'espèce (la v2 l'exige).
+- `pokemon_spawns.rarity` `NULL` : la conversion refuse (la v1 l'écrit toujours ; la recalculer
+  demanderait les données d'espèces).
 - `pokemon_trades` : espèce `0` (« pas de Pokémon ») → `NULL`, `to_user_id = ''` (offre ouverte) → `NULL` ;
   de même `pokemon_trade_drafts.to_user_id = ''` → `NULL`.
 - `pokemon_fusions` → `pokemon_evolutions`.
@@ -236,11 +241,15 @@ la bascule se décalent d'un jour.
   de `pokemon_trades` résolues dans l'année) ; `date` → `day` ; `voice_time.longest_session` →
   `longest_session_ms`, `join_time` → `joined_at` (remis à `NULL`) ; `pokemon_stats.fusions`/
   `fusion_points` → `evolutions`/`evolution_points`.
-- **Plus strict que la v1**, à contrôler avant d'insérer et à lister dans le rapport d'invariants :
-  `pokemon_lottery.wins <= draws` ; `emoji_stats.emoji` `NULL` (réaction d'un emoji serveur supprimé,
-  ligne écartée) ; `randomizabaise_stats.user_a`/`user_b` `NULL` ; orphelins des nouvelles clés
-  étrangères (`pokemon_throws.spawn_id`, `pokemon_drops.spawn_id`, `counter_of` des échanges et
-  brouillons, `pokemon_safari_*`, `pokemon_starter_rewards` → `pokemon_starters`, options de paris).
+- **Plus strict que la v1**, chaque cas compté dans le rapport :
+  - écartés : identifiants de membre invalides (dont `__global__`), lancers et captures/actions safari
+    orphelins, récompenses de starter sans starter, options de pari en double ou orphelines, mises sur
+    une option absente, `emoji_stats.emoji` `NULL` (emoji serveur supprimé), `randomizabaise_stats`
+    sans membre tiré ;
+  - corrigés : `pokemon_lottery.wins` ramené à `draws`, compteurs d'objets négatifs ramenés à 0,
+    `spawn_id` d'un objet au sol, `park_id` d'une visite et `counter_of` d'un échange ou brouillon
+    orphelins → `NULL` ;
+  - toute autre valeur refusée par un `CHECK` fait échouer la conversion, sans rien écrire.
 
 ## 9. Correctifs v1 postérieurs au gel
 

@@ -18,3 +18,6 @@
 - `backup` : `vacuum_into` (copie cohérente, bot en marche) et `is_pcr_database`. Toute table qui stocke un
   salon/message Discord ou une action envers des membres doit être neutralisée dans
   `import_prod::neutralize` (appelé par `pcr import-prod`).
+- `migrate_v1` (`pcr migrate-v1`) : conversion des bases v1 sur des copies attachées, une transaction par
+  base, rapport d'invariants. `v1_*.sql` est le schéma v1 gelé, produit par le code v1 : ne jamais le
+  retoucher à la main. Toute colonne v2 ajoutée avant la bascule doit y trouver sa source (ou son défaut).

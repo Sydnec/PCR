@@ -10,6 +10,7 @@
 pub mod backup;
 pub mod import_prod;
 pub mod meta;
+pub mod migrate_v1;
 mod pool;
 
 pub use pool::{Db, DbError, StatsDb};
