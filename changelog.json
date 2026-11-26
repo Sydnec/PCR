@@ -1,7 +1,24 @@
 {
-  "version": "1.22.1",
-  "lastUpdated": "2026-11-11T23:00:50.218Z",
+  "version": "1.22.2",
+  "lastUpdated": "2026-11-26T20:51:38.601Z",
   "releases": [
+    {
+      "version": "1.22.2",
+      "date": "2026-11-26",
+      "title": "Release 1.22.2",
+      "features": [
+        {
+          "type": "enhancement",
+          "name": "Purge des messages d'un membre plus rapide",
+          "description": "/admin purge-membre parcourt plusieurs salons à la fois et supprime au fil de la lecture ; son avancement est suivi dans le journal du bot.",
+          "announce": false,
+          "author": "Sydnec",
+          "commit": "pending",
+          "timestamp": "2026-11-12T00:17:10.000Z",
+          "branch": "dev/nifty-gauss-89lh5q"
+        }
+      ]
+    },
     {
       "version": "1.22.1",
       "date": "2026-11-11",
@@ -3045,16 +3062,5 @@
       ]
     }
   ],
-  "pending": [
-    {
-      "type": "enhancement",
-      "name": "Purge des messages d'un membre plus rapide",
-      "description": "/admin purge-membre parcourt plusieurs salons à la fois et supprime au fil de la lecture ; son avancement est suivi dans le journal du bot.",
-      "announce": false,
-      "author": "Sydnec",
-      "commit": "pending",
-      "timestamp": "2026-11-12T00:17:10.000Z",
-      "branch": "dev/nifty-gauss-89lh5q"
-    }
-  ]
+  "pending": []
 }
