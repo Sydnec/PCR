@@ -5,8 +5,11 @@
   (clippy l'impose) ; `FixedClock` pour les tests.
 - Hasard : un `rand::Rng` passé en paramètre, jamais tiré en interne (tests à graine fixe).
 - `instance` : config non secrète d'une instance (IDs Discord, URL, écoute), lue depuis `instance.toml`.
-- À venir : `config` (GameConfig : macro clé/type/défaut/bornes/libellé), `refusal` (textes FR des refus),
-  `ids` (codec `custom_id`, grammaire v1), un module par fonctionnalité (`lottery`, `safari`…).
+- `config` : `GameConfig`, déclarée par `section!` (clé v1, type, défaut v1) ; `v1_defaults.json` (écrit par la
+  v1) prouve l'égalité des défauts. `edit` : chemins, conversion de saisie (textes v1), surcharges ;
+  `bounds` : bornes v1 ; `render` : affichage v1. Un réglage ajouté se déclare dans sa section, rien d'autre.
+- `refusal::Refusal` : le texte d'un refus montré à un membre.
+- À venir : `ids` (codec `custom_id`, grammaire v1), un module par fonctionnalité (`lottery`, `safari`…).
 - Données Pokémon : `data/pokemon.json` (251 espèces : `id`, `name` FR, `generation`, `catchRate`, `stage`,
   `isLegendary`, `isMythical`, `isBaby`, `genderRate`, `evolvesFrom/Into`, `sprite`, `forms`) et
   `data/fishing.json` (`rods.{old,good,super}` = paires `[speciesId, poids]`) : converties en tableaux
