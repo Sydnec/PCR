@@ -77,15 +77,25 @@ async fn serve(instance: Instance) -> anyhow::Result<()> {
         }
     });
 
-    let web = tokio::spawn(pcr_web::serve(app.clone(), changed(stopped.clone())));
-    let discord = pcr_discord::run(app, token, stopped).await;
-    // Quelle que soit la fin de la boucle Discord (signal ou erreur fatale), on arrête aussi le site.
-    stop.send_replace(true);
-    let web = web.await.context("web task panicked")?;
+    let mut web = tokio::spawn(pcr_web::serve(app.clone(), changed(stopped.clone())));
+    let mut discord = tokio::spawn(pcr_discord::run(app, token, stopped));
+    // La première tâche qui s'arrête (signal, ou site incapable d'écouter) arrête l'autre : jamais de
+    // bot sans site ni de site sans bot qui tournerait sans que personne le sache.
+    let (web, discord) = tokio::select! {
+        web_result = &mut web => {
+            stop.send_replace(true);
+            (web_result, discord.await)
+        }
+        discord_result = &mut discord => {
+            stop.send_replace(true);
+            (web.await, discord_result)
+        }
+    };
 
     db.close().await;
-    discord?;
-    web.context("web server failed")
+    discord.context("discord task panicked")??;
+    web.context("web task panicked")?
+        .context("web server failed")
 }
 
 /// Se résout dès que le drapeau d'arrêt est levé.

@@ -56,19 +56,52 @@ pub async fn run(
     loop {
         let event = tokio::select! {
             event = shard.next_event(EventTypeFlags::all()) => event,
-            _ = shutdown.changed() => {
-                shard.close(CloseFrame::NORMAL);
+            () = stop_requested(&mut shutdown) => {
+                close_gracefully(&mut shard).await;
                 ctx.app.health.set_discord_ready(false);
-                tracing::info!("discord gateway closed");
                 return Ok(());
             }
         };
         match event {
             Some(Ok(event)) => handle_event(&ctx, event),
             Some(Err(source)) => tracing::warn!(?source, "gateway event error"),
-            None => return Ok(()),
+            None => {
+                // Fermeture définitive (jeton refusé, intents non autorisés) : le site continue de
+                // tourner, `/healthz` signale `discord: false`, et on attend l'arrêt demandé.
+                ctx.app.health.set_discord_ready(false);
+                tracing::error!("discord gateway closed for good, check the token and intents");
+                stop_requested(&mut shutdown).await;
+                return Ok(());
+            }
         }
     }
+}
+
+/// Envoie la trame de fermeture : twilight ne l'émet que si la shard est encore lue ensuite.
+/// Sans elle, Discord affiche le bot en ligne jusqu'à l'expiration de sa présence.
+async fn close_gracefully(shard: &mut Shard) {
+    const CLOSE_TIMEOUT: Duration = Duration::from_secs(5);
+
+    shard.close(CloseFrame::NORMAL);
+    // Les trames de fermeture passent toujours le filtre : `empty()` ignore tout le reste.
+    let drain = async {
+        while let Some(item) = shard.next_event(EventTypeFlags::empty()).await {
+            if matches!(item, Ok(Event::GatewayClose(_))) {
+                break;
+            }
+        }
+    };
+    if tokio::time::timeout(CLOSE_TIMEOUT, drain).await.is_ok() {
+        tracing::info!("discord gateway closed");
+    } else {
+        tracing::warn!("discord gateway did not acknowledge the close in time");
+    }
+}
+
+/// Attend que l'arrêt soit demandé. Le verrou de lecture du `watch` est relâché avant de rendre la
+/// main : le garder à travers un `await` rendrait la tâche non `Send`.
+async fn stop_requested(shutdown: &mut watch::Receiver<bool>) {
+    let _ = shutdown.wait_for(|stop| *stop).await;
 }
 
 /// Remplace en bloc les commandes de guilde, en réessayant avec un délai croissant.
@@ -97,7 +130,7 @@ async fn register_commands(
         }
         tokio::select! {
             () = tokio::time::sleep(delay) => {}
-            _ = shutdown.wait_for(|stop| *stop) => return false,
+            () = stop_requested(shutdown) => return false,
         }
         delay = (delay * 2).min(MAX_RETRY);
     }
