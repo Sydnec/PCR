@@ -94,7 +94,7 @@ traduction. Ceux des panneaux éphémères sont remplacés par les panneaux `pk:
 - [ ] Saints et fêtes du jour (`COTD_CRON_TIMER`)
 - [ ] Rappels échus envoyés en MP (chaque minute) ; purge des rappels envoyés depuis plus de 7 jours
 - [ ] Fuite des Pokémon (chaque minute)
-- [ ] Réparation des messages publics (toutes les 5 min, et au démarrage)
+- [ ] Réparation des messages publics (toutes les 5 min, et au démarrage) : lignes `public_messages` en retard dont `changed_at` tombe dans `repairWindowHours`, passé `repairGraceSeconds` (les vieux messages v1 restés sans fin n'y entrent pas)
 - [ ] Éclosion des œufs (chaque minute)
 - [ ] Ouverture des générations + récap de saison (chaque minute)
 - [ ] Parc safari : balayage + tirage horaire (chaque heure)
@@ -155,6 +155,9 @@ traduction. Ceux des panneaux éphémères sont remplacés par les panneaux `pk:
 - [ ] **Nouveau** : `GET /api/events` (SSE), polling conservé en secours
 
 ## 7. Clés de configuration (`DEFAULTS` v1 → GameConfig)
+
+`migrate-v1` reprend `config.json` tel quel dans `config_overrides` (chemins v1). P2d : signaler les
+clés inconnues de GameConfig plutôt que de les ignorer en silence.
 
 - [ ] `messagePointsDistribution` (7) : `1`, `2`, `3`, `4`, `5`, `6`, `default`
 - [ ] `pokemon` (3) : `enabled`, `generation`, `starterLines`

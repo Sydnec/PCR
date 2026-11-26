@@ -1,126 +1,29 @@
 //! Tests de la conversion v1 → v2 sur la fixture synthétique (schéma v1 gelé + `fixture_*.sql`).
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-use sqlx::{Connection as _, SqliteConnection, SqlitePool, sqlite::SqliteConnectOptions};
+use sqlx::SqlitePool;
 
-use super::{MigrateError, Options, Report, Sources, Targets, migrate, schema};
-
-const FIXTURE_POINTS: &str = include_str!("fixture_points.sql");
-const FIXTURE_BOTDATA: &str = include_str!("fixture_botdata.sql");
-const FIXTURE_CONFIG: &str = r#"{"pokemon": {"spawn": {"shinyOdds": 512, "pingRarities": ["RARE", "TRES_RARE"]}},
-        "birthday": {"enabled": false}}"#;
-
-struct Fixture {
-    dir: PathBuf,
-    sources: Sources,
-    targets: Targets,
-}
-
-impl Fixture {
-    /// Bases v1 de la fixture dans un dossier propre au test ; `tweak` les abîme au besoin.
-    async fn new(name: &str, tweak: &'static str) -> Self {
-        let dir = std::env::temp_dir().join(format!("pcr-migrate-{name}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        let v1 = dir.join("v1");
-        std::fs::create_dir_all(&v1).expect("temp dir");
-        let points = v1.join("points.db");
-        let botdata = v1.join("botdata-2026.db");
-        let config = v1.join("config.json");
-        build(&points, schema::POINTS_DDL, FIXTURE_POINTS, tweak).await;
-        build(&botdata, schema::BOTDATA_DDL, FIXTURE_BOTDATA, "").await;
-        std::fs::write(&config, FIXTURE_CONFIG).expect("config.json");
-        Self {
-            sources: Sources {
-                points,
-                botdata,
-                config: Some(config),
-            },
-            targets: Targets {
-                pcr_db: dir.join("pcr.db"),
-                stats_db: dir.join("stats-2026.db"),
-            },
-            dir,
-        }
-    }
-
-    async fn migrate(&self) -> Result<Report, MigrateError> {
-        let options = Options {
-            now_ms: 1_764_200_000_000,
-            neutralize: false,
-        };
-        migrate(&self.sources, &self.targets, options).await
-    }
-
-    fn nothing_written(&self) -> bool {
-        !self.targets.pcr_db.exists()
-            && !self.targets.stats_db.exists()
-            && !self.dir.join("migrate-v1.work").exists()
-    }
-}
-
-impl Drop for Fixture {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.dir);
-    }
-}
-
-async fn build(path: &Path, ddl: &'static str, rows: &'static str, tweak: &'static str) {
-    let options = SqliteConnectOptions::new()
-        .filename(path)
-        .create_if_missing(true);
-    let mut conn = SqliteConnection::connect_with(&options)
-        .await
-        .expect("create v1 base");
-    sqlx::raw_sql(ddl)
-        .execute(&mut conn)
-        .await
-        .expect("v1 schema");
-    sqlx::raw_sql(rows)
-        .execute(&mut conn)
-        .await
-        .expect("fixture rows");
-    if !tweak.is_empty() {
-        sqlx::raw_sql(tweak)
-            .execute(&mut conn)
-            .await
-            .expect("tweak");
-    }
-    conn.close().await.expect("close");
-}
-
-async fn open(path: &Path) -> SqlitePool {
-    SqlitePool::connect_with(SqliteConnectOptions::new().filename(path).read_only(true))
-        .await
-        .expect("open v2 base")
-}
-
-/// Une valeur scalaire, `None` pour NULL.
-async fn value(pool: &SqlitePool, sql: &'static str) -> Option<i64> {
-    sqlx::query_scalar(sql).fetch_one(pool).await.expect(sql)
-}
-
-fn notes<'a>(report: &'a Report, table: &str) -> Vec<&'a str> {
-    report
-        .tables
-        .iter()
-        .filter(|t| t.table == table)
-        .flat_map(|t| t.notes.iter().map(String::as_str))
-        .collect()
-}
-
-fn check<'a>(report: &'a Report, name: &str) -> &'a super::Check {
-    report
-        .checks
-        .iter()
-        .find(|c| c.name == name)
-        .unwrap_or_else(|| panic!("check {name}"))
-}
+use super::{
+    MigrateError, Report,
+    fixture::{Fixture, Tweak, check, notes, open, value},
+};
 
 #[tokio::test]
 async fn the_fixture_converts_with_every_correction_reported() {
-    let fixture = Fixture::new("ok", "").await;
+    let fixture = Fixture::new("ok", Tweak::None).await;
+    let read = |path: &Path| std::fs::read(path).expect("v1 file");
+    let before = (
+        read(&fixture.sources.points),
+        read(&fixture.sources.botdata),
+    );
     let report = fixture.migrate().await.expect("conversion");
+    // Les fichiers v1 ne sont que lus : la prod doit rester intacte, conversion réussie ou non.
+    let after = (
+        read(&fixture.sources.points),
+        read(&fixture.sources.botdata),
+    );
+    assert!(before == after, "v1 files were modified");
     let game = open(&fixture.targets.pcr_db).await;
     let stats = open(&fixture.targets.stats_db).await;
 
@@ -374,7 +277,11 @@ async fn expect_stats(stats: &SqlitePool, report: &Report) {
 
 #[tokio::test]
 async fn a_v1_schema_that_drifted_from_the_frozen_one_is_refused() {
-    let fixture = Fixture::new("schema", "ALTER TABLE points ADD COLUMN streak INTEGER").await;
+    let fixture = Fixture::new(
+        "schema",
+        Tweak::Points("ALTER TABLE points ADD COLUMN streak INTEGER"),
+    )
+    .await;
     let error = fixture.migrate().await.expect_err("unknown column");
     assert!(
         matches!(&error, MigrateError::Schema { gaps, .. } if gaps == &["unknown column points.streak"]),
@@ -385,14 +292,19 @@ async fn a_v1_schema_that_drifted_from_the_frozen_one_is_refused() {
 
 #[tokio::test]
 async fn a_conversion_that_fails_midway_leaves_nothing_behind() {
-    // Un statut que la v2 refuse, sur une table convertie après bien d'autres.
-    let fixture = Fixture::new("abort", "UPDATE pokemon_safari_parks SET status = 'PAUSED'").await;
+    // Un type de moment notable que la v2 refuse, dans la base de stats : `pcr.db` est alors déjà
+    // entièrement convertie, et ne doit pas rester non plus.
+    let fixture = Fixture::new(
+        "abort",
+        Tweak::Botdata("UPDATE pokemon_highlights SET type = 'BOGUS'"),
+    )
+    .await;
     let error = fixture.migrate().await.expect_err("check constraint");
     assert!(
         matches!(
             error,
             MigrateError::Step {
-                table: "pokemon_safari_parks",
+                table: "pokemon_highlights",
                 ..
             }
         ),

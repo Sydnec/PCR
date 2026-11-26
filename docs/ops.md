@@ -217,7 +217,9 @@ sudo systemctl start pcr
 ```
 
 - `migrate-v1` lit des copies des fichiers v1, refuse un schéma v1 qui n'est pas celui de la v1 gelée
-  (v1.22.1) et ne remplace jamais une base v2 existante. En cas d'échec, rien n'est écrit.
+  (v1.22.1) et ne remplace jamais une base v2 existante. En cas d'échec, rien n'est écrit ; l'erreur
+  nomme la table et la contrainte qu'une ligne v1 viole. Une seule conversion à la fois (dossier de
+  travail commun).
 - Sur dev, il neutralise la copie comme `import-prod`.
 - Le rapport liste, table par table, les lignes lues, écrites, écartées ou corrigées, puis des
   contrôles (soldes, collections, paris ouverts, rappels, totaux du serveur). Un `ÉCART` dit ce qui

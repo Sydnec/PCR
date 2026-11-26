@@ -3,8 +3,11 @@
 //!
 //! Un message est à jour (`synced_version = version`) si sa fin a été écrite, ou si son entité est
 //! encore ouverte (la v1 le réécrivait à chaque changement). Une entité terminée dont la fin n'a pas
-//! été écrite reste en retard : le worker de la v2 la rattrapera, comme le faisait la réparation v1.
-//! Sans salon ou sans message (touche de pêche, envoi jamais abouti), pas de ligne.
+//! été écrite reste en retard : le worker de la v2 la rattrapera, comme le faisait la réparation v1,
+//! seulement si son dernier changement (`changed_at`) tombe dans `publicMessages.repairWindowHours`.
+//! Les vieux messages restés sans fin en v1 n'y entrent pas : ils restent tels quels, comme en v1.
+//! Sans salon ou sans message (touche de pêche, envoi jamais abouti), pas de ligne : en v1 non plus,
+//! le message n'existait pas sur Discord.
 
 use sqlx::SqliteConnection;
 
@@ -20,7 +23,7 @@ struct Source {
     message: &'static str,
     /// Condition SQL : le message montre déjà l'état courant.
     synced: &'static str,
-    /// Le dernier changement d'état, d'où part la fenêtre de rattrapage.
+    /// Le dernier changement d'état, d'où part la fenêtre de rattrapage du worker.
     changed_at: &'static str,
 }
 

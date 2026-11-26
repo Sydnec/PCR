@@ -12,6 +12,8 @@
 
 mod config;
 mod economy;
+#[cfg(test)]
+mod fixture;
 mod items;
 mod messages;
 mod pokemon;
@@ -39,7 +41,8 @@ pub struct Sources {
     pub config: Option<PathBuf>,
 }
 
-/// Les bases v2 à créer ; aucune ne doit exister.
+/// Les bases v2 à créer ; aucune ne doit exister. Les deux dans le même dossier : le dossier de
+/// travail est leur voisin, et un renommage ne traverse pas les systèmes de fichiers.
 #[derive(Debug, Clone)]
 pub struct Targets {
     pub pcr_db: PathBuf,
@@ -134,9 +137,13 @@ async fn run(
     stats.close().await;
     converted?;
 
-    // `pcr.db` en dernier : c'est sa présence qui dit qu'une conversion a eu lieu.
+    // `pcr.db` en dernier : c'est sa présence qui dit qu'une conversion a eu lieu. S'il ne peut pas
+    // prendre sa place, la base de stats repart aussi : une relance ne doit pas buter sur elle.
     std::fs::rename(&stats_path, &targets.stats_db)?;
-    std::fs::rename(&game, &targets.pcr_db)?;
+    if let Err(error) = std::fs::rename(&game, &targets.pcr_db) {
+        let _ = std::fs::remove_file(&targets.stats_db);
+        return Err(error.into());
+    }
     Ok(report)
 }
 
