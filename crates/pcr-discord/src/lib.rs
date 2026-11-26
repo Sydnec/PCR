@@ -7,6 +7,7 @@
 mod announce;
 mod commands;
 mod interactions;
+mod public_messages;
 mod ui;
 
 use std::{
@@ -57,6 +58,15 @@ pub async fn run(
         application_id,
         started: Arc::default(),
     };
+    // Le worker vit avec la connexion Discord : sans elle, il n'aurait rien à écrire.
+    tokio::spawn(pcr_app::public_messages::run(
+        ctx.app.clone(),
+        Arc::new(public_messages::DiscordPublicMessages {
+            app: ctx.app.clone(),
+            http: Arc::clone(&ctx.http),
+        }),
+        shutdown.clone(),
+    ));
     // Une panne de Discord ne doit pas faire tomber le site : on réessaie jusqu'à réponse ou arrêt.
     if !register_commands(&ctx, guild_id, &mut shutdown).await {
         return Ok(());

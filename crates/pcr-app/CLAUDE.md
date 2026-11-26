@@ -13,3 +13,6 @@
 - Stats : `app.stats.add(instant, Counter, delta)` (compteurs de `pcr_db::stats`), écrites par lots toutes les
   15 s et à l'arrêt dans `stats-<année de Paris de l'instant>.db` : la bascule du 1er janvier n'a besoin de
   rien d'autre. Un nouveau compteur s'ajoute à `pcr_db::stats::Counter` avec son upsert.
+- Messages publics : dans la transaction du cas d'usage, `pcr_db::public_messages::create` / `touch` ; après
+  le commit, `app.public_messages_changed()`. Le worker (`public_messages::run`, lancé par `pcr-discord`)
+  écrit un message à la fois, rattrape au démarrage puis toutes les 5 min (grâce et fenêtre de GameConfig).
