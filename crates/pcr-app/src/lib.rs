@@ -7,6 +7,9 @@
 pub mod announcements;
 pub mod config;
 pub mod health;
+pub mod jobs;
+pub mod public_messages;
+pub mod stats;
 
 use std::sync::Arc;
 
@@ -29,10 +32,15 @@ pub struct App {
     /// Une modification de la config à la fois : valider, écrire et recharger d'un tenant, pour
     /// qu'un rechargement lent ne remette pas en service une lecture antérieure à une autre écriture.
     pub(crate) config_writes: Arc<tokio::sync::Mutex<()>>,
+    /// Les compteurs de l'année, écrits par lots (`stats::run`).
+    pub stats: Arc<stats::Stats>,
+    /// Réveille le worker des messages publics (`public_messages_changed`).
+    pub public_messages: Arc<tokio::sync::Notify>,
 }
 
 impl App {
     pub fn new(db: Db, clock: Arc<dyn Clock>, instance: Instance) -> Self {
+        let stats = Arc::new(stats::Stats::new(instance.data_dir.clone()));
         Self {
             db,
             clock,
@@ -40,6 +48,8 @@ impl App {
             health: Arc::default(),
             config: Arc::default(),
             config_writes: Arc::default(),
+            stats,
+            public_messages: Arc::default(),
         }
     }
 
@@ -47,5 +57,11 @@ impl App {
     /// la modifie pendant ce temps.
     pub fn game_config(&self) -> Arc<pcr_core::config::GameConfig> {
         Arc::clone(&self.config.load().config)
+    }
+
+    /// À appeler après le commit d'un cas d'usage qui a créé ou changé un message public : le worker
+    /// l'écrit sans attendre le rattrapage.
+    pub fn public_messages_changed(&self) {
+        self.public_messages.notify_one();
     }
 }

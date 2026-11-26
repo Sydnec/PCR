@@ -204,6 +204,12 @@ async fn serve(instance: Instance) -> anyhow::Result<()> {
         }
     });
 
+    let stats = tokio::spawn(pcr_app::stats::run(app.clone(), stopped.clone()));
+    let jobs = tokio::spawn(pcr_app::jobs::run(
+        app.clone(),
+        pcr_app::jobs::all(),
+        stopped.clone(),
+    ));
     let mut web = tokio::spawn(pcr_web::serve(app.clone(), changed(stopped.clone())));
     let mut discord = tokio::spawn(pcr_discord::run(app, token, stopped));
     // La première tâche qui s'arrête (signal, ou site incapable d'écouter) arrête l'autre : jamais de
@@ -219,6 +225,15 @@ async fn serve(instance: Instance) -> anyhow::Result<()> {
         }
     };
 
+    // Une tâche en cours finit son passage avant la fermeture de la base.
+    stop.send_replace(true);
+    if let Err(error) = jobs.await {
+        tracing::error!(?error, "jobs task panicked");
+    }
+    // Le dernier lot de stats part avant l'arrêt.
+    if let Err(error) = stats.await {
+        tracing::error!(?error, "stats task panicked");
+    }
     db.close().await;
     discord.context("discord task panicked")??;
     web.context("web task panicked")?

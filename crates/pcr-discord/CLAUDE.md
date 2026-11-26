@@ -11,3 +11,5 @@
 - Délai de 3 s : différer (`defer`) avant tout travail lent ; images dans `spawn_blocking`.
 - Intents : seulement ceux qu'une fonctionnalité utilise (membres et contenu des messages sont privilégiés).
 - `announce.rs` : au premier READY, annonce de version (prod) ou aperçu des fragments en attente (dev).
+- `public_messages.rs` : le port d'écriture des messages publics. Un type de message = un rendu dans
+  `renderer()`, qui relit la base au moment d'écrire ; codes Discord « disparu » repris de la v1.

@@ -10,8 +10,11 @@
 pub mod backup;
 pub mod config;
 pub mod import_prod;
+pub mod jobs;
 pub mod meta;
 pub mod migrate_v1;
 mod pool;
+pub mod public_messages;
+pub mod stats;
 
 pub use pool::{Db, DbError, StatsDb};

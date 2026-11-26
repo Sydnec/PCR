@@ -6,6 +6,13 @@
   `(Outcome, Vec<Event>)` ; l'appelant publie les événements après le commit.
 - Jamais d'appel Discord ou HTTP pendant une transaction. Les besoins Discord (MP, messages publics,
   membres) passent par des traits (« ports ») implémentés dans `pcr-discord`.
-- Jobs planifiés (P2) : `croner` en heure de Paris + table `job_runs(job, period_key)` pour rattraper
-  une échéance manquée et ne jamais l'exécuter deux fois. Aucun job entre 02 h et 03 h (changements d'heure).
-- Les stats sont mises en tampon et écrites par lots (~15 s) dans la base de l'année.
+- Tâches de calendrier : `jobs::all()`, échéance `pcr_core::schedule::Schedule` (quotidienne ou annuelle,
+  heure de Paris, jamais entre 2 h et 3 h) revendiquée dans `job_runs` : une fois par période, rattrapée au
+  démarrage tant que la période dure. Pas de `croner` : il tire chrono, écarté du projet. Les balayages
+  (fuites, rappels échus…) sont des boucles idempotentes par l'état en base, hors `jobs`.
+- Stats : `app.stats.add(instant, Counter, delta)` (compteurs de `pcr_db::stats`), écrites par lots toutes les
+  15 s et à l'arrêt dans `stats-<année de Paris de l'instant>.db` : la bascule du 1er janvier n'a besoin de
+  rien d'autre. Un nouveau compteur s'ajoute à `pcr_db::stats::Counter` avec son upsert.
+- Messages publics : dans la transaction du cas d'usage, `pcr_db::public_messages::create` / `touch` ; après
+  le commit, `app.public_messages_changed()`. Le worker (`public_messages::run`, lancé par `pcr-discord`)
+  écrit un message à la fois, rattrape au démarrage puis toutes les 5 min (grâce et fenêtre de GameConfig).
