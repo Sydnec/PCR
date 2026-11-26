@@ -178,7 +178,9 @@ deploy/copy-prod-to-dev.sh pcr-prod pcr-dev
 La dernière sauvegarde quotidienne de prod transite par ta machine (les VM ne se parlent pas), puis `pcr-import-prod` l'importe sur dev :
 1. il sauvegarde la base de dev ;
 2. il arrête le bot ;
-3. `pcr import-prod` valide le fichier, le migre et neutralise ce qui pointe vers la prod ;
+3. `pcr import-prod` valide le fichier, le migre et neutralise ce qui pointe vers la prod : messages
+   publics marqués disparus (le dev ne les éditera jamais), rappels en attente marqués envoyés,
+   brouillons d'échange et sessions du site supprimés ;
 4. il redémarre le bot.
 
 Chaque copie prouve au passage qu'une sauvegarde se restaure.

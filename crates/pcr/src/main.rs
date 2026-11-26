@@ -9,7 +9,7 @@ use anyhow::Context as _;
 use clap::{Parser, Subcommand};
 use pcr_app::App;
 use pcr_core::{
-    clock::SystemClock,
+    clock::{Clock as _, SystemClock},
     instance::{Env, Instance},
 };
 use pcr_db::Db;
@@ -97,12 +97,14 @@ async fn import_prod(instance: &Instance, file: &Path) -> anyhow::Result<()> {
         let _ = std::fs::remove_file(dest.with_extension(leftover));
     }
     pcr_db::backup::vacuum_into(file, &staging).await?;
-    // Migre la copie au schéma de ce binaire *avant* de remplacer quoi que ce soit : un échec laisse
-    // la base de dev intacte. Dès qu'une table référencera un salon, un message Discord ou une action
-    // envers des membres (spawns, échanges, rappels…), sa neutralisation s'ajoutera ici : le bot de
-    // dev ne doit ni éditer la prod ni écrire à de vrais membres.
+    // Migre et neutralise la copie *avant* de remplacer quoi que ce soit : un échec laisse la base de
+    // dev intacte, et le bot de dev ne démarre jamais sur des données qui éditeraient la prod ou
+    // écriraient à de vrais membres.
     let db = Db::open(&staging).await?;
+    let neutralized = pcr_db::import_prod::neutralize(&db, SystemClock.now_ms()).await;
     db.close().await;
+    let neutralized = neutralized?;
+    tracing::info!(?neutralized, "prod references neutralized");
     // La fermeture rapatrie le WAL dans le fichier ; s'il en restait un, le renommage perdrait des pages.
     anyhow::ensure!(
         !staging.with_extension("importing-wal").exists(),

@@ -16,4 +16,5 @@
 - `points.balance` ne bouge que par la fonction de `points` qui écrit `points_log` dans la même
   transaction (pas de déclencheur : il daterait avec l'horloge de SQLite, pas avec `Clock`).
 - `backup` : `vacuum_into` (copie cohérente, bot en marche) et `is_pcr_database`. Toute table qui stocke un
-  salon/message Discord ou une action envers des membres doit être neutralisée par `pcr import-prod`.
+  salon/message Discord ou une action envers des membres doit être neutralisée dans
+  `import_prod::neutralize` (appelé par `pcr import-prod`).
