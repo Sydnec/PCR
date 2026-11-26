@@ -1,11 +1,17 @@
 //! `pcr` : lance le bot et le site, et porte les commandes de maintenance.
 
-use std::{path::PathBuf, sync::Arc};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use anyhow::Context as _;
 use clap::{Parser, Subcommand};
 use pcr_app::App;
-use pcr_core::{clock::SystemClock, instance::Instance};
+use pcr_core::{
+    clock::SystemClock,
+    instance::{Env, Instance},
+};
 use pcr_db::Db;
 use tokio::sync::watch;
 
@@ -25,6 +31,14 @@ enum Command {
     Serve,
     /// Valide le fichier d'instance puis s'arrête.
     CheckConfig,
+    /// Copie cohérente de `pcr.db` vers `--out` (le bot peut tourner pendant ce temps).
+    Backup {
+        #[arg(long)]
+        out: PathBuf,
+    },
+    /// Dev uniquement, bot arrêté : remplace `pcr.db` par une sauvegarde de prod, la migre et
+    /// neutralise ce qui pointe vers la prod.
+    ImportProd { file: PathBuf },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -44,7 +58,56 @@ fn main() -> anyhow::Result<()> {
             Ok(())
         }
         Command::Serve => tokio::runtime::Runtime::new()?.block_on(serve(instance)),
+        Command::Backup { out } => {
+            tokio::runtime::Runtime::new()?.block_on(backup(&instance, &out))
+        }
+        Command::ImportProd { file } => {
+            tokio::runtime::Runtime::new()?.block_on(import_prod(&instance, &file))
+        }
     }
+}
+
+fn database_path(instance: &Instance) -> PathBuf {
+    instance.data_dir.join("pcr.db")
+}
+
+async fn backup(instance: &Instance, out: &Path) -> anyhow::Result<()> {
+    let src = database_path(instance);
+    anyhow::ensure!(src.exists(), "no database at {}", src.display());
+    pcr_db::backup::vacuum_into(&src, out).await?;
+    tracing::info!(out = %out.display(), "backup written");
+    Ok(())
+}
+
+async fn import_prod(instance: &Instance, file: &Path) -> anyhow::Result<()> {
+    // Garde-fou : écraser la base de prod par erreur serait irréparable.
+    anyhow::ensure!(
+        instance.env == Env::Dev,
+        "import-prod only runs on the dev instance"
+    );
+    anyhow::ensure!(
+        pcr_db::backup::is_pcr_database(file).await?,
+        "{} is not a PCR 2.0 database",
+        file.display()
+    );
+
+    let dest = database_path(instance);
+    let staging = dest.with_extension("db.importing");
+    let _ = std::fs::remove_file(&staging);
+    pcr_db::backup::vacuum_into(file, &staging).await?;
+    // Un WAL resté de l'ancienne base ne doit pas être rejoué sur la nouvelle.
+    for suffix in ["db-wal", "db-shm"] {
+        let _ = std::fs::remove_file(dest.with_extension(suffix));
+    }
+    std::fs::rename(&staging, &dest).context("replacing pcr.db")?;
+
+    // Migre la copie au schéma de ce binaire. Dès qu'une table référencera un salon, un message
+    // Discord ou une action envers des membres (spawns, échanges, rappels…), sa neutralisation
+    // s'ajoutera ici : le bot de dev ne doit ni éditer la prod ni écrire à de vrais membres.
+    let db = Db::open(&dest).await?;
+    db.close().await;
+    tracing::info!(from = %file.display(), "prod data imported");
+    Ok(())
 }
 
 fn init_tracing() {

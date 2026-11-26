@@ -7,6 +7,7 @@
 //! Toute requête passe par `sqlx::query!`, vérifiée à la compilation contre le schéma que `build.rs`
 //! construit depuis `migrations/`. Règle : jamais d'`await` Discord ou HTTP dans une transaction.
 
+pub mod backup;
 pub mod meta;
 mod pool;
 
