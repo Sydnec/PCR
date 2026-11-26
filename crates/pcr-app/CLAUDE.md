@@ -10,4 +10,6 @@
   heure de Paris, jamais entre 2 h et 3 h) revendiquée dans `job_runs` : une fois par période, rattrapée au
   démarrage tant que la période dure. Pas de `croner` : il tire chrono, écarté du projet. Les balayages
   (fuites, rappels échus…) sont des boucles idempotentes par l'état en base, hors `jobs`.
-- Les stats sont mises en tampon et écrites par lots (~15 s) dans la base de l'année.
+- Stats : `app.stats.add(instant, Counter, delta)` (compteurs de `pcr_db::stats`), écrites par lots toutes les
+  15 s et à l'arrêt dans `stats-<année de Paris de l'instant>.db` : la bascule du 1er janvier n'a besoin de
+  rien d'autre. Un nouveau compteur s'ajoute à `pcr_db::stats::Counter` avec son upsert.

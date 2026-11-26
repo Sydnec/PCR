@@ -8,6 +8,7 @@ pub mod announcements;
 pub mod config;
 pub mod health;
 pub mod jobs;
+pub mod stats;
 
 use std::sync::Arc;
 
@@ -30,10 +31,13 @@ pub struct App {
     /// Une modification de la config à la fois : valider, écrire et recharger d'un tenant, pour
     /// qu'un rechargement lent ne remette pas en service une lecture antérieure à une autre écriture.
     pub(crate) config_writes: Arc<tokio::sync::Mutex<()>>,
+    /// Les compteurs de l'année, écrits par lots (`stats::run`).
+    pub stats: Arc<stats::Stats>,
 }
 
 impl App {
     pub fn new(db: Db, clock: Arc<dyn Clock>, instance: Instance) -> Self {
+        let stats = Arc::new(stats::Stats::new(instance.data_dir.clone()));
         Self {
             db,
             clock,
@@ -41,6 +45,7 @@ impl App {
             health: Arc::default(),
             config: Arc::default(),
             config_writes: Arc::default(),
+            stats,
         }
     }
 

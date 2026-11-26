@@ -14,5 +14,6 @@ pub mod jobs;
 pub mod meta;
 pub mod migrate_v1;
 mod pool;
+pub mod stats;
 
 pub use pool::{Db, DbError, StatsDb};

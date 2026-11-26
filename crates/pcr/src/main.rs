@@ -204,6 +204,7 @@ async fn serve(instance: Instance) -> anyhow::Result<()> {
         }
     });
 
+    let stats = tokio::spawn(pcr_app::stats::run(app.clone(), stopped.clone()));
     let jobs = tokio::spawn(pcr_app::jobs::run(
         app.clone(),
         pcr_app::jobs::all(),
@@ -228,6 +229,10 @@ async fn serve(instance: Instance) -> anyhow::Result<()> {
     stop.send_replace(true);
     if let Err(error) = jobs.await {
         tracing::error!(?error, "jobs task panicked");
+    }
+    // Le dernier lot de stats part avant l'arrêt.
+    if let Err(error) = stats.await {
+        tracing::error!(?error, "stats task panicked");
     }
     db.close().await;
     discord.context("discord task panicked")??;

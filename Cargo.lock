@@ -1317,9 +1317,11 @@ name = "pcr-app"
 version = "2.0.0-dev"
 dependencies = [
  "arc-swap",
+ "jiff",
  "pcr-core",
  "pcr-db",
  "serde_json",
+ "sqlx",
  "thiserror",
  "tokio",
  "toml",
