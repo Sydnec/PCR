@@ -9,3 +9,7 @@ publish = false
 
 [lints]
 workspace = true
+
+[dependencies]
+pcr-core.workspace = true
+toml.workspace = true
