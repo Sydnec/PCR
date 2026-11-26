@@ -2,7 +2,7 @@ doc-valid-idents = ["SQLite", "OAuth2", "PokéAPI", ".."]
 
 # Time is read only through pcr_core::clock, so every "day" is a Paris day and tests can freeze it.
 disallowed-methods = [
-  { path = "chrono::Utc::now", reason = "use pcr_core::clock::Clock" },
-  { path = "chrono::Local::now", reason = "use pcr_core::clock::Clock" },
+  { path = "jiff::Timestamp::now", reason = "use pcr_core::clock::Clock" },
+  { path = "jiff::ZonedDateTime::now", reason = "use pcr_core::clock::Clock" },
   { path = "std::time::SystemTime::now", reason = "use pcr_core::clock::Clock" },
 ]

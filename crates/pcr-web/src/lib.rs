@@ -14,15 +14,23 @@ const REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
 pub fn router(app: App) -> Router {
     Router::new()
         .route("/healthz", get(health::healthz))
-        .layer(TimeoutLayer::with_status_code(StatusCode::REQUEST_TIMEOUT, REQUEST_TIMEOUT))
+        .layer(TimeoutLayer::with_status_code(
+            StatusCode::REQUEST_TIMEOUT,
+            REQUEST_TIMEOUT,
+        ))
         .layer(TraceLayer::new_for_http())
         .with_state(app)
 }
 
 /// Serves until `shutdown` resolves, then lets in-flight requests finish.
-pub async fn serve(app: App, shutdown: impl Future<Output = ()> + Send + 'static) -> std::io::Result<()> {
+pub async fn serve(
+    app: App,
+    shutdown: impl Future<Output = ()> + Send + 'static,
+) -> std::io::Result<()> {
     let listen = app.instance.web.listen;
     let listener = tokio::net::TcpListener::bind(listen).await?;
     tracing::info!(%listen, "web server listening");
-    axum::serve(listener, router(app)).with_graceful_shutdown(shutdown).await
+    axum::serve(listener, router(app))
+        .with_graceful_shutdown(shutdown)
+        .await
 }

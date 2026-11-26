@@ -34,7 +34,10 @@ mod tests {
         assert_eq!(get(&db, "version").await.expect("get"), None);
         set(&db, "version", "2.0.0").await.expect("set");
         set(&db, "version", "2.0.1").await.expect("overwrite");
-        assert_eq!(get(&db, "version").await.expect("get").as_deref(), Some("2.0.1"));
+        assert_eq!(
+            get(&db, "version").await.expect("get").as_deref(),
+            Some("2.0.1")
+        );
 
         db.close().await;
         std::fs::remove_dir_all(&dir).ok();

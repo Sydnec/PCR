@@ -24,6 +24,11 @@ pub struct App {
 
 impl App {
     pub fn new(db: Db, clock: Arc<dyn Clock>, instance: Instance) -> Self {
-        Self { db, clock, instance: Arc::new(instance), health: Arc::default() }
+        Self {
+            db,
+            clock,
+            instance: Arc::new(instance),
+            health: Arc::default(),
+        }
     }
 }

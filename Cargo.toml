@@ -21,8 +21,8 @@ pcr-web = { path = "crates/pcr-web" }
 anyhow = "1.0.105"
 arc-swap = "1.9.5"
 axum = "0.8.9"
-chrono = { version = "0.4.45", default-features = false, features = ["std", "clock"] }
-chrono-tz = "0.10.4"
+# chrono is unmaintained (RUSTSEC-2026-0543); jiff bundles the tz database for reproducible days.
+jiff = { version = "1.0.3", features = ["tzdb-bundle-always"] }
 clap = { version = "4.6.10", features = ["derive", "env"] }
 # TLS for twilight (gateway + REST); ring needs no C toolchain, unlike aws-lc.
 rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12"] }

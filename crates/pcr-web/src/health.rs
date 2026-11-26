@@ -24,6 +24,10 @@ pub async fn healthz(State(app): State<App>) -> (StatusCode, Json<HealthReport>)
         database,
         discord: app.health.discord_ready(),
     };
-    let status = if database { StatusCode::OK } else { StatusCode::SERVICE_UNAVAILABLE };
+    let status = if database {
+        StatusCode::OK
+    } else {
+        StatusCode::SERVICE_UNAVAILABLE
+    };
     (status, Json(report))
 }

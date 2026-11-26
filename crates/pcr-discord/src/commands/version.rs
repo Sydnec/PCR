@@ -23,10 +23,13 @@ pub async fn panel(ctx: &Ctx) -> Vec<Component> {
         Env::Prod => "production",
         Env::Dev => "développement",
     };
-    let database = if ctx.app.db.ping().await.is_ok() { "OK" } else { "indisponible" };
-    let text = format!(
-        "### PCR {VERSION}\nCommit `{GIT_SHA}` · {env}\nBase de données : {database}"
-    );
+    let database = if ctx.app.db.ping().await.is_ok() {
+        "OK"
+    } else {
+        "indisponible"
+    };
+    let text =
+        format!("### PCR {VERSION}\nCommit `{GIT_SHA}` · {env}\nBase de données : {database}");
     let refresh = ButtonBuilder::new(ButtonStyle::Secondary)
         .custom_id(REFRESH)
         .label("Actualiser")

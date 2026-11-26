@@ -12,7 +12,9 @@ use std::{sync::Arc, time::Duration};
 
 use pcr_app::App;
 use tokio::sync::watch;
-use twilight_gateway::{CloseFrame, Event, EventTypeFlags, Intents, Shard, ShardId, StreamExt as _};
+use twilight_gateway::{
+    CloseFrame, Event, EventTypeFlags, Intents, Shard, ShardId, StreamExt as _,
+};
 use twilight_http::Client;
 use twilight_model::id::{
     Id,
@@ -31,12 +33,20 @@ pub(crate) struct Ctx {
 const INTENTS: Intents = Intents::GUILDS;
 
 /// Connects to Discord, registers the guild commands and handles events until `shutdown` flips.
-pub async fn run(app: App, token: String, mut shutdown: watch::Receiver<bool>) -> anyhow::Result<()> {
+pub async fn run(
+    app: App,
+    token: String,
+    mut shutdown: watch::Receiver<bool>,
+) -> anyhow::Result<()> {
     let http = Arc::new(Client::new(token.clone()));
     let application_id = Id::new(app.instance.discord.application_id);
     let guild_id = Id::new(app.instance.discord.guild_id);
 
-    let ctx = Ctx { app, http, application_id };
+    let ctx = Ctx {
+        app,
+        http,
+        application_id,
+    };
     // A Discord outage must not take the website down: retry until it answers or we stop.
     if !register_commands(&ctx, guild_id, &mut shutdown).await {
         return Ok(());

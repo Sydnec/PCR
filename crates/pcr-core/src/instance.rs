@@ -58,7 +58,8 @@ pub enum InstanceError {
 
 impl Instance {
     pub fn from_toml(text: &str) -> Result<Self, InstanceError> {
-        let instance: Self = toml::from_str(text).map_err(|e| InstanceError::Parse(e.to_string()))?;
+        let instance: Self =
+            toml::from_str(text).map_err(|e| InstanceError::Parse(e.to_string()))?;
         instance.validate()?;
         Ok(instance)
     }
@@ -69,10 +70,16 @@ impl Instance {
             return Err(InstanceError::Invalid("discord ids must be non-zero"));
         }
         if self.web.public_url.ends_with('/') {
-            return Err(InstanceError::Invalid("web.public_url must not end with '/'"));
+            return Err(InstanceError::Invalid(
+                "web.public_url must not end with '/'",
+            ));
         }
-        if !self.web.public_url.starts_with("https://") && !self.web.public_url.starts_with("http://") {
-            return Err(InstanceError::Invalid("web.public_url must be an http(s) URL"));
+        if !self.web.public_url.starts_with("https://")
+            && !self.web.public_url.starts_with("http://")
+        {
+            return Err(InstanceError::Invalid(
+                "web.public_url must be an http(s) URL",
+            ));
         }
         Ok(())
     }
@@ -93,6 +100,9 @@ mod tests {
     #[test]
     fn trailing_slash_in_public_url_is_rejected() {
         let bad = EXAMPLE.replace("dev.example.org\"", "dev.example.org/\"");
-        assert!(matches!(Instance::from_toml(&bad), Err(InstanceError::Invalid(_))));
+        assert!(matches!(
+            Instance::from_toml(&bad),
+            Err(InstanceError::Invalid(_))
+        ));
     }
 }

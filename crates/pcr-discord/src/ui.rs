@@ -22,5 +22,8 @@ pub fn update_panel(components: Vec<Component>) -> InteractionResponse {
 
 /// A plain ephemeral text answer (refusals, errors).
 pub fn ephemeral_text(text: impl Into<String>) -> InteractionResponse {
-    ChannelMessageBuilder::new().content(text).flags(MessageFlags::EPHEMERAL).build()
+    ChannelMessageBuilder::new()
+        .content(text)
+        .flags(MessageFlags::EPHEMERAL)
+        .build()
 }
