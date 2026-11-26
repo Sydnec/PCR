@@ -37,6 +37,8 @@ pub struct Discord {
     /// données de prod ne fasse jamais écrire le bot de dev à de vrais membres.
     #[serde(default)]
     pub dm_allowlist: Vec<u64>,
+    /// Salon des annonces de version (prod) ou des aperçus d'annonce (dev). Absent : pas d'annonce.
+    pub changelog_channel_id: Option<u64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
