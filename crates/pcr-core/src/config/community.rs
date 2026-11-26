@@ -18,6 +18,14 @@ section! {
 }
 
 section! {
+    /// Règles des gains de messages propres à la v2 : la v1 les codait en dur.
+    pub struct MessagePointsRules {
+        /// Carence entre deux messages récompensés ; minuit (Paris) la lève.
+        cooldown_minutes "cooldownMinutes": u32 = 60,
+    }
+}
+
+section! {
     /// L'API du site.
     pub struct Web {
         /// Durée d'une session avant qu'il faille se reconnecter par Discord.

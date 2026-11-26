@@ -16,7 +16,8 @@ mod safari;
 mod section;
 
 pub use community::{
-    Birthday, Links, MessagePoints, PublicMessages, PurgeMember, Redistribution, Translation, Web,
+    Birthday, Links, MessagePoints, MessagePointsRules, PublicMessages, PurgeMember,
+    Redistribution, Translation, Web,
 };
 pub use items::{Charm, EvolutionItem, Item, Items, Rod};
 pub use pokemon::{
@@ -31,6 +32,8 @@ section! {
     /// La configuration de jeu complète, telle que la lisent les cas d'usage.
     pub struct GameConfig {
         message_points_distribution "messagePointsDistribution": MessagePoints = MessagePoints::default(),
+        /// Propre à la v2 (absent du `DEFAULTS` v1).
+        message_points "messagePoints": MessagePointsRules = MessagePointsRules::default(),
         pokemon "pokemon": Pokemon = Pokemon::default(),
         web "web": Web = Web::default(),
         public_messages "publicMessages": PublicMessages = PublicMessages::default(),
@@ -49,6 +52,8 @@ mod tests {
 
     /// Le `DEFAULTS` de la v1, écrit par la v1 elle-même (`JSON.stringify`).
     const V1_DEFAULTS: &str = include_str!("v1_defaults.json");
+    /// Les branches que la v2 ajoute : la v1 codait ces règles en dur, avec la même valeur.
+    const V2_ONLY: &[&str] = &["messagePoints"];
 
     /// JavaScript ne distingue pas 1 de 1.0 : on compare les nombres en flottants.
     fn normalize(value: Value) -> Value {
@@ -68,7 +73,10 @@ mod tests {
     #[test]
     fn defaults_are_exactly_the_v1_defaults() {
         let v1: Value = serde_json::from_str(V1_DEFAULTS).expect("v1 defaults");
-        let v2 = serde_json::to_value(GameConfig::default()).expect("serialize");
+        let mut v2 = serde_json::to_value(GameConfig::default()).expect("serialize");
+        for key in V2_ONLY {
+            v2.as_object_mut().expect("tree").remove(*key);
+        }
         assert_eq!(normalize(v2), normalize(v1));
     }
 }
