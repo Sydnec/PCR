@@ -591,6 +591,55 @@ describe("revente d'un Pokémon", () => {
     assert.equal(await balance(), result.points);
   });
 
+  it("revend plusieurs individus désignés : chacun part ou reste avec sa raison", async () => {
+    const keep = await give("Roucool", { obtained: 1 });
+    const spare = await give("Roucool", { obtained: 2 });
+    await give("Rattata", { obtained: 1 });
+    const locked = await give("Rattata", { obtained: 2, locked: 1 });
+    const legend = await give("Mewtwo", { obtained: 1 });
+    await give("Mewtwo", { obtained: 2 });
+    // Le dernier se compte par espèce, shiny compris : le shiny vit chez les Rattata.
+    const shiny = await give("Rattata", { obtained: 3, shiny: 1 });
+    const theirs = await give("Roucool", { user: "autre" });
+    const { byRarity } = getPokemonConfig().sell;
+
+    // `keep` passe après `spare` : une fois `spare` vendu, c'est le dernier Roucool
+    // revendable, et il reste. Un identifiant répété ne se vend qu'une fois.
+    const report = await call(sell.sellIndividuals, "u1", [spare, legend, locked, shiny, theirs, keep, spare]);
+    assert.deepEqual(report.sold.map((row) => row.id), [spare, legend]);
+    assert.equal(report.points, byRarity.COMMUN + byRarity.LEGENDAIRE);
+    assert.equal(report.failed, false);
+    const reasons = Object.fromEntries(report.refused.map((row) => [row.id, row.reason]));
+    assert.deepEqual(report.refused.map((row) => row.id), [locked, shiny, theirs, keep]);
+    assert.match(reasons[locked], /verrouillé/);
+    assert.match(reasons[shiny], /ne se revend pas/);
+    assert.match(reasons[theirs], /n'est pas dans cette boîte/);
+    assert.match(reasons[keep], /dernier de son espèce/);
+
+    assert.deepEqual((await owned("Roucool")).map((row) => row.id), [keep]);
+    assert.equal((await owned("Rattata")).length, 3);
+    assert.equal((await owned("Mewtwo")).length, 1);
+    assert.equal((await owned("Roucool", "autre")).length, 1);
+    assert.equal(await balance(), report.points);
+  });
+
+  it("une revente groupée qui tombe en panne rend le Pokémon en cours et ne tente pas la suite", async () => {
+    await give("Roucool", { obtained: 1 });
+    const first = await give("Roucool", { obtained: 2 });
+    const second = await give("Roucool", { obtained: 3 });
+    const before = await dbAll(points, "SELECT * FROM pokemon_owned ORDER BY id");
+    await breakCredits();
+    const report = await call(sell.sellIndividuals, "u1", [first, second]);
+    await repairCredits();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    assert.equal(report.failed, true);
+    assert.deepEqual(report.sold, []);
+    assert.deepEqual(report.refused.map((row) => row.id), [first, second]);
+    assert.match(report.refused[0].reason, /Erreur base de données/);
+    assert.deepEqual(await dbAll(points, "SELECT * FROM pokemon_owned ORDER BY id"), before);
+    assert.equal(await balance(), 0);
+  });
+
   it("refuse une espèce inconnue ou une quantité invalide", async () => {
     assert.match((await call(sell.sellPokemon, "u1", { speciesId: 99999, isShiny: false }, 1)).reason, /inconnue/);
     await give("Roucool");

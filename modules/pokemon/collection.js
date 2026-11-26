@@ -585,6 +585,22 @@ export function setLock(userId, pokemonId, locked, cb) {
   );
 }
 
+// Le même verrou sur plusieurs Pokémon à la fois, en une seule écriture : la
+// garde du propriétaire est dans le WHERE, donc un identifiant qui n'est pas
+// (ou plus) à `userId` est ignoré, pas une erreur. Rend les identifiants
+// effectivement touchés.
+export function setLockMany(userId, pokemonIds, locked, cb) {
+  const ids = [...new Set(pokemonIds.map(Number))].filter(Number.isInteger);
+  if (!ids.length) return cb(null, []);
+  db.all(
+    `UPDATE pokemon_owned SET locked = ?
+      WHERE user_id = ? AND id IN (${ids.map(() => "?").join(", ")})
+      RETURNING id`,
+    [locked ? 1 : 0, userId, ...ids],
+    (err, rows) => cb(err, (rows || []).map((row) => row.id))
+  );
+}
+
 // Bascule le verrou d'un Pokémon en une seule écriture gardée : deux bascules
 // simultanées s'appliquent l'une après l'autre, et RETURNING dit l'état obtenu.
 // Rend null si le Pokémon n'est pas (ou plus) à `userId`.

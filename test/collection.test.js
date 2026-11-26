@@ -318,6 +318,19 @@ describe("verrouiller", () => {
     assert.equal((await owned())[0].locked, 0);
   });
 
+  it("verrouille plusieurs Pokémon d'un coup, les siens seulement", async () => {
+    const mine = [await give("Rattata"), await give("Roucool", { locked: 1 })];
+    const theirs = await give("Rattata", { user: "u2" });
+    const touched = await call(collection.setLockMany, "u1", [...mine, mine[0], theirs, 99999], true);
+    assert.deepEqual(touched.sort((a, b) => a - b), mine);
+    assert.deepEqual((await owned()).map((row) => row.locked), [1, 1]);
+    assert.equal((await owned("u2"))[0].locked, 0, "celui d'un autre ne bouge pas");
+
+    assert.deepEqual((await call(collection.setLockMany, "u1", [mine[1]], false)), [mine[1]]);
+    assert.deepEqual((await owned()).map((row) => row.locked), [1, 0]);
+    assert.deepEqual(await call(collection.setLockMany, "u1", [], true), []);
+  });
+
   it("la bascule rend l'état obtenu, ou null si le Pokémon n'est pas à soi", async () => {
     const id = await give("Rattata");
     assert.equal(await call(collection.toggleLock, "u1", id), true);

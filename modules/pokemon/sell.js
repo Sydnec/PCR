@@ -19,6 +19,7 @@ import {
   countGroup,
   getIndividual,
   reserveDuplicates,
+  resolveSelector,
   restoreDuplicates,
 } from "./collection.js";
 import { consumeItem, getItem, grantItem, itemSellValue } from "./items.js";
@@ -128,6 +129,51 @@ export function sellPokemon(userId, { speciesId, isShiny, sex = null, pokemonId 
       cb(null, { ok: true, species, isShiny, sex, form, quantity, unit, points });
     });
   });
+}
+
+// Plusieurs individus désignés, revendus l'un après l'autre : chacun passe par
+// sellPokemon, qui retire avant de créditer et se compense seul. Une vente
+// refusée (verrouillé, dernier de son espèce, shiny) n'empêche pas les autres :
+// le rapport dit lesquels sont partis et pourquoi les autres sont restés. Une
+// erreur de base, elle, arrête tout : ce qui est déjà vendu l'est pour de bon,
+// le reste n'est pas tenté, et `failed` le signale.
+export function sellIndividuals(userId, pokemonIds, cb) {
+  const ids = [...new Set(pokemonIds)];
+  const report = { sold: [], refused: [], points: 0, failed: false };
+
+  const stop = (err, index) => {
+    handleException("Revente groupée :", err);
+    report.failed = true;
+    for (const id of ids.slice(index)) {
+      report.refused.push({ id, reason: `Erreur base de données : #${id} n'a pas été revendu.` });
+    }
+    cb(null, report);
+  };
+
+  const next = (index) => {
+    if (index >= ids.length) return cb(null, report);
+    const pokemonId = ids[index];
+    // Le chemin des commandes : un « #id » se résout en base, et seulement
+    // parmi les Pokémon de `userId`.
+    resolveSelector(userId, `#${pokemonId}`, (err, selector) => {
+      if (err) return stop(err, index);
+      if (selector.error) {
+        report.refused.push({ id: pokemonId, reason: selector.error });
+        return next(index + 1);
+      }
+      sellPokemon(userId, selector, 1, (err, result) => {
+        if (err) return stop(err, index);
+        if (result.ok) {
+          report.sold.push({ id: pokemonId, speciesId: selector.speciesId, points: result.points });
+          report.points += result.points;
+        } else {
+          report.refused.push({ id: pokemonId, reason: result.reason });
+        }
+        next(index + 1);
+      });
+    });
+  };
+  next(0);
 }
 
 // ====================== OBJETS ======================
