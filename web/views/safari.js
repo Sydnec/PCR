@@ -337,9 +337,14 @@ export async function render(ctx) {
   const choosable = () => visit.catches.filter((row) => row.individual);
   const chosen = () => choosable().filter((row) => selected.has(row.pokemonId));
 
+  // L'espèce et la forme d'aujourd'hui : une prise a pu évoluer depuis la
+  // visite, et c'est sous sa forme actuelle qu'elle se revend.
+  const speciesOf = (row) => row.individual?.speciesId ?? row.speciesId;
+  const formOf = (row) => (row.individual ? row.individual.form : row.form);
+
   // Le prix que l'API calcule pour l'espèce, comme la fiche de la boîte.
   function priceOf(row) {
-    const species = ctx.species.get(row.speciesId);
+    const species = ctx.species.get(speciesOf(row));
     return (row.individual.shiny ? species?.sellValueShiny : species?.sellValue) ?? 0;
   }
 
@@ -356,12 +361,13 @@ export async function render(ctx) {
   }
 
   function catchRow(row) {
-    const species = ctx.species.get(row.speciesId);
+    const species = ctx.species.get(speciesOf(row));
     if (!species) return null;
     const mon = row.individual;
+    const form = formOf(row);
     const image = h("img", {
       class: "sprite",
-      src: row.form?.icon ?? (row.shiny ? species.iconShiny : species.icon),
+      src: form?.icon ?? (row.shiny ? species.iconShiny : species.icon),
       alt: "",
       width: 48,
       height: 48,
@@ -370,7 +376,7 @@ export async function render(ctx) {
       h(
         "span",
         { class: "safari-recap-name" },
-        pokemonName(species, row.shiny, mon?.sex ?? null, mon?.nickname ?? null, row.form),
+        pokemonName(species, row.shiny, mon?.sex ?? null, mon?.nickname ?? null, form),
         detail ? h("span", { class: "muted small" }, detail) : null
       );
     if (!mon) {
@@ -420,7 +426,7 @@ export async function render(ctx) {
     const total = sellable.reduce((sum, row) => sum + priceOf(row), 0);
     // Deux de la même espèce peuvent buter sur « le dernier reste » : le total
     // n'est alors qu'un plafond, et le compte rendu dira ce qui est parti.
-    const species = sellable.map((row) => row.speciesId);
+    const species = sellable.map(speciesOf);
     const ceiling = new Set(species).size < species.length ? "jusqu'à " : "";
     const pickAll = (ids) => {
       selected.clear();
