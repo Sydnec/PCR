@@ -98,7 +98,7 @@ CREATE TABLE points (
     balance         INTEGER NOT NULL DEFAULT 0,
     last_message_at INTEGER NOT NULL DEFAULT 0,
     messages_today  INTEGER NOT NULL DEFAULT 0 CHECK (messages_today >= 0),
-    messages_day    TEXT
+    messages_day    TEXT    CHECK (messages_day <> '')
 ) STRICT;
 
 -- Une ligne par mouvement de solde : la courbe des points de la page d'administration, et la piste
@@ -337,7 +337,7 @@ CREATE INDEX pokemon_owned_species ON pokemon_owned (species_id);
 CREATE TABLE pokemon_pc_boxes (
     user_id  INTEGER NOT NULL,
     box      INTEGER NOT NULL CHECK (box >= 0),
-    name     TEXT,
+    name     TEXT    CHECK (name <> ''),
     archived INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0, 1)),
     PRIMARY KEY (user_id, box)
 ) STRICT, WITHOUT ROWID;
@@ -524,7 +524,7 @@ CREATE INDEX pokemon_shop_purchases_time ON pokemon_shop_purchases (bought_at);
 -- `draws` et `wins` sont cumulés depuis toujours.
 CREATE TABLE pokemon_lottery (
     user_id      INTEGER PRIMARY KEY,
-    last_day     TEXT,
+    last_day     TEXT    CHECK (last_day <> ''),
     last_draw_at INTEGER NOT NULL DEFAULT 0,
     draws        INTEGER NOT NULL DEFAULT 0 CHECK (draws >= 0),
     wins         INTEGER NOT NULL DEFAULT 0 CHECK (wins BETWEEN 0 AND draws)

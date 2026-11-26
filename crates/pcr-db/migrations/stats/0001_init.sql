@@ -7,8 +7,9 @@
 --   l'ancienne ligne « __global__ » au lieu de la garder silencieusement ;
 -- - pas de ligne « __global__ » comme en v1 : les totaux du serveur sont des SUM, MAX ou MIN sur les
 --   lignes des membres, et un classement n'a plus de ligne serveur à exclure. Seul le nombre d'échanges
---   du serveur ne s'en déduit pas (un échange compte pour ses deux dresseurs) : il se compte dans
---   `pokemon_trades` de pcr.db, qui garde les échanges conclus et leur date ;
+--   du serveur ne s'en déduit pas (un échange compte pour ses deux dresseurs) : c'est le nombre de
+--   lignes ACCEPTED de `pokemon_trades` (pcr.db) dont `resolved_at` tombe dans l'année à Paris, comme
+--   le comptait la v1 (un échange avec soi-même une fois, SETTLED jamais) ;
 -- - jours en TEXT « AAAA-MM-JJ », jour de Paris ; horodatages en millisecondes ;
 -- - compteurs jamais négatifs : un retrait de trop est un bug, pas une donnée.
 --

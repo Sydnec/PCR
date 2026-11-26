@@ -151,6 +151,20 @@ Pour réessayer un commit marqué en échec (une fois la cause corrigée côté 
 
 **Test du retour arrière.** Sur dev, pousse un commit dont le binaire ne démarre pas, par exemple un `instance.toml` volontairement invalide dans un essai local. Tu dois voir ceci : `ÉCHEC … : retour à …` dans `journalctl -u pcr-update` et sur le webhook, puis `/healthz` de nouveau vert.
 
+**Schéma modifié avant la bascule.** Jusqu'à la bascule v2, le schéma initial (`0001_init.sql`) se
+modifie sur place. Une base créée par une version antérieure refuse alors de démarrer (« was previously
+applied but has been modified ») et le déploiement revient en arrière. Après ce retour arrière, sur dev,
+recrée la base et relance la mise à jour (`<commit>` : celui que nomme l'alerte) :
+
+```bash
+sudo systemctl stop pcr
+sudo rm -f /var/lib/pcr/pcr.db /var/lib/pcr/pcr.db-wal /var/lib/pcr/pcr.db-shm
+sudo sed -i '/^<commit>$/d' /opt/pcr/failed-commits
+sudo systemctl start pcr-update
+```
+
+Une sauvegarde prise avant un tel changement ne se restaure plus avec le nouveau binaire.
+
 ## 8. Sauvegardes et restauration
 
 - **Quotidienne, à 04 h 20** : `pcr-backup.timer` écrit `/var/backups/pcr/pcr-AAAA-MM-JJ.db.zst`, une copie cohérente prise bot en marche. Les sauvegardes sont gardées 14 jours.
