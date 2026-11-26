@@ -1,0 +1,10 @@
+# Installe la dernière version signée de la branche suivie (voir /etc/pcr/update.env).
+[Unit]
+Description=PCR self-update from signed GitHub releases
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/pcr/update.env
+ExecStart=/usr/local/sbin/pcr-update

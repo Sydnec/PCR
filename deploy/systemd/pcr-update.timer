@@ -1,0 +1,10 @@
+[Unit]
+Description=Check for a new PCR release every minute
+
+[Timer]
+OnBootSec=2min
+OnUnitInactiveSec=1min
+# Un oneshot encore en cours n'est jamais relancé : pas de déploiements concurrents.
+
+[Install]
+WantedBy=timers.target
