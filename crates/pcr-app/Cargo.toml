@@ -1,0 +1,18 @@
+[package]
+name = "pcr-app"
+description = "Use-cases shared by Discord and the website, jobs, events"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+pcr-core.workspace = true
+pcr-db.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
