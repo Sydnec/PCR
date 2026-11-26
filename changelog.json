@@ -1,7 +1,13 @@
 {
-  "version": "1.22.2",
-  "lastUpdated": "2026-11-26T20:55:39.767Z",
+  "version": "1.22.3",
+  "lastUpdated": "2026-11-26T20:56:35.905Z",
   "releases": [
+    {
+      "version": "1.22.3",
+      "date": "2026-11-26",
+      "title": "Release 1.22.3",
+      "features": []
+    },
     {
       "version": "1.22.2",
       "date": "2026-11-26",
