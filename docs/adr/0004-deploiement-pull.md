@@ -12,4 +12,7 @@ identité = workflow + branche) et le publie : release `v<version>` pour `main`,
 - Aucun jeton GitHub sur les VM, aucun port entrant pour le déploiement.
 - Prod et dev suivent chacune leur branche automatiquement, comme demandé.
 
+**Santé.** La version est gardée si `/healthz` répond **avec le commit attendu** : un ancien processus
+encore en vie ne peut pas faire passer une version cassée pour saine.
+
 **Conséquence.** Délai d'environ 3 min entre le merge et le bot à jour (build + timer d'une minute).
