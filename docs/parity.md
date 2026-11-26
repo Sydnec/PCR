@@ -90,18 +90,22 @@ traduction. Ceux des panneaux éphémères sont remplacés par les panneaux `pk:
 
 ## 5. Minuteurs (désormais en heure de Paris, rattrapés via `job_runs`)
 
+Tâches de calendrier : `pcr_app::jobs` (échéance quotidienne ou annuelle, rattrapée au démarrage tant que
+sa période dure). Balayages (chaque minute, chaque heure) : boucles idempotentes par l'état en base.
+
 - [ ] Calendrier de l'Avent (`ADVENT_CRON_TIMER`, 1er–24 décembre)
 - [ ] Saints et fêtes du jour (`COTD_CRON_TIMER`)
 - [ ] Rappels échus envoyés en MP (chaque minute) ; purge des rappels envoyés depuis plus de 7 jours
 - [ ] Fuite des Pokémon (chaque minute)
-- [ ] Réparation des messages publics (toutes les 5 min, et au démarrage) : lignes `public_messages` en retard dont `changed_at` tombe dans `repairWindowHours`, passé `repairGraceSeconds` (les vieux messages v1 restés sans fin n'y entrent pas)
+- [x] Réparation des messages publics (toutes les 5 min, et au démarrage ; worker P2e, rendus par type avec leurs fonctionnalités) : lignes `public_messages` en retard dont `changed_at` tombe dans `repairWindowHours`, passé `repairGraceSeconds` (les vieux messages v1 restés sans fin n'y entrent pas)
 - [ ] Éclosion des œufs (chaque minute)
 - [ ] Ouverture des générations + récap de saison (chaque minute)
 - [ ] Parc safari : balayage + tirage horaire (chaque heure)
 - [ ] Pot commun (échéance hebdomadaire, vérifiée chaque heure)
 - [ ] Anniversaires (à `birthday.hour`, heure de Paris)
 - [ ] Au démarrage : message des rôles, annonce de version, nettoyage `voice_time`
-- [ ] **Nouveau** : bascule de la base de stats au 1er janvier, récap annuel
+- [x] **Nouveau** : bascule de la base de stats au 1er janvier (chaque compteur va au fichier de l'année de Paris où il a eu lieu)
+- [ ] **Nouveau** : récap annuel (P7)
 - [ ] **Nouveau** : purge des sessions du site expirées (`web_sessions`)
 
 ## 6. Routes web (formes JSON v1 conservées)
