@@ -8,6 +8,7 @@
 //! construit depuis `migrations/`. Règle : jamais d'`await` Discord ou HTTP dans une transaction.
 
 pub mod backup;
+pub mod config;
 pub mod import_prod;
 pub mod meta;
 pub mod migrate_v1;

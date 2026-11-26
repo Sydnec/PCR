@@ -1,6 +1,7 @@
 # pcr-app — cas d'usage
 
-- `App` (clonable) porte `Db`, `Clock`, `Instance`, `Health` ; c'est l'état partagé par Discord et le site.
+- `App` (clonable) porte `Db`, `Clock`, `Instance`, `Health` et la config de jeu ; c'est l'état partagé par
+  Discord et le site. Lire la config par `app.game_config()` (copie cohérente), la modifier par `config::set`.
 - Un cas d'usage = une fonction qui ouvre **une** transaction, applique les règles de `pcr-core`, et renvoie
   `(Outcome, Vec<Event>)` ; l'appelant publie les événements après le commit.
 - Jamais d'appel Discord ou HTTP pendant une transaction. Les besoins Discord (MP, messages publics,
