@@ -187,14 +187,32 @@ mod tests {
     async fn a_message_pays_once_per_cooldown_and_is_journaled() {
         let t = TestApp::new("points-message", "2026-10-06T10:00:00Z").await;
         let first = on_message(&t.app, 1, 900, "bonjour").await.expect("first");
-        assert_eq!(first, Some(Reward { rank: 1, points: 750 }));
+        assert_eq!(
+            first,
+            Some(Reward {
+                rank: 1,
+                points: 750
+            })
+        );
         let again = on_message(&t.app, 1, 900, "encore").await.expect("again");
         assert_eq!(again, None);
         let later = t.at("2026-10-06T11:00:00Z");
-        let second = on_message(&later, 1, 900, "plus tard").await.expect("second");
-        assert_eq!(second, Some(Reward { rank: 2, points: 600 }));
+        let second = on_message(&later, 1, 900, "plus tard")
+            .await
+            .expect("second");
+        assert_eq!(
+            second,
+            Some(Reward {
+                rank: 2,
+                points: 600
+            })
+        );
 
-        assert_eq!(t.scalar("SELECT balance FROM points WHERE user_id = 1").await, 1350);
+        assert_eq!(
+            t.scalar("SELECT balance FROM points WHERE user_id = 1")
+                .await,
+            1350
+        );
         assert_eq!(
             t.scalar("SELECT count(*) FROM points_log WHERE user_id = 1 AND source = 'message'")
                 .await,
@@ -235,15 +253,28 @@ mod tests {
     async fn an_admin_grant_reports_both_balances_and_may_go_negative() {
         let t = TestApp::new("points-grant", "2026-10-06T10:00:00Z").await;
         let given = grant_user(&t.app, 1, 300).await.expect("grant");
-        assert_eq!(given, Granted { before: 0, after: 300 });
+        assert_eq!(
+            given,
+            Granted {
+                before: 0,
+                after: 300
+            }
+        );
         let taken = grant_user(&t.app, 1, -500).await.expect("take");
-        assert_eq!(taken, Granted { before: 300, after: -200 });
+        assert_eq!(
+            taken,
+            Granted {
+                before: 300,
+                after: -200
+            }
+        );
         assert!(matches!(
             grant_user(&t.app, 1, 0).await,
             Err(PointsError::Refused(_))
         ));
         assert_eq!(
-            t.scalar("SELECT count(*) FROM points_log WHERE source = 'admin'").await,
+            t.scalar("SELECT count(*) FROM points_log WHERE source = 'admin'")
+                .await,
             2
         );
         t.close().await;
@@ -261,7 +292,10 @@ mod tests {
         assert_eq!(t.scalar("SELECT count(*) FROM points").await, 0);
         assert_eq!(t.scalar("SELECT count(*) FROM points_log").await, 0);
         t.sql("DROP TRIGGER panne").await;
-        assert_eq!(grant_members(&t.app, &[1, 2, 3], 100).await.expect("grant"), 3);
+        assert_eq!(
+            grant_members(&t.app, &[1, 2, 3], 100).await.expect("grant"),
+            3
+        );
         assert_eq!(t.scalar("SELECT sum(balance) FROM points").await, 300);
         t.close().await;
     }

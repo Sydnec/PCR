@@ -5,6 +5,7 @@ use twilight_model::{
     application::command::CommandOptionChoice,
     channel::message::{Component, MessageFlags},
     http::interaction::InteractionResponse,
+    user::User,
 };
 use twilight_util::builder::interaction_response::{
     AutocompleteBuilder, ChannelMessageBuilder, UpdateMessageBuilder,
@@ -34,4 +35,28 @@ pub fn ephemeral_text(text: impl Into<String>) -> InteractionResponse {
 /// Les propositions d'une autocomplétion.
 pub fn autocomplete(choices: Vec<CommandOptionChoice>) -> InteractionResponse {
     AutocompleteBuilder::new(choices).build()
+}
+
+/// Le nom d'affichage d'un utilisateur Discord (son nom global, à défaut son identifiant de compte),
+/// comme `User.displayName` en v1.
+pub fn display_name(user: &User) -> &str {
+    user.global_name.as_deref().unwrap_or(&user.name)
+}
+
+/// L'avatar d'un utilisateur, ou l'avatar par défaut que Discord lui attribue.
+pub fn avatar_url(user: &User) -> String {
+    if let Some(hash) = user.avatar {
+        let extension = if hash.is_animated() { "gif" } else { "png" };
+        return format!(
+            "https://cdn.discordapp.com/avatars/{}/{hash}.{extension}",
+            user.id
+        );
+    }
+    // Les anciens comptes à discriminant gardent leur règle, les nouveaux dérivent de l'id.
+    let index = if user.discriminator == 0 {
+        (user.id.get() >> 22) % 6
+    } else {
+        u64::from(user.discriminator % 5)
+    };
+    format!("https://cdn.discordapp.com/embed/avatars/{index}.png")
 }

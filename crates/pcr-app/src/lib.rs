@@ -64,6 +64,12 @@ impl App {
         Arc::clone(&self.config.load().config)
     }
 
+    /// Le hasard d'une action en service, tiré du système. Les cas d'usage le reçoivent en paramètre :
+    /// les tests leur passent un générateur à graine fixe.
+    pub fn rng() -> rand::rngs::StdRng {
+        rand::make_rng()
+    }
+
     /// À appeler après le commit d'un cas d'usage qui a créé ou changé un message public : le worker
     /// l'écrit sans attendre le rattrapage.
     pub fn public_messages_changed(&self) {
