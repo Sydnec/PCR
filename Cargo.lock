@@ -1356,6 +1356,7 @@ dependencies = [
  "anyhow",
  "pcr-app",
  "pcr-core",
+ "serde_json",
  "tokio",
  "tracing",
  "twilight-cache-inmemory",
