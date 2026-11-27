@@ -54,10 +54,18 @@ pub fn for_reaction<'a>(roles: &'a [Role], ping_role: u64, emoji: &str) -> Vec<&
     if emoji.is_empty() {
         return Vec::new();
     }
+    // Seuls les rôles proposés par le message, ceux dont le nom commence par un emoji : le nom d'un
+    // emoji serveur est du texte libre (« S » donnerait sinon « Sans emoji »).
     self_service(roles, ping_role)
         .into_iter()
-        .filter(|role| role.name.starts_with(emoji))
+        .filter(|role| role.name.starts_with(emoji) && starts_with_emoji(&role.name))
         .collect()
+}
+
+fn starts_with_emoji(name: &str) -> bool {
+    emoji(name)
+        .first()
+        .is_some_and(|first| name.starts_with(first.as_str()))
 }
 
 /// Le texte du message des rôles et les réactions à y poser : un rôle en libre-service par ligne,
@@ -85,6 +93,40 @@ pub const BAD_COLOR: &str =
 pub fn color_code(input: &str) -> Option<String> {
     let code = input.trim().replacen('#', "", 1).to_ascii_uppercase();
     (code.len() == 6 && code.bytes().all(|b| b.is_ascii_hexdigit())).then_some(code)
+}
+
+/// Ce que fait `/color` : rien si la couleur est déjà portée ; sinon retirer les anciennes couleurs du
+/// membre et prendre celle demandée, existante ou à créer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ColorPlan {
+    AlreadyWorn,
+    Change {
+        /// Les rôles de couleur que porte le membre.
+        remove: Vec<u64>,
+        /// Le rôle de cette couleur, s'il existe déjà.
+        existing: Option<u64>,
+    },
+}
+
+/// Le plan de `/color code` pour un membre qui porte les rôles `held`.
+pub fn color_plan(roles: &[Role], held: &[u64], code: &str) -> ColorPlan {
+    let name = format!("{COLOR_PREFIX}{code}");
+    let worn = |role: &&Role| held.contains(&role.id);
+    if roles.iter().filter(worn).any(|role| role.name == name) {
+        return ColorPlan::AlreadyWorn;
+    }
+    ColorPlan::Change {
+        remove: roles
+            .iter()
+            .filter(worn)
+            .filter(|role| role.name.starts_with(COLOR_PREFIX))
+            .map(|role| role.id)
+            .collect(),
+        existing: roles
+            .iter()
+            .find(|role| role.name == name)
+            .map(|role| role.id),
+    }
 }
 
 #[cfg(test)]
@@ -124,6 +166,8 @@ mod tests {
             [2]
         );
         assert!(for_reaction(&roles, 1, "🛡").is_empty());
+        // Un emoji serveur nommé « S » ne donne pas un rôle sans emoji.
+        assert!(for_reaction(&roles, 1, "S").is_empty());
         assert!(self_service(&roles, 99).is_empty());
         let (text, reactions) = role_message(&roles, 1);
         assert_eq!(
@@ -131,6 +175,33 @@ mod tests {
             "Pour être ping, réagissez à ce message :\n- 🎨 pour Artistes\n- 🎮 pour Gamers\n"
         );
         assert_eq!(reactions, ["🎨", "🎮"]);
+    }
+
+    #[test]
+    fn asking_for_the_color_one_wears_changes_nothing() {
+        let roles = vec![
+            role(1, "&A020F0", 3),
+            role(2, "&00FF00", 3),
+            role(3, "🎮 Gamers", 2),
+        ];
+        assert_eq!(
+            color_plan(&roles, &[1, 3], "A020F0"),
+            ColorPlan::AlreadyWorn
+        );
+        assert_eq!(
+            color_plan(&roles, &[1, 3], "00FF00"),
+            ColorPlan::Change {
+                remove: vec![1],
+                existing: Some(2)
+            }
+        );
+        assert_eq!(
+            color_plan(&roles, &[3], "123456"),
+            ColorPlan::Change {
+                remove: vec![],
+                existing: None
+            }
+        );
     }
 
     #[test]

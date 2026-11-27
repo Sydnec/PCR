@@ -1,23 +1,56 @@
-//! Le vocal, pour les stats de l'année (`pcr_app::voice`).
+//! Le vocal, pour les stats de l'année (`pcr_app::voice`). Les changements passent par une file
+//! unique, traitée dans l'ordre d'arrivée : une arrivée et un départ rapprochés d'un même membre, ou
+//! le relevé du démarrage, ne s'appliquent jamais à l'envers.
 
-use twilight_model::voice::VoiceState;
+use pcr_app::App;
+use tokio::sync::mpsc;
+use twilight_model::{
+    id::{Id, marker::GuildMarker},
+    voice::VoiceState,
+};
 
-use crate::{Ctx, id};
+use crate::id;
 
-/// Un état vocal : dans un salon, ou sorti du vocal. Ceux d'un autre serveur ne comptent pas.
-pub async fn changed(ctx: Ctx, state: VoiceState) {
-    if state.guild_id != Some(ctx.guild_id) {
-        return;
-    }
-    let user = id(state.user_id.get());
-    if let Err(error) = pcr_app::voice::changed(&ctx.app, user, state.channel_id.is_some()).await {
-        tracing::error!(?error, "recording a voice change failed");
+/// Ce que la file reçoit.
+#[derive(Debug)]
+pub enum Change {
+    /// Un membre (de ce serveur ou d'un autre), dans un salon vocal ou non.
+    State {
+        guild: Option<Id<GuildMarker>>,
+        user: i64,
+        in_channel: bool,
+    },
+    /// À la connexion : les membres en vocal à cet instant.
+    Reset(Vec<i64>),
+}
+
+pub type Sender = mpsc::UnboundedSender<Change>;
+
+impl From<VoiceState> for Change {
+    fn from(state: VoiceState) -> Self {
+        Self::State {
+            guild: state.guild_id,
+            user: id(state.user_id.get()),
+            in_channel: state.channel_id.is_some(),
+        }
     }
 }
 
-/// À la connexion : les membres en vocal à cet instant.
-pub async fn reset(ctx: Ctx, in_voice: Vec<i64>) {
-    if let Err(error) = pcr_app::voice::reset(&ctx.app, &in_voice).await {
-        tracing::error!(?error, "resetting voice sessions failed");
+/// Traite la file jusqu'à ce que la connexion s'arrête.
+pub async fn run(app: App, guild: Id<GuildMarker>, mut changes: mpsc::UnboundedReceiver<Change>) {
+    while let Some(change) = changes.recv().await {
+        let done = match change {
+            // Ceux d'un autre serveur ne comptent pas.
+            Change::State {
+                guild: Some(of),
+                user,
+                in_channel,
+            } if of == guild => pcr_app::voice::changed(&app, user, in_channel).await,
+            Change::State { .. } => Ok(()),
+            Change::Reset(in_voice) => pcr_app::voice::reset(&app, &in_voice).await,
+        };
+        if let Err(error) = done {
+            tracing::error!(?error, "recording a voice change failed");
+        }
     }
 }

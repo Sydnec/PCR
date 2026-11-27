@@ -5,7 +5,7 @@
 use std::sync::Arc;
 
 use pcr_app::members::MembersPort as _;
-use pcr_core::roles::{self as rules, COLOR_PREFIX};
+use pcr_core::roles::{self as rules, COLOR_PREFIX, ColorPlan};
 use twilight_http::request::AuditLogReason as _;
 use twilight_interactions::command::{CommandInputData, CommandModel, CreateCommand};
 use twilight_model::{
@@ -68,12 +68,16 @@ async fn paint(
     let guild = ctx.guild_id;
     let roles = crate::roles::server_roles(ctx).await?;
     let name = format!("{COLOR_PREFIX}{code}");
+    let held: Vec<u64> = held.iter().map(|id| id.get()).collect();
+    let (remove, existing) = match rules::color_plan(&roles, &held, code) {
+        // Redemander sa couleur ne la retire pas (ni ne supprime son rôle).
+        ColorPlan::AlreadyWorn => return Ok(()),
+        ColorPlan::Change { remove, existing } => (remove, existing),
+    };
     // L'ancienne couleur part ; son rôle aussi, si plus personne d'autre ne le porte (la v1 le
     // supprimait encore porté par un autre membre).
-    for old in roles.iter().filter(|role| {
-        role.name.starts_with(COLOR_PREFIX) && held.iter().any(|id| id.get() == role.id)
-    }) {
-        let id = Id::<RoleMarker>::new(old.id);
+    for old in remove {
+        let id = Id::<RoleMarker>::new(old);
         ctx.http
             .remove_guild_member_role(guild, user, id)
             .await
@@ -83,19 +87,19 @@ async fn paint(
             guild,
         };
         let others = port
-            .roster(crate::id(old.id))
+            .roster(crate::id(old))
             .await?
             .members
             .iter()
             .any(|member| {
-                member.id != crate::id(user.get()) && member.roles.contains(&crate::id(old.id))
+                member.id != crate::id(user.get()) && member.roles.contains(&crate::id(old))
             });
         if !others && let Err(error) = ctx.http.delete_role(guild, id).await {
             tracing::warn!(?error, "could not delete an unused color role");
         }
     }
-    let role = if let Some(role) = roles.iter().find(|role| role.name == name) {
-        Id::new(role.id)
+    let role = if let Some(role) = existing {
+        Id::new(role)
     } else {
         {
             let color = u32::from_str_radix(code, 16).map_err(|e| e.to_string())?;

@@ -61,6 +61,8 @@ pub(crate) struct Ctx {
     pub purges: commands::admin::purge_member::Running,
     /// Une liste des fils réécrite à la fois.
     pub thread_list: Arc<tokio::sync::Mutex<()>>,
+    /// La file des changements de vocal (`voice::run`).
+    pub voice: voice::Sender,
 }
 
 /// Un identifiant Discord tel qu'il vit en base.
@@ -91,6 +93,8 @@ pub async fn run(
     let application_id = Id::new(app.instance.discord.application_id);
     let guild_id = Id::new(app.instance.discord.guild_id);
 
+    let (voice_tx, voice_rx) = tokio::sync::mpsc::unbounded_channel();
+    let voice_queue = tokio::spawn(voice::run(app.clone(), guild_id, voice_rx));
     let ctx = Ctx {
         app,
         http,
@@ -101,6 +105,7 @@ pub async fn run(
         invites: Arc::default(),
         purges: Arc::default(),
         thread_list: Arc::default(),
+        voice: voice_tx,
     };
     // Le worker vit avec la connexion Discord : sans elle, il n'aurait rien à écrire. Il est attendu
     // avant de rendre la main, donc avant la fermeture de la base : un message posté est toujours noté.
@@ -143,6 +148,9 @@ pub async fn run(
         shutdown.clone(),
     ));
     let result = gateway(&ctx, guild_id, token, &mut shutdown).await;
+    // Plus rien n'arrive de la gateway : ce qui reste en file n'a plus d'importance, le démarrage
+    // suivant relève qui est en vocal.
+    voice_queue.abort();
     for (name, task) in [
         ("public messages worker", worker),
         ("pot commun loop", pot),
@@ -284,7 +292,7 @@ fn handle_event(ctx: &Ctx, event: Event) {
                     .filter(|state| state.channel_id.is_some())
                     .map(|state| id(state.user_id.get()))
                     .collect();
-                tokio::spawn(voice::reset(ctx.clone(), in_voice));
+                let _ = ctx.voice.send(voice::Change::Reset(in_voice));
                 tokio::spawn(arrivals::cache_invites(ctx.clone()));
             }
         }
@@ -295,7 +303,7 @@ fn handle_event(ctx: &Ctx, event: Event) {
             tokio::spawn(reactions::handle(ctx.clone(), reaction.0, false));
         }
         Event::VoiceStateUpdate(update) => {
-            tokio::spawn(voice::changed(ctx.clone(), update.0));
+            let _ = ctx.voice.send(update.0.into());
         }
         Event::MemberAdd(member) => {
             tokio::spawn(arrivals::member_added(ctx.clone(), *member));

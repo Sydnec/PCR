@@ -151,6 +151,24 @@ async fn start(ctx: &Ctx, raw: &str, admin: u64) -> anyhow::Result<String> {
 }
 
 /// Le parcours, du lancement au bilan ; le verrou est rendu quoi qu'il arrive.
+/// Rend le verrou et arrête le journal d'avancement à la fin de la purge, panique comprise : une
+/// purge du même membre ne doit pas rester refusée jusqu'au redémarrage.
+struct Release {
+    running: Running,
+    target: u64,
+    ticker: tokio::task::AbortHandle,
+}
+
+impl Drop for Release {
+    fn drop(&mut self) {
+        self.ticker.abort();
+        self.running
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .remove(&self.target);
+    }
+}
+
 async fn run_purge(ctx: Ctx, target: u64, who: String, admin: u64, progress: Arc<Progress>) {
     let settings = ctx.app.game_config().purge_member.clone();
     let ticker = tokio::spawn({
@@ -171,6 +189,11 @@ async fn run_purge(ctx: Ctx, target: u64, who: String, admin: u64, progress: Arc
             }
         }
     });
+    let _release = Release {
+        running: Arc::clone(&ctx.purges),
+        target,
+        ticker: ticker.abort_handle(),
+    };
     let lines = match scan::purge(&ctx, target, &progress, &settings).await {
         Ok(mut report) => {
             report.who = who;
@@ -197,12 +220,7 @@ async fn run_purge(ctx: Ctx, target: u64, who: String, admin: u64, progress: Arc
             ]
         }
     };
-    ticker.abort();
     notify(&ctx, admin, &lines).await;
-    ctx.purges
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .remove(&target);
 }
 
 /// Le bilan en MP, coupé à la taille d'un message ; des MP fermés le laissent au journal.

@@ -72,6 +72,7 @@ pub(super) async fn purge(
     ));
     let mut tasks = JoinSet::new();
     let mut seen = HashSet::new();
+    let mut spawned = std::collections::HashMap::new();
     let mut enqueue = |channel: &Channel| {
         if !seen.insert(channel.id) {
             return;
@@ -89,12 +90,14 @@ pub(super) async fn purge(
             channel.parent_id,
         );
         let limit_log = settings.rate_limit_log_seconds;
-        tasks.spawn(async move {
+        let task = tasks.spawn(async move {
             let _slot = slots.acquire_owned().await;
             let outcome = purge_channel(&ctx, id, archived, target, &progress, limit_log).await;
             progress.done.fetch_add(1, Ordering::Relaxed);
             (id, parent, outcome)
         });
+        // Une tâche qui panique ne rend pas son salon : la table le retrouve pour le bilan.
+        spawned.insert(task.id(), id);
     };
     for channel in channels.iter().filter(|channel| has_messages(channel.kind)) {
         enqueue(channel);
@@ -121,8 +124,17 @@ pub(super) async fn purge(
     let mut skipped_parents = HashSet::new();
     let mut skipped_threads = Vec::new();
     while let Some(joined) = tasks.join_next().await {
-        let Ok((id, parent, outcome)) = joined else {
-            continue;
+        let (id, parent, outcome) = match joined {
+            Ok(done) => done,
+            Err(error) => {
+                if let Some(id) = spawned.get(&error.id()) {
+                    report
+                        .failed
+                        .push((id.get(), "tâche interrompue (voir le journal)".to_owned()));
+                }
+                tracing::error!(?error, "a purge task failed");
+                continue;
+            }
         };
         match outcome {
             Outcome::Done(tally) if tally.deleted > 0 || tally.failed > 0 => {

@@ -128,3 +128,21 @@ fn the_reply_says_why_there_is_nothing() {
     let mute = json!({"text": "Hello", "lang": "en"});
     assert_eq!(reply("53", Some(&mute), 4096), Reply::Text(UNAVAILABLE));
 }
+
+#[test]
+fn the_author_name_forms_no_link() {
+    let tweet = json!({
+        "text": "Hello", "lang": "en",
+        "author": {"screen_name": "sacha", "name": "x](https://piege.example) [\n**gras"},
+        "translation": {"text": "Bonjour", "source_lang": "en"}
+    });
+    let Reply::Translation {
+        author: Some((name, _)),
+        ..
+    } = reply("40", Some(&tweet), 4096)
+    else {
+        panic!("translation expected");
+    };
+    assert_eq!(name, r"x\]\(https://piege.example\) \[ \*\*gras (@sacha)");
+    assert_eq!(handle(&json!({"author": {"screen_name": "sächa"}})), None);
+}

@@ -79,12 +79,13 @@ pub fn duration(ms: i64) -> String {
 }
 
 /// Coupe un texte en messages d'au plus `max` caractères, aux fins de ligne (`splitMessage` de la
-/// v1).
+/// v1). Les caractères se comptent comme Discord (unités UTF-16 : un emoji en vaut deux).
 pub fn split_message(text: &str, max: usize) -> Vec<String> {
+    let len = |text: &str| text.encode_utf16().count();
     let mut messages = Vec::new();
     let mut current = String::new();
     for line in text.split('\n') {
-        if !current.is_empty() && current.chars().count() + line.chars().count() + 1 > max {
+        if !current.is_empty() && len(&current) + len(line) + 1 > max {
             messages.push(std::mem::take(&mut current));
         }
         current.push_str(line);

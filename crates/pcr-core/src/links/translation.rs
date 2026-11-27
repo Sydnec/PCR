@@ -173,8 +173,11 @@ pub fn handle(tweet: &Value) -> Option<&str> {
     let handle = tweet
         .get("author")
         .and_then(|author| text_of(author, "screen_name"))?;
-    (!handle.is_empty() && handle.chars().all(|c| c.is_alphanumeric() || c == '_'))
-        .then_some(handle)
+    (!handle.is_empty()
+        && handle
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_'))
+    .then_some(handle)
 }
 
 /// La langue d'un tweet à traduire, nommée, ou `None` s'il n'y a rien à traduire : un tweet en
@@ -245,6 +248,16 @@ pub fn escape(text: &str) -> String {
     out
 }
 
+static INLINE_MARKUP: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"[\\*_~`|\[\]<>()#@-]").expect("valid regex"));
+
+/// Un texte d'une ligne qui ne forme rien : toute la mise en forme échappée, les retours à la ligne
+/// changés en espaces (le nom d'un auteur, mis dans le texte d'un lien).
+pub fn escape_inline(text: &str) -> String {
+    let single = text.replace(['\n', '\r'], " ");
+    INLINE_MARKUP.replace_all(&single, r"\$0").into_owned()
+}
+
 /// Coupé à `max` caractères, « … » compris, jamais au milieu d'un lien (tronqué, il mènerait
 /// ailleurs).
 pub fn truncate(text: &str, max: usize) -> String {
@@ -291,8 +304,10 @@ pub fn reply(id: &str, tweet: Option<&Value>, max: usize) -> Reply {
         return Reply::Text(NOTHING);
     }
     let author = handle(tweet).map(|handle| {
+        // Le nom vient de l'auteur du tweet et finit dans le texte d'un lien : rien n'y doit former
+        // un lien masqué, une mention ou une autre ligne.
         let name = match tweet.get("author").and_then(|a| text_of(a, "name")) {
-            Some(name) => format!("{name} (@{handle})"),
+            Some(name) => format!("{} (@{handle})", escape_inline(name)),
             None => format!("@{handle}"),
         };
         (
