@@ -11,7 +11,7 @@ pub fn number(n: i64) -> String {
 /// Un nombre qui peut être fractionnaire (un poids de tirage) : au plus trois décimales, sans zéro
 /// inutile, comme `toLocaleString("fr-FR")` : `1234.5` → « 1 234,5 », `0.15` → « 0,15 ».
 pub fn decimal(value: f64) -> String {
-    let rounded = format!("{:.3}", value.abs());
+    let rounded = fixed(value.abs(), 3);
     let (whole, fraction) = rounded.split_once('.').unwrap_or((&rounded, ""));
     let fraction = fraction.trim_end_matches('0');
     let sign = if value < 0.0 && (whole != "0" || !fraction.is_empty()) {
@@ -29,7 +29,60 @@ pub fn decimal(value: f64) -> String {
 /// Une part en pourcentage, à `decimals` décimales, comme `(part * 100).toFixed(decimals)` de la
 /// v1 suivi de « % » : `0.0512` à 1 décimale → « 5,1 % ».
 pub fn percent(share: f64, decimals: usize) -> String {
-    format!("{:.decimals$} %", share * 100.0).replace('.', ",")
+    let value = share * 100.0;
+    let sign = if value < 0.0 { "-" } else { "" };
+    format!("{sign}{} %", fixed(value.abs(), decimals)).replace('.', ",")
+}
+
+/// Les décimales qu'il faut pour écrire exactement n'importe quel flottant (1 074 au plus).
+const EXACT_DIGITS: usize = 1100;
+
+/// Un nombre positif à `decimals` décimales, comme `toFixed` et `toLocaleString` de la v1 : le plus
+/// proche, et une moitié exacte vers le haut (« 12,5 » → « 13 »). Rust arrondit une moitié exacte
+/// au chiffre pair (« 12 ») : on la repère sur le développement décimal complet du flottant, qui
+/// n'a alors que des zéros après le 5. Multiplier avant d'arrondir ne conviendrait pas : 0,15 vaut
+/// en réalité 0,1499…, que la v1 écrit « 0,1 », mais `0.15 * 10` tombe pile sur 1,5.
+fn fixed(value: f64, decimals: usize) -> String {
+    // Une moitié exacte s'écrit pile avec un chiffre de plus, terminé par 5 : sinon, pas la peine
+    // de développer le flottant en entier.
+    let one_more = decimals + 1;
+    if !format!("{value:.one_more$}").ends_with('5') {
+        return format!("{value:.decimals$}");
+    }
+    let exact = format!("{value:.EXACT_DIGITS$}");
+    let point = exact.find('.').unwrap_or(exact.len());
+    let fraction = exact.as_bytes().get(point + 1..).unwrap_or_default();
+    let tie = fraction.get(decimals) == Some(&b'5')
+        && fraction
+            .iter()
+            .skip(decimals + 1)
+            .all(|digit| *digit == b'0');
+    if !tie {
+        return format!("{value:.decimals$}");
+    }
+    // Les chiffres gardés, augmentés d'une unité au dernier rang, retenue comprise.
+    let kept = &exact[..if decimals == 0 {
+        point
+    } else {
+        point + 1 + decimals
+    }];
+    let mut digits: Vec<u8> = kept.bytes().collect();
+    let mut carry = true;
+    for digit in digits
+        .iter_mut()
+        .rev()
+        .filter(|digit| digit.is_ascii_digit())
+    {
+        if !carry {
+            break;
+        }
+        carry = *digit == b'9';
+        *digit = if carry { b'0' } else { *digit + 1 };
+    }
+    if carry {
+        digits.insert(0, b'1');
+    }
+    String::from_utf8(digits).unwrap_or_default()
 }
 
 /// Les chiffres d'un entier, milliers séparés par l'espace fine insécable.
@@ -96,6 +149,12 @@ mod tests {
             assert_eq!(decimal(value), expected, "{value}");
         }
         assert_eq!(percent(0.0512, 1), "5,1 %");
+        // Une moitié exacte monte, comme en v1 ; une moitié apparente reste ce qu'elle vaut.
+        assert_eq!(percent(0.125, 0), "13 %");
+        assert_eq!(decimal(0.0625), "0,063");
+        assert_eq!(decimal(9.9995), "9,999");
+        assert_eq!(decimal(999.9995), "1\u{202f}000");
+        assert_eq!(decimal(0.15), "0,15");
         assert_eq!(percent(1.0, 0), "100 %");
         assert_eq!(percent(0.000_123, 3), "0,012 %");
     }

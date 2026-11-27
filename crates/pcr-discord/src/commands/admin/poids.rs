@@ -140,18 +140,23 @@ mod tests {
 
     use super::*;
 
-    fn text_length(panel: &[Component]) -> usize {
-        let mut total = 0;
+    /// Les textes d'un message, dans l'ordre.
+    fn texts(panel: &[Component]) -> Vec<&str> {
+        let mut texts = Vec::new();
         for component in panel {
             if let Component::Container(container) = component {
                 for inner in &container.components {
                     if let Component::TextDisplay(text) = inner {
-                        total += text.content.chars().count();
+                        texts.push(text.content.as_str());
                     }
                 }
             }
         }
-        total
+        texts
+    }
+
+    fn text_length(panel: &[Component]) -> usize {
+        texts(panel).iter().map(|text| text.chars().count()).sum()
     }
 
     /// Discord refuse un message de plus de 4 000 caractères : la table la plus longue doit se
@@ -165,6 +170,17 @@ mod tests {
         for panel in &messages {
             assert!(text_length(panel) <= MESSAGE_MAX, "{}", text_length(panel));
         }
+        // Le titre ouvre le premier message, le pied de page ferme le dernier, et lui seul.
+        assert!(texts(&messages[0])[0].starts_with(TITLE));
+        let footers = messages
+            .iter()
+            .flat_map(|panel| texts(panel))
+            .filter(|t| *t == FOOTER);
+        assert_eq!(footers.count(), 1);
+        assert_eq!(
+            messages.last().and_then(|panel| texts(panel).pop()),
+            Some(FOOTER)
+        );
         // Une table trop longue pour un seul message se poursuit dans un bloc « suite ».
         let mut long = all[0].clone();
         long.rows = (0..200).map(|_| long.rows[0].clone()).collect();

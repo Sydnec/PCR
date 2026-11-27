@@ -134,11 +134,7 @@ impl<'a> Draw<'a> {
             return 0.0;
         }
         let base = pool.rarity_weight(rarity_of(species, self.config));
-        let boost = if pool.generation_boost.is_finite() {
-            pool.generation_boost.max(1.0)
-        } else {
-            1.0
-        };
+        let boost = pool.generation_boost.max(1.0);
         let fished = if fishing::is_fishable(species.id) {
             self.fishing_factor
         } else {
