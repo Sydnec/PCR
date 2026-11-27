@@ -20,6 +20,8 @@ pub enum Source {
     Admin,
     /// Pot commun (cotisation et part, en un mouvement net).
     Redistribution,
+    /// Paris : mise, remboursement, gain.
+    Bet,
 }
 
 impl Source {
@@ -28,6 +30,7 @@ impl Source {
             Self::Message => "message",
             Self::Admin => "admin",
             Self::Redistribution => "redistribution",
+            Self::Bet => "bet",
         }
     }
 }

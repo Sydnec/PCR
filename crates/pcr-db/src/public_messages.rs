@@ -42,6 +42,33 @@ pub async fn create(
     Ok(())
 }
 
+/// Déclare le message public d'une entité dont la réponse d'interaction tient lieu de message
+/// (`message_id`), ou que le worker doit poster parce que cette réponse a échoué (`None`). La version
+/// reste à montrer : le worker réécrit une fois le message depuis la base, ce qui rattrape un
+/// changement arrivé entre la réponse et cet enregistrement. Sans effet si la ligne existe déjà.
+pub async fn posted(
+    db: &Db,
+    kind: &str,
+    entity_id: i64,
+    channel_id: i64,
+    message_id: Option<i64>,
+    now_ms: i64,
+) -> Result<(), DbError> {
+    sqlx::query!(
+        "INSERT INTO public_messages (kind, entity_id, channel_id, message_id, changed_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT (kind, entity_id) DO NOTHING",
+        kind,
+        entity_id,
+        channel_id,
+        message_id,
+        now_ms
+    )
+    .execute(db.writer())
+    .await?;
+    Ok(())
+}
+
 /// L'entité a changé : son message est à réécrire (dans la transaction du changement). Sans effet
 /// pour une entité sans message public, ou dont le message a disparu.
 pub async fn touch(
