@@ -67,6 +67,15 @@ pub struct Discord {
     /// arrive par elle reçoit ce rôle au lieu du rôle par défaut.
     pub temporary_member_invite_code: Option<String>,
     pub temporary_member_role_id: Option<u64>,
+    /// Le salon des apparitions (`POKEMON_CHANNEL_ID`). Absent : aucun Pokémon n'apparaît, et les
+    /// messages ne comptent pas pour la suivante.
+    pub pokemon_channel_id: Option<u64>,
+    /// Le rôle des dresseurs (`POKEMON_ROLE_ID`), appelé par les apparitions rares et shiny.
+    pub pokemon_role_id: Option<u64>,
+    /// Le rôle des porteurs du Charme Chroma de chaque génération (`SHINY_CHARM_ROLE_ID_<n>`), appelé
+    /// quand une apparition brille pour eux seuls. La clé est la génération.
+    #[serde(default)]
+    pub shiny_charm_role_ids: std::collections::BTreeMap<u8, u64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -126,6 +135,14 @@ mod tests {
     fn example_file_is_valid() {
         let instance = Instance::from_toml(EXAMPLE).expect("example parses");
         assert_eq!(instance.env, Env::Dev);
+    }
+
+    #[test]
+    fn charm_roles_are_keyed_by_generation() {
+        let instance = Instance::from_toml(EXAMPLE).expect("example parses");
+        let roles = &instance.discord.shiny_charm_role_ids;
+        assert_eq!(roles.get(&2), Some(&700_000_000_000_000_015));
+        assert!(instance.discord.pokemon_channel_id.is_some());
     }
 
     #[test]
