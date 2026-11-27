@@ -45,6 +45,8 @@ tokio = { version = "1.54.1", features = ["macros", "rt-multi-thread", "signal",
 toml = "1.2.3"
 # Analyse des liens partagés (déjà tirée par twilight) : l'hôte se compare comme le `new URL` de la v1.
 url = "2.5.9"
+# Attendre plusieurs lectures ensemble (déjà tirée par sqlx et axum).
+futures-util = { version = "0.3.34", default-features = false, features = ["std"] }
 tower-http = { version = "0.7.1", features = ["trace", "timeout"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }

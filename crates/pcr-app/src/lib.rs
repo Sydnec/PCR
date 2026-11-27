@@ -14,16 +14,19 @@ pub mod error;
 pub mod health;
 pub mod http;
 pub mod jobs;
+pub mod links;
 pub mod members;
 pub mod outbox;
 pub mod points;
 pub mod public_messages;
 pub mod randomizabaise;
+pub mod reactions;
 pub mod redistribution;
 pub mod reminders;
 pub mod stats;
 #[cfg(test)]
 mod testing;
+pub mod voice;
 
 use std::sync::Arc;
 
@@ -50,6 +53,8 @@ pub struct App {
     pub stats: Arc<stats::Stats>,
     /// Réveille le worker des messages publics (`public_messages_changed`).
     pub public_messages: Arc<tokio::sync::Notify>,
+    /// `/admin restart` : le binaire s'arrête proprement, et systemd le relance.
+    pub restart: Arc<tokio::sync::Notify>,
 }
 
 impl App {
@@ -64,6 +69,7 @@ impl App {
             config_writes: Arc::default(),
             stats,
             public_messages: Arc::default(),
+            restart: Arc::default(),
         }
     }
 
@@ -77,6 +83,11 @@ impl App {
     /// les tests leur passent un générateur à graine fixe.
     pub fn rng() -> rand::rngs::StdRng {
         rand::make_rng()
+    }
+
+    /// Demande un arrêt propre (`/admin restart`) : le service le relance (`Restart=always`).
+    pub fn request_restart(&self) {
+        self.restart.notify_one();
     }
 
     /// À appeler après le commit d'un cas d'usage qui a créé ou changé un message public : le worker

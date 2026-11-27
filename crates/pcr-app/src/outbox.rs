@@ -9,6 +9,7 @@ use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
 pub use pcr_db::reminders::Reminder;
 
 use crate::http::Http;
+pub use crate::http::Page;
 
 pub type OutboxFuture<'a, T> = Pin<Box<dyn Future<Output = Result<T, String>> + Send + 'a>>;
 
@@ -31,17 +32,25 @@ pub trait Outbox: Send + Sync + std::fmt::Debug {
     fn remind<'a>(&'a self, reminder: &'a Reminder) -> OutboxFuture<'a, Delivery>;
 }
 
-/// Les pages que lit le bot (saints du jour) ; un faux dans les tests.
+/// Les pages que lit le bot (saints du jour, tweets) ; un faux dans les tests.
 pub trait Web: Send + Sync + std::fmt::Debug {
-    fn get<'a>(&'a self, url: &'a str, user_agent: &'a str) -> OutboxFuture<'a, String>;
+    /// La page à `url`, quel que soit son statut ; une erreur si rien n'est venu dans `timeout`.
+    fn get<'a>(
+        &'a self,
+        url: &'a str,
+        user_agent: &'a str,
+        timeout: Duration,
+    ) -> OutboxFuture<'a, Page>;
 }
 
-/// Une page met au plus ce temps à venir : le message du jour n'attend pas plus.
-const WEB_TIMEOUT: Duration = Duration::from_secs(15);
-
 impl Web for Http {
-    fn get<'a>(&'a self, url: &'a str, user_agent: &'a str) -> OutboxFuture<'a, String> {
-        Box::pin(self.get_text(url, user_agent, WEB_TIMEOUT))
+    fn get<'a>(
+        &'a self,
+        url: &'a str,
+        user_agent: &'a str,
+        timeout: Duration,
+    ) -> OutboxFuture<'a, Page> {
+        Box::pin(Http::get(self, url, user_agent, timeout))
     }
 }
 
@@ -50,7 +59,12 @@ impl Web for Http {
 pub struct Offline(pub String);
 
 impl Web for Offline {
-    fn get<'a>(&'a self, _url: &'a str, _user_agent: &'a str) -> OutboxFuture<'a, String> {
+    fn get<'a>(
+        &'a self,
+        _url: &'a str,
+        _user_agent: &'a str,
+        _timeout: Duration,
+    ) -> OutboxFuture<'a, Page> {
         Box::pin(async move { Err(self.0.clone()) })
     }
 }
