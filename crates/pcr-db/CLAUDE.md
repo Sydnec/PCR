@@ -11,7 +11,8 @@
   de contrôle : les bases existantes refusent alors de démarrer (« previously applied but has been
   modified ») et doivent être recréées (`migrate-v1` en dev).
 - Un module par fonctionnalité, fonctions `async fn x(db: &Db | &mut SqliteConnection, …)`. Les cas
-  d'usage multi-étapes reçoivent la transaction ouverte par `pcr-app`.
+  d'usage multi-étapes reçoivent la transaction ouverte par `pcr-app` (`pcr_db::Conn` et
+  `pcr_db::Transaction` nomment ces types sans que `pcr-app` dépende de `sqlx`).
 - Invariants en SQL (index uniques partiels, `CHECK`, `STRICT`), montants `INTEGER`, horodatages en ms.
 - `points.balance` ne bouge que par `points::move_balance`, qui écrit `points_log` (avec sa `Source`)
   dans la même transaction (pas de déclencheur : il daterait avec l'horloge de SQLite, pas avec `Clock`).

@@ -10,8 +10,10 @@
   `bounds` : bornes v1 ; `render` : affichage v1. Un réglage ajouté se déclare dans sa section (s'il est propre à la v2, l'exclure du test d'égalité v1).
 - `refusal::Refusal` : le texte d'un refus montré à un membre.
 - `format` : nombres à la française (U+202F). `points` (gain d'un message, délai de `/solde`),
-  `redistribution` (pot commun), `stats` (mots et emoji d'un message, découpés comme en v1).
-- À venir : `ids` (codec `custom_id`, grammaire v1), un module par fonctionnalité (`lottery`, `safari`…).
+  `redistribution` (pot commun), `stats` (mots et emoji d'un message, découpés comme en v1), `bets`
+  (`custom_id` des paris, gains au quotient exact, plus proche estimation, saisies, refus).
+- `ids` : codec `custom_id`, grammaire v1 `action|arg|…` ; chaque fonctionnalité y décode les siens.
+- À venir : un module par fonctionnalité (`lottery`, `safari`…).
 - Données Pokémon : `data/pokemon.json` (251 espèces : `id`, `name` FR, `generation`, `catchRate`, `stage`,
   `isLegendary`, `isMythical`, `isBaby`, `genderRate`, `evolvesFrom/Into`, `sprite`, `forms`) et
   `data/fishing.json` (`rods.{old,good,super}` = paires `[speciesId, poids]`) : converties en tableaux

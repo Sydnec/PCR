@@ -16,8 +16,13 @@
 - Messages publics : dans la transaction du cas d'usage, `pcr_db::public_messages::create` / `touch` ; après
   le commit, `app.public_messages_changed()`. Le worker (`public_messages::run`, lancé par `pcr-discord`)
   écrit un message à la fois, rattrape au démarrage puis toutes les 5 min (grâce et fenêtre de GameConfig).
+  Quand la réponse d'interaction est le message (un pari), sa ligne naît après elle, avec son `message_id`
+  (`public_messages::posted`, `bets::posted`).
 - Hasard : les cas d'usage reçoivent `rng: &mut impl Rng` ; en service `App::rng()`, en test une graine fixe.
 - Membres d'un rôle : port `members::MembersPort` (liste complète lue sur Discord), tri pur `role_members`.
 - Points : `points` (gain d'un message, `/solde`, classement, `/admin points`), `redistribution` (pot
-  commun : boucle horaire `run`, lancée par `pcr-discord`). Tests : `testing::TestApp` (base jetable,
-  horloge figée, `sql` pour provoquer une panne).
+  commun : boucle horaire `run`, lancée par `pcr-discord`). Paris : `bets` (création, `stake`, `resolve`…,
+  `View` et `gains` partagés par le paiement et les rendus ; les stats comptent après le commit).
+- Un compteur « record » (`Counter::combine`, ex. `BetMaxWin`) garde le maximum au lieu d'additionner, dans
+  le tampon comme en base. `Stats::bet_stats` vide le tampon avant de lire l'année en cours.
+- Tests : `testing::TestApp` (base jetable, horloge figée, `sql` pour provoquer une panne).

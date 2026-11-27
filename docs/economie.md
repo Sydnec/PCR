@@ -38,6 +38,40 @@ les bots en sont exclus.
   `redistribution.intervalHours` (168 par défaut), `redistribution.contributionPercent` (5, borné
   entre 0 et 100 — une faute de frappe y serait irréversible).
 
+## Paris
+
+`/bet question option1 option2 [option3…5]` ouvre un pari classique, `/estimate question` un pari
+d'estimation (le plus proche gagne). La réponse à la commande est le message du pari, posté dans le
+salon et qui appelle le rôle des paris (`bet_role_id` dans `instance.toml`, `DISCORD_BET_ROLE_ID` en
+v1 ; absent, personne n'est appelé).
+
+- **Miser** : un bouton par option ouvre une modale (le solde y est rappelé). On mise sur une seule
+  option et l'on peut y rajouter des points, jamais changer de camp ; le créateur ne parie pas sur son
+  propre pari. Une estimation se modifie tant que le pari est ouvert : seule la différence de mise est
+  débitée, ou remboursée si elle baisse. Le message montre en direct la part de chaque option (ou la
+  liste des estimations).
+- **Saisie** : un nombre entier, les espaces sont ignorées (« 1 000 » vaut mille). La v1 s'arrêtait
+  au premier blanc et misait 1 point ; « 12abc » ou « 1e3 », qu'elle lisait 12 et 1, sont refusés.
+- **Terminer** (créateur seul, « Déclarer le résultat ») : pour un pari classique, un menu propose
+  l'option gagnante, la clôture des mises (le résultat viendra plus tard) ou l'annulation (chacun est
+  remboursé) ; pour une estimation, une modale demande la bonne réponse. Le résultat est publié dans le
+  salon du pari.
+- **Gains** : les gagnants (l'option gagnante, ou les estimations les plus proches, ex æquo compris)
+  se partagent toute la cagnotte au prorata de leur mise, arrondi vers le bas ; ce que la division
+  laisse, et toute la cagnotte quand personne n'a gagné, revient à la banque. Le calcul est entier et
+  exact : la v1, en flottant, perdait un point quand une part tombait juste (29 et 71 points seuls sur
+  l'option gagnante recevaient 28 et 71).
+- **Une seule fin** : annuler ou résoudre revendique le pari dans la transaction qui rembourse ou
+  paie. Deux résolutions croisées (deux menus ouverts, une modale envoyée deux fois) ne paient jamais
+  deux fois : la seconde répond « Ce pari vient d'être terminé. ». Une modale de mise envoyée après la
+  clôture ne prend rien.
+- **`/betstats [user]`** : total misé et plus gros gain d'un membre, volume misé et record du serveur,
+  pour l'année en cours (la base de stats bascule au 1er janvier, comme en v1). Une mise compte à la
+  résolution du pari, pas à l'annulation.
+- Un pari ouvert à la bascule garde son message v1 : ses boutons marchent, mais le message n'est plus
+  réécrit (une modification ne fait pas passer un message existant aux composants v2) ; son résultat
+  est publié.
+
 ## Journal des points
 
 Chaque mouvement de solde laisse une ligne dans `points_log` (dresseur, mouvement, solde après,
