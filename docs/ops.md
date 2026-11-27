@@ -99,7 +99,7 @@ Complète ensuite ces fichiers :
 
 | Fichier | Contenu | Droits |
 |---|---|---|
-| `/etc/pcr/instance.toml` | IDs Discord (dont `default_role_id`, le rôle des membres : sans lui, le pot commun attend), URL publique, `trusted_proxy`, `dm_allowlist` (dev : ton ID) | `root:pcr 0640` |
+| `/etc/pcr/instance.toml` | IDs Discord (dont `default_role_id`, le rôle des membres : sans lui, le pot commun attend ; `bet_role_id`, facultatif, le rôle appelé à chaque nouveau pari), URL publique, `trusted_proxy`, `dm_allowlist` (dev : ton ID) | `root:pcr 0640` |
 | `/etc/pcr/pcr.env` | `DISCORD_TOKEN`, `DISCORD_CLIENT_SECRET` | `root:pcr 0640` |
 | `/etc/pcr/update.env` | branche suivie (déjà remplie), `PCR_OPS_WEBHOOK` (webhook d'un salon ops, facultatif) | `root 0600` |
 

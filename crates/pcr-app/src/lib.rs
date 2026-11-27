@@ -5,6 +5,7 @@
 //! adaptateurs se contentent de traduire les entrées et de rendre les résultats.
 
 pub mod announcements;
+pub mod bets;
 pub mod config;
 pub mod health;
 pub mod jobs;

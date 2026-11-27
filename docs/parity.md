@@ -9,8 +9,8 @@ Légende : `[x]` porté en v2 · `~~barré~~` abandonné volontairement (avec la
 ## 1. Commandes hors Pokémon
 
 - ~~`/autodel lien [jours]` — Supprimera automatiquement votre message avec X jours.~~ (abandonnée : jamais utilisée)
-- [ ] `/bet question option1 option2 [option3] [option4] [option5]` — Créer un nouveau pari
-- [ ] `/betstats [user]` — Affiche les statistiques des paris
+- [x] `/bet question option1 option2 [option3] [option4] [option5]` — Créer un nouveau pari (la réponse est le message public du pari et appelle `bet_role_id` ; question limitée à 200 caractères et options à 76, ce qui faisait échouer la v1 ; voir les écarts en dessous)
+- [x] `/betstats [user]` — Affiche les statistiques des paris (montants au format français ; le détenteur du record n'est nommé que s'il y a un record : à zéro, la v1 désignait n'importe qui)
 - [ ] `/birthday add date` — Enregistre (ou modifie) ta date d'anniversaire
 - [ ] `/birthday list` — Affiche les 10 prochains anniversaires du serveur
 - [ ] `/birthday remove` — Supprime ta date d'anniversaire
@@ -19,7 +19,7 @@ Légende : `[x]` porté en v2 · `~~barré~~` abandonné volontairement (avec la
 - [ ] `/cotd` — Affiche les saints du jour
 - [ ] `/ecaflip option1 [option2] [option3] [option4] [option5] [option6] [option7] [option8] [option9] [option10]` — Pile ou Face ?
 - [ ] `/edit message` — Modifie la question du sondage
-- [ ] `/estimate question` — Créer un nouveau pari d'estimation (Le plus proche gagne)
+- [x] `/estimate question` — Créer un nouveau pari d'estimation (Le plus proche gagne)
 - [ ] `/help` — Fourni la liste des commandes disponibles avec ce bot
 - [ ] `/join` — Rejoindre le fil de discussion actuel
 - [ ] `/mesrappels liste` — Voir la liste de tes rappels actifs
@@ -31,6 +31,22 @@ Légende : `[x]` porté en v2 · `~~barré~~` abandonné volontairement (avec la
 - [x] `/solde [user]` — Affiche le solde de points d'un utilisateur (solde et délai ; les balls en poche s'y ajoutent en P4, le rappel de loterie en P5)
 - [ ] `/version` — Affiche la version actuelle du bot
 - [ ] `/week question [jour] [date_debut] [date_fin]` — Créer un sondage contenant les jours d'une période
+
+Écarts assumés des paris (P3b, détail dans [economie.md](economie.md#paris)) :
+
+- gains au quotient entier exact au lieu de `floor((mise / total gagnant) * cagnotte)` en flottant :
+  même résultat sauf quand une part tombe juste, où la v1 perdait un point (valeurs de référence tirées
+  du code v1 sous Node dans `pcr_core::bets`) ;
+- saisie stricte : espaces ignorées (« 1 000 »), tout autre caractère refusé (`parseInt` lisait
+  « 1 000 » comme 1, « 12abc » comme 12) ;
+- l'envoi d'une modale de mise revérifie l'auteur et l'option (la v1 ajoutait une mise faite depuis une
+  seconde modale à l'option de la première) ;
+- réponses personnelles au tutoiement, montants au format français, messages en composants v2 (le
+  créateur est mentionné, sans notification, au lieu de son pseudo en pied d'embed) ;
+- le résultat d'une estimation ne répète plus la bonne réponse (« La réponse correcte était… » suivait
+  « La bonne réponse était… ») ; un pari résolu garde son titre d'ouverture, sans boutons, comme en
+  v1 quand il n'avait pas été clos avant ;
+- un pari ouvert à la bascule garde son message v1 figé (boutons actifs, résultat publié).
 
 ## 2. Pokémon : actions v1 → emplacement v2
 
@@ -86,7 +102,8 @@ spawn, objet au sol, offre d'échange, parc et partage safari, partage de vitrin
 traduction. Ceux des panneaux éphémères sont remplacés par les panneaux `pk:` et répondent
 « panneau expiré ».
 
-- [ ] `bet_estimate_join` · `bet_estimate_modal` · `bet_estimate_resolve_submit` · `bet_join` · `bet_modal` · `bet_resolve_modal` · `bet_resolve_select` · `poke_box` · `poke_cmp` · `poke_cmpg` · `poke_cmpgo` · `poke_cmpn` · `poke_cmpr` · `poke_cmpt` · `poke_dex` · `poke_dexf` · `poke_dexs` · `poke_dext` · `poke_drop` · `poke_dup` · `poke_dupr` · `poke_dupsp` · `poke_dupspr` · `poke_evo` · `poke_evo_cancel` · `poke_evo_pick` · `poke_master` · `poke_master_cancel` · `poke_master_ok` · `poke_owned` · `poke_reback` · `poke_remaster` · `poke_respecial` · `poke_rethrow` · `poke_safari_bait` · `poke_safari_ball` · `poke_safari_cancel` · `poke_safari_enter` · `poke_safari_flee` · `poke_safari_gens` · `poke_safari_go` · `poke_safari_live` · `poke_safari_share` · `poke_showcase_share` · `poke_special` · `poke_starter_no` · `poke_starter_ok` · `poke_td_back` · `poke_td_cancel` · `poke_td_find` · `poke_td_go` · `poke_td_ind` · `poke_td_kind` · `poke_td_pick` · `poke_td_pts` · `poke_td_side` · `poke_throw` · `poke_trade_accept` · `poke_trade_cancel` · `poke_trade_counter` · `poke_trade_decline` · `poke_trade_pick` · `rappel` · `tweet_translate`
+- [x] `bet_estimate_join` · `bet_estimate_modal` · `bet_estimate_resolve_submit` · `bet_join` · `bet_modal` · `bet_resolve_modal` · `bet_resolve_select` (`pcr_core::bets::Action` ; le message du pari que la v1 ajoutait aux deux derniers est ignoré)
+- [ ] `poke_box` · `poke_cmp` · `poke_cmpg` · `poke_cmpgo` · `poke_cmpn` · `poke_cmpr` · `poke_cmpt` · `poke_dex` · `poke_dexf` · `poke_dexs` · `poke_dext` · `poke_drop` · `poke_dup` · `poke_dupr` · `poke_dupsp` · `poke_dupspr` · `poke_evo` · `poke_evo_cancel` · `poke_evo_pick` · `poke_master` · `poke_master_cancel` · `poke_master_ok` · `poke_owned` · `poke_reback` · `poke_remaster` · `poke_respecial` · `poke_rethrow` · `poke_safari_bait` · `poke_safari_ball` · `poke_safari_cancel` · `poke_safari_enter` · `poke_safari_flee` · `poke_safari_gens` · `poke_safari_go` · `poke_safari_live` · `poke_safari_share` · `poke_showcase_share` · `poke_special` · `poke_starter_no` · `poke_starter_ok` · `poke_td_back` · `poke_td_cancel` · `poke_td_find` · `poke_td_go` · `poke_td_ind` · `poke_td_kind` · `poke_td_pick` · `poke_td_pts` · `poke_td_side` · `poke_throw` · `poke_trade_accept` · `poke_trade_cancel` · `poke_trade_counter` · `poke_trade_decline` · `poke_trade_pick` · `rappel` · `tweet_translate`
 
 ## 5. Minuteurs (désormais en heure de Paris, rattrapés via `job_runs`)
 

@@ -8,11 +8,17 @@
 - Commandes : `commands/<nom>.rs` avec `#[derive(CommandModel, CreateCommand)]`, déclarées dans `commands::all()`.
 - Jeu Pokémon (P4) : `pokemon/<panneau>.rs`, préfixe `pk:` ; les messages publics gardent leurs préfixes v1.
 - Un handler décode, appelle `pcr-app`, rend le résultat. Pas de règle de jeu ici.
-- Délai de 3 s : un handler lent renvoie `Reply::later(éphémère, travail)` ; le routeur diffère puis
-  remplace la réponse (texte ou panneau v2, sans notifier personne). Images dans `spawn_blocking`.
+- Délai de 3 s : un handler lent renvoie `Reply::later(éphémère, travail)` (commande, bouton, modale) ou
+  `Reply::later_update` (un menu, remplacé par le résultat) ; le routeur diffère puis remplace la réponse
+  (texte ou panneau v2, sans notifier personne). Une modale ne se diffère pas : le clic qui l'ouvre lit
+  vite et répond `Now`. `Reply::Posted` : réponse publique immédiate qui devient un message public (un
+  rôle n'est appelé que dans une réponse immédiate). Images dans `spawn_blocking`.
+- Paris : `bets/` (routage `bet_*` des composants et modales, `forms`, `render` des messages publics),
+  commandes `bet`, `estimate`, `betstats`.
 - Intents : seulement ceux qu'une fonctionnalité utilise. Contenu des messages (privilégié) : stats de
   mots ; la liste des membres passe par l'API (`members.rs`, intention « Server Members » de l'application).
 - `messages.rs` : chaque message d'un membre (pas d'un bot, MP compris) → `pcr_app::points::on_message`.
 - `announce.rs` : au premier READY, annonce de version (prod) ou aperçu des fragments en attente (dev).
 - `public_messages.rs` : le port d'écriture des messages publics. Un type de message = un rendu dans
-  `renderer()`, qui relit la base au moment d'écrire ; codes Discord « disparu » repris de la v1.
+  `renderer()`, qui relit la base au moment d'écrire et désigne les rôles qu'il peut appeler (`Rendered`) :
+  toute autre mention reste muette ; codes Discord « disparu » repris de la v1.

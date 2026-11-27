@@ -10,7 +10,7 @@
 //! plancher de zéro : au pire un d'écart sur un compteur, dans ce seul cas limite.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, hash_map::Entry},
     path::{Path, PathBuf},
     sync::Mutex,
     time::Duration,
@@ -18,7 +18,7 @@ use std::{
 
 use jiff::Timestamp;
 use pcr_core::clock::paris_date;
-pub use pcr_db::stats::Counter;
+pub use pcr_db::stats::{BetStats, Counter};
 use pcr_db::{DbError, StatsDb};
 use tokio::sync::watch;
 
@@ -50,14 +50,24 @@ impl Stats {
         data_dir.join(format!("stats-{year}.db"))
     }
 
-    /// Ajoute `delta` à `counter`, pour l'année de Paris de `at`.
+    /// Ajoute `delta` à `counter` (ou le retient comme record, voir [`Counter::combine`]), pour
+    /// l'année de Paris de `at`.
     pub fn add(&self, at: Timestamp, counter: Counter, delta: i64) {
         let year = paris_date(at).year();
         let mut pending = self
             .pending
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        *pending.entry((year, counter)).or_default() += delta;
+        merge(&mut pending, year, counter, delta);
+    }
+
+    /// Les statistiques de paris de l'année en cours. Le tampon est d'abord écrit : un pari résolu à
+    /// l'instant compte déjà.
+    pub async fn bet_stats(&self, now: Timestamp, user: i64) -> Result<BetStats, DbError> {
+        self.flush(now).await?;
+        let mut open = self.open.lock().await;
+        let db = self.current(&mut open, paris_date(now).year()).await?;
+        pcr_db::stats::bet_stats(db, user).await
     }
 
     /// Écrit le tampon, une transaction par année. Un lot qui échoue revient dans le tampon pour le
@@ -149,7 +159,20 @@ impl Stats {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
         for (counter, delta) in counters {
-            *pending.entry((year, counter)).or_default() += delta;
+            merge(&mut pending, year, counter, delta);
+        }
+    }
+}
+
+/// Fusionne une valeur dans le tampon : additionnée, ou gardée si c'est un nouveau record.
+fn merge(pending: &mut HashMap<(i16, Counter), i64>, year: i16, counter: Counter, value: i64) {
+    match pending.entry((year, counter)) {
+        Entry::Occupied(mut entry) => {
+            let combined = entry.key().1.combine(*entry.get(), value);
+            *entry.get_mut() = combined;
+        }
+        Entry::Vacant(entry) => {
+            entry.insert(value);
         }
     }
 }
@@ -245,6 +268,54 @@ mod tests {
             .await,
             2027
         );
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[tokio::test]
+    async fn a_record_keeps_the_largest_value_through_the_buffer_and_the_base() {
+        let dir = std::env::temp_dir().join(format!("pcr-app-stats-max-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let stats = Stats::new(dir.clone());
+        let now = at("2026-11-27T12:00:00Z");
+        let record = || Counter::BetMaxWin { user: 7 };
+        let wagered = || Counter::BetWagered { user: 7 };
+
+        // Le dossier n'existe pas encore : le lot échoue et revient dans le tampon.
+        stats.add(now, record(), 50);
+        stats.add(now, wagered(), 10);
+        assert!(stats.flush(now).await.is_err());
+        stats.add(now, record(), 30);
+        stats.add(now, wagered(), 20);
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        stats.flush(now).await.expect("flush");
+
+        // Un record plus petit que celui de la base ne l'écrase pas.
+        stats.add(now, record(), 40);
+        stats.add(now, Counter::BetMaxWin { user: 8 }, 0);
+        let read = stats.bet_stats(now, 7).await.expect("read");
+        assert_eq!(
+            read,
+            BetStats {
+                total_wagered: 30,
+                max_win: 50,
+                server_wagered: 30,
+                server_max_win: 50,
+                record_holder: Some(7),
+            }
+        );
+        stats.add(now, record(), 90);
+        assert_eq!(stats.bet_stats(now, 7).await.expect("read").max_win, 90);
+        assert_eq!(
+            stats.bet_stats(now, 8).await.expect("read"),
+            BetStats {
+                total_wagered: 0,
+                max_win: 0,
+                server_wagered: 30,
+                server_max_win: 90,
+                record_holder: Some(7),
+            }
+        );
+        stats.close().await;
         std::fs::remove_dir_all(&dir).ok();
     }
 }

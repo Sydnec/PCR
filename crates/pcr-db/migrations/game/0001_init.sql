@@ -43,9 +43,10 @@ CREATE TABLE job_runs (
 ) STRICT, WITHOUT ROWID;
 
 -- Les messages publics que le bot poste puis réécrit au fil de la partie : annonce d'apparition, offre
--- d'échange, objet au sol, parc safari, direct d'une visite, bilan de saison. Une ligne par message,
--- désignée par la ligne de jeu qu'il montre (`kind`, `entity_id`) ; les tables de jeu ne portent ni
--- salon ni message.
+-- d'échange, objet au sol, parc safari, direct d'une visite, bilan de saison, pari et son résultat. Une
+-- ligne par message, désignée par la ligne de jeu qu'il montre (`kind`, `entity_id`) ; les tables de jeu
+-- ne portent ni salon ni message. Le message d'un pari est la réponse à `/bet` : sa ligne naît après
+-- cette réponse, avec son `message_id` (ou sans, si la réponse a échoué : le worker le poste alors).
 --
 -- Le cas d'usage qui change l'état de jeu monte `version` dans sa transaction. Après le commit, le
 -- worker relit la base, construit le contenu, l'écrit sur Discord puis pose `synced_version`. Un message
@@ -59,7 +60,8 @@ CREATE TABLE job_runs (
 CREATE TABLE public_messages (
     id             INTEGER PRIMARY KEY,
     kind           TEXT    NOT NULL CHECK (kind IN (
-                       'spawn', 'trade', 'drop', 'safari_park', 'safari_live', 'season_recap')),
+                       'spawn', 'trade', 'drop', 'safari_park', 'safari_live', 'season_recap',
+                       'bet', 'bet_result')),
     entity_id      INTEGER NOT NULL,
     channel_id     INTEGER NOT NULL,
     message_id     INTEGER,

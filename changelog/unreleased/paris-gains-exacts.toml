@@ -1,0 +1,4 @@
+type = "fix"
+name = "Paris : des gains au point près"
+description = "Quand une part de la cagnotte tombe juste, le gagnant reçoit bien tout ce qui lui revient : il perdait parfois un point. Une mise tapée « 1 000 » vaut désormais mille points, et non plus un seul."
+announce = true

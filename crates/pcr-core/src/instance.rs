@@ -42,6 +42,9 @@ pub struct Discord {
     /// Le rôle des membres du serveur (`DEFAULT_ROLE_ID` en v1) : les bénéficiaires du pot commun.
     /// Absent : le pot commun attend qu'il soit posé.
     pub default_role_id: Option<u64>,
+    /// Le rôle appelé à chaque nouveau pari (`DISCORD_BET_ROLE_ID` en v1). Absent : personne n'est
+    /// appelé.
+    pub bet_role_id: Option<u64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
