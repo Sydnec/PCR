@@ -191,7 +191,9 @@ async fn insert(
 }
 
 /// La réponse à `/bet` est partie (`message_id`), ou a échoué (`None` : le worker postera le
-/// message). Le pari a désormais son message public.
+/// message). Le pari a désormais son message public. Un arrêt du bot entre la réponse et cet
+/// enregistrement laisse le message figé (ses boutons marchent, il ne se réécrit plus) : c'est le
+/// prix d'une ligne qui ne naît qu'avec son `message_id`, et qu'aucun worker ne peut poster en double.
 pub async fn posted(
     app: &App,
     bet: i64,

@@ -35,6 +35,9 @@ const PREDICTION: &str = "prediction";
 const RESULT: &str = "result";
 
 const CREATE_FAILED: &str = "Erreur création pari.";
+/// Essais pour enregistrer le message d'un pari qui vient d'être posté, et leur intervalle.
+const RECORD_ATTEMPTS: u32 = 3;
+const RECORD_RETRY: std::time::Duration = std::time::Duration::from_secs(1);
 
 /// Membre, salon : des identifiants Discord en `i64`, comme en base.
 fn id(value: u64) -> i64 {
@@ -97,12 +100,21 @@ pub(crate) async fn post(
         response: Box::new(response),
         then: Box::new(move |message_id| {
             Box::pin(async move {
-                // Sans salon connu, le message ne pourrait pas être réécrit : il reste tel quel.
+                // Une commande de guilde a toujours son salon ; sans lui, le message ne pourrait
+                // pas être réécrit et resterait tel quel.
                 let Some(channel) = channel else {
                     return;
                 };
-                if let Err(error) = cases::posted(&app, bet, channel, message_id).await {
-                    tracing::error!(?error, bet, "recording a bet message failed");
+                // Sans cette ligne, le message du pari ne se réécrirait plus jamais : une panne
+                // passagère de la base (écrivain occupé) mérite quelques essais.
+                for attempt in 1..=RECORD_ATTEMPTS {
+                    match cases::posted(&app, bet, channel, message_id).await {
+                        Ok(()) => return,
+                        Err(error) => {
+                            tracing::error!(?error, bet, attempt, "recording a bet message failed");
+                        }
+                    }
+                    tokio::time::sleep(RECORD_RETRY).await;
                 }
             })
         }),

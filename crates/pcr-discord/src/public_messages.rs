@@ -108,10 +108,11 @@ impl DiscordPublicMessages {
             }
             Some(id) => {
                 let id = Id::new_checked(u64::try_from(id).unwrap_or(0)).ok_or(WriteError::Gone)?;
+                // Rien n'appelle dans une modification : la mention du rôle a servi à la création.
                 self.http
                     .update_message(channel, id)
                     .components(Some(&rendered.components))
-                    .allowed_mentions(Some(&mentions))
+                    .allowed_mentions(Some(&AllowedMentions::default()))
                     .await
             }
         };

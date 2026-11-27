@@ -37,8 +37,12 @@ pub async fn stake_form(
     if found.creator_id == user {
         return Err(refused(rules::OWN_BET));
     }
-    let staked = bets::participation(&mut conn, bet, user).await?;
+    // Le refus que l'envoi donnerait, avant toute saisie (une estimation n'a pas d'options).
     let options = bets::options(&mut conn, bet).await?;
+    if !options.iter().any(|(index, _)| *index == option) {
+        return Err(refused(rules::INVALID_OPTION));
+    }
+    let staked = bets::participation(&mut conn, bet, user).await?;
     check_same_option(&options, staked.as_ref(), option)?;
     Ok(StakeForm {
         balance: points::balance_in(&mut conn, user).await?,

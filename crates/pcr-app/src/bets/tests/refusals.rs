@@ -187,7 +187,16 @@ async fn typed_values_and_options_are_checked() {
         refusal(stake(&t.app, bet, ALICE, 9, "10").await),
         rules::INVALID_OPTION
     );
+    assert_eq!(
+        refusal(stake_form(&t.app, bet, ALICE, 9).await),
+        rules::INVALID_OPTION
+    );
     let guess = estimation(&t).await;
+    // Un bouton de mise sur une estimation : elle n'a pas d'options.
+    assert_eq!(
+        refusal(stake_form(&t.app, guess, ALICE, 1).await),
+        rules::INVALID_OPTION
+    );
     assert_eq!(
         refusal(estimate(&t.app, guess, ALICE, "beaucoup", "10").await),
         rules::BAD_PREDICTION
