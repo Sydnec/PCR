@@ -36,8 +36,13 @@ Réécriture en Rust, même résultat pour les joueurs. Le détail des choix est
 | P3b | Paris : `/bet`, `/estimate`, `/betstats`, les `custom_id` `bet_*`, messages publics du pari et de son résultat | ✅ |
 | P3c | Communauté : rappels (`/rappel`, bouton `rappel`, `/mesrappels`, envoi et purge), anniversaires, `/poll`, `/week`, `/edit`, `/ecaflip`, saints du jour (`/cotd` + minuteur), calendrier de l'Avent, `/randomizabaise`, `/safe-place`, `/join` | ✅ |
 | P3d | Administration et salon : `/admin purge`, `/admin purge-membre`, `/admin restart`, liens X/Instagram et traduction, rôles (message des rôles, rôle à l'arrivée, invitations, `/color`), liste des fils, stats de réactions et de vocal, `/help`, `/version` | ✅ |
-| P4 | Pokémon socle : spawn, lancers, shiny, objets (et les balls en poche dans `/solde`), Centre Pokémon, Mon aventure, Boîte, `/pokedex` | à faire |
-| P5 | Pokémon avancé : boutique, revente, loterie (et son rappel dans `/solde`), évolution, œufs, pêche, safari, échanges, vitrine… | à faire |
+| P4a | Pokémon, données et règles : espèces et tables de pêche converties par `build.rs`, génération ouverte (et plafond de `pokemon.generation`), rareté, sexe, formes, poids d'apparition (🔒, 🥚), probabilités de capture, difficulté, shiny, lignées, catalogue d'objets et ses tirages, `/admin poids` | ✅ |
+| P4b | Apparitions : revendication au fil des messages, tirage (espèce, sexe, forme, shiny, objet tenu), message public et ses `custom_id` `poke_*`, fuite (balayage chaque minute), `/admin pokespawn`, fiche d'espèce (bouton « Infos »), balls en poche dans `/solde` | à faire |
+| P4c | Lancers : paiement en points ou ball en poche, délai entre deux lancers, Master Ball (confirmation, prix personnel), course et remboursement, individus (sexe, ball, verrou d'office), panneau de relance, annonce de capture ou de fuite, journal et stats, Charme Chroma | à faire |
+| P4d | Objets : objet tenu remis à la capture, objet au sol (`poke_drop`), limite de détention et surplus (Master Ball, cannes), journal des objets, `/admin item` | à faire |
+| P4e | `/pokedex` : Pokédex et ses filtres, fiche d'espèce, classement, lettres de Zarbi, clic droit › Pokédex | à faire |
+| P4f | Centre Pokémon (message permanent) et `/pokemon` (Mon aventure) : Boîte et fiche d'individu (verrou, surnom), Sac, lien du site | à faire |
+| P5 | Pokémon avancé : boutique, revente, loterie (et son rappel dans `/solde`), évolution, œufs, pêche, safari, échanges (et doublons), vitrine (et `/zarbi`)… | à faire |
 | P6 | Site : API aux formes v1, OAuth, sessions, SSE, front repris, diff v1/v2 | à faire |
 | P7 | Récap annuel | à faire |
 | P8 | Bascule de la prod | à faire |
@@ -47,6 +52,13 @@ relecture, et les paris sortent de l'économie parce qu'ils apportent à eux seu
 types de messages publics et la réponse d'interaction enregistrée comme message public. `/admin item`,
 `poids`, `pokespawn`, `safarispawn` et `saison` attendent le jeu Pokémon (P4, P5), la purge des sessions
 du site arrive avec le site (P6).
+
+P4 est découpée en six PR, chacune bâtie sur la précédente : les règles pures d'abord (ni base ni
+Discord, elles se relisent contre les tests v1), puis le cycle d'une apparition, les lancers qui la
+concluent, les objets qu'elle porte, et enfin les panneaux qui lisent tout cela. Les lancers sortent
+des apparitions parce qu'ils apportent à eux seuls neuf `custom_id`, le paiement et la naissance des
+individus. Les doublons rejoignent les échanges (P5), qui partagent leur calcul des évolutions mises de
+côté, et `/zarbi` la vitrine (P5), l'autre image que dessine le bot.
 
 ## Démarrer une session
 

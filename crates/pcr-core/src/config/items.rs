@@ -118,6 +118,31 @@ section! {
     }
 }
 
+impl Items {
+    /// Le catalogue dans l'ordre de déclaration, celui de la v1 : le sac, les tables de tirage et
+    /// les menus le suivent (un tri par clé mettrait « `ball_hyper` » avant « `ball_poke` »).
+    pub fn entries(&self) -> [(&'static str, &Item); 16] {
+        [
+            ("ball_poke", &self.ball_poke),
+            ("ball_super", &self.ball_super),
+            ("super_bonbon", &self.super_bonbon),
+            ("ball_hyper", &self.ball_hyper),
+            ("evolyte", &self.evolyte),
+            ("pierre_soleil", &self.pierre_soleil),
+            ("roche_royale", &self.roche_royale),
+            ("catalyseur", &self.catalyseur),
+            ("pepite", &self.pepite),
+            ("ticket_safari", &self.ticket_safari),
+            ("ball_master", &self.ball_master),
+            ("canne", &self.canne),
+            ("super_canne", &self.super_canne),
+            ("mega_canne", &self.mega_canne),
+            ("charme_chroma_1", &self.charme_chroma_1),
+            ("charme_chroma_2", &self.charme_chroma_2),
+        ]
+    }
+}
+
 section! {
     pub struct Item {
         /// Une ball offerte : elle prend nom, icône et image de la ball de capture.
@@ -226,5 +251,25 @@ section! {
 section! {
     pub struct Charm {
         generation "generation": u8 = 1,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Un objet ajouté au catalogue sans passer par `entries` n'existerait pour aucun tirage.
+    #[test]
+    fn entries_follow_the_declared_catalogue() {
+        let items = Items::default();
+        let tree = serde_json::to_value(&items).expect("serialize");
+        let declared: Vec<&str> = tree
+            .as_object()
+            .expect("tree")
+            .keys()
+            .map(String::as_str)
+            .collect();
+        let listed: Vec<&str> = items.entries().iter().map(|(key, _)| *key).collect();
+        assert_eq!(listed, declared);
     }
 }

@@ -17,6 +17,7 @@ pub mod ids;
 pub mod instance;
 pub mod links;
 pub mod points;
+pub mod pokemon;
 pub mod polls;
 pub mod purge;
 pub mod randomizabaise;

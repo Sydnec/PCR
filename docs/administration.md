@@ -32,8 +32,9 @@
     sauvages, rencontres du parc, butin des Pokémon, loterie. Un poids n'est pas un pourcentage mais
     une part d'un total qui bouge à chaque ligne ajoutée, et la table se construit avec les
     **mêmes** fonctions que les tirages : elle ne peut pas diverger de ce qu'elle décrit. Les objets
-    hors tirage (charmes, objets d'une génération fermée) sont nommés sous le titre plutôt que listés,
-    et un tableau trop long pour Discord se poursuit dans un champ « suite », voire un second message.
+    hors tirage (charmes, objets d'une génération fermée) sont nommés sous le titre plutôt que listés.
+    Les quatre tables ne tiennent pas dans un message (4 000 caractères) : elles se répartissent en
+    plusieurs, et un tableau trop long se poursuit dans un bloc « suite », en-tête répété.
   - `/admin config-voir [cle]` : valeur courante face à la valeur par défaut. Sans clé, tous les
     réglages. Un réglage en base qui ne convient plus (disparu, ou d'une valeur refusée) est signalé
     en tête : sa valeur par défaut s'applique. Le [site](site.md#administration) offre les deux en

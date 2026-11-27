@@ -10,7 +10,8 @@
 - Un handler décode, appelle `pcr-app`, rend le résultat. Pas de règle de jeu ici.
 - Délai de 3 s : un handler lent renvoie `Reply::later(éphémère, travail)` (commande, bouton, modale) ou
   `Reply::later_update` (un menu, remplacé par le résultat) ; le routeur diffère puis remplace la réponse
-  (texte ou panneau v2, sans notifier personne). Une modale ne se diffère pas : le clic qui l'ouvre lit
+  (texte ou panneau v2, sans notifier personne ; `Edit::Panels` quand un message ne suffit pas : les
+  suivants partent en suites, même visibilité). Une modale ne se diffère pas : le clic qui l'ouvre lit
   vite et répond `Now`. `Reply::Posted` : réponse publique immédiate qui devient un message public (un
   rôle n'est appelé que dans une réponse immédiate). Images dans `spawn_blocking`.
 - Paris : `bets/` (routage `bet_*` des composants et modales, `forms`, `render` des messages publics),
@@ -22,7 +23,7 @@
 - Salon : `links.rs` (copie des liens, bouton `tweet_translate|`), `roles.rs` (message des rôles, réactions,
   rôles du serveur), `arrivals.rs` (rôle d'arrivée, cache des invitations), `threads.rs` (liste des fils,
   `delete` par lots), `reactions.rs`, `voice.rs`. Commandes `/admin purge`, `purge-membre` (tâche de fond,
-  `purge_member/scan.rs`), `restart`, `/color`, `/help`.
+  `purge_member/scan.rs`), `restart`, `/color`, `/help`, `/admin poids`.
 - Intents : seulement ceux qu'une fonctionnalité utilise. Contenu des messages (privilégié) : stats de
   mots et liens ; membres (privilégié, « Server Members ») : arrivées, et la liste par l'API
   (`members.rs`) ; réactions, vocal, invitations.

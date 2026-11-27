@@ -18,6 +18,7 @@ pub mod links;
 pub mod members;
 pub mod outbox;
 pub mod points;
+pub mod pokemon;
 pub mod public_messages;
 pub mod randomizabaise;
 pub mod reactions;

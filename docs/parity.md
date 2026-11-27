@@ -124,7 +124,7 @@ Les règles ne changent pas ; `/pk` disparaît au profit du Centre Pokémon, de 
 - [ ] `/admin item cible objet [quantite]` — Donne (ou retire) un objet à un dresseur ou à tout un rôle
 - [x] `/admin config cle valeur` — Modifie un réglage du bot, appliqué immédiatement
 - [x] `/admin config-voir [cle]` — Affiche un réglage — ou une branche entière — et sa valeur par défaut
-- [ ] `/admin poids [table]` — Convertit les poids de tirage en probabilités réelles
+- [x] `/admin poids [table]` — Convertit les poids de tirage en probabilités réelles (P4a : composants v2, un tableau se poursuit dans un bloc « suite » quand le message dépasse 4 000 caractères, au lieu d'un champ de 1 024)
 - [x] `/admin potcommun [simulation]` — Déclenche un pot commun immédiatement, ou simule le prochain (montants et taux au format français : « 2,5 % » au lieu de « 2.5 % »)
 - [x] `/admin purge [lien] [nombre]` — Supprime des messages
 - [x] `/admin purge-membre id` — Supprime tous les messages d'un membre sur le serveur, bilan en MP
@@ -224,8 +224,8 @@ surcharge que GameConfig refuse est ignorée, journalisée et signalée par `/ad
 assumés : les compteurs, prix, minutes et heures sont des entiers (les poids de tirage, chances,
 multiplicateurs et `throwCooldownSeconds` restent fractionnaires) ; une saisie vide ou hexadécimale
 n'est plus prise pour un nombre ; « Chemin interdit. » disparaît (aucune pollution de prototype
-possible en Rust) ; le plafond de `pokemon.generation` (dernière génération des données d'espèces)
-arrive avec ces données (P4). Propre à la v2 : `messagePoints.cooldownMinutes` (60), la carence entre
+possible en Rust) ; `pokemon.generation` est plafonné à la dernière génération des données d'espèces
+(`data/pokemon.json`, converti par `build.rs` en P4a), comme en v1. Propre à la v2 : `messagePoints.cooldownMinutes` (60), la carence entre
 deux messages récompensés que la v1 codait en dur.
 
 - [x] `messagePointsDistribution` (7) : `1`, `2`, `3`, `4`, `5`, `6`, `default`

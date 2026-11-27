@@ -20,8 +20,15 @@
   « Traduire », noms de langues, échappement), `purge` (lien de message, âge d'un identifiant, bilan),
   `roles` (libre-service, message des rôles, couleur), `threads` (liste des fils).
 - À venir : un module par fonctionnalité (`lottery`, `safari`…).
-- Données Pokémon : `data/pokemon.json` (251 espèces : `id`, `name` FR, `generation`, `catchRate`, `stage`,
-  `isLegendary`, `isMythical`, `isBaby`, `genderRate`, `evolvesFrom/Into`, `sprite`, `forms`) et
-  `data/fishing.json` (`rods.{old,good,super}` = paires `[speciesId, poids]`) : converties en tableaux
-  statiques par `build.rs` (P4). Ne pas lire ces fichiers en entier : la forme ci-dessus suffit.
+- Données Pokémon : `data/pokemon.json` (251 espèces : `id`, `name` FR, `slug`, `generation`, `catchRate`,
+  `stage`, `isLegendary`, `isMythical`, `isBaby`, `genderRate`, `tradeEvolution`, `types`,
+  `evolvesFrom/Into`, `sprite`, `forms`) et `data/fishing.json` (`rods.{old,good,super}` = paires
+  `[speciesId, poids]`) : converties en tableaux statiques par `build.rs`, qui refuse une donnée mal formée.
+  Ne pas lire ces fichiers en entier : la forme ci-dessus suffit.
+- `pokemon` : `species` (lecture brute `get`, jouable `available`/`all(génération)`, sexe, formes,
+  images), `generation::active` (à calculer une fois par action et à passer aux règles), `rarity`,
+  `lineage`, `weights::Draw` (poids d'apparition, tirage `pick_at(roll)`, 🔒/🥚), `capture` (formule,
+  plancher, difficulté, prix de la Master Ball, shiny), `items` (catalogue, tables `Held`/`Lottery`),
+  `fishing`, `tables` (`/admin poids`, mêmes fonctions que les tirages). Un tirage prend un `roll` dans
+  [0, 1) ou un RNG : les tests figent le premier, comme `withRandom` en v1.
 - Tests : valeurs de référence reprises des tests v1 (`git show origin/main:test/<fichier>`).
