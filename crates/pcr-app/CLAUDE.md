@@ -29,6 +29,7 @@
   calendrier), `randomizabaise`. Salon : `links` (boutons et traduction, sur `outbox::Web`), `voice` et
   `reactions` (stats de l'année), `App::request_restart` (`/admin restart` : `main` s'arrête proprement).
   Refus : `error::UseCaseError`. Faux ports : `testing::FakeOutbox`, `FakeWeb`.
+- Pokémon : `pokemon` (`generation`, la génération jouable à l'horloge de l'`App` ; `weight_tables`).
 - Points : `points` (gain d'un message, `/solde`, classement, `/admin points`), `redistribution` (pot
   commun : boucle horaire `run`, lancée par `pcr-discord`). Paris : `bets` (création, `stake`, `resolve`…,
   `View` et `gains` partagés par le paiement et les rendus ; les stats comptent après le commit).
