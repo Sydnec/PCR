@@ -30,6 +30,11 @@
   `reactions` (stats de l'année), `App::request_restart` (`/admin restart` : `main` s'arrête proprement).
   Refus : `error::UseCaseError`. Faux ports : `testing::FakeOutbox`, `FakeWeb`.
 - Pokémon : `pokemon` (`generation`, la génération jouable à l'horloge de l'`App` ; `weight_tables`).
+  `pokemon::spawn` : `on_message` (chaque message du serveur), `force` (`/admin pokespawn`), `claim`
+  (la revendication dans une transaction ouverte, que la capture réutilisera), `flee_due` et `run`
+  (balayage chaque minute, lancé par `pcr-discord`), `view` (ce que montre le message `spawn`) ; les
+  stats partent après le commit (`spawn/stats.rs`). `pokemon::sheet::for_spawn` (bouton « Infos » :
+  une lecture ratée laisse sa partie à `None`), `pokemon::items::ball_stock` (balls en poche).
 - Points : `points` (gain d'un message, `/solde`, classement, `/admin points`), `redistribution` (pot
   commun : boucle horaire `run`, lancée par `pcr-discord`). Paris : `bets` (création, `stake`, `resolve`…,
   `View` et `gains` partagés par le paiement et les rendus ; les stats comptent après le commit).

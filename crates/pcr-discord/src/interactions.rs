@@ -22,7 +22,7 @@ use crate::{
         admin, bet, betstats, birthday, classement, color, cotd, ecaflip, edit, estimate, help,
         join, mesrappels, poll, randomizabaise, rappel, safe_place, solde, version, week,
     },
-    links, reminders, ui,
+    links, pokemon, reminders, ui,
 };
 
 const GENERIC_ERROR: &str = "Une erreur est survenue, réessaie dans un instant.";
@@ -311,6 +311,7 @@ async fn route(ctx: &Ctx, interaction: &Interaction) -> anyhow::Result<Reply> {
             }
             id if id.starts_with(reminders::PREFIX) => reminders::button(ctx, interaction, id),
             id if id.starts_with(TRANSLATE) => links::translate(ctx, id),
+            id if id.starts_with(pokemon::PREFIX) => pokemon::component(ctx, interaction, id),
             // Un id inconnu vient d'un panneau d'une version précédente : le dire plutôt qu'échouer.
             _ => ui::ephemeral_text(EXPIRED).into(),
         },

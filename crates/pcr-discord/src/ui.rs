@@ -3,8 +3,9 @@
 
 use twilight_model::{
     application::command::CommandOptionChoice,
-    channel::message::{Component, MessageFlags},
+    channel::message::{Component, EmojiReactionType, MessageFlags},
     http::interaction::InteractionResponse,
+    id::Id,
     user::User,
 };
 use twilight_util::builder::interaction_response::{
@@ -68,5 +69,58 @@ pub fn relayed() -> twilight_model::channel::message::AllowedMentions {
     AllowedMentions {
         parse: vec![MentionType::Users, MentionType::Roles],
         ..AllowedMentions::default()
+    }
+}
+
+/// Un emoji de la config (`<:pokeball:155…>`, `<a:nom:id>` ou un emoji Unicode) tel qu'un bouton le
+/// porte ; `None` s'il est vide ou illisible : le bouton part alors sans icône plutôt que refusé.
+pub fn emoji(text: &str) -> Option<EmojiReactionType> {
+    let text = text.trim();
+    if text.is_empty() {
+        return None;
+    }
+    let Some(inner) = text.strip_prefix('<').and_then(|t| t.strip_suffix('>')) else {
+        return Some(EmojiReactionType::Unicode {
+            name: text.to_owned(),
+        });
+    };
+    let (animated, rest) = match inner.strip_prefix("a:") {
+        Some(rest) => (true, rest),
+        None => (false, inner.strip_prefix(':')?),
+    };
+    let (name, id) = rest.rsplit_once(':')?;
+    Some(EmojiReactionType::Custom {
+        animated,
+        id: Id::new_checked(id.parse().ok()?)?,
+        name: Some(name.to_owned()),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn config_emoji_become_button_emoji() {
+        assert_eq!(
+            emoji("<:pokeball:1551325915160514690>"),
+            Some(EmojiReactionType::Custom {
+                animated: false,
+                id: Id::new(1_551_325_915_160_514_690),
+                name: Some("pokeball".to_owned()),
+            })
+        );
+        assert!(matches!(
+            emoji("<a:dance:12>"),
+            Some(EmojiReactionType::Custom { animated: true, .. })
+        ));
+        assert_eq!(
+            emoji("🎣"),
+            Some(EmojiReactionType::Unicode {
+                name: "🎣".to_owned()
+            })
+        );
+        assert_eq!(emoji(""), None);
+        assert_eq!(emoji("<:cassé:0>"), None);
     }
 }

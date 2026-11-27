@@ -237,6 +237,9 @@ INSERT INTO pokemon_state (id) VALUES (1);
 -- tenu, sexe, forme. Retoucher les données ou la config ne change jamais une partie en cours, et
 -- l'individu capturé est celui que l'annonce a montré. `cast_cost` : ce que la canne a coûté (bilan de
 -- saison), NULL pour une apparition. `flees_at` : l'échéance de fuite, tirée à l'apparition.
+-- `announcement` : le texte d'un administrateur (`/admin pokespawn`), et `pings_role` : l'annonce appelle
+-- le rôle Pokémon. La v1 les gardait dans son message ; le message v2 se reconstruit depuis la base, ils
+-- vivent donc ici (NULL et 0 pour les apparitions de la v1, dont le message est déjà posté).
 CREATE TABLE pokemon_spawns (
     id           INTEGER PRIMARY KEY,
     species_id   INTEGER NOT NULL,
@@ -260,6 +263,8 @@ CREATE TABLE pokemon_spawns (
     caught_at    INTEGER,
     caught_ball  TEXT,
     ended_at     INTEGER,
+    announcement TEXT,
+    pings_role   INTEGER NOT NULL DEFAULT 0 CHECK (pings_role IN (0, 1)),
     CHECK (status <> 'FISHING' OR reserved_for IS NOT NULL),
     CHECK (status <> 'CAUGHT' OR caught_by IS NOT NULL)
 ) STRICT;

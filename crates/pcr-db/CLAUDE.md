@@ -19,6 +19,10 @@
 - `points.balance` ne bouge que par `points::move_balance`, qui écrit `points_log` (avec sa `Source`)
   dans la même transaction (pas de déclencheur : il daterait avec l'horloge de SQLite, pas avec `Clock`).
   Une liste d'identifiants passe en JSON (`json_each(?)`) : `query!` ne sait pas lier un `IN` variable.
+- Pokémon : `pokemon::spawn` (apparitions, état du salon, dépenses et journal des lancers ; la fuite est
+  un `UPDATE` gardé sur le statut), `pokemon::collection` (exemplaires, sexes et formes d'un dresseur),
+  `pokemon::items` (sac). Stats du jeu : `stats::Counter::Pokemon*` (colonnes dans `stats/pokemon.rs`,
+  records par `combine`) et `stats::record_highlight` (une ligne par moment notable).
 - `backup` : `vacuum_into` (copie cohérente, bot en marche) et `is_pcr_database`. Toute table qui stocke un
   salon/message Discord ou une action envers des membres doit être neutralisée dans
   `import_prod::neutralize` (appelé par `pcr import-prod`).

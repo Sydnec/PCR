@@ -85,6 +85,32 @@ pub fn unown() -> Option<&'static Species> {
     SPECIES.iter().find(|species| species.slug == "unown")
 }
 
+/// Les espèces jouables dont le nom contient `query`, dans l'ordre du Pokédex : sans accents, casse ni
+/// ponctuation, comme la v1 (« melo » trouve Mélo, « mmime » M. Mime). Une requête vide les donne
+/// toutes.
+pub fn search(query: &str, generation: u8) -> impl Iterator<Item = &'static Species> {
+    let needle = search_key(query);
+    all(generation).filter(move |species| search_key(species.name).contains(&needle))
+}
+
+/// Un nom réduit à ses lettres et chiffres ASCII, accents ôtés (ce que faisait la normalisation NFD).
+fn search_key(text: &str) -> String {
+    text.chars()
+        .flat_map(char::to_lowercase)
+        .filter_map(|c| match c {
+            'a'..='z' | '0'..='9' => Some(c),
+            'à' | 'â' | 'ä' | 'á' => Some('a'),
+            'é' | 'è' | 'ê' | 'ë' => Some('e'),
+            'î' | 'ï' | 'í' => Some('i'),
+            'ô' | 'ö' | 'ó' => Some('o'),
+            'û' | 'ù' | 'ü' | 'ú' => Some('u'),
+            'ç' => Some('c'),
+            'ÿ' => Some('y'),
+            _ => None,
+        })
+        .collect()
+}
+
 impl Species {
     pub fn is_available(&self, generation: u8) -> bool {
         self.generation <= generation
@@ -319,6 +345,22 @@ mod tests {
             named("Magnéton").sex_after_evolution(Some(Sex::Male), &mut rng),
             None
         );
+    }
+
+    #[test]
+    fn a_search_ignores_accents_case_and_punctuation() {
+        let found = |query: &str| search(query, 2).map(|s| s.name).collect::<Vec<_>>();
+        assert_eq!(found("MELODELFE"), ["Mélodelfe"]);
+        assert_eq!(found("mmime"), ["M. Mime"]);
+        assert_eq!(found("ho oh"), ["Ho-Oh"]);
+        assert_eq!(search("", 1).count(), 151);
+        assert_eq!(found("celebi"), ["Celebi"]);
+        assert!(search("celebi", 1).next().is_none(), "génération fermée");
+        // Aucune lettre d'un nom ne se perd : un accent oublié ici rendrait l'espèce introuvable.
+        for species in all_data() {
+            let letters = species.name.chars().filter(|c| c.is_alphanumeric()).count();
+            assert_eq!(search_key(species.name).len(), letters, "{}", species.name);
+        }
     }
 
     #[test]

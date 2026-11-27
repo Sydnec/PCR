@@ -13,6 +13,7 @@ mod links;
 mod members;
 mod messages;
 mod outbox;
+mod pokemon;
 mod polls;
 mod public_messages;
 mod reactions;
@@ -147,6 +148,11 @@ pub async fn run(
         outbox,
         shutdown.clone(),
     ));
+    // La fuite des Pokémon réécrit leur message : elle vit avec le worker, donc avec la connexion.
+    let flee = tokio::spawn(pcr_app::pokemon::spawn::run(
+        ctx.app.clone(),
+        shutdown.clone(),
+    ));
     let result = gateway(&ctx, guild_id, token, &mut shutdown).await;
     // Plus rien n'arrive de la gateway : ce qui reste en file n'a plus d'importance, le démarrage
     // suivant relève qui est en vocal.
@@ -156,6 +162,7 @@ pub async fn run(
         ("pot commun loop", pot),
         ("jobs loop", jobs),
         ("reminders loop", reminders),
+        ("pokemon flee loop", flee),
     ] {
         if let Err(error) = task.await {
             tracing::error!(?error, task = name, "background task panicked");

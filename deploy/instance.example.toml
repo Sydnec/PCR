@@ -32,6 +32,16 @@ color_role_id = 700000000000000010
 # Invitation des membres temporaires et leur rôle (TEMPORY_MEMBER_* en v1) ; facultatifs.
 temporary_member_invite_code = "abcdef"
 temporary_member_role_id = 700000000000000011
+# Jeu Pokémon (POKEMON_CHANNEL_ID, POKEMON_ROLE_ID en v1) : le salon des apparitions (absent : pas
+# d'apparitions) et le rôle des dresseurs, appelé par les apparitions rares et shiny ; facultatifs.
+pokemon_channel_id = 700000000000000012
+pokemon_role_id = 700000000000000013
+
+# Rôle des porteurs du Charme Chroma de chaque génération (SHINY_CHARM_ROLE_ID_<n> en v1), appelé
+# quand une apparition ne brille que pour eux ; facultatif.
+[discord.shiny_charm_role_ids]
+1 = 700000000000000014
+2 = 700000000000000015
 
 [web]
 listen = "0.0.0.0:8080"

@@ -65,7 +65,14 @@
     l'interrompt sans bilan : la relancer reprend ce qui reste. Le bot a besoin de « Voir le salon »,
     « Voir l'historique » et « Gérer les messages », plus « Gérer les fils » pour les fils privés et
     verrouillés.
-  - `/admin pokespawn [espece] [shiny] [annonce] [ping]` : déclenche une apparition (voir [Pokémon](pokemon/README.md)).
+  - `/admin pokespawn [espece] [shiny] [annonce] [ping]` : déclenche une apparition tout de suite (voir
+    [Pokémon](pokemon/README.md)), même pendant un parc safari et même à la place d'un légendaire. Le
+    compteur de messages et le délai repartent de zéro, pour qu'une apparition naturelle ne chasse pas
+    aussitôt le Pokémon annoncé. L'autocomplétion propose les espèces jouables, hors pool comprises
+    (marquées « (hors pool) », légendaires ⭐) ; une espèce d'une génération encore fermée est refusée
+    avec la raison. `shiny` le rend shiny (ou non) pour tout le salon, `annonce` (1 000 caractères au
+    plus) s'affiche en tête du message, et `ping` force ou supprime la mention du rôle Pokémon. Il
+    faut `pokemon_channel_id` dans `instance.toml`.
   - `/admin safarispawn [joueur] [pause]` : ouvre un parc safari (voir [Parc Safari](pokemon/safari.md)).
   - `/admin saison` : l'aperçu du bilan de la saison en cours, tel que le bot le publiera à l'ouverture
     de la génération suivante (voir [Bilan de saison](pokemon/README.md#bilan-de-saison)). Il ne publie

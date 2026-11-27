@@ -16,6 +16,7 @@ pub mod jobs;
 pub mod meta;
 pub mod migrate_v1;
 pub mod points;
+pub mod pokemon;
 mod pool;
 pub mod public_messages;
 pub mod redistribution;
