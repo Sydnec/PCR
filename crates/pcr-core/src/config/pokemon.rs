@@ -108,6 +108,24 @@ section! {
     }
 }
 
+impl Balls {
+    /// Les balls de capture dans l'ordre du catalogue v1 (Poké, Super, Hyper, Master).
+    pub fn entries(&self) -> [(&'static str, &Ball); 4] {
+        [
+            ("poke", &self.poke),
+            ("super", &self.super_),
+            ("hyper", &self.hyper),
+            ("master", &self.master),
+        ]
+    }
+
+    pub fn get(&self, key: &str) -> Option<&Ball> {
+        self.entries()
+            .into_iter()
+            .find_map(|(k, ball)| (k == key).then_some(ball))
+    }
+}
+
 section! {
     pub struct Ball {
         label "label": String = String::new(),
@@ -156,6 +174,13 @@ section! {
             bonus: Bonus { fished: None, item: Some("catalyseur".into()), multiplier: 4.0 },
             ..SpecialBall::default()
         },
+    }
+}
+
+impl SpecialBalls {
+    /// Les balls de la boutique, dans l'ordre du catalogue v1.
+    pub fn entries(&self) -> [(&'static str, &SpecialBall); 2] {
+        [("appat", &self.appat), ("catalyseur", &self.catalyseur)]
     }
 }
 
@@ -335,5 +360,38 @@ section! {
         retry_minutes "retryMinutes": u32 = 10,
         record_retries "recordRetries": u32 = 3,
         record_retry_delay_ms "recordRetryDelayMs": u32 = 500,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn declared(value: &impl serde::Serialize, skip: &[&str]) -> Vec<String> {
+        let tree = serde_json::to_value(value).expect("serialize");
+        tree.as_object()
+            .expect("tree")
+            .keys()
+            .filter(|key| !skip.contains(&key.as_str()))
+            .cloned()
+            .collect()
+    }
+
+    #[test]
+    fn ball_entries_follow_the_declared_catalogue() {
+        let balls = Balls::default();
+        let listed: Vec<_> = balls
+            .entries()
+            .iter()
+            .map(|(key, _)| (*key).to_owned())
+            .collect();
+        assert_eq!(listed, declared(&balls, &[]));
+        let special = SpecialBalls::default();
+        let listed: Vec<_> = special
+            .entries()
+            .iter()
+            .map(|(key, _)| (*key).to_owned())
+            .collect();
+        assert_eq!(listed, declared(&special, &["maxHeld", "dailyLimit"]));
     }
 }

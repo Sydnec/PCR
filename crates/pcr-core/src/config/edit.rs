@@ -273,6 +273,11 @@ mod tests {
             refusal("redistribution.contributionPercent", "150"),
             "`150` dépasse le maximum autorisé (100)."
         );
+        // Au-delà de la dernière génération des données.
+        assert_eq!(
+            refusal("pokemon.generation", "3"),
+            "`3` dépasse le maximum autorisé (2)."
+        );
         assert_eq!(
             refusal("pokemon.capture.globalMultiplier", "-1"),
             "`-1` est en dessous du minimum autorisé (0)."

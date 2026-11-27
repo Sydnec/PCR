@@ -3,6 +3,7 @@
 /// Bornes des réglages dont une faute de frappe ne se rattrape pas (reprises de la v1). Le type seul
 /// ne protège de rien : `contributionPercent: 50` est un nombre valide, et couperait en deux la
 /// fortune de tout le monde à l'échéance suivante, sans annonce ni retour possible.
+#[allow(clippy::cast_lossless)] // `f64::from` ne s'appelle pas dans une constante.
 pub(super) const BOUNDS: &[(&str, Option<f64>, Option<f64>)] = &[
     ("redistribution.contributionPercent", Some(0.0), Some(100.0)),
     ("redistribution.intervalHours", Some(1.0), None),
@@ -89,8 +90,12 @@ pub(super) const BOUNDS: &[(&str, Option<f64>, Option<f64>)] = &[
         Some(0.0),
         Some(10_000.0),
     ),
-    // Le plafond (la dernière génération des données d'espèces) arrive avec ces données (P4).
-    ("pokemon.generation", Some(1.0), None),
+    // Au-delà de la dernière génération des données, le réglage promettrait des espèces absentes.
+    (
+        "pokemon.generation",
+        Some(1.0),
+        Some(crate::pokemon::species::MAX_GENERATION as f64),
+    ),
     ("birthday.hour", Some(0.0), Some(23.0)),
     // À 0, la purge attendrait sans fin ; au-delà, le bot saturerait sa limite chez Discord.
     ("purgeMember.concurrency", Some(1.0), Some(20.0)),
