@@ -44,6 +44,8 @@ pub struct Upcoming {
     pub user: i64,
     pub birthday: Birthday,
     pub next: Date,
+    /// Minuit (Paris) de la prochaine fête, en secondes : ce que Discord affiche en date locale.
+    pub next_at: i64,
     /// 0 : aujourd'hui.
     pub days: i32,
     /// L'âge fêté, si l'année est connue.
@@ -71,6 +73,10 @@ pub async fn upcoming(app: &App) -> Result<Vec<Upcoming>, DbError> {
                 user: row.user_id,
                 birthday,
                 next,
+                next_at: pcr_core::clock::paris()
+                    .to_timestamp(next.to_datetime(jiff::civil::Time::midnight()))
+                    .ok()?
+                    .as_second(),
                 days: rules::days_until(birthday, today)?,
                 age: birthday.year.map(|year| next.year() - year),
             })

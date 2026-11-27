@@ -18,8 +18,11 @@ use twilight_model::{
 
 use crate::{
     Ctx, bets,
-    commands::{admin, bet, betstats, classement, estimate, solde, version},
-    ui,
+    commands::{
+        admin, bet, betstats, birthday, classement, cotd, ecaflip, edit, estimate, join,
+        mesrappels, poll, randomizabaise, rappel, safe_place, solde, version, week,
+    },
+    reminders, ui,
 };
 
 const GENERIC_ERROR: &str = "Une erreur est survenue, réessaie dans un instant.";
@@ -244,8 +247,19 @@ async fn route(ctx: &Ctx, interaction: &Interaction) -> anyhow::Result<Reply> {
             "admin" => admin::run(ctx, interaction, command).await,
             "bet" => bet::run(ctx, interaction, command).await,
             "betstats" => betstats::run(ctx, interaction, command),
+            "birthday" => birthday::run(ctx, interaction, command),
             "classement" => classement::run(ctx),
+            "cotd" => cotd::run(ctx),
+            "ecaflip" => ecaflip::run(command),
+            "edit" => edit::run(ctx, interaction, command),
             "estimate" => estimate::run(ctx, interaction, command).await,
+            "join" => join::run(ctx, interaction),
+            "mesrappels" => mesrappels::run(ctx, interaction, command),
+            "poll" => poll::run(ctx, interaction, command),
+            "randomizabaise" => randomizabaise::run(ctx, interaction),
+            "rappel" => rappel::run(ctx, interaction, command),
+            "safe-place" => safe_place::run(ctx, command),
+            "week" => week::run(ctx, interaction, command),
             "solde" => solde::run(ctx, interaction, command).await,
             "version" => ui::ephemeral_panel(version::panel(ctx).await).into(),
             name => {
@@ -258,6 +272,7 @@ async fn route(ctx: &Ctx, interaction: &Interaction) -> anyhow::Result<Reply> {
             id if id.starts_with(bets::PREFIX) => {
                 bets::component(ctx, interaction, component).await
             }
+            id if id.starts_with(reminders::PREFIX) => reminders::button(ctx, interaction, id),
             // Un id inconnu vient d'un panneau d'une version précédente : le dire plutôt qu'échouer.
             _ => ui::ephemeral_text(EXPIRED).into(),
         },

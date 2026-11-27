@@ -60,3 +60,13 @@ pub fn avatar_url(user: &User) -> String {
     };
     format!("https://cdn.discordapp.com/embed/avatars/{index}.png")
 }
+
+/// Les mentions d'un texte écrit par un membre et relayé par le bot (sondages, pile ou face) : ses
+/// mentions de membres et de rôles appellent, comme en v1, jamais `@everyone` ni `@here`.
+pub fn relayed() -> twilight_model::channel::message::AllowedMentions {
+    use twilight_model::channel::message::{AllowedMentions, MentionType};
+    AllowedMentions {
+        parse: vec![MentionType::Users, MentionType::Roles],
+        ..AllowedMentions::default()
+    }
+}

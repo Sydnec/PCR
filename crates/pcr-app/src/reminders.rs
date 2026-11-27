@@ -41,14 +41,9 @@ pub struct Created {
     pub button: String,
 }
 
-/// `/rappel date [message]` : la date tapée est en heure de Paris.
-pub async fn create(
-    app: &App,
-    user: i64,
-    channel: i64,
-    when: &str,
-    message: Option<&str>,
-) -> Result<Created, UseCaseError> {
+/// La date tapée dans `/rappel`, en heure de Paris, si elle est valable : sans rien écrire, pour
+/// qu'un refus se dise en privé avant la réponse publique.
+pub fn validate(app: &App, when: &str) -> Result<Timestamp, UseCaseError> {
     let now = app.clock.now();
     let at = rules::parse_when(when, now).ok_or_else(|| UseCaseError::refused(rules::BAD_DATE))?;
     if at <= now {
@@ -58,6 +53,18 @@ pub async fn create(
     if at > now.checked_add(days(max_days)).unwrap_or(Timestamp::MAX) {
         return Err(rules::too_far(max_days).into());
     }
+    Ok(at)
+}
+
+/// `/rappel date [message]` : la date tapée est en heure de Paris.
+pub async fn create(
+    app: &App,
+    user: i64,
+    channel: i64,
+    when: &str,
+    message: Option<&str>,
+) -> Result<Created, UseCaseError> {
+    let at = validate(app, when)?;
     let message = message
         .map(str::trim)
         .filter(|message| !message.is_empty())

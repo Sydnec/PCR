@@ -22,7 +22,7 @@ use twilight_model::{
 };
 use twilight_util::builder::message::{ContainerBuilder, TextDisplayBuilder};
 
-use crate::bets::render::clip;
+use crate::{bets::render::clip, members::display_name};
 
 /// Longueur d'un message texte que Discord accepte.
 const MESSAGE_MAX: usize = 2000;
@@ -106,29 +106,7 @@ impl Outbox for DiscordOutbox {
     }
 
     fn display_name(&self, user: i64) -> OutboxFuture<'_, Option<String>> {
-        Box::pin(async move {
-            let Some(id) = user_id(user) else {
-                return Ok(None);
-            };
-            if let Ok(response) = self.http.guild_member(self.guild, id).await
-                && let Ok(member) = response.model().await
-            {
-                return Ok(Some(
-                    member
-                        .nick
-                        .or(member.user.global_name)
-                        .unwrap_or(member.user.name),
-                ));
-            }
-            match self.http.user(id).await {
-                Ok(response) => Ok(response
-                    .model()
-                    .await
-                    .ok()
-                    .map(|found| found.global_name.unwrap_or(found.name))),
-                Err(_) => Ok(None),
-            }
-        })
+        Box::pin(async move { Ok(display_name(&self.http, self.guild, user).await) })
     }
 
     fn remind<'a>(&'a self, reminder: &'a Reminder) -> OutboxFuture<'a, Delivery> {
