@@ -14,7 +14,7 @@ Légende : `[x]` porté en v2 · `~~barré~~` abandonné volontairement (avec la
 - [ ] `/birthday add date` — Enregistre (ou modifie) ta date d'anniversaire
 - [ ] `/birthday list` — Affiche les 10 prochains anniversaires du serveur
 - [ ] `/birthday remove` — Supprime ta date d'anniversaire
-- [x] `/classement` — Affiche le classement des utilisateurs avec le plus de points
+- [x] `/classement` — Affiche le classement des utilisateurs avec le plus de points (soldes au format français ; un compte que Discord ne retrouve plus est désigné par sa mention, sans notification, au lieu de son identifiant brut)
 - [ ] `/color hexa` — Changer la couleur de votre pseudo
 - [ ] `/cotd` — Affiche les saints du jour
 - [ ] `/ecaflip option1 [option2] [option3] [option4] [option5] [option6] [option7] [option8] [option9] [option10]` — Pile ou Face ?
@@ -70,7 +70,7 @@ Les règles ne changent pas ; `/pk` disparaît au profit du Centre Pokémon, de 
 - [x] `/admin config cle valeur` — Modifie un réglage du bot, appliqué immédiatement
 - [x] `/admin config-voir [cle]` — Affiche un réglage — ou une branche entière — et sa valeur par défaut
 - [ ] `/admin poids [table]` — Convertit les poids de tirage en probabilités réelles
-- [x] `/admin potcommun [simulation]` — Déclenche un pot commun immédiatement, ou simule le prochain
+- [x] `/admin potcommun [simulation]` — Déclenche un pot commun immédiatement, ou simule le prochain (montants et taux au format français : « 2,5 % » au lieu de « 2.5 % »)
 - [ ] `/admin purge [lien] [nombre]` — Supprime des messages
 - [ ] `/admin purge-membre id` — Supprime tous les messages d'un membre sur le serveur, bilan en MP
 - [ ] `/admin pokespawn [espece] [shiny] [annonce] [ping]` — Déclenche l'apparition d'un Pokémon (événements)

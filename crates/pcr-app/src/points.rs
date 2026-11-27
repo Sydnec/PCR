@@ -235,6 +235,73 @@ mod tests {
         t.close().await;
     }
 
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn ten_simultaneous_messages_pay_once() {
+        // Reprise de « dix messages simultanés du même dresseur » (test/messages.test.js).
+        let t = TestApp::new("points-race", "2026-10-06T10:00:00Z").await;
+        let tasks: Vec<_> = (0..10)
+            .map(|i| {
+                let app = t.app.clone();
+                tokio::spawn(async move { on_message(&app, 1, 900, &format!("message {i}")).await })
+            })
+            .collect();
+        let mut paid = 0;
+        for task in tasks {
+            if task.await.expect("task").expect("message").is_some() {
+                paid += 1;
+            }
+        }
+        assert_eq!(paid, 1);
+        assert_eq!(
+            t.scalar("SELECT balance FROM points WHERE user_id = 1")
+                .await,
+            750
+        );
+        assert_eq!(t.scalar("SELECT count(*) FROM points_log").await, 1);
+        t.close().await;
+    }
+
+    #[tokio::test]
+    async fn a_message_feeds_the_yearly_stats() {
+        let t = TestApp::new("points-stats", "2026-10-06T10:00:00Z").await;
+        on_message(&t.app, 1, 900, "Salut, SALUT ! Un mot 🎉🎉")
+            .await
+            .expect("message");
+        on_message(&t.app, 1, 900, "salut").await.expect("message");
+        let now = crate::testing::at("2026-10-06T10:00:00Z");
+        t.app.stats.flush(now).await.expect("flush");
+        t.app.stats.close().await;
+        let path = crate::stats::Stats::path(&t.app.instance.data_dir, 2026);
+        let stats = pcr_db::StatsDb::open(&path).await.expect("stats");
+        let count = |query: &'static str| {
+            let reader = stats.reader().clone();
+            async move {
+                sqlx::query_scalar::<_, i64>(query)
+                    .fetch_one(&reader)
+                    .await
+                    .expect(query)
+            }
+        };
+        assert_eq!(
+            count("SELECT count FROM message_stats WHERE user_id = 1 AND channel_id = 900 AND day = '2026-10-06'").await,
+            2
+        );
+        assert_eq!(
+            count("SELECT count FROM word_stats WHERE word = 'salut'").await,
+            3
+        );
+        assert_eq!(
+            count("SELECT count(*) FROM word_stats WHERE word = 'un'").await,
+            0
+        );
+        assert_eq!(
+            count("SELECT count FROM emoji_stats WHERE emoji = '🎉'").await,
+            2
+        );
+        stats.close().await;
+        t.close().await;
+    }
+
     #[tokio::test]
     async fn a_reward_that_fails_halfway_pays_nothing() {
         let t = TestApp::new("points-message-failure", "2026-10-06T10:00:00Z").await;
