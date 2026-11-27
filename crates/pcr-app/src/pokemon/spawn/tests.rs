@@ -114,6 +114,26 @@ async fn ten_simultaneous_messages_make_a_single_pokemon() {
 }
 
 #[tokio::test]
+async fn a_fishing_bite_does_not_hold_the_channel() {
+    let t = TestApp::new("spawn-fishing", NOW).await;
+    crate::config::set(&t.app, "pokemon.spawn.minDelayAfterEndMinutes", "5", 1)
+        .await
+        .expect("set");
+    // La dernière apparition du salon a fini il y a dix minutes ; une pêche vient de finir.
+    t.sql(format!(
+        "INSERT INTO pokemon_spawns (species_id, catch_rate, rarity, status, spawned_at, ended_at)
+         VALUES (16, 255, 'COMMUN', 'FLED', 1, {});
+         INSERT INTO pokemon_spawns (species_id, catch_rate, rarity, status, fished, reserved_for,
+                                     caught_by, spawned_at, ended_at)
+         VALUES (129, 255, 'COMMUN', 'CAUGHT', 1, 5, 5, 2, {NOW_MS});",
+        NOW_MS - 10 * MINUTE
+    ))
+    .await;
+    assert!(on_message(&t.app).await.expect("message").is_some());
+    t.close().await;
+}
+
+#[tokio::test]
 async fn messages_never_chase_a_legendary() {
     let t = TestApp::new("spawn-legendary", NOW).await;
     active(&t, 150, "LEGENDAIRE", &(NOW_MS + 30 * MINUTE).to_string()).await;
@@ -243,8 +263,12 @@ async fn a_forced_spawn_refuses_what_it_cannot_show() {
         refusal(force(&unconfigured, &Request::default()).await),
         rules::NO_CHANNEL
     );
-    // Sans salon, les messages ne comptent même pas.
+    // Sans salon, ou le jeu coupé, les messages ne comptent même pas.
     assert!(on_message(&unconfigured).await.expect("message").is_none());
+    crate::config::set(&t.app, "pokemon.enabled", "false", 1)
+        .await
+        .expect("set");
+    assert!(on_message(&t.app).await.expect("message").is_none());
     assert_eq!(t.scalar("SELECT message_count FROM pokemon_state").await, 0);
     t.close().await;
 }
@@ -271,6 +295,19 @@ async fn the_sweep_makes_due_and_unseen_pokemon_flee() {
         "sa fuite se lit sur son message"
     );
     assert_eq!(count(&t, "ACTIVE").await, 0, "le salon reste vide");
+
+    // Un message jamais posté (salon perdu) ne le fait pas fuir : il attend son échéance, sans quoi
+    // chaque message du serveur en ferait naître un autre, aussitôt enfui.
+    let unposted = active(&t, 19, "COMMUN", &(NOW_MS + 60 * MINUTE).to_string()).await;
+    t.sql(format!(
+        "UPDATE public_messages SET message_id = NULL, gone_at = {NOW_MS} WHERE entity_id = {unposted}"
+    ))
+    .await;
+    assert_eq!(flee_due(&t.app).await.expect("sweep"), 0);
+    t.sql(format!(
+        "UPDATE pokemon_spawns SET status = 'FLED', ended_at = {NOW_MS} WHERE id = {unposted}"
+    ))
+    .await;
 
     // Un message disparu : plus personne ne le voit, il s'en va.
     let unseen = active(&t, 19, "COMMUN", &(NOW_MS + 60 * MINUTE).to_string()).await;

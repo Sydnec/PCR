@@ -12,7 +12,8 @@ use crate::{
 };
 
 /// Au-delà de ce nombre de balls encaissées, une apparition entre dans les moments notables de
-/// l'année (seuil de la v1).
+/// l'année. Le seuil de la v1, qui ne se réglait pas : c'est un repère du récap annuel, pas une règle
+/// du jeu (ni prix, ni taux, ni durée), d'où une constante plutôt qu'un réglage.
 const CONTESTED_THROWS: i64 = 10;
 
 pub(super) fn record_birth(app: &App, now: Timestamp, born: &Born) {

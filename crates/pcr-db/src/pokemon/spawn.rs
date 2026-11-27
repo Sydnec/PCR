@@ -225,15 +225,18 @@ pub async fn flee(conn: &mut SqliteConnection, id: i64, now_ms: i64) -> Result<b
     Ok(done.rows_affected() == 1)
 }
 
-/// Les apparitions qui doivent fuir : leur durée de vie est écoulée, ou leur message a disparu (plus
-/// personne ne les voit).
+/// Les apparitions qui doivent fuir : leur durée de vie est écoulée, ou leur message posté a disparu
+/// (plus personne ne les voit). Un message qui n'a jamais pu être posté (salon supprimé) ne compte
+/// pas : sans quoi chaque message du serveur ferait naître un Pokémon aussitôt enfui, en boucle ; il
+/// attend son échéance.
 pub async fn due(conn: &mut SqliteConnection, now_ms: i64) -> Result<Vec<Spawn>, DbError> {
     let rows = sqlx::query!(
         "SELECT * FROM pokemon_spawns AS s
           WHERE status = 'ACTIVE'
             AND (flees_at <= ? OR EXISTS (
                   SELECT 1 FROM public_messages
-                   WHERE kind = 'spawn' AND entity_id = s.id AND gone_at IS NOT NULL))",
+                   WHERE kind = 'spawn' AND entity_id = s.id
+                     AND message_id IS NOT NULL AND gone_at IS NOT NULL))",
         now_ms
     )
     .fetch_all(conn)

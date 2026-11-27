@@ -125,7 +125,8 @@ Les règles ne changent pas ; `/pk` disparaît au profit du Centre Pokémon, de 
   des messages publics). Un redémarrage au mauvais moment ne perd plus l'annonce (elle part au retour)
   et ne laisse plus d'apparition sans message à nettoyer au démarrage ;
 - un Pokémon dont le message a disparu (constaté à sa réécriture suivante) s'enfuit au balayage d'après
-  (la v1 ne le vérifiait qu'au démarrage) ; une apparition v1 sans échéance en reçoit une au premier
+  (la v1 ne le vérifiait qu'au démarrage) ; une annonce qui n'a jamais pu être postée (salon perdu)
+  attend son échéance, au lieu d'en faire renaître une à chaque message ; une apparition v1 sans échéance en reçoit une au premier
   balayage, d'après sa rareté ;
 - l'annonce est un conteneur (composants v2) reconstruit depuis la base : le texte de l'administrateur
   et la mention des rôles vivent dans `pokemon_spawns` (`announcement`, `pings_role`) au lieu du
@@ -136,7 +137,8 @@ Les règles ne changent pas ; `/pk` disparaît au profit du Centre Pokémon, de 
   (`pokemon_channel_id`, `pokemon_role_id`, `[discord.shiny_charm_role_ids]`) ; les messages privés
   ne comptent pas pour les apparitions, comme en v1 ;
 - `/admin pokespawn` : plus de refus « un spawn est déjà en cours de création » (il n'y a plus de
-  verrou) ; l'annonce est limitée à 1 000 caractères (un message en composants v2 en tient 4 000) ;
+  verrou) ; sans salon, le refus nomme `pokemon_channel_id` (la clé d'`instance.toml`) au lieu de
+  `POKEMON_CHANNEL_ID` ; l'annonce est limitée à 1 000 caractères (un message en composants v2 en tient 4 000) ;
   une saisie qui n'est pas un numéro d'espèce (l'autocomplétion en donne un) est « Espèce inconnue » ;
   un tirage sans espèce possible est refusé au lieu d'annoncer un succès sans rien faire apparaître ;
 - fiche « Infos » : une lecture ratée de la collection omet ses pastilles au lieu d'annoncer zéro ; la
