@@ -85,6 +85,9 @@ impl Reply {
 pub enum Edit {
     Text(String),
     Panel(Vec<Component>),
+    /// Plusieurs panneaux, quand un message n'y suffit pas (`/admin poids`) : le premier remplace
+    /// la réponse, les suivants partent à sa suite, avec la même visibilité.
+    Panels(Vec<Vec<Component>>),
 }
 
 pub async fn handle(ctx: Ctx, interaction: Interaction) {
@@ -132,14 +135,15 @@ pub async fn handle(ctx: Ctx, interaction: Interaction) {
                     ..InteractionResponseData::default()
                 }),
             };
-            complete(&client, &interaction, &defer, work, false).await;
+            complete(&client, &interaction, &defer, work, false, ephemeral).await;
         }
         Reply::LaterUpdate { work } => {
             let defer = InteractionResponse {
                 kind: InteractionResponseType::DeferredUpdateMessage,
                 data: None,
             };
-            complete(&client, &interaction, &defer, work, true).await;
+            // Un menu vit dans un panneau personnel : ses suites le restent.
+            complete(&client, &interaction, &defer, work, true, true).await;
         }
     }
 }
@@ -169,6 +173,7 @@ async fn complete(
     defer: &InteractionResponse,
     work: Work,
     update: bool,
+    ephemeral: bool,
 ) {
     if let Err(error) = client
         .create_response(interaction.id, &interaction.token, defer)
@@ -197,9 +202,37 @@ async fn complete(
                 .flags(MessageFlags::IS_COMPONENTS_V2)
                 .await
         }
+        Edit::Panels(panels) => {
+            request
+                .components(Some(panels.first().map_or(&[], Vec::as_slice)))
+                .flags(MessageFlags::IS_COMPONENTS_V2)
+                .await
+        }
     };
     if let Err(error) = sent {
         tracing::warn!(?error, "could not complete deferred interaction");
+        return;
+    }
+    let Edit::Panels(panels) = &edit else {
+        return;
+    };
+    let flags = if ephemeral {
+        MessageFlags::EPHEMERAL | MessageFlags::IS_COMPONENTS_V2
+    } else {
+        MessageFlags::IS_COMPONENTS_V2
+    };
+    for components in panels.iter().skip(1) {
+        let sent = client
+            .create_followup(&interaction.token)
+            .allowed_mentions(Some(&silent))
+            .components(components)
+            .flags(flags)
+            .await;
+        // Une suite perdue rendrait les suivantes hors de leur ordre : on s'arrête là.
+        if let Err(error) = sent {
+            tracing::warn!(?error, "could not send a follow-up panel");
+            return;
+        }
     }
 }
 

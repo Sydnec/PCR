@@ -5,6 +5,7 @@
 //! l'exécution comme pour l'autocomplétion, qui énumère la configuration vivante.
 
 mod config;
+mod poids;
 mod points;
 mod potcommun;
 mod purge;
@@ -39,6 +40,8 @@ pub enum AdminCommand {
     Config(config::ConfigCommand),
     #[command(name = "config-voir")]
     ConfigVoir(config::ConfigVoirCommand),
+    #[command(name = "poids")]
+    Poids(poids::PoidsCommand),
     #[command(name = "potcommun")]
     Potcommun(potcommun::PotcommunCommand),
     #[command(name = "purge")]
@@ -73,6 +76,7 @@ pub async fn run(ctx: &Ctx, interaction: &Interaction, data: &CommandData) -> Re
         Ok(AdminCommand::Points(command)) => points::run(ctx, command, admin.get()),
         Ok(AdminCommand::Config(command)) => config::set(ctx, command, admin.get()).await.into(),
         Ok(AdminCommand::ConfigVoir(command)) => config::view(ctx, &command).into(),
+        Ok(AdminCommand::Poids(command)) => poids::run(ctx, &command),
         Ok(AdminCommand::Potcommun(command)) => potcommun::run(ctx, &command, admin.get()),
         Ok(AdminCommand::Purge(command)) => purge::run(ctx, interaction, command, admin.get()),
         Ok(AdminCommand::PurgeMembre(command)) => purge_member::run(ctx, command, admin.get()),
