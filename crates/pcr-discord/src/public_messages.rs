@@ -2,16 +2,17 @@
 //!
 //! Chaque type de message (`spawn`, `trade`, `drop`…) a son rendu, qui relit la base au moment
 //! d'écrire : un contenu préparé trop tôt reposerait un état périmé. Les rendus arrivent avec leurs
-//! fonctionnalités (paris en P3b, Pokémon en P4 et P5) ; d'ici là, un message sans rendu est laissé
-//! tel quel.
+//! fonctionnalités (paris en P3b, apparitions en P4b, le reste du jeu en P4 et P5) ; d'ici là, un
+//! message sans rendu est laissé tel quel.
 //!
 //! Les mentions d'un message public n'appellent personne, sauf les rôles que son rendu désigne (le
-//! rôle des paris, à la création) : un pari ou un résultat cite des membres sans les déranger.
+//! rôle des paris ou des dresseurs, à la création) : un pari ou une capture cite des membres sans les
+//! déranger.
 
 use std::sync::Arc;
 
 use pcr_app::{
-    App, bets,
+    App, bets, pokemon,
     public_messages::{PublicMessage, PublicMessagePort, WriteError, WriteFuture, Written},
 };
 use twilight_http::{Client, api_error::ApiError, error::ErrorType};
@@ -62,6 +63,7 @@ fn renderer(kind: &str) -> Option<Render> {
     match kind {
         bets::MESSAGE => Some(render::bet),
         bets::RESULT_MESSAGE => Some(render::result),
+        pokemon::spawn::MESSAGE => Some(crate::pokemon::spawn::render),
         _ => None,
     }
 }

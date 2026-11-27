@@ -12,7 +12,6 @@ use std::time::Duration;
 
 use jiff::Timestamp;
 use pcr_core::{
-    clock::paris_date,
     config::GameConfig,
     pokemon::{
         rarity::Rarity,
@@ -29,14 +28,12 @@ use pcr_db::{
 use rand::{Rng, RngExt as _};
 use tokio::sync::watch;
 
-use crate::{
-    App,
-    error::UseCaseError,
-    stats::{Counter, DailyColumn, Highlight, HighlightKind, SpeciesColumn, UserColumn},
-};
+use crate::{App, error::UseCaseError};
 
+mod stats;
 mod view;
 
+pub use pcr_db::pokemon::spawn::{Spawn as Row, Status, Throw};
 pub use view::{Participant, Spending, View, view};
 
 /// Le type de message public d'une apparition.
@@ -44,9 +41,6 @@ pub const MESSAGE: &str = "spawn";
 /// Cadence du balayage des fuites, comme en v1 : indépendant de l'activité du serveur, sans quoi un
 /// salon silencieux ne délogerait jamais un Pokémon que personne n'attrape.
 const TICK: Duration = Duration::from_mins(1);
-/// Au-delà de ce nombre de balls encaissées, une apparition entre dans les moments notables de
-/// l'année (seuil de la v1).
-const CONTESTED_THROWS: i64 = 10;
 
 /// Une apparition née.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -265,9 +259,9 @@ async fn flee_one(conn: &mut Conn, spawn: Spawn, now_ms: i64) -> Result<Option<F
 async fn after_commit(app: &App, now: Timestamp, claimed: Claimed) -> Born {
     let born = claimed.born;
     if let Some(fled) = &claimed.replaced {
-        record_flight(app, now, fled).await;
+        stats::record_flight(app, now, fled).await;
     }
-    record_birth(app, now, &born);
+    stats::record_birth(app, now, &born);
     app.public_messages_changed();
     let encounter = &born.encounter;
     tracing::info!(
@@ -279,90 +273,6 @@ async fn after_commit(app: &App, now: Timestamp, claimed: Claimed) -> Born {
         "pokemon spawned"
     );
     born
-}
-
-fn record_birth(app: &App, now: Timestamp, born: &Born) {
-    let species = i64::from(born.encounter.species.id);
-    let add = |counter| app.stats.add(now, counter, 1);
-    add(Counter::PokemonSpecies {
-        species,
-        column: SpeciesColumn::Spawns,
-    });
-    if born.encounter.shiny.shiny {
-        add(Counter::PokemonSpecies {
-            species,
-            column: SpeciesColumn::ShinySpawns,
-        });
-    }
-    add(Counter::PokemonDaily {
-        day: paris_date(now).to_string(),
-        column: DailyColumn::Spawns,
-    });
-}
-
-/// Une fuite dans les statistiques : l'espèce s'est échappée, les records d'acharnement de ses
-/// participants, et un moment notable si elle a encaissé beaucoup de balls. Une statistique qui
-/// échoue ne défait jamais la fuite : elle est seulement journalisée.
-async fn record_flight(app: &App, now: Timestamp, fled: &Fled) {
-    let spawn = &fled.spawn;
-    app.stats.add(
-        now,
-        Counter::PokemonSpecies {
-            species: spawn.species_id,
-            column: SpeciesColumn::Escapes,
-        },
-        1,
-    );
-    let mut by_user: Vec<(i64, i64)> = Vec::new();
-    for spent in &fled.spent {
-        match by_user.iter_mut().find(|(user, _)| *user == spent.user_id) {
-            Some((_, throws)) => *throws += spent.throws,
-            None => by_user.push((spent.user_id, spent.throws)),
-        }
-    }
-    for (user, throws) in &by_user {
-        app.stats.add(
-            now,
-            Counter::PokemonUser {
-                user: *user,
-                column: UserColumn::MostThrowsOnOneSpawn,
-            },
-            *throws,
-        );
-    }
-    if let Some(best) = by_user.iter().map(|(_, throws)| *throws).max() {
-        app.stats.add(
-            now,
-            Counter::PokemonSpecies {
-                species: spawn.species_id,
-                column: SpeciesColumn::MaxThrowsSingleSpawn,
-            },
-            best,
-        );
-    }
-    let throws: i64 = fled.spent.iter().map(|spent| spent.throws).sum();
-    if throws < CONTESTED_THROWS {
-        return;
-    }
-    let cost: i64 = fled.spent.iter().map(|spent| spent.cost).sum();
-    let name = u16::try_from(spawn.species_id)
-        .ok()
-        .and_then(species::get)
-        .map_or("?", |species| species.name);
-    let highlight = Highlight {
-        kind: HighlightKind::CostlyEscape,
-        user: None,
-        species: Some(spawn.species_id),
-        is_shiny: spawn.is_shiny,
-        value: Some(throws),
-        detail: Some(format!(
-            "{name} s'est enfui après {throws} balls ({cost} pts gaspillés)"
-        )),
-        created_at: now.as_millisecond(),
-    };
-    if let Err(error) = app.stats.highlight(now, &highlight).await {
-        tracing::warn!(?error, "recording a pokemon highlight failed");
-    }
 }
 
 /// Fait fuir les apparitions dont la durée de vie est écoulée, ou dont le message a disparu. Une
@@ -389,7 +299,7 @@ pub async fn flee_due(app: &App) -> Result<usize, DbError> {
     tx.commit().await.map_err(DbError::from)?;
     for done in &fled {
         tracing::info!(id = done.spawn.id, "spawn fled");
-        record_flight(app, now, done).await;
+        stats::record_flight(app, now, done).await;
     }
     if !fled.is_empty() {
         app.public_messages_changed();

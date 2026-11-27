@@ -7,6 +7,7 @@
 mod config;
 mod poids;
 mod points;
+mod pokespawn;
 mod potcommun;
 mod purge;
 pub mod purge_member;
@@ -42,6 +43,8 @@ pub enum AdminCommand {
     ConfigVoir(config::ConfigVoirCommand),
     #[command(name = "poids")]
     Poids(poids::PoidsCommand),
+    #[command(name = "pokespawn")]
+    Pokespawn(pokespawn::PokespawnCommand),
     #[command(name = "potcommun")]
     Potcommun(potcommun::PotcommunCommand),
     #[command(name = "purge")]
@@ -77,6 +80,7 @@ pub async fn run(ctx: &Ctx, interaction: &Interaction, data: &CommandData) -> Re
         Ok(AdminCommand::Config(command)) => config::set(ctx, command, admin.get()).await.into(),
         Ok(AdminCommand::ConfigVoir(command)) => config::view(ctx, &command).into(),
         Ok(AdminCommand::Poids(command)) => poids::run(ctx, &command),
+        Ok(AdminCommand::Pokespawn(command)) => pokespawn::run(ctx, command, admin.get()),
         Ok(AdminCommand::Potcommun(command)) => potcommun::run(ctx, &command, admin.get()),
         Ok(AdminCommand::Purge(command)) => purge::run(ctx, interaction, command, admin.get()),
         Ok(AdminCommand::PurgeMembre(command)) => purge_member::run(ctx, command, admin.get()),
@@ -111,6 +115,7 @@ pub fn autocomplete(
         {
             config::choices(ctx, typed)
         }
+        Some(("pokespawn", "espece", typed)) => pokespawn::choices(ctx, typed),
         _ => Vec::new(),
     }
 }
