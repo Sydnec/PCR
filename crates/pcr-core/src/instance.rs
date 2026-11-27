@@ -54,6 +54,19 @@ pub struct Discord {
     pub cotd_channel_id: Option<u64>,
     /// Le salon où s'ouvrent les fils du calendrier de l'Avent.
     pub advent_channel_id: Option<u64>,
+    /// Le message des rôles (`ROLE_CHANNEL_ID`, `ROLE_MESSAGE_ID`) : y réagir donne les rôles placés
+    /// sous `ping_role_id` (`PING_ROLE_ID`). Il manque l'un des trois : pas de rôles en libre-service.
+    pub role_channel_id: Option<u64>,
+    pub role_message_id: Option<u64>,
+    pub ping_role_id: Option<u64>,
+    /// Le salon de la liste des fils, republiée à chaque fil créé (`THREAD_LIST_CHANNEL_ID`).
+    pub thread_list_channel_id: Option<u64>,
+    /// Le rôle sous lequel se rangent les rôles de couleur de `/color` (`COLOR_ROLE_ID`).
+    pub color_role_id: Option<u64>,
+    /// L'invitation des membres temporaires et leur rôle à l'arrivée (`TEMPORY_MEMBER_*`) : qui
+    /// arrive par elle reçoit ce rôle au lieu du rôle par défaut.
+    pub temporary_member_invite_code: Option<String>,
+    pub temporary_member_role_id: Option<u64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
