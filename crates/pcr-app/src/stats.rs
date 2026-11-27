@@ -75,6 +75,19 @@ impl Stats {
         pcr_db::stats::record_ship(db, message, members, shiny).await
     }
 
+    /// Le vocal (`voice_time`), dans le fichier de l'année en cours : une session commencée avant le
+    /// 1er janvier et finie après ne se mesure pas (le fichier de l'année n'a pas son début).
+    pub async fn voice(&self, now: Timestamp, change: Voice<'_>) -> Result<(), DbError> {
+        let mut open = self.open.lock().await;
+        let db = self.current(&mut open, paris_date(now).year()).await?;
+        let at = now.as_millisecond();
+        match change {
+            Voice::Joined(user) => pcr_db::stats::voice_joined(db, user, at).await,
+            Voice::Left(user) => pcr_db::stats::voice_left(db, user, at).await,
+            Voice::Reset(in_voice) => pcr_db::stats::voice_reset(db, in_voice).await.map(|_| ()),
+        }
+    }
+
     /// Les statistiques de paris de l'année en cours. Le tampon est d'abord écrit : un pari résolu à
     /// l'instant compte déjà.
     pub async fn bet_stats(&self, now: Timestamp, user: i64) -> Result<BetStats, DbError> {
@@ -176,6 +189,15 @@ impl Stats {
             merge(&mut pending, year, counter, delta);
         }
     }
+}
+
+/// Ce qui change au vocal.
+#[derive(Debug, Clone, Copy)]
+pub enum Voice<'a> {
+    Joined(i64),
+    Left(i64),
+    /// Au démarrage : les membres encore en vocal.
+    Reset(&'a [i64]),
 }
 
 /// Fusionne une valeur dans le tampon : additionnée, ou gardée si c'est un nouveau record.

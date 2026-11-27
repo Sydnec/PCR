@@ -16,6 +16,9 @@
 - Communauté : `reminders` (date en heure de Paris, bouton `rappel|`, `encodeURIComponent`), `birthdays`,
   `polls` (numérotation des lignes, période de `/week`), `cotd` (nominis, page des fêtes, message),
   `advent` (les 24 questions), `ecaflip`, `randomizabaise`. Valeurs de référence des tests v1.
+- Administration et salon : `links` (réécriture vers les miroirs, `links::translation` : bouton
+  « Traduire », noms de langues, échappement), `purge` (lien de message, âge d'un identifiant, bilan),
+  `roles` (libre-service, message des rôles, couleur), `threads` (liste des fils).
 - À venir : un module par fonctionnalité (`lottery`, `safari`…).
 - Données Pokémon : `data/pokemon.json` (251 espèces : `id`, `name` FR, `generation`, `catchRate`, `stage`,
   `isLegendary`, `isMythical`, `isBaby`, `genderRate`, `evolvesFrom/Into`, `sprite`, `forms`) et

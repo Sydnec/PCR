@@ -38,19 +38,20 @@ impl Http {
         })
     }
 
-    /// Le texte d'une page, en suivant ses redirections ; une erreur dit pourquoi.
-    pub async fn get_text(
+    /// Une page, en suivant ses redirections : son statut et son texte, quel que soit le statut (une
+    /// API dit « supprimé » par un 404). Une erreur dit pourquoi rien n'est venu.
+    pub async fn get(
         &self,
         url: &str,
         user_agent: &str,
         timeout: Duration,
-    ) -> Result<String, String> {
+    ) -> Result<Page, String> {
         tokio::time::timeout(timeout, self.fetch(url, user_agent))
             .await
             .map_err(|_| format!("{url}: timed out"))?
     }
 
-    async fn fetch(&self, url: &str, user_agent: &str) -> Result<String, String> {
+    async fn fetch(&self, url: &str, user_agent: &str) -> Result<Page, String> {
         let mut uri: Uri = url.parse().map_err(|e| format!("{url}: {e}"))?;
         for _ in 0..=REDIRECTS {
             let request = Request::get(uri.clone())
@@ -72,17 +73,35 @@ impl Http {
                 uri = follow(&uri, location)?;
                 continue;
             }
-            if !status.is_success() {
-                return Err(format!("{uri}: HTTP {status}"));
-            }
             let body = Limited::new(response.into_body(), MAX_BYTES)
                 .collect()
                 .await
                 .map_err(|e| format!("{uri}: {e}"))?
                 .to_bytes();
-            return Ok(String::from_utf8_lossy(&body).into_owned());
+            return Ok(Page {
+                status: status.as_u16(),
+                body: String::from_utf8_lossy(&body).into_owned(),
+            });
         }
         Err(format!("{url}: too many redirects"))
+    }
+}
+
+/// Une page lue.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Page {
+    pub status: u16,
+    pub body: String,
+}
+
+impl Page {
+    /// Le texte d'une réponse réussie (2xx), sinon une erreur qui donne le statut.
+    pub fn ok(self) -> Result<String, String> {
+        if (200..300).contains(&self.status) {
+            Ok(self.body)
+        } else {
+            Err(format!("HTTP {}", self.status))
+        }
     }
 }
 

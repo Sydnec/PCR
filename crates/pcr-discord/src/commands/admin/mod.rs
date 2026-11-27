@@ -7,6 +7,9 @@
 mod config;
 mod points;
 mod potcommun;
+mod purge;
+pub mod purge_member;
+mod restart;
 
 use twilight_interactions::command::{CommandInputData, CommandModel, CreateCommand};
 use twilight_model::{
@@ -38,6 +41,12 @@ pub enum AdminCommand {
     ConfigVoir(config::ConfigVoirCommand),
     #[command(name = "potcommun")]
     Potcommun(potcommun::PotcommunCommand),
+    #[command(name = "purge")]
+    Purge(purge::PurgeCommand),
+    #[command(name = "purge-membre")]
+    PurgeMembre(purge_member::PurgeMembreCommand),
+    #[command(name = "restart")]
+    Restart(restart::RestartCommand),
 }
 
 fn administrators() -> Permissions {
@@ -65,6 +74,9 @@ pub async fn run(ctx: &Ctx, interaction: &Interaction, data: &CommandData) -> Re
         Ok(AdminCommand::Config(command)) => config::set(ctx, command, admin.get()).await.into(),
         Ok(AdminCommand::ConfigVoir(command)) => config::view(ctx, &command).into(),
         Ok(AdminCommand::Potcommun(command)) => potcommun::run(ctx, &command, admin.get()),
+        Ok(AdminCommand::Purge(command)) => purge::run(ctx, interaction, command, admin.get()),
+        Ok(AdminCommand::PurgeMembre(command)) => purge_member::run(ctx, command, admin.get()),
+        Ok(AdminCommand::Restart(_)) => restart::run(ctx, admin.get()),
         // Ne peut arriver qu'entre deux versions : une sous-commande que ce binaire ne connaît pas.
         Err(error) => {
             let name = data

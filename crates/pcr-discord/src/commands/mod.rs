@@ -5,10 +5,12 @@ pub mod bet;
 pub mod betstats;
 pub mod birthday;
 pub mod classement;
+pub mod color;
 pub mod cotd;
 pub mod ecaflip;
 pub mod edit;
 pub mod estimate;
+pub mod help;
 pub mod join;
 pub mod mesrappels;
 pub mod poll;
@@ -29,10 +31,12 @@ pub fn all() -> Vec<Command> {
         betstats::BetstatsCommand::create_command().into(),
         birthday::BirthdayCommand::create_command().into(),
         classement::ClassementCommand::create_command().into(),
+        color::ColorCommand::create_command().into(),
         cotd::CotdCommand::create_command().into(),
         ecaflip::EcaflipCommand::create_command().into(),
         edit::EditCommand::create_command().into(),
         estimate::EstimateCommand::create_command().into(),
+        help::HelpCommand::create_command().into(),
         join::JoinCommand::create_command().into(),
         mesrappels::MesrappelsCommand::create_command().into(),
         poll::PollCommand::create_command().into(),

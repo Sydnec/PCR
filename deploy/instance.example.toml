@@ -22,6 +22,16 @@ safe_place_channel_id = 700000000000000002
 birthday_channel_id = 700000000000000003
 cotd_channel_id = 700000000000000004
 advent_channel_id = 700000000000000005
+# Message des rôles (ROLE_CHANNEL_ID, ROLE_MESSAGE_ID) et rôle de ping sous lequel se trouvent les
+# rôles en libre-service (PING_ROLE_ID) ; liste des fils ; rôle repère des couleurs de /color.
+role_channel_id = 700000000000000006
+role_message_id = 700000000000000007
+ping_role_id = 700000000000000008
+thread_list_channel_id = 700000000000000009
+color_role_id = 700000000000000010
+# Invitation des membres temporaires et leur rôle (TEMPORY_MEMBER_* en v1) ; facultatifs.
+temporary_member_invite_code = "abcdef"
+temporary_member_role_id = 700000000000000011
 
 [web]
 listen = "0.0.0.0:8080"

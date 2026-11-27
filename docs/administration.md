@@ -2,7 +2,7 @@
 
 # 🛡️ Modération & Administration
 
-- `/autodel` : configuration de la suppression automatique des messages dans un salon.
+- ~~`/autodel`~~ : abandonnée en v2 (jamais utilisée).
 - `/edit` : permet au bot d'éditer un de ses propres messages. Ouverte à l'auteur du sondage comme
   aux administrateurs, elle reste donc hors de `/admin`.
 - **`/admin`** : toutes les commandes d'administration sont regroupées sous une commande unique, que
@@ -40,27 +40,34 @@
     arbre, pour `SYDNEC_USER_ID`.
   - `/admin potcommun [simulation]` : déclenche un pot commun hors calendrier, ou simule le
     prochain sans toucher aux soldes. L'échéance hebdomadaire n'en est pas décalée.
-  - `/admin purge [lien] [nombre]` : suppression de messages en masse.
+  - `/admin purge [lien] [nombre]` : supprime les `nombre` derniers messages du salon (100 au plus),
+    ou ceux qui suivent le message d'un `lien` (100 au plus par passage, la réponse prévient quand il
+    en reste). Le lien doit désigner un message de **ce** salon : il se vérifie avant de supprimer
+    quoi que ce soit. Comme en v1, les messages de plus de 14 jours restent (Discord ne les supprime
+    pas par lots).
   - `/admin purge-membre <id>` : supprime tous les messages d'un membre, même parti, sur tout le
     serveur : salons textuels, annonces, chats vocaux, fils actifs et archivés, posts de forum. Rien
     n'est publié : la réponse privée confirme le lancement, puis le bilan arrive en MP à
     l'administrateur, avec le décompte par salon, ceux ignorés faute de droits et ceux en erreur.
     Plusieurs salons sont parcourus en même temps (`purgeMember.concurrency`, 6 par défaut), et les
-    messages du membre sont supprimés au fil de la lecture, sans attendre la fin du salon ; les fils
-    archivés s'inventorient pendant que les premiers salons se purgent. Les messages de moins de
-    14 jours partent par lots de cent, les plus anciens un par un, comme Discord l'impose : sur un
-    gros serveur, ça reste long. Un fil archivé n'est rouvert que s'il contient des messages du
-    membre, puis refermé ; de même pour un fil qui s'archive de lui-même en cours de purge. Le suivi va au journal du bot, jamais sur Discord : l'inventaire, un point
-    d'étape toutes les `purgeMember.progressLogSeconds` secondes (salons parcourus, messages lus et
-    supprimés, salons en cours avec leurs chiffres), chaque salon touché à sa fin, et toute attente
-    imposée par Discord d'au moins `purgeMember.rateLimitLogSeconds` secondes. Refusée pour un
-    identifiant inconnu de Discord, pour celui du bot, ou si une purge du même membre tourne déjà :
-    le refus dit alors où elle en est. Un redémarrage l'interrompt sans bilan : la relancer reprend
-    ce qui reste. Le bot a besoin de « Voir le salon », « Voir l'historique » et « Gérer les
-    messages », plus « Gérer les fils » pour les fils privés et verrouillés.
+    messages du membre sont supprimés au fil de la lecture, page par page ; les fils archivés
+    s'inventorient pendant que les premiers salons se purgent. Les messages de moins de 14 jours
+    partent par lots, les plus anciens un par un, comme Discord l'impose : sur un gros serveur, ça
+    reste long. Un fil archivé n'est rouvert que s'il contient des messages du membre, puis refermé ;
+    de même pour un fil qui s'archive de lui-même en cours de purge. Un salon que le bot ne peut pas
+    lire est cité comme ignoré (une seule fois avec ses fils), une suppression refusée est comptée
+    « impossible ». Le suivi va au journal du bot, jamais sur Discord : un point d'étape toutes les
+    `purgeMember.progressLogSeconds` secondes (salons parcourus, messages lus et supprimés), et toute
+    requête que Discord a fait attendre d'au moins `purgeMember.rateLimitLogSeconds` secondes. Refusée
+    pour un identifiant qui n'en est pas un (17 à 20 chiffres), inconnu de Discord, pour celui du bot,
+    ou si une purge du même membre tourne déjà : le refus dit alors où elle en est. Un redémarrage
+    l'interrompt sans bilan : la relancer reprend ce qui reste. Le bot a besoin de « Voir le salon »,
+    « Voir l'historique » et « Gérer les messages », plus « Gérer les fils » pour les fils privés et
+    verrouillés.
   - `/admin pokespawn [espece] [shiny] [annonce] [ping]` : déclenche une apparition (voir [Pokémon](pokemon/README.md)).
   - `/admin safarispawn [joueur] [pause]` : ouvre un parc safari (voir [Parc Safari](pokemon/safari.md)).
   - `/admin saison` : l'aperçu du bilan de la saison en cours, tel que le bot le publiera à l'ouverture
     de la génération suivante (voir [Bilan de saison](pokemon/README.md#bilan-de-saison)). Il ne publie
     ni n'enregistre rien.
-  - `/admin restart` : redémarre le bot.
+  - `/admin restart` : redémarre le bot. Il s'arrête proprement (tâches en cours finies, stats
+    écrites, base fermée), et systemd le relance (`Restart=always`).

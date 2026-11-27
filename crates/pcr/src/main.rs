@@ -197,9 +197,14 @@ async fn serve(instance: Instance) -> anyhow::Result<()> {
     let stop = Arc::new(stop);
     tokio::spawn({
         let stop = Arc::clone(&stop);
+        let restart = Arc::clone(&app.restart);
         async move {
-            wait_for_signal().await;
-            tracing::info!("shutdown requested");
+            // `/admin restart` s'arrête comme un signal : le service (`Restart=always`) relance le
+            // binaire, après que tout a fini proprement.
+            tokio::select! {
+                () = wait_for_signal() => tracing::info!("shutdown requested"),
+                () = restart.notified() => tracing::info!("restart requested from Discord"),
+            }
             stop.send_replace(true);
         }
     });

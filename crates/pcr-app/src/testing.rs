@@ -144,11 +144,15 @@ impl crate::outbox::Web for FakeWeb {
         &'a self,
         url: &'a str,
         _user_agent: &'a str,
-    ) -> crate::outbox::OutboxFuture<'a, String> {
+        _timeout: std::time::Duration,
+    ) -> crate::outbox::OutboxFuture<'a, crate::outbox::Page> {
         Box::pin(async move {
             self.0
                 .get(url)
-                .cloned()
+                .map(|body| crate::outbox::Page {
+                    status: 200,
+                    body: body.clone(),
+                })
                 .ok_or_else(|| format!("{url}: unreachable"))
         })
     }

@@ -19,14 +19,16 @@ use twilight_model::{
 use crate::{
     Ctx, bets,
     commands::{
-        admin, bet, betstats, birthday, classement, cotd, ecaflip, edit, estimate, join,
-        mesrappels, poll, randomizabaise, rappel, safe_place, solde, version, week,
+        admin, bet, betstats, birthday, classement, color, cotd, ecaflip, edit, estimate, help,
+        join, mesrappels, poll, randomizabaise, rappel, safe_place, solde, version, week,
     },
-    reminders, ui,
+    links, reminders, ui,
 };
 
 const GENERIC_ERROR: &str = "Une erreur est survenue, réessaie dans un instant.";
 pub const EXPIRED: &str = "Ce panneau a expiré, relance la commande.";
+/// Les boutons « Traduire » des copies de liens X.
+const TRANSLATE: &str = "tweet_translate|";
 
 pub type Work = Pin<Box<dyn Future<Output = anyhow::Result<Edit>> + Send>>;
 /// La suite d'une réponse qui tient lieu de message public : elle reçoit l'identifiant du message
@@ -249,10 +251,12 @@ async fn route(ctx: &Ctx, interaction: &Interaction) -> anyhow::Result<Reply> {
             "betstats" => betstats::run(ctx, interaction, command),
             "birthday" => birthday::run(ctx, interaction, command).await,
             "classement" => classement::run(ctx),
+            "color" => color::run(ctx, interaction, command),
             "cotd" => cotd::run(ctx),
             "ecaflip" => ecaflip::run(command),
             "edit" => edit::run(ctx, interaction, command),
             "estimate" => estimate::run(ctx, interaction, command).await,
+            "help" => help::run(),
             "join" => join::run(ctx, interaction),
             "mesrappels" => mesrappels::run(ctx, interaction, command),
             "poll" => poll::run(ctx, interaction, command),
@@ -273,6 +277,7 @@ async fn route(ctx: &Ctx, interaction: &Interaction) -> anyhow::Result<Reply> {
                 bets::component(ctx, interaction, component).await
             }
             id if id.starts_with(reminders::PREFIX) => reminders::button(ctx, interaction, id),
+            id if id.starts_with(TRANSLATE) => links::translate(ctx, id),
             // Un id inconnu vient d'un panneau d'une version précédente : le dire plutôt qu'échouer.
             _ => ui::ephemeral_text(EXPIRED).into(),
         },

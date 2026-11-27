@@ -2,6 +2,8 @@
 //! (heure de Paris). Les saints viennent de nominis, les fêtes de journee-mondiale.com : une page
 //! des fêtes illisible n'empêche pas les saints de partir.
 
+use std::time::Duration;
+
 use pcr_core::cotd::{self as rules};
 
 use crate::{
@@ -9,9 +11,15 @@ use crate::{
     outbox::{Ports, Web},
 };
 
+/// Une page met au plus ce temps à venir : le message du jour n'attend pas plus.
+const PAGE_TIMEOUT: Duration = Duration::from_secs(15);
+
 /// Le message du jour ; `None` si nominis ne répond pas ce qu'on attend (la v1 se taisait alors).
 pub async fn today(web: &dyn Web) -> Result<Option<String>, String> {
-    let json = web.get(rules::SAINTS_URL, rules::USER_AGENT).await?;
+    let json = web
+        .get(rules::SAINTS_URL, rules::USER_AGENT, PAGE_TIMEOUT)
+        .await?
+        .ok()?;
     let Some(saints) = rules::parse_saints(&json) else {
         tracing::warn!("unexpected nominis answer");
         return Ok(None);
@@ -20,8 +28,10 @@ pub async fn today(web: &dyn Web) -> Result<Option<String>, String> {
         .get(
             &rules::feasts_url(saints.day, saints.month),
             rules::USER_AGENT,
+            PAGE_TIMEOUT,
         )
         .await
+        .and_then(crate::http::Page::ok)
     {
         Ok(page) => rules::parse_feasts(&page),
         Err(error) => {

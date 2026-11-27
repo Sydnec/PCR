@@ -18,6 +18,7 @@ pcr-core.workspace = true
 pcr-db.workspace = true
 arc-swap.workspace = true
 bytes.workspace = true
+futures-util.workspace = true
 http.workspace = true
 http-body-util.workspace = true
 hyper-rustls.workspace = true

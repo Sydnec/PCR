@@ -26,7 +26,9 @@
   erreur est une panne passagère, un membre injoignable se dit (`Delivery::Unreachable`). Pages web :
   `outbox::Web`, servi par `http::Http` (la pile hyper + rustls de twilight, aucune crate de plus).
 - Communauté : `reminders` (balayage chaque minute, `run`), `birthdays`, `cotd`, `advent` (tâches de
-  calendrier), `randomizabaise`. Refus : `error::UseCaseError`. Faux ports : `testing::FakeOutbox`, `FakeWeb`.
+  calendrier), `randomizabaise`. Salon : `links` (boutons et traduction, sur `outbox::Web`), `voice` et
+  `reactions` (stats de l'année), `App::request_restart` (`/admin restart` : `main` s'arrête proprement).
+  Refus : `error::UseCaseError`. Faux ports : `testing::FakeOutbox`, `FakeWeb`.
 - Points : `points` (gain d'un message, `/solde`, classement, `/admin points`), `redistribution` (pot
   commun : boucle horaire `run`, lancée par `pcr-discord`). Paris : `bets` (création, `stake`, `resolve`…,
   `View` et `gains` partagés par le paiement et les rendus ; les stats comptent après le commit).

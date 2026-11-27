@@ -1,0 +1,4 @@
+type = "enhancement"
+name = "Liens X et Instagram"
+description = "Les liens X et les reels Instagram sont toujours republiés avec leur aperçu, et le bouton « Traduire » sous un tweet étranger affiche maintenant l'auteur en lien."
+announce = true

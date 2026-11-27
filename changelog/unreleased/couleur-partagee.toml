@@ -1,0 +1,4 @@
+type = "fix"
+name = "/color ne vole plus la couleur des autres"
+description = "Changer de couleur ne supprime plus l'ancien rôle de couleur tant qu'un autre membre le porte encore."
+announce = true

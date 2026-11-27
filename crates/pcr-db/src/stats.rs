@@ -45,6 +45,10 @@ pub enum Counter {
     BetMaxWin {
         user: i64,
     },
+    /// Réactions reçues par le message d'un `/randomizabaise` (sa ligne existe déjà).
+    ShipReaction {
+        message: i64,
+    },
 }
 
 impl Counter {
@@ -125,6 +129,50 @@ pub async fn record_ship(
     .execute(db.writer())
     .await?;
     Ok(())
+}
+
+/// Un membre entre en vocal à `at` (ms). Changer de salon ne relance pas la session.
+pub async fn voice_joined(db: &StatsDb, user: i64, at: i64) -> Result<(), DbError> {
+    sqlx::query!(
+        "INSERT INTO voice_time (user_id, joined_at) VALUES (?, ?)
+         ON CONFLICT (user_id) DO UPDATE SET joined_at = coalesce(joined_at, excluded.joined_at)",
+        user,
+        at
+    )
+    .execute(db.writer())
+    .await?;
+    Ok(())
+}
+
+/// Un membre quitte le vocal à `at` : la session s'ajoute à son total et peut devenir sa plus longue.
+pub async fn voice_left(db: &StatsDb, user: i64, at: i64) -> Result<(), DbError> {
+    sqlx::query!(
+        "UPDATE voice_time
+            SET total_time_ms = total_time_ms + MAX(? - joined_at, 0),
+                longest_session_ms = MAX(longest_session_ms, ? - joined_at),
+                joined_at = NULL
+          WHERE user_id = ? AND joined_at IS NOT NULL",
+        at,
+        at,
+        user
+    )
+    .execute(db.writer())
+    .await?;
+    Ok(())
+}
+
+/// Au démarrage : seules les sessions des membres encore en vocal (`in_voice`) continuent ; les
+/// autres, coupées par l'arrêt, ne se mesurent plus.
+pub async fn voice_reset(db: &StatsDb, in_voice: &[i64]) -> Result<u64, DbError> {
+    let ids = serde_json::to_string(in_voice).unwrap_or_else(|_| "[]".to_owned());
+    let done = sqlx::query!(
+        "UPDATE voice_time SET joined_at = NULL
+          WHERE joined_at IS NOT NULL AND user_id NOT IN (SELECT value FROM json_each(?))",
+        ids
+    )
+    .execute(db.writer())
+    .await?;
+    Ok(done.rows_affected())
 }
 
 /// Pose sa marque d'année sur une base neuve : un fichier renommé à la main reste reconnaissable.
@@ -216,6 +264,16 @@ pub async fn add_all(db: &StatsDb, counters: &[(Counter, i64)]) -> Result<(), Db
                     name,
                     delta,
                     delta
+                )
+                .execute(&mut *tx)
+                .await?;
+            }
+            Counter::ShipReaction { message } => {
+                sqlx::query!(
+                    "UPDATE randomizabaise_stats SET reaction_count = MAX(reaction_count + ?, 0)
+                      WHERE message_id = ?",
+                    delta,
+                    message
                 )
                 .execute(&mut *tx)
                 .await?;

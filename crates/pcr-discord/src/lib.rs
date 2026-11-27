@@ -5,16 +5,22 @@
 //! après un redémarrage.
 
 mod announce;
+mod arrivals;
 mod bets;
 mod commands;
 mod interactions;
+mod links;
 mod members;
 mod messages;
 mod outbox;
 mod polls;
 mod public_messages;
+mod reactions;
 mod reminders;
+mod roles;
+mod threads;
 mod ui;
+mod voice;
 
 use std::{
     sync::{
@@ -30,6 +36,7 @@ use twilight_gateway::{
     CloseFrame, Event, EventTypeFlags, Intents, Shard, ShardId, StreamExt as _,
 };
 use twilight_http::Client;
+use twilight_model::gateway::payload::incoming::GuildCreate;
 use twilight_model::id::{
     Id,
     marker::{ApplicationMarker, GuildMarker},
@@ -46,6 +53,16 @@ pub(crate) struct Ctx {
     pub web: Arc<dyn pcr_app::outbox::Web>,
     /// Les tâches de démarrage ne partent qu'au premier READY, pas à chaque reconnexion.
     pub started: Arc<AtomicBool>,
+    /// Les utilisations de chaque invitation, pour reconnaître celle d'un nouveau membre (un cache :
+    /// relu au démarrage).
+    pub invites: Arc<std::sync::Mutex<std::collections::HashMap<String, u64>>>,
+    /// Les `/admin purge-membre` en cours, par membre visé : un anti-doublon, pas un état de jeu (un
+    /// redémarrage interrompt la purge, la relancer reprend ce qui reste).
+    pub purges: commands::admin::purge_member::Running,
+    /// Une liste des fils réécrite à la fois.
+    pub thread_list: Arc<tokio::sync::Mutex<()>>,
+    /// La file des changements de vocal (`voice::run`).
+    pub voice: voice::Sender,
 }
 
 /// Un identifiant Discord tel qu'il vit en base.
@@ -54,11 +71,17 @@ pub(crate) fn id(value: u64) -> i64 {
 }
 
 /// Seulement ce que le bot utilise. Les messages du serveur et les MP (comme en v1) rapportent des
-/// points ; leur contenu, privilégié, nourrit les stats de mots et d'emoji.
+/// points ; leur contenu, privilégié, nourrit les stats de mots et d'emoji et la réécriture des
+/// liens. Les réactions et le vocal font des stats (et donnent les rôles en libre-service) ; les
+/// arrivées (privilégié, « Server Members ») et les invitations donnent le rôle d'arrivée.
 const INTENTS: Intents = Intents::GUILDS
     .union(Intents::GUILD_MESSAGES)
     .union(Intents::DIRECT_MESSAGES)
-    .union(Intents::MESSAGE_CONTENT);
+    .union(Intents::MESSAGE_CONTENT)
+    .union(Intents::GUILD_MESSAGE_REACTIONS)
+    .union(Intents::GUILD_VOICE_STATES)
+    .union(Intents::GUILD_MEMBERS)
+    .union(Intents::GUILD_INVITES);
 
 /// Se connecte à Discord, enregistre les commandes de guilde et traite les événements jusqu'à l'arrêt.
 pub async fn run(
@@ -70,6 +93,8 @@ pub async fn run(
     let application_id = Id::new(app.instance.discord.application_id);
     let guild_id = Id::new(app.instance.discord.guild_id);
 
+    let (voice_tx, voice_rx) = tokio::sync::mpsc::unbounded_channel();
+    let voice_queue = tokio::spawn(voice::run(app.clone(), guild_id, voice_rx));
     let ctx = Ctx {
         app,
         http,
@@ -77,6 +102,10 @@ pub async fn run(
         guild_id,
         web: web(),
         started: Arc::default(),
+        invites: Arc::default(),
+        purges: Arc::default(),
+        thread_list: Arc::default(),
+        voice: voice_tx,
     };
     // Le worker vit avec la connexion Discord : sans elle, il n'aurait rien à écrire. Il est attendu
     // avant de rendre la main, donc avant la fermeture de la base : un message posté est toujours noté.
@@ -119,6 +148,9 @@ pub async fn run(
         shutdown.clone(),
     ));
     let result = gateway(&ctx, guild_id, token, &mut shutdown).await;
+    // Plus rien n'arrive de la gateway : ce qui reste en file n'a plus d'importance, le démarrage
+    // suivant relève qui est en vocal.
+    voice_queue.abort();
     for (name, task) in [
         ("public messages worker", worker),
         ("pot commun loop", pot),
@@ -246,12 +278,42 @@ fn handle_event(ctx: &Ctx, event: Event) {
             ctx.app.health.set_discord_ready(true);
             if !ctx.started.swap(true, Ordering::Relaxed) {
                 tokio::spawn(announce::run(ctx.clone()));
+                tokio::spawn(roles::sync_message(ctx.clone()));
             }
         }
+        // Le serveur au complet, à chaque connexion : qui est en vocal, et les invitations.
+        Event::GuildCreate(guild) => {
+            if let GuildCreate::Available(guild) = *guild
+                && guild.id == ctx.guild_id
+            {
+                let in_voice: Vec<i64> = guild
+                    .voice_states
+                    .iter()
+                    .filter(|state| state.channel_id.is_some())
+                    .map(|state| id(state.user_id.get()))
+                    .collect();
+                let _ = ctx.voice.send(voice::Change::Reset(in_voice));
+                tokio::spawn(arrivals::cache_invites(ctx.clone()));
+            }
+        }
+        Event::ReactionAdd(reaction) => {
+            tokio::spawn(reactions::handle(ctx.clone(), reaction.0, true));
+        }
+        Event::ReactionRemove(reaction) => {
+            tokio::spawn(reactions::handle(ctx.clone(), reaction.0, false));
+        }
+        Event::VoiceStateUpdate(update) => {
+            let _ = ctx.voice.send(update.0.into());
+        }
+        Event::MemberAdd(member) => {
+            tokio::spawn(arrivals::member_added(ctx.clone(), *member));
+        }
+        Event::InviteCreate(invite) => arrivals::invite_created(ctx, &invite),
         Event::Resumed => ctx.app.health.set_discord_ready(true),
         Event::GatewayClose(_) => ctx.app.health.set_discord_ready(false),
         Event::ThreadCreate(thread) => {
-            tokio::spawn(polls::on_thread_create(ctx.clone(), thread.0));
+            tokio::spawn(polls::on_thread_create(ctx.clone(), thread.0.clone()));
+            tokio::spawn(threads::on_thread_create(ctx.clone(), thread.0));
         }
         Event::MessageCreate(message) => {
             tokio::spawn(messages::handle(ctx.clone(), message.message));

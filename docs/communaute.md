@@ -60,6 +60,43 @@ erreur. Les heures sont celles de Paris.
 - **Calendrier de l'Avent** : du 1er au 24 décembre, à `advent.hour` (minuit), un fil par jour dans le
   salon de l'Avent, avec sa question épinglée. Un bot arrêté à l'heure ouvre la case à son démarrage.
 
+## Liens X et Instagram
+
+Un message du serveur qui contient un lien X (Twitter) ou un reel Instagram est republié avec leurs
+miroirs (vxtwitter.com, kkinstagram.com), dont Discord affiche l'aperçu, sous la mention de son
+auteur, qui n'est pas notifié ; l'original est supprimé une fois la copie publiée. Les liens X y
+perdent les traceurs collés après le « ? » (sauf une recherche, un hashtag ou un lien d'intention,
+dont c'est le contenu). L'hôte se compare exactement (un « x.com.pirate.net » n'est pas X), un lien
+entre chevrons reste tel quel, un message qui contient un lien masqué (`[texte](adresse)`) n'est pas
+republié, et une copie qui dépasserait 2 000 caractères non plus.
+
+Sous la copie, chaque tweet qui n'est pas en français reçoit un bouton **« Traduire »**
+(`links.translation`, au plus `maxTweets`). Le clic répond en privé : la traduction de l'API de
+FxTwitter, échappée (rien n'y forme un lien masqué ni une mention), avec son auteur et la langue
+d'origine ; ou pourquoi il n'y en a pas (tweet supprimé, déjà en français, rien à traduire, API
+muette).
+
+## Rôles
+
+- **Message des rôles** : au démarrage, le bot réécrit le message des rôles (`role_channel_id`,
+  `role_message_id`) avec les rôles placés sous le rôle de ping (`ping_role_id`) dont le nom commence
+  par un emoji, et y pose ces emoji. Réagir donne le rôle, retirer sa réaction le reprend. Un rôle
+  géré par une intégration, ou qui porte une permission sensible (administration, gestion,
+  modération, `@everyone`), n'est jamais proposé.
+- **`/color hexa`** : la couleur de son pseudo, par un rôle « &A020F0 » rangé sous le rôle repère des
+  couleurs (`color_role_id`). L'ancienne couleur est retirée, et son rôle supprimé quand plus
+  personne ne le porte (la v1 le supprimait même encore porté par un autre membre).
+- **Arrivée** : un nouveau membre reçoit le rôle par défaut, ou celui des membres temporaires s'il
+  arrive par leur invitation (`temporary_member_invite_code`, `temporary_member_role_id`).
+  L'invitation se reconnaît à son compteur d'utilisations : sans le droit « Gérer le serveur », elle
+  ne se lit pas, et le rôle par défaut s'applique.
+
+## Liste des fils
+
+À chaque fil créé dans un salon textuel que voit le rôle par défaut (hors forum des sondages et salon
+de l'Avent), la liste des fils du serveur, actifs et archivés, est republiée dans son salon
+(`thread_list_channel_id`), salon par salon dans l'ordre du serveur.
+
 ## Divers
 
 - **`/ecaflip option1 [option2…10]`** : une seule option est une question, la réponse est « Oui » ou
@@ -69,7 +106,12 @@ erreur. Les heures sont celles de Paris.
   compte ses réactions). Un ship shiny demande trois membres.
 - **`/safe-place message`** : un message anonyme dans la safe place. Il n'appelle personne, et son
   auteur n'est écrit nulle part.
-- **`/join`** : rejoindre le fil où l'on tape la commande.
+- **`/join`** : rejoindre le fil où l'on tape la commande (ou apprendre qu'on y est déjà).
+- **`/help`** : la liste des commandes et de leur description ; **`/version`** : la version du bot,
+  avec le commit, l'environnement et l'état de la base.
+- **Stats de l'année** : les réactions (posées, reçues par message, par emoji) et le temps passé en
+  vocal comptent pour le récap annuel. Une session vocale coupée par un arrêt du bot n'est pas
+  mesurée.
 
 Le texte écrit par un membre et relayé par le bot (sondages, pile ou face) peut mentionner des
 membres et des rôles, comme en v1, jamais `@everyone` ni `@here`.
