@@ -13,6 +13,8 @@ dm_allowlist = [333333333333333333]
 changelog_channel_id = 444444444444444444
 # Rôle des membres (DEFAULT_ROLE_ID en v1) : bénéficiaires du pot commun.
 default_role_id = 555555555555555555
+# Rôle appelé à chaque nouveau pari (DISCORD_BET_ROLE_ID en v1) ; facultatif.
+bet_role_id = 666666666666666666
 
 [web]
 listen = "0.0.0.0:8080"
