@@ -1,0 +1,4 @@
+type = "fix"
+name = "Rappels : les longs messages passent"
+description = "Un rappel avec un long message ne fait plus échouer `/rappel`, et son bouton « Me rappeler aussi » marche quand même. Une date refusée ne s'affiche plus qu'à toi."
+announce = true

@@ -8,8 +8,10 @@
   membres) passent par des traits (« ports ») implémentés dans `pcr-discord`.
 - Tâches de calendrier : `jobs::all()`, échéance `pcr_core::schedule::Schedule` (quotidienne ou annuelle,
   heure de Paris, jamais entre 2 h et 3 h) revendiquée dans `job_runs` : une fois par période, rattrapée au
-  démarrage tant que la période dure. Pas de `croner` : il tire chrono, écarté du projet. Les balayages
-  (fuites, rappels échus…) sont des boucles idempotentes par l'état en base, hors `jobs`.
+  démarrage tant que la période dure. L'échéance se relit à chaque tour (`Job::schedule(&App)`, `None` :
+  coupée) ; `run` reçoit les `outbox::Ports` (Discord, web). La boucle est lancée par `pcr-discord`. Pas
+  de `croner` : il tire chrono, écarté du projet. Les balayages (fuites, rappels échus…) sont des boucles
+  idempotentes par l'état en base, hors `jobs`.
 - Stats : `app.stats.add(instant, Counter, delta)` (compteurs de `pcr_db::stats`), écrites par lots toutes les
   15 s et à l'arrêt dans `stats-<année de Paris de l'instant>.db` : la bascule du 1er janvier n'a besoin de
   rien d'autre. Un nouveau compteur s'ajoute à `pcr_db::stats::Counter` avec son upsert.
@@ -20,6 +22,11 @@
   (`public_messages::posted`, `bets::posted`).
 - Hasard : les cas d'usage reçoivent `rng: &mut impl Rng` ; en service `App::rng()`, en test une graine fixe.
 - Membres d'un rôle : port `members::MembersPort` (liste complète lue sur Discord), tri pur `role_members`.
+- Ce que les tâches de fond envoient : port `outbox::Outbox` (salon, fil, MP d'un rappel, pseudo) ; une
+  erreur est une panne passagère, un membre injoignable se dit (`Delivery::Unreachable`). Pages web :
+  `outbox::Web`, servi par `http::Http` (la pile hyper + rustls de twilight, aucune crate de plus).
+- Communauté : `reminders` (balayage chaque minute, `run`), `birthdays`, `cotd`, `advent` (tâches de
+  calendrier), `randomizabaise`. Refus : `error::UseCaseError`. Faux ports : `testing::FakeOutbox`, `FakeWeb`.
 - Points : `points` (gain d'un message, `/solde`, classement, `/admin points`), `redistribution` (pot
   commun : boucle horaire `run`, lancée par `pcr-discord`). Paris : `bets` (création, `stake`, `resolve`…,
   `View` et `gains` partagés par le paiement et les rendus ; les stats comptent après le commit).

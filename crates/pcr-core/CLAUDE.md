@@ -13,6 +13,9 @@
   `redistribution` (pot commun), `stats` (mots et emoji d'un message, découpés comme en v1), `bets`
   (`custom_id` des paris, gains au quotient exact, plus proche estimation, saisies, refus).
 - `ids` : codec `custom_id`, grammaire v1 `action|arg|…` ; chaque fonctionnalité y décode les siens.
+- Communauté : `reminders` (date en heure de Paris, bouton `rappel|`, `encodeURIComponent`), `birthdays`,
+  `polls` (numérotation des lignes, période de `/week`), `cotd` (nominis, page des fêtes, message),
+  `advent` (les 24 questions), `ecaflip`, `randomizabaise`. Valeurs de référence des tests v1.
 - À venir : un module par fonctionnalité (`lottery`, `safari`…).
 - Données Pokémon : `data/pokemon.json` (251 espèces : `id`, `name` FR, `generation`, `catchRate`, `stage`,
   `isLegendary`, `isMythical`, `isBaby`, `genderRate`, `evolvesFrom/Into`, `sprite`, `forms`) et

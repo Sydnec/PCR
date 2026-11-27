@@ -15,6 +15,10 @@
   rôle n'est appelé que dans une réponse immédiate). Images dans `spawn_blocking`.
 - Paris : `bets/` (routage `bet_*` des composants et modales, `forms`, `render` des messages publics),
   commandes `bet`, `estimate`, `betstats`.
+- Communauté : `reminders.rs` (bouton `rappel|`, panneaux), `polls.rs` (numérotation : `THREAD_CREATE` du
+  forum des sondages, `/week`, `/edit`), `outbox.rs` (le port `Outbox` : salons, fils de l'Avent, MP des
+  rappels). Les tâches de calendrier et le balayage des rappels sont lancés dans `lib.rs`, avec la
+  connexion. Un texte de membre relayé n'appelle que membres et rôles (`ui::relayed`), jamais `@everyone`.
 - Intents : seulement ceux qu'une fonctionnalité utilise. Contenu des messages (privilégié) : stats de
   mots ; la liste des membres passe par l'API (`members.rs`, intention « Server Members » de l'application).
 - `messages.rs` : chaque message d'un membre (pas d'un bot, MP compris) → `pcr_app::points::on_message`.

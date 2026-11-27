@@ -1,0 +1,4 @@
+type = "enhancement"
+name = "Anniversaires, saints du jour et Avent ne se perdent plus"
+description = "Si le bot redémarre à l'heure des vœux d'anniversaire, des saints du jour ou de la case de l'Avent, le message part à son retour, le jour même, au lieu d'être sauté. `/cotd` répond même quand le site des saints ne répond pas."
+announce = true
