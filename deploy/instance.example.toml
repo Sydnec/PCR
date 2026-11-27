@@ -11,6 +11,8 @@ admin_user_id = 333333333333333333
 dm_allowlist = [333333333333333333]
 # Annonces de version (prod) ou aperçus des annonces à venir (dev).
 changelog_channel_id = 444444444444444444
+# Rôle des membres (DEFAULT_ROLE_ID en v1) : bénéficiaires du pot commun.
+default_role_id = 555555555555555555
 
 [web]
 listen = "0.0.0.0:8080"

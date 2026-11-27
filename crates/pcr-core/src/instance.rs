@@ -39,6 +39,9 @@ pub struct Discord {
     pub dm_allowlist: Vec<u64>,
     /// Salon des annonces de version (prod) ou des aperçus d'annonce (dev). Absent : pas d'annonce.
     pub changelog_channel_id: Option<u64>,
+    /// Le rôle des membres du serveur (`DEFAULT_ROLE_ID` en v1) : les bénéficiaires du pot commun.
+    /// Absent : le pot commun attend qu'il soit posé.
+    pub default_role_id: Option<u64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

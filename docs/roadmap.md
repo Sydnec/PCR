@@ -32,12 +32,21 @@ Réécriture en Rust, même résultat pour les joueurs. Le détail des choix est
 | P2c | `pcr migrate-v1` : empreinte du schéma v1, conversion, rapport d'invariants, fixture synthétique. **Gel de la v1.** | ✅ (v1 gelée à v1.22.1, `97c987a`) |
 | P2d | GameConfig (macro, défauts v1, bornes, surcharges en base, `ArcSwap`), `/admin config` et `config-voir` | ✅ |
 | P2e | Scheduler Paris + `job_runs`, stats tamponnées et bascule annuelle, worker `public_messages` | ✅ |
-| P3 | Économie et communauté (tout le non-Pokémon de `parity.md` §1 et §3) | à faire |
-| P4 | Pokémon socle : spawn, lancers, shiny, objets, Centre Pokémon, Mon aventure, Boîte, `/pokedex` | à faire |
-| P5 | Pokémon avancé : boutique, revente, loterie, évolution, œufs, pêche, safari, échanges, vitrine… | à faire |
+| P3a | Économie : gains de messages (et stats de messages, mots, emoji, commandes), `/solde`, `/classement`, `/admin points`, pot commun (minuteur + `/admin potcommun`) | ✅ |
+| P3b | Paris : `/bet`, `/estimate`, `/betstats`, les `custom_id` `bet_*`, messages publics du pari et de son résultat | à faire |
+| P3c | Communauté : rappels (`/rappel`, bouton `rappel`, `/mesrappels`, envoi et purge), anniversaires, `/poll`, `/week`, `/edit`, `/ecaflip`, saints du jour (`/cotd` + minuteur), calendrier de l'Avent, `/randomizabaise`, `/safe-place`, `/join` | à faire |
+| P3d | Administration et salon : `/admin purge`, `/admin purge-membre`, `/admin restart`, liens X/Instagram et traduction, rôles (message des rôles, rôle à l'arrivée, invitations, `/color`), liste des fils, stats de réactions et de vocal, `/help`, `/version` | à faire |
+| P4 | Pokémon socle : spawn, lancers, shiny, objets (et les balls en poche dans `/solde`), Centre Pokémon, Mon aventure, Boîte, `/pokedex` | à faire |
+| P5 | Pokémon avancé : boutique, revente, loterie (et son rappel dans `/solde`), évolution, œufs, pêche, safari, échanges, vitrine… | à faire |
 | P6 | Site : API aux formes v1, OAuth, sessions, SSE, front repris, diff v1/v2 | à faire |
 | P7 | Récap annuel | à faire |
 | P8 | Bascule de la prod | à faire |
+
+P3 (tout le non-Pokémon de `parity.md` §1, §3 et §5) est découpée en quatre PR : chacune tient en une
+relecture, et les paris sortent de l'économie parce qu'ils apportent à eux seuls sept interactions, deux
+types de messages publics et la réponse d'interaction enregistrée comme message public. `/admin item`,
+`poids`, `pokespawn`, `safarispawn` et `saison` attendent le jeu Pokémon (P4, P5), la purge des sessions
+du site arrive avec le site (P6).
 
 ## Démarrer une session
 

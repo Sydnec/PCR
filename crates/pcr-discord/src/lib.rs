@@ -7,6 +7,8 @@
 mod announce;
 mod commands;
 mod interactions;
+mod members;
+mod messages;
 mod public_messages;
 mod ui;
 
@@ -39,8 +41,12 @@ pub(crate) struct Ctx {
     pub started: Arc<AtomicBool>,
 }
 
-/// Seulement ce que le bot utilise : les intents privilégiés arrivent avec les fonctionnalités qui en ont besoin.
-const INTENTS: Intents = Intents::GUILDS;
+/// Seulement ce que le bot utilise. Les messages du serveur et les MP (comme en v1) rapportent des
+/// points ; leur contenu, privilégié, nourrit les stats de mots et d'emoji.
+const INTENTS: Intents = Intents::GUILDS
+    .union(Intents::GUILD_MESSAGES)
+    .union(Intents::DIRECT_MESSAGES)
+    .union(Intents::MESSAGE_CONTENT);
 
 /// Se connecte à Discord, enregistre les commandes de guilde et traite les événements jusqu'à l'arrêt.
 pub async fn run(
@@ -68,9 +74,21 @@ pub async fn run(
         }),
         shutdown.clone(),
     ));
+    // Le pot commun lit les membres sur Discord : il vit, lui aussi, avec la connexion.
+    let pot = tokio::spawn(pcr_app::redistribution::run(
+        ctx.app.clone(),
+        Arc::new(members::DiscordMembers {
+            http: Arc::clone(&ctx.http),
+            guild: guild_id,
+        }),
+        shutdown.clone(),
+    ));
     let result = gateway(&ctx, guild_id, token, &mut shutdown).await;
     if let Err(error) = worker.await {
         tracing::error!(?error, "public messages worker panicked");
+    }
+    if let Err(error) = pot.await {
+        tracing::error!(?error, "pot commun loop panicked");
     }
     result
 }
@@ -181,6 +199,9 @@ fn handle_event(ctx: &Ctx, event: Event) {
         }
         Event::Resumed => ctx.app.health.set_discord_ready(true),
         Event::GatewayClose(_) => ctx.app.health.set_discord_ready(false),
+        Event::MessageCreate(message) => {
+            tokio::spawn(messages::handle(ctx.clone(), message.message));
+        }
         Event::InteractionCreate(interaction) => {
             // Chaque interaction a sa tâche : le délai de réponse de 3 s ne doit jamais attendre
             // derrière un autre handler.

@@ -118,15 +118,14 @@ CREATE TABLE points_log (
 CREATE INDEX points_log_user ON points_log (user_id, created_at);
 CREATE INDEX points_log_time ON points_log (created_at);
 
--- État du pot commun : une seule ligne. L'échéance sert de verrou : l'UPDATE gardé qui la repousse ne
--- réussit qu'une fois par échéance. 0 = jamais planifiée : le premier passage la pose sans prélever,
--- sinon une installation neuve prélèverait tout le monde dès sa première heure. `redistribution_since`
--- est un bail : `/admin potcommun` contourne l'échéance, et deux pots ne doivent jamais tourner ensemble ;
--- il expire pour qu'un arrêt en plein pot ne bloque pas les suivants.
+-- État du pot commun : une seule ligne. L'échéance est repoussée dans la transaction du pot : elle ne
+-- se consomme qu'avec lui, une fois par échéance. 0 = jamais planifiée : le premier passage la pose sans
+-- prélever, sinon une installation neuve prélèverait tout le monde dès sa première heure. (Le bail v1
+-- `redistribution_since` disparaît : un pot tient dans une transaction de l'écrivain unique, deux pots
+-- ne peuvent plus tourner ensemble.)
 CREATE TABLE economy_state (
     id                     INTEGER PRIMARY KEY CHECK (id = 1),
-    next_redistribution_at INTEGER NOT NULL DEFAULT 0,
-    redistribution_since   INTEGER NOT NULL DEFAULT 0
+    next_redistribution_at INTEGER NOT NULL DEFAULT 0
 ) STRICT;
 INSERT INTO economy_state (id) VALUES (1);
 

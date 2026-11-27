@@ -8,8 +8,13 @@ pub mod announcements;
 pub mod config;
 pub mod health;
 pub mod jobs;
+pub mod members;
+pub mod points;
 pub mod public_messages;
+pub mod redistribution;
 pub mod stats;
+#[cfg(test)]
+mod testing;
 
 use std::sync::Arc;
 
@@ -57,6 +62,12 @@ impl App {
     /// la modifie pendant ce temps.
     pub fn game_config(&self) -> Arc<pcr_core::config::GameConfig> {
         Arc::clone(&self.config.load().config)
+    }
+
+    /// Le hasard d'une action en service, tiré du système. Les cas d'usage le reçoivent en paramètre :
+    /// les tests leur passent un générateur à graine fixe.
+    pub fn rng() -> rand::rngs::StdRng {
+        rand::make_rng()
     }
 
     /// À appeler après le commit d'un cas d'usage qui a créé ou changé un message public : le worker

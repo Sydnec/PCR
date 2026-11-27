@@ -34,6 +34,15 @@ pub fn paris_date(at: Timestamp) -> Date {
     PARIS.to_datetime(at).date()
 }
 
+/// Le prochain minuit à Paris après `at` : la remise à zéro des compteurs du jour. Minuit existe
+/// toujours à Paris (les changements d'heure tombent entre 2 h et 3 h).
+pub fn next_paris_midnight(at: Timestamp) -> Timestamp {
+    paris_date(at)
+        .tomorrow()
+        .and_then(|day| PARIS.to_timestamp(day.at(0, 0, 0, 0)))
+        .expect("Paris midnight exists and stays in range")
+}
+
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SystemClock;
 
@@ -72,6 +81,23 @@ mod tests {
         // Été (UTC+2) : la limite passe à 22 h UTC.
         assert_eq!(paris_date(at("2026-07-14T21:59:59Z")), date(2026, 7, 14));
         assert_eq!(paris_date(at("2026-07-14T22:00:00Z")), date(2026, 7, 15));
+    }
+
+    #[test]
+    fn next_midnight_is_paris_midnight() {
+        assert_eq!(
+            next_paris_midnight(at("2026-01-14T22:59:59Z")),
+            at("2026-01-14T23:00:00Z")
+        );
+        assert_eq!(
+            next_paris_midnight(at("2026-01-14T23:00:00Z")),
+            at("2026-01-15T23:00:00Z")
+        );
+        // La veille du passage à l'heure d'été : le jour suivant n'a que 23 heures.
+        assert_eq!(
+            next_paris_midnight(at("2026-03-29T12:00:00Z")),
+            at("2026-03-29T22:00:00Z")
+        );
     }
 
     #[test]

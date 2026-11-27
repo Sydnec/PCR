@@ -42,15 +42,14 @@ pub(super) async fn convert(
         )
         .await?;
 
-    // La ligne unique existe déjà (posée par le schéma v2) : on reprend l'échéance du prochain pot.
-    // Le bail repart à zéro : aucun pot ne tourne pendant une conversion.
+    // La ligne unique existe déjà (posée par le schéma v2) : on reprend l'échéance du prochain pot. Le
+    // bail v1 (`redistribution_since`) n'a plus d'équivalent : aucun pot ne tourne pendant une conversion.
     report
         .copy(
             conn,
             "economy_state",
             "v1.economy_state",
-            "UPDATE economy_state SET redistribution_since = 0,
-                    next_redistribution_at = COALESCE(
+            "UPDATE economy_state SET next_redistribution_at = COALESCE(
                         (SELECT next_redistribution_at FROM v1.economy_state WHERE id = 1), 0)",
             "ligne unique",
         )

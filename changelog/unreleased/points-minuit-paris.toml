@@ -1,0 +1,4 @@
+type = "enhancement"
+name = "Points des messages : minuit à Paris"
+description = "Le premier message de la journée rapporte de nouveau le plus dès minuit, heure de Paris, et non plus à 1 h ou 2 h du matin."
+announce = true

@@ -1,0 +1,4 @@
+type = "enhancement"
+name = "Classement plus lisible"
+description = "Les soldes du classement s'affichent avec leurs séparateurs de milliers, comme dans `/solde`."
+announce = true

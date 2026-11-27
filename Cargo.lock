@@ -1320,6 +1320,7 @@ dependencies = [
  "jiff",
  "pcr-core",
  "pcr-db",
+ "rand",
  "serde_json",
  "sqlx",
  "thiserror",
@@ -1333,6 +1334,8 @@ name = "pcr-core"
 version = "2.0.0-dev"
 dependencies = [
  "jiff",
+ "rand",
+ "regex",
  "serde",
  "serde_json",
  "thiserror",
@@ -1479,6 +1482,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed2bf2547551a7053d6fdfafda3f938979645c44812fbfcda098faae3f1a362d"
 dependencies = [
  "bitflags",
+]
+
+[[package]]
+name = "regex"
+version = "1.13.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9807af0e638c12e753aa1b4e601791bf2a8f71274023c8bbeec12fc149950857"
+dependencies = [
+ "aho-corasick",
+ "memchr",
+ "regex-automata",
+ "regex-syntax",
 ]
 
 [[package]]

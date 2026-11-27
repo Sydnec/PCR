@@ -67,10 +67,6 @@ async fn expect_economy(game: &SqlitePool, report: &Report) {
     assert!(!balances.ok);
     assert_eq!(balances.detail, "v1 4850, v2 4800");
     assert_eq!(
-        value(game, "SELECT redistribution_since FROM economy_state").await,
-        Some(0)
-    );
-    assert_eq!(
         value(
             game,
             "SELECT count(*) FROM points_redistributions WHERE triggered_by IS NULL"

@@ -5,6 +5,8 @@
 //! l'exécution comme pour l'autocomplétion, qui énumère la configuration vivante.
 
 mod config;
+mod points;
+mod potcommun;
 
 use twilight_interactions::command::{CommandInputData, CommandModel, CreateCommand};
 use twilight_model::{
@@ -13,13 +15,14 @@ use twilight_model::{
         interaction::{Interaction, application_command::CommandData},
     },
     guild::Permissions,
-    http::interaction::InteractionResponse,
 };
 
-use crate::{Ctx, ui};
+use crate::{Ctx, interactions::Reply, ui};
 
 const NOT_ADMIN: &str = "❌ Cette commande est réservée aux administrateurs.";
 
+// Une option résolue (membre ou rôle) pèse lourd ; la commande n'est décodée qu'une fois par appel.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, CommandModel, CreateCommand)]
 #[command(
     name = "admin",
@@ -27,10 +30,14 @@ const NOT_ADMIN: &str = "❌ Cette commande est réservée aux administrateurs."
     default_permissions = "administrators"
 )]
 pub enum AdminCommand {
+    #[command(name = "points")]
+    Points(points::PointsCommand),
     #[command(name = "config")]
     Config(config::ConfigCommand),
     #[command(name = "config-voir")]
     ConfigVoir(config::ConfigVoirCommand),
+    #[command(name = "potcommun")]
+    Potcommun(potcommun::PotcommunCommand),
 }
 
 fn administrators() -> Permissions {
@@ -46,16 +53,18 @@ fn is_admin(interaction: &Interaction) -> bool {
         .is_some_and(|permissions| permissions.contains(Permissions::ADMINISTRATOR))
 }
 
-pub async fn run(ctx: &Ctx, interaction: &Interaction, data: &CommandData) -> InteractionResponse {
+pub async fn run(ctx: &Ctx, interaction: &Interaction, data: &CommandData) -> Reply {
     if !is_admin(interaction) {
-        return ui::ephemeral_text(NOT_ADMIN);
+        return ui::ephemeral_text(NOT_ADMIN).into();
     }
     let Some(admin) = interaction.author_id() else {
-        return ui::ephemeral_text(NOT_ADMIN);
+        return ui::ephemeral_text(NOT_ADMIN).into();
     };
     match AdminCommand::from_interaction(CommandInputData::from(data.clone())) {
-        Ok(AdminCommand::Config(command)) => config::set(ctx, command, admin.get()).await,
-        Ok(AdminCommand::ConfigVoir(command)) => config::view(ctx, &command),
+        Ok(AdminCommand::Points(command)) => points::run(ctx, command, admin.get()),
+        Ok(AdminCommand::Config(command)) => config::set(ctx, command, admin.get()).await.into(),
+        Ok(AdminCommand::ConfigVoir(command)) => config::view(ctx, &command).into(),
+        Ok(AdminCommand::Potcommun(command)) => potcommun::run(ctx, &command, admin.get()),
         // Ne peut arriver qu'entre deux versions : une sous-commande que ce binaire ne connaît pas.
         Err(error) => {
             let name = data
@@ -66,6 +75,7 @@ pub async fn run(ctx: &Ctx, interaction: &Interaction, data: &CommandData) -> In
             ui::ephemeral_text(format!(
                 "❌ `{name}` est introuvable. Le bot n'est peut-être pas à jour."
             ))
+            .into()
         }
     }
 }

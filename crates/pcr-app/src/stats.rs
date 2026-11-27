@@ -18,7 +18,8 @@ use std::{
 
 use jiff::Timestamp;
 use pcr_core::clock::paris_date;
-use pcr_db::{DbError, StatsDb, stats::Counter};
+pub use pcr_db::stats::Counter;
+use pcr_db::{DbError, StatsDb};
 use tokio::sync::watch;
 
 use crate::App;
