@@ -147,10 +147,11 @@ pub fn decode_uri_component(text: &str) -> Option<String> {
     String::from_utf8(bytes).ok()
 }
 
-/// « Créé le 27/11/2026 14:30:00 » : `toLocaleString("fr-FR")` de la v1, en heure de Paris.
-pub fn created_label(at: Timestamp) -> String {
-    let local = paris().to_datetime(at);
-    format!(
+/// « Créé le 27/11/2026 14:30:00 » : `toLocaleString("fr-FR")` de la v1, en heure de Paris, pour
+/// un instant en millisecondes (`None` hors des dates représentables).
+pub fn created_label(at_ms: i64) -> Option<String> {
+    let local = paris().to_datetime(Timestamp::from_millisecond(at_ms).ok()?);
+    Some(format!(
         "Créé le {:02}/{:02}/{} {:02}:{:02}:{:02}",
         local.day(),
         local.month(),
@@ -158,7 +159,7 @@ pub fn created_label(at: Timestamp) -> String {
         local.hour(),
         local.minute(),
         local.second()
-    )
+    ))
 }
 
 #[cfg(test)]
@@ -224,8 +225,8 @@ mod tests {
     #[test]
     fn the_creation_date_reads_like_v1() {
         assert_eq!(
-            created_label(at("2026-07-14T07:05:09Z")),
-            "Créé le 14/07/2026 09:05:09"
+            created_label(at("2026-07-14T07:05:09Z").as_millisecond()).as_deref(),
+            Some("Créé le 14/07/2026 09:05:09")
         );
     }
 }

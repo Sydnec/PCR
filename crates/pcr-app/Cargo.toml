@@ -17,8 +17,14 @@ workspace = true
 pcr-core.workspace = true
 pcr-db.workspace = true
 arc-swap.workspace = true
+bytes.workspace = true
+http.workspace = true
+http-body-util.workspace = true
+hyper-rustls.workspace = true
+hyper-util.workspace = true
 jiff.workspace = true
 rand = { workspace = true, features = ["sys_rng"] }
+rustls.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
