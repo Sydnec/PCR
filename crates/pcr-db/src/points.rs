@@ -106,7 +106,8 @@ pub async fn balance(db: &Db, user: i64) -> Result<i64, DbError> {
     balance_in(&mut conn, user).await
 }
 
-async fn balance_in(conn: &mut SqliteConnection, user: i64) -> Result<i64, DbError> {
+/// Le solde de `user`, lu dans la transaction en cours (0 sans ligne).
+pub async fn balance_in(conn: &mut SqliteConnection, user: i64) -> Result<i64, DbError> {
     let balance = sqlx::query_scalar!("SELECT balance FROM points WHERE user_id = ?", user)
         .fetch_optional(conn)
         .await?;
