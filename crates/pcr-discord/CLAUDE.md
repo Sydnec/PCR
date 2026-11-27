@@ -7,6 +7,11 @@
   Builders : `twilight_util::builder::message::*` et `builder::interaction_response::*`.
 - Commandes : `commands/<nom>.rs` avec `#[derive(CommandModel, CreateCommand)]`, déclarées dans `commands::all()`.
 - Jeu Pokémon (P4) : `pokemon/<panneau>.rs`, préfixe `pk:` ; les messages publics gardent leurs préfixes v1.
+  `pokemon::component` route les `poke_*` ; `pokemon/spawn.rs` rend le message `spawn` (annonce, puis
+  `spawn/end.rs` : capture ou fuite), `pokemon/sheet.rs` la fiche d'une espèce, suivie de
+  `commands::solde::panel` (le panneau de `/solde`). `/admin pokespawn` (autocomplétion des espèces).
+  `ui::emoji` : un emoji de la config (`<:nom:id>`) pour un bouton. Le balayage des fuites est lancé
+  dans `lib.rs`, avec la connexion.
 - Un handler décode, appelle `pcr-app`, rend le résultat. Pas de règle de jeu ici.
 - Délai de 3 s : un handler lent renvoie `Reply::later(éphémère, travail)` (commande, bouton, modale) ou
   `Reply::later_update` (un menu, remplacé par le résultat) ; le routeur diffère puis remplace la réponse
@@ -27,7 +32,8 @@
 - Intents : seulement ceux qu'une fonctionnalité utilise. Contenu des messages (privilégié) : stats de
   mots et liens ; membres (privilégié, « Server Members ») : arrivées, et la liste par l'API
   (`members.rs`) ; réactions, vocal, invitations.
-- `messages.rs` : chaque message d'un membre (pas d'un bot, MP compris) → `pcr_app::points::on_message`.
+- `messages.rs` : chaque message d'un membre (pas d'un bot, MP compris) → `pcr_app::points::on_message` ;
+  ceux du serveur seulement → `pcr_app::pokemon::spawn::on_message`.
 - `announce.rs` : au premier READY, annonce de version (prod) ou aperçu des fragments en attente (dev).
 - `public_messages.rs` : le port d'écriture des messages publics. Un type de message = un rendu dans
   `renderer()`, qui relit la base au moment d'écrire et désigne les rôles qu'il peut appeler (`Rendered`) :

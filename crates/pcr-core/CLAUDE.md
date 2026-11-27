@@ -31,4 +31,9 @@
   plancher, difficulté, prix de la Master Ball, shiny), `items` (catalogue, tables `Held`/`Lottery`),
   `fishing`, `tables` (`/admin poids`, mêmes fonctions que les tirages). Un tirage prend un `roll` dans
   [0, 1) ou un RNG : les tests figent le premier, comme `withRandom` en v1.
+- `pokemon::spawn` : revendication (`claims`, par message, capture ou administrateur), échéance de fuite,
+  tirage d'une apparition (`roll`, `Forced`), mention du rôle, boutons du message public (`Button` :
+  `poke_throw`, `poke_special`, `poke_owned`) et textes de refus. `pokemon::display` : nom d'un individu
+  (shiny, forme, sexe), couleur, numéro de Pokédex, chance en pourcentage. `species::search` : recherche
+  par nom sans accents (autocomplétion).
 - Tests : valeurs de référence reprises des tests v1 (`git show origin/main:test/<fichier>`).

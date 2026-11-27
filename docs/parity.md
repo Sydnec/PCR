@@ -28,7 +28,7 @@ Légende : `[x]` porté en v2 · `~~barré~~` abandonné volontairement (avec la
 - [x] `/randomizabaise` — Depuis le temps que vous l'attendiez celle là
 - [x] `/rappel date [message]` — Créer un rappel qui te sera envoyé en DM
 - [x] `/safe-place message` — Envoie un message anonymement dans la safe place
-- [x] `/solde [user]` — Affiche le solde de points d'un utilisateur (solde et délai ; les balls en poche s'y ajoutent en P4, le rappel de loterie en P5)
+- [x] `/solde [user]` — Affiche le solde de points d'un utilisateur (solde, délai et balls en poche ; le rappel de loterie arrive en P5)
 - [x] `/version` — Affiche la version actuelle du bot
 - [x] `/week question [jour] [date_debut] [date_fin]` — Créer un sondage contenant les jours d'une période
 
@@ -118,6 +118,32 @@ Les règles ne changent pas ; `/pk` disparaît au profit du Centre Pokémon, de 
 - [ ] `/pk web` — Le lien du site PokéPCR : capture, parc safari, boîte PC… → **Bouton Site ↗**
 - [ ] `/zarbi texte` — Écris un message en Zarbi, avec les lettres que tu as réunies → **inchangée**
 
+Écarts assumés des apparitions (P4b, détail dans [pokemon/capture.md](pokemon/capture.md)) :
+
+- plus de verrou `spawning` : la revendication, la fuite du Pokémon en place et la naissance du
+  suivant tiennent dans une transaction de l'écrivain unique, et le message part après le commit (worker
+  des messages publics). Un redémarrage au mauvais moment ne perd plus l'annonce (elle part au retour)
+  et ne laisse plus d'apparition sans message à nettoyer au démarrage ;
+- un Pokémon dont le message a disparu (constaté à sa réécriture suivante) s'enfuit au balayage d'après
+  (la v1 ne le vérifiait qu'au démarrage) ; une apparition v1 sans échéance en reçoit une au premier
+  balayage, d'après sa rareté ;
+- l'annonce est un conteneur (composants v2) reconstruit depuis la base : le texte de l'administrateur
+  et la mention des rôles vivent dans `pokemon_spawns` (`announcement`, `pings_role`) au lieu du
+  message, les rubriques de l'embed deviennent des lignes, les prix des boutons suivent la config à
+  chaque réécriture, et la mention disparaît à la fin comme le contenu v1. Un Pokémon apparu en v1 et
+  encore là à la bascule garde son message v1, qui n'est plus réécrit (comme un pari) ;
+- le salon, le rôle des dresseurs et ceux du Charme Chroma passent dans `instance.toml`
+  (`pokemon_channel_id`, `pokemon_role_id`, `[discord.shiny_charm_role_ids]`) ; les messages privés
+  ne comptent pas pour les apparitions, comme en v1 ;
+- `/admin pokespawn` : plus de refus « un spawn est déjà en cours de création » (il n'y a plus de
+  verrou) ; l'annonce est limitée à 1 000 caractères (un message en composants v2 en tient 4 000) ;
+  une saisie qui n'est pas un numéro d'espèce (l'autocomplétion en donne un) est « Espèce inconnue » ;
+  un tirage sans espèce possible est refusé au lieu d'annoncer un succès sans rien faire apparaître ;
+- fiche « Infos » : une lecture ratée de la collection omet ses pastilles au lieu d'annoncer zéro ; la
+  légende 🥚 ne cite plus `/pk oeuf pondre` (« Ne sort que d'un œuf, pondu par un couple de parents. ») ;
+- jusqu'à P4c, les boutons de lancer répondent que les lancers ne sont pas ouverts ; jusqu'à P4d
+  (objet au sol), un Pokémon qui s'enfuit emporte toujours son objet.
+
 ## 3. Administration (`/admin`)
 
 - [x] `/admin points cible montant` — Donne (ou retire) des points à un dresseur ou à tout un rôle
@@ -128,7 +154,7 @@ Les règles ne changent pas ; `/pk` disparaît au profit du Centre Pokémon, de 
 - [x] `/admin potcommun [simulation]` — Déclenche un pot commun immédiatement, ou simule le prochain (montants et taux au format français : « 2,5 % » au lieu de « 2.5 % »)
 - [x] `/admin purge [lien] [nombre]` — Supprime des messages
 - [x] `/admin purge-membre id` — Supprime tous les messages d'un membre sur le serveur, bilan en MP
-- [ ] `/admin pokespawn [espece] [shiny] [annonce] [ping]` — Déclenche l'apparition d'un Pokémon (événements)
+- [x] `/admin pokespawn [espece] [shiny] [annonce] [ping]` — Déclenche l'apparition d'un Pokémon (événements) (voir les écarts des apparitions, section 2)
 - [ ] `/admin safarispawn [joueur] [pause]` — Ouvre un parc safari (événement public, ou offert à un dresseur)
 - [ ] `/admin saison` — Aperçu du bilan de la saison en cours (rien n'est publié ni enregistré)
 - [x] `/admin restart` — Redémarre le bot
@@ -144,7 +170,9 @@ traduction. Ceux des panneaux éphémères sont remplacés par les panneaux `pk:
 - [x] `tweet_translate` (`tweet_translate|<tweet>`, inchangé)
 - [x] `rappel` (`rappel|<ms>|<message encodé>` de la v1 ; la v2 renvoie au rappel d'origine, `rappel|<ms>|#<id>`, quand le message ne tient pas dans les 100 caractères d'un `custom_id`)
 - [x] `bet_estimate_join` · `bet_estimate_modal` · `bet_estimate_resolve_submit` · `bet_join` · `bet_modal` · `bet_resolve_modal` · `bet_resolve_select` (`pcr_core::bets::Action` ; le message du pari que la v1 ajoutait aux deux derniers est ignoré)
-- [ ] `poke_box` · `poke_cmp` · `poke_cmpg` · `poke_cmpgo` · `poke_cmpn` · `poke_cmpr` · `poke_cmpt` · `poke_dex` · `poke_dexf` · `poke_dexs` · `poke_dext` · `poke_drop` · `poke_dup` · `poke_dupr` · `poke_dupsp` · `poke_dupspr` · `poke_evo` · `poke_evo_cancel` · `poke_evo_pick` · `poke_master` · `poke_master_cancel` · `poke_master_ok` · `poke_owned` · `poke_reback` · `poke_remaster` · `poke_respecial` · `poke_rethrow` · `poke_safari_bait` · `poke_safari_ball` · `poke_safari_cancel` · `poke_safari_enter` · `poke_safari_flee` · `poke_safari_gens` · `poke_safari_go` · `poke_safari_live` · `poke_safari_share` · `poke_showcase_share` · `poke_special` · `poke_starter_no` · `poke_starter_ok` · `poke_td_back` · `poke_td_cancel` · `poke_td_find` · `poke_td_go` · `poke_td_ind` · `poke_td_kind` · `poke_td_pick` · `poke_td_pts` · `poke_td_side` · `poke_throw` · `poke_trade_accept` · `poke_trade_cancel` · `poke_trade_counter` · `poke_trade_decline` · `poke_trade_pick`
+- [x] `poke_owned` (`poke_owned|<apparition>` : la fiche de l'espèce, P4b ; `pcr_core::pokemon::spawn::Button`)
+- [ ] `poke_throw` · `poke_special` (décodés depuis P4b, `pcr_core::pokemon::spawn::Button` ; le lancer arrive en P4c, d'ici là ils répondent que les lancers ne sont pas ouverts)
+- [ ] `poke_box` · `poke_cmp` · `poke_cmpg` · `poke_cmpgo` · `poke_cmpn` · `poke_cmpr` · `poke_cmpt` · `poke_dex` · `poke_dexf` · `poke_dexs` · `poke_dext` · `poke_drop` · `poke_dup` · `poke_dupr` · `poke_dupsp` · `poke_dupspr` · `poke_evo` · `poke_evo_cancel` · `poke_evo_pick` · `poke_master` · `poke_master_cancel` · `poke_master_ok` · `poke_reback` · `poke_remaster` · `poke_respecial` · `poke_rethrow` · `poke_safari_bait` · `poke_safari_ball` · `poke_safari_cancel` · `poke_safari_enter` · `poke_safari_flee` · `poke_safari_gens` · `poke_safari_go` · `poke_safari_live` · `poke_safari_share` · `poke_showcase_share` · `poke_starter_no` · `poke_starter_ok` · `poke_td_back` · `poke_td_cancel` · `poke_td_find` · `poke_td_go` · `poke_td_ind` · `poke_td_kind` · `poke_td_pick` · `poke_td_pts` · `poke_td_side` · `poke_trade_accept` · `poke_trade_cancel` · `poke_trade_counter` · `poke_trade_decline` · `poke_trade_pick`
 
 ## 5. Minuteurs (désormais en heure de Paris, rattrapés via `job_runs`)
 
@@ -154,7 +182,7 @@ sa période dure). Balayages (chaque minute, chaque heure) : boucles idempotente
 - [x] Calendrier de l'Avent (`ADVENT_CRON_TIMER`, 1er–24 décembre ; heure `advent.hour`, rattrapée au démarrage dans la journée)
 - [x] Saints et fêtes du jour (`COTD_CRON_TIMER` ; heure `cotd.hour`, retentés si le site ne répond pas)
 - [x] Rappels échus envoyés en MP (chaque minute) ; purge des rappels envoyés depuis plus de 7 jours (`reminders.keepSentDays`)
-- [ ] Fuite des Pokémon (chaque minute)
+- [x] Fuite des Pokémon (chaque minute ; aussi celle d'un Pokémon dont le message a disparu, et l'échéance d'une apparition v1 qui n'en avait pas)
 - [x] Réparation des messages publics (toutes les 5 min, et au démarrage ; worker P2e, rendus par type avec leurs fonctionnalités) : lignes `public_messages` en retard dont `changed_at` tombe dans `repairWindowHours`, passé `repairGraceSeconds` (les vieux messages v1 restés sans fin n'y entrent pas)
 - [ ] Éclosion des œufs (chaque minute)
 - [ ] Ouverture des générations + récap de saison (chaque minute)
@@ -289,6 +317,8 @@ la bascule se décalent d'un jour.
   envoi jamais abouti) : pas de ligne. `synced_version = 1` si `message_closed_at` est posé ou si
   l'entité est encore ouverte ; `0` pour une entité terminée dont la fin n'a pas été écrite, que le
   worker réécrira.
+- `pokemon_spawns.announcement` et `pings_role` (nouvelles) : NULL et 0 pour les apparitions v1, dont
+  le message est déjà posté (la v1 gardait l'annonce et la mention dans son message).
 - `points` : `messages_today_count` → `messages_today`, `last_reset_date` → `messages_day` (`''` → `NULL`).
 - `points_log` : `source = 'v1'` pour l'historique ; les déclencheurs v1 disparaissent (journal écrit
   par le code, à l'heure de `Clock`).

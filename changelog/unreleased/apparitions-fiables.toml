@@ -1,0 +1,4 @@
+type = "enhancement"
+name = "Apparitions plus fiables"
+description = "Si le bot redémarre au moment où un Pokémon apparaît, son annonce part à son retour au lieu d'être perdue. Un Pokémon dont le message a été supprimé s'enfuit de lui-même au lieu de rester invisible."
+announce = true

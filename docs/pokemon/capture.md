@@ -31,7 +31,9 @@
   (`fleeAfterMinutes`). Passé ce délai, un Pokémon que personne n'a capturé s'enfuit de lui-même,
   sans dépendre de l'activité du serveur — un salon silencieux ne reste donc jamais figé sur le même
   Pokémon. La durée de vie n'est jamais affichée. Celle d'un légendaire est multipliée par
-  `legendaryFleeMultiplier` (2 par défaut), sur le minimum comme sur le maximum.
+  `legendaryFleeMultiplier` (2 par défaut), sur le minimum comme sur le maximum. Un Pokémon dont le
+  message a disparu (supprimé par un modérateur) s'enfuit lui aussi au balayage suivant : plus
+  personne ne le voit.
 - **Course à un vainqueur** : tout le monde peut lancer autant de balls qu'il veut, le premier jet
   réussi remporte le Pokémon. Les balls ratées sont définitivement perdues.
 - **Panneau de relance** : la réponse privée à un lancer porte elle-même les quatre balls et se
@@ -78,6 +80,10 @@
   manque ! »), shiny ou non — suivie de
   **son solde de points et des balls qu'il a en poche**, l'autre question qu'on se pose devant une
   apparition. `/solde` affiche le même embed.
+- **Une seule apparition à la fois, sans verrou** : la revendication, la fuite du Pokémon en place et
+  la naissance du suivant tiennent dans une seule transaction, que la base fait passer l'une après
+  l'autre. Dix messages simultanés ne font apparaître qu'un Pokémon, et un redémarrage au mauvais
+  moment ne perd plus l'annonce : elle part au retour du bot.
 - **L'annonce finit toujours sur ce que dit la base.** Ses réécritures passent une à une, le
   contenu relu au moment d'écrire : un rafraîchissement parti juste avant la capture ne peut plus
   reposer l'embed « actif » par-dessus celui de la victoire. Discord qui refuse une fois se
