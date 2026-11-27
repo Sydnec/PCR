@@ -72,9 +72,9 @@ La **prod** garde l'application actuelle : les boutons des messages déjà post�
 
 Pour le **dev**, sur <https://discord.com/developers/applications> :
 1. Crée l'application « PCR dev », puis son bot. Note l'**Application ID** et le **token**.
-2. Dans l'onglet *Bot*, active les **Privileged Gateway Intents** *Server Members* et *Message Content*. Active-les aussi sur l'application de prod.
+2. Dans l'onglet *Bot*, active les **Privileged Gateway Intents** *Server Members* et *Message Content*. Active-les aussi sur l'application de prod. Le bot reçoit aussi les réactions, le vocal et les invitations (intents non privilégiés).
 3. Dans l'onglet *OAuth2*, note le **Client Secret** et ajoute la redirection `https://dev.pokepcr.<domaine>/api/auth/callback`.
-4. Crée le serveur de test, puis invite le bot. Dans *OAuth2 › URL Generator*, choisis les scopes `bot` et `applications.commands`, et la permission *Administrator*, ou les permissions fines quand elles seront listées.
+4. Crée le serveur de test, puis invite le bot. Dans *OAuth2 › URL Generator*, choisis les scopes `bot` et `applications.commands`, et la permission *Administrator*, ou les permissions fines : voir les salons et l'historique, envoyer des messages, gérer les messages (liens, purges, sondages), ajouter des réactions, gérer les rôles (rôles en libre-service, `/color`, rôle d'arrivée : le rôle du bot doit être au-dessus), gérer le serveur (lire les invitations), créer des fils publics, gérer les fils (purges, Avent), épingler.
 5. En mode développeur, récupère les IDs utiles : serveur, ton compte, puis les salons et rôles au fil des phases.
 
 ## 4. Provisionner une VM
@@ -99,7 +99,7 @@ Complète ensuite ces fichiers :
 
 | Fichier | Contenu | Droits |
 |---|---|---|
-| `/etc/pcr/instance.toml` | IDs Discord (dont `default_role_id`, le rôle des membres : sans lui, le pot commun attend ; `bet_role_id`, facultatif, le rôle appelé à chaque nouveau pari ; les salons de la communauté `poll_channel_id` (forum des sondages), `safe_place_channel_id`, `birthday_channel_id`, `cotd_channel_id`, `advent_channel_id`, chacun facultatif), URL publique, `trusted_proxy`, `dm_allowlist` (dev : ton ID) | `root:pcr 0640` |
+| `/etc/pcr/instance.toml` | IDs Discord (dont `default_role_id`, le rôle des membres : sans lui, le pot commun attend ; `bet_role_id`, facultatif, le rôle appelé à chaque nouveau pari ; les salons de la communauté `poll_channel_id` (forum des sondages), `safe_place_channel_id`, `birthday_channel_id`, `cotd_channel_id`, `advent_channel_id`, chacun facultatif ; le message des rôles `role_channel_id`, `role_message_id`, `ping_role_id`, la liste des fils `thread_list_channel_id`, le repère des couleurs `color_role_id`, l'invitation et le rôle des membres temporaires `temporary_member_invite_code`, `temporary_member_role_id`, facultatifs aussi), URL publique, `trusted_proxy`, `dm_allowlist` (dev : ton ID) | `root:pcr 0640` |
 | `/etc/pcr/pcr.env` | `DISCORD_TOKEN`, `DISCORD_CLIENT_SECRET` | `root:pcr 0640` |
 | `/etc/pcr/update.env` | branche suivie (déjà remplie), `PCR_OPS_WEBHOOK` (webhook d'un salon ops, facultatif) | `root 0600` |
 

@@ -15,12 +15,12 @@ Légende : `[x]` porté en v2 · `~~barré~~` abandonné volontairement (avec la
 - [x] `/birthday list` — Affiche les 10 prochains anniversaires du serveur
 - [x] `/birthday remove` — Supprime ta date d'anniversaire
 - [x] `/classement` — Affiche le classement des utilisateurs avec le plus de points (soldes au format français ; un compte que Discord ne retrouve plus est désigné par sa mention, sans notification, au lieu de son identifiant brut)
-- [ ] `/color hexa` — Changer la couleur de votre pseudo
+- [x] `/color hexa` — Changer la couleur de votre pseudo
 - [x] `/cotd` — Affiche les saints du jour
 - [x] `/ecaflip option1 [option2] [option3] [option4] [option5] [option6] [option7] [option8] [option9] [option10]` — Pile ou Face ?
 - [x] `/edit message` — Modifie la question du sondage
 - [x] `/estimate question` — Créer un nouveau pari d'estimation (Le plus proche gagne)
-- [ ] `/help` — Fourni la liste des commandes disponibles avec ce bot
+- [x] `/help` — Fourni la liste des commandes disponibles avec ce bot
 - [x] `/join` — Rejoindre le fil de discussion actuel
 - [x] `/mesrappels liste` — Voir la liste de tes rappels actifs
 - [x] `/mesrappels supprimer id` — Supprimer un rappel
@@ -29,7 +29,7 @@ Légende : `[x]` porté en v2 · `~~barré~~` abandonné volontairement (avec la
 - [x] `/rappel date [message]` — Créer un rappel qui te sera envoyé en DM
 - [x] `/safe-place message` — Envoie un message anonymement dans la safe place
 - [x] `/solde [user]` — Affiche le solde de points d'un utilisateur (solde et délai ; les balls en poche s'y ajoutent en P4, le rappel de loterie en P5)
-- [ ] `/version` — Affiche la version actuelle du bot
+- [x] `/version` — Affiche la version actuelle du bot
 - [x] `/week question [jour] [date_debut] [date_fin]` — Créer un sondage contenant les jours d'une période
 
 Écarts assumés des paris (P3b, détail dans [economie.md](economie.md#paris)) :
@@ -67,6 +67,25 @@ Légende : `[x]` porté en v2 · `~~barré~~` abandonné volontairement (avec la
 - messages en composants v2 ; les réponses personnelles déjà au tutoiement en v1 le restent ; le
   calendrier de l'Avent n'a ni catégorie ni image (aucune en v1), ses questions vivent dans
   `pcr_core::advent`.
+
+Écarts assumés de l'administration et du salon (P3d, détail dans [administration.md](administration.md)
+et [communaute.md](communaute.md)) :
+
+- `/admin purge-membre` ne vérifie pas les droits avant de lire un salon : un salon illisible est cité
+  comme ignoré (une fois, avec ses fils), une suppression refusée est comptée « impossible » ; les
+  messages récents partent par lots d'une page ; le journal donne les totaux, et les attentes de
+  Discord se mesurent à la durée des requêtes (twilight ne les annonce pas) ;
+- `/admin purge` : `nombre` est un entier (la v1 acceptait un décimal, arrondi vers le bas) ;
+- `/admin restart` s'arrête proprement (la v1 sortait du processus) ;
+- `/color` ne supprime l'ancien rôle de couleur que si plus personne ne le porte ;
+- les liens ne sont réécrits que dans les messages du serveur (la v1 échouait à supprimer l'original
+  d'un MP) ; la traduction s'affiche en composants v2 (l'auteur en lien, la langue en pied) ;
+- réactions comptées sur tous les messages (la v1 ne voyait que ceux arrivés depuis son démarrage) ;
+  une session vocale à cheval sur le 1er janvier n'est pas mesurée (comme en v1) ;
+- les rôles d'arrivée lisent les invitations à chaque connexion ; le rôle des membres temporaires et
+  son invitation passent dans `instance.toml` ; les rôles du Charme Chroma (`guildMemberUpdate`)
+  arrivent avec le jeu Pokémon (P5) ;
+- `/version` garde le texte de la v1 et ajoute le commit, l'environnement et l'état de la base.
 
 ## 2. Pokémon : actions v1 → emplacement v2
 
@@ -107,12 +126,12 @@ Les règles ne changent pas ; `/pk` disparaît au profit du Centre Pokémon, de 
 - [x] `/admin config-voir [cle]` — Affiche un réglage — ou une branche entière — et sa valeur par défaut
 - [ ] `/admin poids [table]` — Convertit les poids de tirage en probabilités réelles
 - [x] `/admin potcommun [simulation]` — Déclenche un pot commun immédiatement, ou simule le prochain (montants et taux au format français : « 2,5 % » au lieu de « 2.5 % »)
-- [ ] `/admin purge [lien] [nombre]` — Supprime des messages
-- [ ] `/admin purge-membre id` — Supprime tous les messages d'un membre sur le serveur, bilan en MP
+- [x] `/admin purge [lien] [nombre]` — Supprime des messages
+- [x] `/admin purge-membre id` — Supprime tous les messages d'un membre sur le serveur, bilan en MP
 - [ ] `/admin pokespawn [espece] [shiny] [annonce] [ping]` — Déclenche l'apparition d'un Pokémon (événements)
 - [ ] `/admin safarispawn [joueur] [pause]` — Ouvre un parc safari (événement public, ou offert à un dresseur)
 - [ ] `/admin saison` — Aperçu du bilan de la saison en cours (rien n'est publié ni enregistré)
-- [ ] `/admin restart` — Redémarre le bot
+- [x] `/admin restart` — Redémarre le bot
 - [ ] `/admin recap-annuel apercu` — **nouveau** : aperçu du récap annuel
 
 ## 4. Identifiants de composants (`custom_id`) v1
@@ -122,9 +141,10 @@ spawn, objet au sol, offre d'échange, parc et partage safari, partage de vitrin
 traduction. Ceux des panneaux éphémères sont remplacés par les panneaux `pk:` et répondent
 « panneau expiré ».
 
+- [x] `tweet_translate` (`tweet_translate|<tweet>`, inchangé)
 - [x] `rappel` (`rappel|<ms>|<message encodé>` de la v1 ; la v2 renvoie au rappel d'origine, `rappel|<ms>|#<id>`, quand le message ne tient pas dans les 100 caractères d'un `custom_id`)
 - [x] `bet_estimate_join` · `bet_estimate_modal` · `bet_estimate_resolve_submit` · `bet_join` · `bet_modal` · `bet_resolve_modal` · `bet_resolve_select` (`pcr_core::bets::Action` ; le message du pari que la v1 ajoutait aux deux derniers est ignoré)
-- [ ] `poke_box` · `poke_cmp` · `poke_cmpg` · `poke_cmpgo` · `poke_cmpn` · `poke_cmpr` · `poke_cmpt` · `poke_dex` · `poke_dexf` · `poke_dexs` · `poke_dext` · `poke_drop` · `poke_dup` · `poke_dupr` · `poke_dupsp` · `poke_dupspr` · `poke_evo` · `poke_evo_cancel` · `poke_evo_pick` · `poke_master` · `poke_master_cancel` · `poke_master_ok` · `poke_owned` · `poke_reback` · `poke_remaster` · `poke_respecial` · `poke_rethrow` · `poke_safari_bait` · `poke_safari_ball` · `poke_safari_cancel` · `poke_safari_enter` · `poke_safari_flee` · `poke_safari_gens` · `poke_safari_go` · `poke_safari_live` · `poke_safari_share` · `poke_showcase_share` · `poke_special` · `poke_starter_no` · `poke_starter_ok` · `poke_td_back` · `poke_td_cancel` · `poke_td_find` · `poke_td_go` · `poke_td_ind` · `poke_td_kind` · `poke_td_pick` · `poke_td_pts` · `poke_td_side` · `poke_throw` · `poke_trade_accept` · `poke_trade_cancel` · `poke_trade_counter` · `poke_trade_decline` · `poke_trade_pick` · `tweet_translate`
+- [ ] `poke_box` · `poke_cmp` · `poke_cmpg` · `poke_cmpgo` · `poke_cmpn` · `poke_cmpr` · `poke_cmpt` · `poke_dex` · `poke_dexf` · `poke_dexs` · `poke_dext` · `poke_drop` · `poke_dup` · `poke_dupr` · `poke_dupsp` · `poke_dupspr` · `poke_evo` · `poke_evo_cancel` · `poke_evo_pick` · `poke_master` · `poke_master_cancel` · `poke_master_ok` · `poke_owned` · `poke_reback` · `poke_remaster` · `poke_respecial` · `poke_rethrow` · `poke_safari_bait` · `poke_safari_ball` · `poke_safari_cancel` · `poke_safari_enter` · `poke_safari_flee` · `poke_safari_gens` · `poke_safari_go` · `poke_safari_live` · `poke_safari_share` · `poke_showcase_share` · `poke_special` · `poke_starter_no` · `poke_starter_ok` · `poke_td_back` · `poke_td_cancel` · `poke_td_find` · `poke_td_go` · `poke_td_ind` · `poke_td_kind` · `poke_td_pick` · `poke_td_pts` · `poke_td_side` · `poke_throw` · `poke_trade_accept` · `poke_trade_cancel` · `poke_trade_counter` · `poke_trade_decline` · `poke_trade_pick`
 
 ## 5. Minuteurs (désormais en heure de Paris, rattrapés via `job_runs`)
 
@@ -141,7 +161,7 @@ sa période dure). Balayages (chaque minute, chaque heure) : boucles idempotente
 - [ ] Parc safari : balayage + tirage horaire (chaque heure)
 - [x] Pot commun (échéance hebdomadaire, vérifiée chaque heure et au démarrage ; revendiquée dans la transaction du pot)
 - [x] Anniversaires (à `birthday.hour`, heure de Paris ; rattrapés au démarrage dans la journée)
-- [ ] Au démarrage : message des rôles, annonce de version, nettoyage `voice_time`
+- [x] Au démarrage : message des rôles, annonce de version, nettoyage `voice_time` (à chaque connexion, avec les membres alors en vocal)
 - [x] **Nouveau** : bascule de la base de stats au 1er janvier (chaque compteur va au fichier de l'année de Paris où il a eu lieu)
 - [ ] **Nouveau** : récap annuel (P7)
 - [ ] **Nouveau** : purge des sessions du site expirées (`web_sessions`)

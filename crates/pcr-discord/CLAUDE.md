@@ -19,8 +19,13 @@
   forum des sondages, `/week`, `/edit`), `outbox.rs` (le port `Outbox` : salons, fils de l'Avent, MP des
   rappels). Les tâches de calendrier et le balayage des rappels sont lancés dans `lib.rs`, avec la
   connexion. Un texte de membre relayé n'appelle que membres et rôles (`ui::relayed`), jamais `@everyone`.
+- Salon : `links.rs` (copie des liens, bouton `tweet_translate|`), `roles.rs` (message des rôles, réactions,
+  rôles du serveur), `arrivals.rs` (rôle d'arrivée, cache des invitations), `threads.rs` (liste des fils,
+  `delete` par lots), `reactions.rs`, `voice.rs`. Commandes `/admin purge`, `purge-membre` (tâche de fond,
+  `purge_member/scan.rs`), `restart`, `/color`, `/help`.
 - Intents : seulement ceux qu'une fonctionnalité utilise. Contenu des messages (privilégié) : stats de
-  mots ; la liste des membres passe par l'API (`members.rs`, intention « Server Members » de l'application).
+  mots et liens ; membres (privilégié, « Server Members ») : arrivées, et la liste par l'API
+  (`members.rs`) ; réactions, vocal, invitations.
 - `messages.rs` : chaque message d'un membre (pas d'un bot, MP compris) → `pcr_app::points::on_message`.
 - `announce.rs` : au premier READY, annonce de version (prod) ou aperçu des fragments en attente (dev).
 - `public_messages.rs` : le port d'écriture des messages publics. Un type de message = un rendu dans
