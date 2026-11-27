@@ -3,6 +3,7 @@
 use std::{future::Future, pin::Pin};
 
 use pcr_app::stats::Counter;
+use twilight_http::client::InteractionClient;
 use twilight_model::{
     application::{
         command::CommandType,
@@ -16,23 +17,38 @@ use twilight_model::{
 };
 
 use crate::{
-    Ctx,
-    commands::{admin, classement, solde, version},
+    Ctx, bets,
+    commands::{admin, bet, betstats, classement, estimate, solde, version},
     ui,
 };
 
 const GENERIC_ERROR: &str = "Une erreur est survenue, réessaie dans un instant.";
-const EXPIRED: &str = "Ce panneau a expiré, relance la commande.";
+pub const EXPIRED: &str = "Ce panneau a expiré, relance la commande.";
 
 pub type Work = Pin<Box<dyn Future<Output = anyhow::Result<Edit>> + Send>>;
+/// La suite d'une réponse qui tient lieu de message public : elle reçoit l'identifiant du message
+/// posté, ou `None` si la réponse a échoué.
+pub type Then = Box<dyn FnOnce(Option<i64>) -> Pin<Box<dyn Future<Output = ()> + Send>> + Send>;
 
 /// La réponse d'un handler.
 pub enum Reply {
     /// Tout de suite.
     Now(Box<InteractionResponse>),
     /// Différée : Discord affiche « réfléchit… » le temps du travail (au-delà de 3 s, une réponse
-    /// immédiate serait refusée), puis le résultat remplace l'attente.
+    /// immédiate serait refusée), puis le résultat remplace l'attente. Vaut pour une commande, un
+    /// bouton ou une modale envoyée : la réponse est un nouveau message.
     Later { ephemeral: bool, work: Work },
+    /// Différée sur le message du composant (un menu) : le résultat remplace ce message, et ses
+    /// composants disparaissent avec un texte. Jamais pour une modale ouverte depuis un message
+    /// public : c'est lui qui serait remplacé.
+    LaterUpdate { work: Work },
+    /// Une réponse publique immédiate qui devient un message public (celui d'un pari) : immédiate,
+    /// parce que la mention d'un rôle n'appelle personne dans une réponse différée puis modifiée.
+    /// `then` enregistre ensuite le message.
+    Posted {
+        response: Box<InteractionResponse>,
+        then: Then,
+    },
 }
 
 impl From<InteractionResponse> for Reply {
@@ -48,6 +64,12 @@ impl Reply {
     ) -> Self {
         Self::Later {
             ephemeral,
+            work: Box::pin(work),
+        }
+    }
+
+    pub fn later_update(work: impl Future<Output = anyhow::Result<Edit>> + Send + 'static) -> Self {
+        Self::LaterUpdate {
             work: Box::pin(work),
         }
     }
@@ -79,6 +101,19 @@ pub async fn handle(ctx: Ctx, interaction: Interaction) {
                 tracing::warn!(?error, "could not answer interaction");
             }
         }
+        Reply::Posted { response, then } => {
+            let posted = match client
+                .create_response(interaction.id, &interaction.token, &response)
+                .await
+            {
+                Ok(_) => original_message(&client, &interaction.token).await,
+                Err(error) => {
+                    tracing::warn!(?error, "could not answer interaction");
+                    None
+                }
+            };
+            then(posted).await;
+        }
         Reply::Later { ephemeral, work } => {
             let flags = if ephemeral {
                 MessageFlags::EPHEMERAL
@@ -92,36 +127,74 @@ pub async fn handle(ctx: Ctx, interaction: Interaction) {
                     ..InteractionResponseData::default()
                 }),
             };
-            if let Err(error) = client
-                .create_response(interaction.id, &interaction.token, &defer)
-                .await
-            {
-                tracing::warn!(?error, "could not defer interaction");
-                return;
-            }
-            let edit = work.await.unwrap_or_else(|error| {
-                tracing::error!(?error, kind = ?interaction.kind, "deferred interaction failed");
-                Edit::Text(GENERIC_ERROR.to_owned())
-            });
-            // Personne n'est notifié par une réponse : un classement ou un récapitulatif cite des
-            // membres sans les appeler.
-            let silent = AllowedMentions::default();
-            let request = client
-                .update_response(&interaction.token)
-                .allowed_mentions(Some(&silent));
-            let sent = match &edit {
-                Edit::Text(text) => request.content(Some(text)).await,
-                Edit::Panel(components) => {
-                    request
-                        .components(Some(components))
-                        .flags(MessageFlags::IS_COMPONENTS_V2)
-                        .await
-                }
-            };
-            if let Err(error) = sent {
-                tracing::warn!(?error, "could not complete deferred interaction");
-            }
+            complete(&client, &interaction, &defer, work, false).await;
         }
+        Reply::LaterUpdate { work } => {
+            let defer = InteractionResponse {
+                kind: InteractionResponseType::DeferredUpdateMessage,
+                data: None,
+            };
+            complete(&client, &interaction, &defer, work, true).await;
+        }
+    }
+}
+
+/// L'identifiant du message que la réponse vient de poster. Introuvable, le message ne sera pas
+/// réécrit : `None` le fait reposter par le worker, un doublon valant mieux qu'un message figé.
+async fn original_message(client: &InteractionClient<'_>, token: &str) -> Option<i64> {
+    match client.response(token).await {
+        Ok(response) => match response.model().await {
+            Ok(message) => i64::try_from(message.id.get()).ok(),
+            Err(error) => {
+                tracing::warn!(?error, "could not read the posted interaction response");
+                None
+            }
+        },
+        Err(error) => {
+            tracing::warn!(?error, "could not fetch the posted interaction response");
+            None
+        }
+    }
+}
+
+/// Diffère, fait le travail, puis remplace la réponse (ou le message du composant, `update`).
+async fn complete(
+    client: &InteractionClient<'_>,
+    interaction: &Interaction,
+    defer: &InteractionResponse,
+    work: Work,
+    update: bool,
+) {
+    if let Err(error) = client
+        .create_response(interaction.id, &interaction.token, defer)
+        .await
+    {
+        tracing::warn!(?error, "could not defer interaction");
+        return;
+    }
+    let edit = work.await.unwrap_or_else(|error| {
+        tracing::error!(?error, kind = ?interaction.kind, "deferred interaction failed");
+        Edit::Text(GENERIC_ERROR.to_owned())
+    });
+    // Personne n'est notifié par une réponse : un classement ou un récapitulatif cite des
+    // membres sans les appeler.
+    let silent = AllowedMentions::default();
+    let request = client
+        .update_response(&interaction.token)
+        .allowed_mentions(Some(&silent));
+    let sent = match &edit {
+        // Le menu qui a servi disparaît avec le texte qui le remplace.
+        Edit::Text(text) if update => request.content(Some(text)).components(Some(&[])).await,
+        Edit::Text(text) => request.content(Some(text)).await,
+        Edit::Panel(components) => {
+            request
+                .components(Some(components))
+                .flags(MessageFlags::IS_COMPONENTS_V2)
+                .await
+        }
+    };
+    if let Err(error) = sent {
+        tracing::warn!(?error, "could not complete deferred interaction");
     }
 }
 
@@ -169,7 +242,10 @@ async fn route(ctx: &Ctx, interaction: &Interaction) -> anyhow::Result<Reply> {
     Ok(match &interaction.data {
         Some(InteractionData::ApplicationCommand(command)) => match command.name.as_str() {
             "admin" => admin::run(ctx, interaction, command).await,
+            "bet" => bet::run(ctx, interaction, command).await,
+            "betstats" => betstats::run(ctx, interaction, command),
             "classement" => classement::run(ctx),
+            "estimate" => estimate::run(ctx, interaction, command).await,
             "solde" => solde::run(ctx, interaction, command).await,
             "version" => ui::ephemeral_panel(version::panel(ctx).await).into(),
             name => {
@@ -179,9 +255,15 @@ async fn route(ctx: &Ctx, interaction: &Interaction) -> anyhow::Result<Reply> {
         },
         Some(InteractionData::MessageComponent(component)) => match component.custom_id.as_str() {
             version::REFRESH => ui::update_panel(version::panel(ctx).await).into(),
+            id if id.starts_with(bets::PREFIX) => {
+                bets::component(ctx, interaction, component).await
+            }
             // Un id inconnu vient d'un panneau d'une version précédente : le dire plutôt qu'échouer.
             _ => ui::ephemeral_text(EXPIRED).into(),
         },
+        Some(InteractionData::ModalSubmit(modal)) if modal.custom_id.starts_with(bets::PREFIX) => {
+            bets::modal(ctx, interaction, modal)
+        }
         _ => ui::ephemeral_text(EXPIRED).into(),
     })
 }

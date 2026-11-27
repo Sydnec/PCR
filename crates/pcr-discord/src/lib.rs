@@ -5,6 +5,7 @@
 //! après un redémarrage.
 
 mod announce;
+mod bets;
 mod commands;
 mod interactions;
 mod members;

@@ -2,19 +2,25 @@
 //!
 //! Chaque type de message (`spawn`, `trade`, `drop`…) a son rendu, qui relit la base au moment
 //! d'écrire : un contenu préparé trop tôt reposerait un état périmé. Les rendus arrivent avec leurs
-//! fonctionnalités (P4, P5) ; d'ici là, tout message est laissé tel quel.
+//! fonctionnalités (paris en P3b, Pokémon en P4 et P5) ; d'ici là, un message sans rendu est laissé
+//! tel quel.
+//!
+//! Les mentions d'un message public n'appellent personne, sauf les rôles que son rendu désigne (le
+//! rôle des paris, à la création) : un pari ou un résultat cite des membres sans les déranger.
 
 use std::sync::Arc;
 
 use pcr_app::{
-    App,
+    App, bets,
     public_messages::{PublicMessage, PublicMessagePort, WriteError, WriteFuture, Written},
 };
 use twilight_http::{Client, api_error::ApiError, error::ErrorType};
 use twilight_model::{
-    channel::message::{Component, MessageFlags},
-    id::Id,
+    channel::message::{AllowedMentions, Component, MessageFlags},
+    id::{Id, marker::RoleMarker},
 };
+
+use crate::bets::render;
 
 /// Codes Discord qui prouvent qu'un message ne se réécrira plus jamais (repris de la v1) : réessayer
 /// ne servirait à rien, et le rattrapage tournerait en boucle.
@@ -27,14 +33,37 @@ const MESSAGE_GONE: [u64; 6] = [
     50083, // Thread is archived
 ];
 
+/// Le contenu d'un message public.
+#[derive(Debug)]
+pub(crate) struct Rendered {
+    pub components: Vec<Component>,
+    /// Les rôles que le message appelle (seulement quand il est posté : une modification n'appelle
+    /// jamais personne).
+    pub ping_roles: Vec<Id<RoleMarker>>,
+}
+
+impl Rendered {
+    /// Les seules mentions qui notifient : les rôles désignés.
+    pub fn mentions(&self) -> AllowedMentions {
+        AllowedMentions {
+            roles: self.ping_roles.clone(),
+            ..AllowedMentions::default()
+        }
+    }
+}
+
 type Render = for<'a> fn(&'a App, i64) -> RenderFuture<'a>;
-type RenderFuture<'a> = std::pin::Pin<
-    Box<dyn std::future::Future<Output = anyhow::Result<Option<Vec<Component>>>> + Send + 'a>,
+pub(crate) type RenderFuture<'a> = std::pin::Pin<
+    Box<dyn std::future::Future<Output = anyhow::Result<Option<Rendered>>> + Send + 'a>,
 >;
 
 /// Le rendu d'un type de message ; `None` tant que sa fonctionnalité n'est pas portée.
-fn renderer(_kind: &str) -> Option<Render> {
-    None
+fn renderer(kind: &str) -> Option<Render> {
+    match kind {
+        bets::MESSAGE => Some(render::bet),
+        bets::RESULT_MESSAGE => Some(render::result),
+        _ => None,
+    }
 }
 
 #[derive(Debug)]
@@ -49,12 +78,12 @@ impl PublicMessagePort for DiscordPublicMessages {
             let Some(render) = renderer(&message.kind) else {
                 return Ok(Written::Skipped);
             };
-            let components = match render(&self.app, message.entity_id).await {
-                Ok(Some(components)) => components,
+            let rendered = match render(&self.app, message.entity_id).await {
+                Ok(Some(rendered)) => rendered,
                 Ok(None) => return Ok(Written::Skipped),
                 Err(error) => return Err(WriteError::Permanent(error.to_string())),
             };
-            self.post_or_edit(message, &components).await
+            self.post_or_edit(message, &rendered).await
         })
     }
 }
@@ -63,15 +92,17 @@ impl DiscordPublicMessages {
     async fn post_or_edit(
         &self,
         message: &PublicMessage,
-        components: &[Component],
+        rendered: &Rendered,
     ) -> Result<Written, WriteError> {
         let channel = Id::new_checked(u64::try_from(message.channel_id).unwrap_or(0))
             .ok_or(WriteError::Gone)?;
+        let mentions = rendered.mentions();
         let response = match message.message_id {
             None => {
                 self.http
                     .create_message(channel)
-                    .components(components)
+                    .components(&rendered.components)
+                    .allowed_mentions(Some(&mentions))
                     .flags(MessageFlags::IS_COMPONENTS_V2)
                     .await
             }
@@ -79,7 +110,8 @@ impl DiscordPublicMessages {
                 let id = Id::new_checked(u64::try_from(id).unwrap_or(0)).ok_or(WriteError::Gone)?;
                 self.http
                     .update_message(channel, id)
-                    .components(Some(components))
+                    .components(Some(&rendered.components))
+                    .allowed_mentions(Some(&mentions))
                     .await
             }
         };
