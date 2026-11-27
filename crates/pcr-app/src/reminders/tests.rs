@@ -88,6 +88,11 @@ async fn refused_reminders_write_nothing() {
         refusal(copy(&t.app, OTHER, CHANNEL, "rappel|1798209000000|#99").await),
         pcr_core::reminders::SOURCE_GONE
     );
+    // Passé et purgé depuis : le bouton dit qu'il est passé.
+    assert_eq!(
+        refusal(copy(&t.app, OTHER, CHANNEL, "rappel|1700000000000|#99").await),
+        pcr_core::reminders::ALREADY_PAST
+    );
     assert_eq!(count(&t, "SELECT count(*) FROM reminders").await, 0);
     let mine = create(&t.app, ME, CHANNEL, "25/12 15:30", None)
         .await

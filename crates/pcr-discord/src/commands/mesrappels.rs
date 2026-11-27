@@ -1,5 +1,7 @@
 //! `/mesrappels liste|supprimer` : ses rappels à venir, en privé. Textes de la v1.
 
+use std::fmt::Write as _;
+
 use pcr_app::outbox::Reminder;
 use twilight_interactions::command::{CommandInputData, CommandModel, CreateCommand};
 use twilight_model::{
@@ -98,7 +100,7 @@ fn list_panel(list: &[Reminder]) -> Vec<Component> {
                 ))
                 .build(),
             )
-            .component(TextDisplayBuilder::new(clip(&entries.join("\n\n"), LIST_MAX)).build())
+            .component(TextDisplayBuilder::new(fitted(&entries)).build())
             .component(
                 TextDisplayBuilder::new(
                     "-# Utilise /mesrappels supprimer <id> pour supprimer un rappel",
@@ -108,6 +110,25 @@ fn list_panel(list: &[Reminder]) -> Vec<Component> {
             .build()
             .into(),
     ]
+}
+
+/// Les rappels qui tiennent dans le panneau ; les suivants sont comptés (la v1 échouait au-delà de
+/// 25, la limite des champs d'un embed).
+fn fitted(entries: &[String]) -> String {
+    let mut text = String::new();
+    for (shown, entry) in entries.iter().enumerate() {
+        if !text.is_empty() && text.len() + entry.len() + 2 > LIST_MAX {
+            let rest = entries.len() - shown;
+            let plural = if rest > 1 { "s" } else { "" };
+            let _ = write!(text, "\n\n… et {rest} autre{plural}");
+            return text;
+        }
+        if !text.is_empty() {
+            text.push_str("\n\n");
+        }
+        text.push_str(&clip(entry, LIST_MAX));
+    }
+    text
 }
 
 fn deleted_panel(reminder: &Reminder) -> Vec<Component> {

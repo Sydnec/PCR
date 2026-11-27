@@ -54,7 +54,7 @@ pub fn run(ctx: &Ctx, interaction: &Interaction, data: &CommandData) -> Reply {
         let text = command.message.replace(';', "\n");
         // Le message d'ouverture d'un post porte l'identifiant du fil.
         Ok(
-            match number_own(&ctx, channel, channel.cast(), &text).await {
+            match number_own(&ctx, channel, channel.cast(), &text, true).await {
                 Ok(()) => Edit::Text("Ça y est chef !".to_owned()),
                 Err(error) => {
                     tracing::warn!(%error, "could not edit a poll");

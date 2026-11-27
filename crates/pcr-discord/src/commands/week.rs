@@ -102,7 +102,7 @@ pub fn run(ctx: &Ctx, interaction: &Interaction, data: &CommandData) -> Reply {
                 return Ok(Edit::Text(FAILED.to_owned()));
             }
         };
-        if let Err(error) = number_own(&ctx, channel, posted.id, &posted.content).await {
+        if let Err(error) = number_own(&ctx, channel, posted.id, &posted.content, false).await {
             tracing::warn!(%error, "could not number a week poll");
         }
         Ok(Edit::Text("Sondage créé ✅".to_owned()))

@@ -64,21 +64,28 @@ async fn react(
     }
 }
 
-/// Numérote un sondage du bot (déjà posté) : réécrit son texte si une ligne prend un numéro, puis
-/// réagit.
+/// Numérote un sondage du bot et réagit. `content` est le texte voulu : il est écrit s'il diffère
+/// de ce que porte le message (`write`, la question réécrite par `/edit`) ou si une ligne prend un
+/// numéro.
 pub async fn number_own(
     ctx: &Ctx,
     channel: Id<ChannelMarker>,
     message: Id<MessageMarker>,
     content: &str,
+    write: bool,
 ) -> Result<(), String> {
     let usable = server_emoji(ctx).await;
     let numbered = polls::number(content, |emoji| is_usable(&usable, emoji));
-    if numbered.rewritten {
+    let text = if numbered.rewritten {
+        Some(numbered.text.as_str())
+    } else {
+        write.then_some(content)
+    };
+    if let Some(text) = text {
         let mentions = ui::relayed();
         ctx.http
             .update_message(channel, message)
-            .content(Some(&numbered.text))
+            .content(Some(text))
             .allowed_mentions(Some(&mentions))
             .await
             .map_err(|e| e.to_string())?;
@@ -120,7 +127,7 @@ async fn number_post(ctx: &Ctx, thread: Id<ChannelMarker>) -> Result<(), String>
         .await
         .map_err(|e| e.to_string())?;
     if starter.author.id.get() == ctx.application_id.get() {
-        return number_own(ctx, thread, starter.id, &starter.content).await;
+        return number_own(ctx, thread, starter.id, &starter.content, false).await;
     }
     let usable = server_emoji(ctx).await;
     let numbered = polls::number(&starter.content, |emoji| is_usable(&usable, emoji));

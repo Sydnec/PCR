@@ -81,23 +81,21 @@ pub async fn copy(
 ) -> Result<Created, UseCaseError> {
     let button =
         Button::parse(custom_id).ok_or_else(|| UseCaseError::refused(rules::ALREADY_PAST))?;
-    let (at_ms, message) = match button {
-        Button::Inline { at_ms, message } => (at_ms, message),
-        Button::Copy { at_ms, reminder } => {
-            let source = reminders::get(&app.db, reminder).await?;
-            (
-                at_ms,
-                source
-                    .map(|source| source.message)
-                    .ok_or_else(|| UseCaseError::refused(rules::SOURCE_GONE))?,
-            )
-        }
+    let at_ms = match &button {
+        Button::Inline { at_ms, .. } | Button::Copy { at_ms, .. } => *at_ms,
     };
+    // L'heure d'abord : un rappel passé finit purgé, son bouton doit dire « passé », pas « disparu ».
     let at = Timestamp::from_millisecond(at_ms)
-        .map_err(|_| UseCaseError::refused(rules::ALREADY_PAST))?;
-    if at <= app.clock.now() {
-        return Err(UseCaseError::refused(rules::ALREADY_PAST));
-    }
+        .ok()
+        .filter(|at| *at > app.clock.now())
+        .ok_or_else(|| UseCaseError::refused(rules::ALREADY_PAST))?;
+    let message = match button {
+        Button::Inline { message, .. } => message,
+        Button::Copy { reminder, .. } => reminders::get(&app.db, reminder)
+            .await?
+            .map(|source| source.message)
+            .ok_or_else(|| UseCaseError::refused(rules::SOURCE_GONE))?,
+    };
     insert(app, user, channel, at, &message).await
 }
 

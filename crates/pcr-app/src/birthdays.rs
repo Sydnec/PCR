@@ -2,7 +2,8 @@
 //! Paris) dans le salon des anniversaires.
 //!
 //! Chaque fête est revendiquée en base (`last_wished_year`) avant de partir : une tâche rejouée après
-//! une panne ne félicite jamais deux fois, et un envoi raté rend la fête au passage suivant.
+//! une panne ne félicite jamais deux fois, et un envoi raté rend la fête au passage suivant. Un arrêt
+//! brutal entre la revendication et l'envoi perd ce vœu-là (comme en v1) : mieux qu'un doublon.
 
 use jiff::civil::Date;
 use pcr_core::birthdays::{self as rules, Birthday};

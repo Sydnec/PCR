@@ -61,6 +61,9 @@ Légende : `[x]` porté en v2 · `~~barré~~` abandonné volontairement (avec la
 - `/poll` sans option refuse au lieu de rester sans réponse ; au-delà de dix lignes, les sondages sont
   numérotés 🇦…🇯 (la v1 écrivait « undefined ») ;
 - un ship shiny demande trois membres (la v1 écrivait « <@undefined> ») ; le tirage est uniforme ;
+- `/mesrappels liste` coupe une longue liste avec « … et N autres » (la v1 échouait au-delà de 25
+  rappels) ; un MP de rappel refusé pour de bon (4xx) n'est pas relancé ; une tâche de calendrier
+  rejouée ne reposte pas un message ou un fil de l'Avent déjà là ;
 - messages en composants v2 ; les réponses personnelles déjà au tutoiement en v1 le restent ; le
   calendrier de l'Avent n'a ni catégorie ni image (aucune en v1), ses questions vivent dans
   `pcr_core::advent`.

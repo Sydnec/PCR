@@ -51,7 +51,7 @@ pub struct ListCommand;
 #[command(name = "remove", desc = "Supprime ta date d'anniversaire")]
 pub struct RemoveCommand;
 
-pub fn run(ctx: &Ctx, interaction: &Interaction, data: &CommandData) -> Reply {
+pub async fn run(ctx: &Ctx, interaction: &Interaction, data: &CommandData) -> Reply {
     let (Ok(command), Some(user)) = (
         BirthdayCommand::from_interaction(CommandInputData::from(data.clone())),
         interaction.author_id(),
@@ -81,24 +81,25 @@ pub fn run(ctx: &Ctx, interaction: &Interaction, data: &CommandData) -> Reply {
                 },
             ))
         }),
-        // Différé : un pseudo par fête, lu sur Discord.
-        BirthdayCommand::List(_) => Reply::later(false, async move {
+        // La liste se lit d'abord (une lecture rapide) : vide ou illisible, la réponse reste privée ;
+        // sinon la réponse publique est différée, le temps de lire un pseudo par fête sur Discord.
+        BirthdayCommand::List(_) => {
             let list = match pcr_app::birthdays::upcoming(&ctx.app).await {
+                Ok(list) if list.is_empty() => return ui::ephemeral_text(rules::NONE_YET).into(),
                 Ok(list) => list,
                 Err(error) => {
                     tracing::error!(?error, "listing birthdays failed");
-                    return Ok(Edit::Text(FAILED.to_owned()));
+                    return ui::ephemeral_text(FAILED).into();
                 }
             };
-            if list.is_empty() {
-                return Ok(Edit::Text(rules::NONE_YET.to_owned()));
-            }
-            let mut lines = Vec::with_capacity(list.len());
-            for entry in &list {
-                lines.push(line(&ctx, entry).await);
-            }
-            Ok(Edit::Panel(panel(&lines)))
-        }),
+            Reply::later(false, async move {
+                let mut lines = Vec::with_capacity(list.len());
+                for entry in &list {
+                    lines.push(line(&ctx, entry).await);
+                }
+                Ok(Edit::Panel(panel(&lines)))
+            })
+        }
     }
 }
 

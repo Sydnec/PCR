@@ -30,6 +30,10 @@ pub fn run(ctx: &Ctx, interaction: &Interaction) -> Reply {
     };
     let (http, thread) = (ctx.http.clone(), thread.id);
     Reply::later(true, async move {
+        // Discord accepte d'ajouter un membre déjà là sans rien dire : la v1 voulait le signaler.
+        if http.thread_member(thread, user).await.is_ok() {
+            return Ok(Edit::Text("✅ Tu es déjà membre de ce fil !".to_owned()));
+        }
         Ok(Edit::Text(
             match http.add_thread_member(thread, user).await {
                 Ok(_) => "👀".to_owned(),

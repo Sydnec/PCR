@@ -247,7 +247,7 @@ async fn route(ctx: &Ctx, interaction: &Interaction) -> anyhow::Result<Reply> {
             "admin" => admin::run(ctx, interaction, command).await,
             "bet" => bet::run(ctx, interaction, command).await,
             "betstats" => betstats::run(ctx, interaction, command),
-            "birthday" => birthday::run(ctx, interaction, command),
+            "birthday" => birthday::run(ctx, interaction, command).await,
             "classement" => classement::run(ctx),
             "cotd" => cotd::run(ctx),
             "ecaflip" => ecaflip::run(command),
