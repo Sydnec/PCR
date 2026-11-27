@@ -1,5 +1,6 @@
 //! Réglages hors Pokémon : gains de messages, site, messages publics, liens, pot commun, purge,
-//! anniversaires. Valeurs par défaut de la v1.
+//! anniversaires, rappels, sondages, saints du jour, calendrier de l'Avent. Valeurs par défaut de la
+//! v1 ; celles que la v1 codait en dur (ou mettait dans son `.env`) sont propres à la v2.
 
 use super::section::section;
 
@@ -110,5 +111,45 @@ section! {
         hour "hour": u32 = 9,
         message "message": String =
             "🎂 JOAAAAAAAAAAAAAAAAAAAAA {user} ! Passe une excellente journée !!!".into(),
+    }
+}
+
+section! {
+    /// Rappels (propre à la v2 : la v1 codait ces durées en dur).
+    pub struct Reminders {
+        /// Un rappel se pose au plus ce nombre de jours à l'avance.
+        max_days_ahead "maxDaysAhead": u32 = 365,
+        /// Un rappel envoyé est effacé passé ce délai (son bouton ne sert plus à rien).
+        keep_sent_days "keepSentDays": u32 = 7,
+    }
+}
+
+section! {
+    /// `/week` (propre à la v2) : la période la plus longue qu'un sondage liste.
+    pub struct Week {
+        max_days "maxDays": u32 = 31,
+    }
+}
+
+section! {
+    /// `/randomizabaise` (propre à la v2) : une chance sur `shinyOdds` de shipper trois membres.
+    pub struct Randomizabaise {
+        shiny_odds "shinyOdds": u32 = 1024,
+    }
+}
+
+section! {
+    /// Saints et fêtes du jour (propre à la v2, `COTD_CRON_TIMER` en v1) : l'heure du message, heure
+    /// de Paris.
+    pub struct Cotd {
+        hour "hour": u32 = 10,
+    }
+}
+
+section! {
+    /// Calendrier de l'Avent (propre à la v2, `ADVENT_CRON_TIMER` en v1) : l'heure d'ouverture de la
+    /// case, heure de Paris, du 1er au 24 décembre.
+    pub struct Advent {
+        hour "hour": u32 = 0,
     }
 }
