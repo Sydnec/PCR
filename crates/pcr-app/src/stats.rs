@@ -18,7 +18,9 @@ use std::{
 
 use jiff::Timestamp;
 use pcr_core::clock::paris_date;
-pub use pcr_db::stats::{BetStats, Counter};
+pub use pcr_db::stats::{
+    BetStats, Counter, DailyColumn, Highlight, HighlightKind, SpeciesColumn, UserColumn,
+};
 use pcr_db::{DbError, StatsDb};
 use tokio::sync::watch;
 
@@ -73,6 +75,13 @@ impl Stats {
         let mut open = self.open.lock().await;
         let db = self.current(&mut open, paris_date(now).year()).await?;
         pcr_db::stats::record_ship(db, message, members, shiny).await
+    }
+
+    /// Un moment notable du jeu Pokémon, dans le fichier de l'année en cours (une ligne).
+    pub async fn highlight(&self, now: Timestamp, highlight: &Highlight) -> Result<(), DbError> {
+        let mut open = self.open.lock().await;
+        let db = self.current(&mut open, paris_date(now).year()).await?;
+        pcr_db::stats::record_highlight(db, highlight).await
     }
 
     /// Le vocal (`voice_time`), dans le fichier de l'année en cours : une session commencée avant le

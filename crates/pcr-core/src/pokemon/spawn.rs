@@ -18,6 +18,24 @@ use crate::{config::Spawn, ids};
 
 const MINUTE_MS: i64 = 60_000;
 
+/// Le bouton d'une apparition qui n'existe plus (ou jamais) en base.
+pub const GONE: &str = "❌ Ce Pokémon est introuvable.";
+/// `/admin pokespawn` sans salon des apparitions.
+pub const NO_CHANNEL: &str = "❌ `pokemon_channel_id` n'est pas configuré.";
+/// `/admin pokespawn` sur une saisie qui ne désigne aucune espèce.
+pub const UNKNOWN_SPECIES: &str = "❌ Espèce inconnue.";
+/// Aucune espèce à tirer (tous les poids à zéro).
+pub const EMPTY_POOL: &str = "❌ Aucune espèce disponible pour le spawn.";
+
+/// `/admin pokespawn` sur une espèce d'une génération encore fermée : un événement ne doit pas servir
+/// à l'ouvrir en douce.
+pub fn closed_generation(species: &Species, generation: u8) -> String {
+    format!(
+        "❌ **{}** est de génération {}, et le jeu s'arrête pour l'instant à la génération {generation}.",
+        species.name, species.generation
+    )
+}
+
 /// Ce qui pousse à revendiquer une apparition.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Cause {

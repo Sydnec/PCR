@@ -9,7 +9,13 @@ use sqlx::{Connection as _, SqliteConnection};
 
 use crate::{DbError, StatsDb};
 
-/// Une ligne de compteur d'une table de stats (les tables Pokémon s'ajoutent avec leur jeu, P4).
+mod pokemon;
+
+pub use pokemon::{
+    DailyColumn, Highlight, HighlightKind, SpeciesColumn, UserColumn, record_highlight,
+};
+
+/// Une ligne de compteur d'une table de stats.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Counter {
     /// Messages d'un membre dans un salon, un jour de Paris (« AAAA-MM-JJ »).
@@ -49,6 +55,21 @@ pub enum Counter {
     ShipReaction {
         message: i64,
     },
+    /// Une colonne de `pokemon_species_stats`.
+    PokemonSpecies {
+        species: i64,
+        column: SpeciesColumn,
+    },
+    /// Une colonne de `pokemon_daily_stats`, un jour de Paris.
+    PokemonDaily {
+        day: String,
+        column: DailyColumn,
+    },
+    /// Une colonne de `pokemon_stats`, celle d'un dresseur.
+    PokemonUser {
+        user: i64,
+        column: UserColumn,
+    },
 }
 
 impl Counter {
@@ -56,7 +77,15 @@ impl Counter {
     /// plupart s'additionnent, un record garde la plus grande.
     pub fn combine(&self, current: i64, value: i64) -> i64 {
         match self {
-            Self::BetMaxWin { .. } => current.max(value),
+            Self::BetMaxWin { .. }
+            | Self::PokemonSpecies {
+                column: SpeciesColumn::MaxThrowsSingleSpawn,
+                ..
+            }
+            | Self::PokemonUser {
+                column: UserColumn::MostThrowsOnOneSpawn,
+                ..
+            } => current.max(value),
             _ => current + value,
         }
     }
@@ -281,6 +310,9 @@ pub async fn add_all(db: &StatsDb, counters: &[(Counter, i64)]) -> Result<(), Db
             Counter::BetWagered { user } | Counter::BetMaxWin { user } => {
                 add_bet(&mut tx, counter, *user, delta).await?;
             }
+            Counter::PokemonSpecies { .. }
+            | Counter::PokemonDaily { .. }
+            | Counter::PokemonUser { .. } => pokemon::add(&mut tx, counter, delta).await?,
         }
     }
     tx.commit().await?;
