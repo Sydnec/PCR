@@ -6,6 +6,15 @@
 pub(super) const BOUNDS: &[(&str, Option<f64>, Option<f64>)] = &[
     ("redistribution.contributionPercent", Some(0.0), Some(100.0)),
     ("redistribution.intervalHours", Some(1.0), None),
+    // Des heures de Paris ; 2 h, qui manque ou double au changement d'heure, part à 3 h.
+    ("cotd.hour", Some(0.0), Some(23.0)),
+    ("advent.hour", Some(0.0), Some(23.0)),
+    ("reminders.maxDaysAhead", Some(1.0), None),
+    // Une ligne par jour, et une réaction par ligne : Discord n'en accepte pas plus de 20 par
+    // message, au-delà les jours restent sans réaction.
+    ("week.maxDays", Some(1.0), Some(31.0)),
+    // À 0, le tirage diviserait par zéro.
+    ("randomizabaise.shinyOdds", Some(1.0), None),
     // Diviseurs : à 0, un Pokédex ou une boîte auraient un nombre de pages infini.
     ("pokemon.pokedex.pageSize", Some(1.0), None),
     ("pokemon.box.pageSize", Some(1.0), Some(25.0)),

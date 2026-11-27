@@ -9,6 +9,7 @@
 
 pub mod backup;
 pub mod bets;
+pub mod birthdays;
 pub mod config;
 pub mod import_prod;
 pub mod jobs;
@@ -18,6 +19,7 @@ pub mod points;
 mod pool;
 pub mod public_messages;
 pub mod redistribution;
+pub mod reminders;
 pub mod stats;
 
 pub use pool::{Db, DbError, StatsDb};

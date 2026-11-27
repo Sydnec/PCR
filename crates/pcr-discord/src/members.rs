@@ -67,3 +67,25 @@ impl MembersPort for DiscordMembers {
         })
     }
 }
+
+/// Le pseudo d'un membre sur le serveur (son surnom, à défaut son nom affiché, puis son nom de
+/// compte) ; un compte parti garde son nom affiché ; `None` si Discord ne le connaît plus.
+pub(crate) async fn display_name(
+    http: &Client,
+    guild: Id<GuildMarker>,
+    user: i64,
+) -> Option<String> {
+    let id = u64::try_from(user).ok().and_then(Id::new_checked)?;
+    if let Ok(response) = http.guild_member(guild, id).await
+        && let Ok(member) = response.model().await
+    {
+        return Some(
+            member
+                .nick
+                .or(member.user.global_name)
+                .unwrap_or(member.user.name),
+        );
+    }
+    let found = http.user(id).await.ok()?.model().await.ok()?;
+    Some(found.global_name.unwrap_or(found.name))
+}

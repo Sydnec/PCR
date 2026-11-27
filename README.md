@@ -13,7 +13,7 @@ rappels, des anniversaires, et un site compagnon pour jouer depuis le navigateur
   `/pokemon` au lieu de `/pk`. → [Documentation du jeu](docs/pokemon/README.md)
 - **Économie** : points gagnés en discutant, pot commun hebdomadaire, paris. → [Détails](docs/economie.md)
 - **Communauté** : `/poll`, `/week`, `/rappel`, `/birthday`, `/cotd`, `/ecaflip`, `/randomizabaise`, `/color`,
-  `/safe-place`, calendrier de l'Avent, liens X et Instagram avec traduction.
+  `/safe-place`, calendrier de l'Avent, liens X et Instagram avec traduction. → [Détails](docs/communaute.md)
 - **Récap annuel** (nouveau en 2.0) : le 1er janvier, un bilan personnel en MP et un bilan du serveur.
 - **Site** : capture en direct, parc safari, boîte PC, Pokédex, sac, œuf, administration. → [Site](docs/site.md) · [API](docs/api.md)
 - **Administration** : `/admin` (points, objets, configuration à chaud, purges, événements). → [Détails](docs/administration.md)

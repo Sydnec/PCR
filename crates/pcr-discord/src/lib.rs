@@ -10,7 +10,10 @@ mod commands;
 mod interactions;
 mod members;
 mod messages;
+mod outbox;
+mod polls;
 mod public_messages;
+mod reminders;
 mod ui;
 
 use std::{
@@ -38,8 +41,16 @@ pub(crate) struct Ctx {
     pub app: App,
     pub http: Arc<Client>,
     pub application_id: Id<ApplicationMarker>,
+    pub guild_id: Id<GuildMarker>,
+    /// Les pages lues par le bot (saints du jour).
+    pub web: Arc<dyn pcr_app::outbox::Web>,
     /// Les tâches de démarrage ne partent qu'au premier READY, pas à chaque reconnexion.
     pub started: Arc<AtomicBool>,
+}
+
+/// Un identifiant Discord tel qu'il vit en base.
+pub(crate) fn id(value: u64) -> i64 {
+    i64::try_from(value).unwrap_or(i64::MAX)
 }
 
 /// Seulement ce que le bot utilise. Les messages du serveur et les MP (comme en v1) rapportent des
@@ -63,6 +74,8 @@ pub async fn run(
         app,
         http,
         application_id,
+        guild_id,
+        web: web(),
         started: Arc::default(),
     };
     // Le worker vit avec la connexion Discord : sans elle, il n'aurait rien à écrire. Il est attendu
@@ -84,14 +97,51 @@ pub async fn run(
         }),
         shutdown.clone(),
     ));
+    // Les tâches de calendrier et les rappels écrivent sur Discord : eux aussi vivent avec la
+    // connexion, et sont attendus avant la fermeture de la base.
+    let outbox: Arc<dyn pcr_app::outbox::Outbox> = Arc::new(outbox::DiscordOutbox {
+        http: Arc::clone(&ctx.http),
+        guild: guild_id,
+    });
+    let ports = pcr_app::outbox::Ports {
+        outbox: Arc::clone(&outbox),
+        web: Arc::clone(&ctx.web),
+    };
+    let jobs = tokio::spawn(pcr_app::jobs::run(
+        ctx.app.clone(),
+        pcr_app::jobs::all(),
+        ports,
+        shutdown.clone(),
+    ));
+    let reminders = tokio::spawn(pcr_app::reminders::run(
+        ctx.app.clone(),
+        outbox,
+        shutdown.clone(),
+    ));
     let result = gateway(&ctx, guild_id, token, &mut shutdown).await;
-    if let Err(error) = worker.await {
-        tracing::error!(?error, "public messages worker panicked");
-    }
-    if let Err(error) = pot.await {
-        tracing::error!(?error, "pot commun loop panicked");
+    for (name, task) in [
+        ("public messages worker", worker),
+        ("pot commun loop", pot),
+        ("jobs loop", jobs),
+        ("reminders loop", reminders),
+    ] {
+        if let Err(error) = task.await {
+            tracing::error!(?error, task = name, "background task panicked");
+        }
     }
     result
+}
+
+/// Le client des pages lues par le bot (saints du jour). Sans magasin de certificats sur la machine,
+/// ces pages restent injoignables, sans arrêter le reste.
+fn web() -> Arc<dyn pcr_app::outbox::Web> {
+    match pcr_app::http::Http::new() {
+        Ok(http) => Arc::new(http),
+        Err(error) => {
+            tracing::error!(%error, "no HTTP client, the saints of the day stay silent");
+            Arc::new(pcr_app::outbox::Offline(error))
+        }
+    }
 }
 
 /// La gateway jusqu'à l'arrêt demandé (ou une fermeture définitive, puis l'arrêt).
@@ -200,6 +250,9 @@ fn handle_event(ctx: &Ctx, event: Event) {
         }
         Event::Resumed => ctx.app.health.set_discord_ready(true),
         Event::GatewayClose(_) => ctx.app.health.set_discord_ready(false),
+        Event::ThreadCreate(thread) => {
+            tokio::spawn(polls::on_thread_create(ctx.clone(), thread.0));
+        }
         Event::MessageCreate(message) => {
             tokio::spawn(messages::handle(ctx.clone(), message.message));
         }

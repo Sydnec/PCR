@@ -16,8 +16,8 @@ mod safari;
 mod section;
 
 pub use community::{
-    Birthday, Links, MessagePoints, MessagePointsRules, PublicMessages, PurgeMember,
-    Redistribution, Translation, Web,
+    Advent, Birthday, Cotd, Links, MessagePoints, MessagePointsRules, PublicMessages, PurgeMember,
+    Randomizabaise, Redistribution, Reminders, Translation, Web, Week,
 };
 pub use items::{Charm, EvolutionItem, Item, Items, Rod};
 pub use pokemon::{
@@ -41,6 +41,12 @@ section! {
         redistribution "redistribution": Redistribution = Redistribution::default(),
         purge_member "purgeMember": PurgeMember = PurgeMember::default(),
         birthday "birthday": Birthday = Birthday::default(),
+        /// Propres à la v2 (absents du `DEFAULTS` v1).
+        reminders "reminders": Reminders = Reminders::default(),
+        week "week": Week = Week::default(),
+        randomizabaise "randomizabaise": Randomizabaise = Randomizabaise::default(),
+        cotd "cotd": Cotd = Cotd::default(),
+        advent "advent": Advent = Advent::default(),
     }
 }
 
@@ -53,7 +59,14 @@ mod tests {
     /// Le `DEFAULTS` de la v1, écrit par la v1 elle-même (`JSON.stringify`).
     const V1_DEFAULTS: &str = include_str!("v1_defaults.json");
     /// Les branches que la v2 ajoute : la v1 codait ces règles en dur, avec la même valeur.
-    const V2_ONLY: &[&str] = &["messagePoints"];
+    const V2_ONLY: &[&str] = &[
+        "messagePoints",
+        "reminders",
+        "week",
+        "randomizabaise",
+        "cotd",
+        "advent",
+    ];
 
     /// JavaScript ne distingue pas 1 de 1.0 : on compare les nombres en flottants.
     fn normalize(value: Value) -> Value {

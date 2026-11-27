@@ -61,6 +61,20 @@ impl Stats {
         merge(&mut pending, year, counter, delta);
     }
 
+    /// Un `/randomizabaise`, dans le fichier de l'année en cours (directement : c'est une ligne,
+    /// pas un compteur à additionner).
+    pub async fn record_ship(
+        &self,
+        now: Timestamp,
+        message: i64,
+        members: &[i64],
+        shiny: bool,
+    ) -> Result<(), DbError> {
+        let mut open = self.open.lock().await;
+        let db = self.current(&mut open, paris_date(now).year()).await?;
+        pcr_db::stats::record_ship(db, message, members, shiny).await
+    }
+
     /// Les statistiques de paris de l'année en cours. Le tampon est d'abord écrit : un pari résolu à
     /// l'instant compte déjà.
     pub async fn bet_stats(&self, now: Timestamp, user: i64) -> Result<BetStats, DbError> {

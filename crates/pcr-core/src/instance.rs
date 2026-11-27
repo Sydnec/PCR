@@ -45,6 +45,15 @@ pub struct Discord {
     /// Le rôle appelé à chaque nouveau pari (`DISCORD_BET_ROLE_ID` en v1). Absent : personne n'est
     /// appelé.
     pub bet_role_id: Option<u64>,
+    /// Les salons de la communauté (`*_CHANNEL_ID` en v1). Absent : la fonctionnalité est coupée,
+    /// sans erreur. `poll_channel_id` : le forum des sondages (`/poll`, `/edit`).
+    pub poll_channel_id: Option<u64>,
+    pub safe_place_channel_id: Option<u64>,
+    pub birthday_channel_id: Option<u64>,
+    /// Saints et fêtes du jour.
+    pub cotd_channel_id: Option<u64>,
+    /// Le salon où s'ouvrent les fils du calendrier de l'Avent.
+    pub advent_channel_id: Option<u64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

@@ -4,15 +4,23 @@
 //! renvoient ce qui s'est passé, plus les événements à publier une fois le commit fait. Les
 //! adaptateurs se contentent de traduire les entrées et de rendre les résultats.
 
+pub mod advent;
 pub mod announcements;
 pub mod bets;
+pub mod birthdays;
 pub mod config;
+pub mod cotd;
+pub mod error;
 pub mod health;
+pub mod http;
 pub mod jobs;
 pub mod members;
+pub mod outbox;
 pub mod points;
 pub mod public_messages;
+pub mod randomizabaise;
 pub mod redistribution;
+pub mod reminders;
 pub mod stats;
 #[cfg(test)]
 mod testing;

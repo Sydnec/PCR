@@ -11,26 +11,26 @@ Légende : `[x]` porté en v2 · `~~barré~~` abandonné volontairement (avec la
 - ~~`/autodel lien [jours]` — Supprimera automatiquement votre message avec X jours.~~ (abandonnée : jamais utilisée)
 - [x] `/bet question option1 option2 [option3] [option4] [option5]` — Créer un nouveau pari (la réponse est le message public du pari et appelle `bet_role_id` ; question limitée à 200 caractères et options à 76, ce qui faisait échouer la v1 ; voir les écarts en dessous)
 - [x] `/betstats [user]` — Affiche les statistiques des paris (montants au format français ; le détenteur du record n'est nommé que s'il y a un record : à zéro, la v1 désignait n'importe qui)
-- [ ] `/birthday add date` — Enregistre (ou modifie) ta date d'anniversaire
-- [ ] `/birthday list` — Affiche les 10 prochains anniversaires du serveur
-- [ ] `/birthday remove` — Supprime ta date d'anniversaire
+- [x] `/birthday add date` — Enregistre (ou modifie) ta date d'anniversaire
+- [x] `/birthday list` — Affiche les 10 prochains anniversaires du serveur
+- [x] `/birthday remove` — Supprime ta date d'anniversaire
 - [x] `/classement` — Affiche le classement des utilisateurs avec le plus de points (soldes au format français ; un compte que Discord ne retrouve plus est désigné par sa mention, sans notification, au lieu de son identifiant brut)
 - [ ] `/color hexa` — Changer la couleur de votre pseudo
-- [ ] `/cotd` — Affiche les saints du jour
-- [ ] `/ecaflip option1 [option2] [option3] [option4] [option5] [option6] [option7] [option8] [option9] [option10]` — Pile ou Face ?
-- [ ] `/edit message` — Modifie la question du sondage
+- [x] `/cotd` — Affiche les saints du jour
+- [x] `/ecaflip option1 [option2] [option3] [option4] [option5] [option6] [option7] [option8] [option9] [option10]` — Pile ou Face ?
+- [x] `/edit message` — Modifie la question du sondage
 - [x] `/estimate question` — Créer un nouveau pari d'estimation (Le plus proche gagne)
 - [ ] `/help` — Fourni la liste des commandes disponibles avec ce bot
-- [ ] `/join` — Rejoindre le fil de discussion actuel
-- [ ] `/mesrappels liste` — Voir la liste de tes rappels actifs
-- [ ] `/mesrappels supprimer id` — Supprimer un rappel
-- [ ] `/poll question [option1] [option2] [option3] [option4] [option5] [option6] [option7] [option8] [option9] [option10]` — Créer un sondage dans le channel #Sondage
-- [ ] `/randomizabaise` — Depuis le temps que vous l'attendiez celle là
-- [ ] `/rappel date [message]` — Créer un rappel qui te sera envoyé en DM
-- [ ] `/safe-place message` — Envoie un message anonymement dans la safe place
+- [x] `/join` — Rejoindre le fil de discussion actuel
+- [x] `/mesrappels liste` — Voir la liste de tes rappels actifs
+- [x] `/mesrappels supprimer id` — Supprimer un rappel
+- [x] `/poll question [option1] [option2] [option3] [option4] [option5] [option6] [option7] [option8] [option9] [option10]` — Créer un sondage dans le channel #Sondage
+- [x] `/randomizabaise` — Depuis le temps que vous l'attendiez celle là
+- [x] `/rappel date [message]` — Créer un rappel qui te sera envoyé en DM
+- [x] `/safe-place message` — Envoie un message anonymement dans la safe place
 - [x] `/solde [user]` — Affiche le solde de points d'un utilisateur (solde et délai ; les balls en poche s'y ajoutent en P4, le rappel de loterie en P5)
 - [ ] `/version` — Affiche la version actuelle du bot
-- [ ] `/week question [jour] [date_debut] [date_fin]` — Créer un sondage contenant les jours d'une période
+- [x] `/week question [jour] [date_debut] [date_fin]` — Créer un sondage contenant les jours d'une période
 
 Écarts assumés des paris (P3b, détail dans [economie.md](economie.md#paris)) :
 
@@ -47,6 +47,26 @@ Légende : `[x]` porté en v2 · `~~barré~~` abandonné volontairement (avec la
   « La bonne réponse était… ») ; un pari résolu garde son titre d'ouverture, sans boutons, comme en
   v1 quand il n'avait pas été clos avant ;
 - un pari ouvert à la bascule garde son message v1 figé (boutons actifs, résultat publié).
+
+Écarts assumés de la communauté (P3c, détail dans [communaute.md](communaute.md)) :
+
+- les salons (`*_CHANNEL_ID`) passent dans `instance.toml`, les heures et durées codées en dur (ou en
+  cron dans le `.env`) dans des réglages propres à la v2 : `reminders.maxDaysAhead`,
+  `reminders.keepSentDays`, `week.maxDays`, `randomizabaise.shinyOdds`, `cotd.hour`, `advent.hour` ;
+- dates en heure de Paris (`/rappel`, `/week`, `/birthday list`) ; une date qui n'existe pas est
+  refusée par `/week` (la v1 glissait le 31/02 au 3 mars) ;
+- un refus de `/rappel` se dit en privé (la v1 le publiait dans la réponse différée) ;
+- vœux, saints et case de l'Avent manqués pendant un arrêt partent au démarrage, le jour même ; un
+  envoi raté est retenté (la v1 perdait la journée) ; `/cotd` répond même quand le site est en panne ;
+- `/poll` sans option refuse au lieu de rester sans réponse ; au-delà de dix lignes, les sondages sont
+  numérotés 🇦…🇯 (la v1 écrivait « undefined ») ;
+- un ship shiny demande trois membres (la v1 écrivait « <@undefined> ») ; le tirage est uniforme ;
+- `/mesrappels liste` coupe une longue liste avec « … et N autres » (la v1 échouait au-delà de 25
+  rappels) ; un MP de rappel refusé pour de bon (4xx) n'est pas relancé ; une tâche de calendrier
+  rejouée ne reposte pas un message ou un fil de l'Avent déjà là ;
+- messages en composants v2 ; les réponses personnelles déjà au tutoiement en v1 le restent ; le
+  calendrier de l'Avent n'a ni catégorie ni image (aucune en v1), ses questions vivent dans
+  `pcr_core::advent`.
 
 ## 2. Pokémon : actions v1 → emplacement v2
 
@@ -102,24 +122,25 @@ spawn, objet au sol, offre d'échange, parc et partage safari, partage de vitrin
 traduction. Ceux des panneaux éphémères sont remplacés par les panneaux `pk:` et répondent
 « panneau expiré ».
 
+- [x] `rappel` (`rappel|<ms>|<message encodé>` de la v1 ; la v2 renvoie au rappel d'origine, `rappel|<ms>|#<id>`, quand le message ne tient pas dans les 100 caractères d'un `custom_id`)
 - [x] `bet_estimate_join` · `bet_estimate_modal` · `bet_estimate_resolve_submit` · `bet_join` · `bet_modal` · `bet_resolve_modal` · `bet_resolve_select` (`pcr_core::bets::Action` ; le message du pari que la v1 ajoutait aux deux derniers est ignoré)
-- [ ] `poke_box` · `poke_cmp` · `poke_cmpg` · `poke_cmpgo` · `poke_cmpn` · `poke_cmpr` · `poke_cmpt` · `poke_dex` · `poke_dexf` · `poke_dexs` · `poke_dext` · `poke_drop` · `poke_dup` · `poke_dupr` · `poke_dupsp` · `poke_dupspr` · `poke_evo` · `poke_evo_cancel` · `poke_evo_pick` · `poke_master` · `poke_master_cancel` · `poke_master_ok` · `poke_owned` · `poke_reback` · `poke_remaster` · `poke_respecial` · `poke_rethrow` · `poke_safari_bait` · `poke_safari_ball` · `poke_safari_cancel` · `poke_safari_enter` · `poke_safari_flee` · `poke_safari_gens` · `poke_safari_go` · `poke_safari_live` · `poke_safari_share` · `poke_showcase_share` · `poke_special` · `poke_starter_no` · `poke_starter_ok` · `poke_td_back` · `poke_td_cancel` · `poke_td_find` · `poke_td_go` · `poke_td_ind` · `poke_td_kind` · `poke_td_pick` · `poke_td_pts` · `poke_td_side` · `poke_throw` · `poke_trade_accept` · `poke_trade_cancel` · `poke_trade_counter` · `poke_trade_decline` · `poke_trade_pick` · `rappel` · `tweet_translate`
+- [ ] `poke_box` · `poke_cmp` · `poke_cmpg` · `poke_cmpgo` · `poke_cmpn` · `poke_cmpr` · `poke_cmpt` · `poke_dex` · `poke_dexf` · `poke_dexs` · `poke_dext` · `poke_drop` · `poke_dup` · `poke_dupr` · `poke_dupsp` · `poke_dupspr` · `poke_evo` · `poke_evo_cancel` · `poke_evo_pick` · `poke_master` · `poke_master_cancel` · `poke_master_ok` · `poke_owned` · `poke_reback` · `poke_remaster` · `poke_respecial` · `poke_rethrow` · `poke_safari_bait` · `poke_safari_ball` · `poke_safari_cancel` · `poke_safari_enter` · `poke_safari_flee` · `poke_safari_gens` · `poke_safari_go` · `poke_safari_live` · `poke_safari_share` · `poke_showcase_share` · `poke_special` · `poke_starter_no` · `poke_starter_ok` · `poke_td_back` · `poke_td_cancel` · `poke_td_find` · `poke_td_go` · `poke_td_ind` · `poke_td_kind` · `poke_td_pick` · `poke_td_pts` · `poke_td_side` · `poke_throw` · `poke_trade_accept` · `poke_trade_cancel` · `poke_trade_counter` · `poke_trade_decline` · `poke_trade_pick` · `tweet_translate`
 
 ## 5. Minuteurs (désormais en heure de Paris, rattrapés via `job_runs`)
 
 Tâches de calendrier : `pcr_app::jobs` (échéance quotidienne ou annuelle, rattrapée au démarrage tant que
 sa période dure). Balayages (chaque minute, chaque heure) : boucles idempotentes par l'état en base.
 
-- [ ] Calendrier de l'Avent (`ADVENT_CRON_TIMER`, 1er–24 décembre)
-- [ ] Saints et fêtes du jour (`COTD_CRON_TIMER`)
-- [ ] Rappels échus envoyés en MP (chaque minute) ; purge des rappels envoyés depuis plus de 7 jours
+- [x] Calendrier de l'Avent (`ADVENT_CRON_TIMER`, 1er–24 décembre ; heure `advent.hour`, rattrapée au démarrage dans la journée)
+- [x] Saints et fêtes du jour (`COTD_CRON_TIMER` ; heure `cotd.hour`, retentés si le site ne répond pas)
+- [x] Rappels échus envoyés en MP (chaque minute) ; purge des rappels envoyés depuis plus de 7 jours (`reminders.keepSentDays`)
 - [ ] Fuite des Pokémon (chaque minute)
 - [x] Réparation des messages publics (toutes les 5 min, et au démarrage ; worker P2e, rendus par type avec leurs fonctionnalités) : lignes `public_messages` en retard dont `changed_at` tombe dans `repairWindowHours`, passé `repairGraceSeconds` (les vieux messages v1 restés sans fin n'y entrent pas)
 - [ ] Éclosion des œufs (chaque minute)
 - [ ] Ouverture des générations + récap de saison (chaque minute)
 - [ ] Parc safari : balayage + tirage horaire (chaque heure)
 - [x] Pot commun (échéance hebdomadaire, vérifiée chaque heure et au démarrage ; revendiquée dans la transaction du pot)
-- [ ] Anniversaires (à `birthday.hour`, heure de Paris)
+- [x] Anniversaires (à `birthday.hour`, heure de Paris ; rattrapés au démarrage dans la journée)
 - [ ] Au démarrage : message des rôles, annonce de version, nettoyage `voice_time`
 - [x] **Nouveau** : bascule de la base de stats au 1er janvier (chaque compteur va au fichier de l'année de Paris où il a eu lieu)
 - [ ] **Nouveau** : récap annuel (P7)
@@ -215,6 +236,7 @@ deux messages récompensés que la v1 codait en dur.
 - [x] `redistribution` (3) : `enabled`, `intervalHours`, `contributionPercent`
 - [x] `purgeMember` (3) : `concurrency`, `progressLogSeconds`, `rateLimitLogSeconds`
 - [x] `birthday` (3) : `enabled`, `hour`, `message`
+- [x] **Propres à la v2** : `reminders` (`maxDaysAhead`, `keepSentDays`), `week` (`maxDays`), `randomizabaise` (`shinyOdds`), `cotd` (`hour`), `advent` (`hour`)
 
 ## 8. Tables v1 → v2
 

@@ -100,6 +100,33 @@ pub async fn bet_stats(db: &StatsDb, user: i64) -> Result<BetStats, DbError> {
     })
 }
 
+/// Un `/randomizabaise` : le message et les membres shippés (ses réactions se comptent ensuite).
+/// Rejoué, il ne change rien.
+pub async fn record_ship(
+    db: &StatsDb,
+    message: i64,
+    members: &[i64],
+    shiny: bool,
+) -> Result<(), DbError> {
+    let (Some(&a), Some(&b)) = (members.first(), members.get(1)) else {
+        return Ok(());
+    };
+    let c = members.get(2).copied();
+    let shiny = i64::from(shiny);
+    sqlx::query!(
+        "INSERT INTO randomizabaise_stats (message_id, user_a, user_b, user_c, is_shiny)
+         VALUES (?, ?, ?, ?, ?) ON CONFLICT (message_id) DO NOTHING",
+        message,
+        a,
+        b,
+        c,
+        shiny
+    )
+    .execute(db.writer())
+    .await?;
+    Ok(())
+}
+
 /// Pose sa marque d'année sur une base neuve : un fichier renommé à la main reste reconnaissable.
 pub async fn mark_year(db: &StatsDb, year: i16) -> Result<(), DbError> {
     let year = year.to_string();

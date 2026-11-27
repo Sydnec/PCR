@@ -1,0 +1,4 @@
+type = "fix"
+name = "Sondages plus solides"
+description = "`/week` refuse une date qui n'existe pas (comme le 31/02) au lieu de glisser au mois suivant, et un sondage de plus de dix lignes reçoit des lettres au lieu de « undefined ». `/poll` sans option le dit au lieu de rester muet."
+announce = true
