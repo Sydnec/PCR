@@ -55,7 +55,7 @@ twilight-gateway = "0.18.0"
 twilight-http = "0.18.0"
 twilight-interactions = "0.18.0"
 twilight-model = "0.18.0"
-twilight-util = { version = "0.18.0", features = ["builder"] }
+twilight-util = { version = "0.18.0", features = ["builder", "permission-calculator"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

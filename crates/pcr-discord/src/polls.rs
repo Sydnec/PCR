@@ -48,7 +48,7 @@ fn reaction(emoji: &str) -> Option<RequestReactionType<'_>> {
 }
 
 /// Pose les réactions, une à une : une réaction refusée (emoji disparu) n'arrête pas les suivantes.
-async fn react(
+pub(crate) async fn react(
     ctx: &Ctx,
     channel: Id<ChannelMarker>,
     message: Id<MessageMarker>,

@@ -1,4 +1,5 @@
-//! `/version` : ce qui tourne, où, et en quel état.
+//! `/version` : la version du bot (texte de la v1), et ce que la v2 y ajoute : le commit,
+//! l'environnement et l'état de la base.
 
 use pcr_core::{
     build::{GIT_SHA, VERSION},
@@ -15,7 +16,7 @@ use crate::Ctx;
 pub const REFRESH: &str = "version|refresh";
 
 #[derive(Debug, CommandModel, CreateCommand)]
-#[command(name = "version", desc = "Affiche la version du bot")]
+#[command(name = "version", desc = "Affiche la version actuelle du bot")]
 pub struct VersionCommand;
 
 pub async fn panel(ctx: &Ctx) -> Vec<Component> {
@@ -28,8 +29,9 @@ pub async fn panel(ctx: &Ctx) -> Vec<Component> {
     } else {
         "indisponible"
     };
-    let text =
-        format!("### PCR {VERSION}\nCommit `{GIT_SHA}` · {env}\nBase de données : {database}");
+    let text = format!(
+        "La version actuelle du bot est : **v{VERSION}**\n-# Commit `{GIT_SHA}` · {env} · base de données : {database}"
+    );
     let refresh = ButtonBuilder::new(ButtonStyle::Secondary)
         .custom_id(REFRESH)
         .label("Actualiser")
