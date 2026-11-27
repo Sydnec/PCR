@@ -14,7 +14,7 @@ Légende : `[x]` porté en v2 · `~~barré~~` abandonné volontairement (avec la
 - [ ] `/birthday add date` — Enregistre (ou modifie) ta date d'anniversaire
 - [ ] `/birthday list` — Affiche les 10 prochains anniversaires du serveur
 - [ ] `/birthday remove` — Supprime ta date d'anniversaire
-- [ ] `/classement` — Affiche le classement des utilisateurs avec le plus de points
+- [x] `/classement` — Affiche le classement des utilisateurs avec le plus de points
 - [ ] `/color hexa` — Changer la couleur de votre pseudo
 - [ ] `/cotd` — Affiche les saints du jour
 - [ ] `/ecaflip option1 [option2] [option3] [option4] [option5] [option6] [option7] [option8] [option9] [option10]` — Pile ou Face ?
@@ -28,7 +28,7 @@ Légende : `[x]` porté en v2 · `~~barré~~` abandonné volontairement (avec la
 - [ ] `/randomizabaise` — Depuis le temps que vous l'attendiez celle là
 - [ ] `/rappel date [message]` — Créer un rappel qui te sera envoyé en DM
 - [ ] `/safe-place message` — Envoie un message anonymement dans la safe place
-- [ ] `/solde [user]` — Affiche le solde de points d'un utilisateur
+- [x] `/solde [user]` — Affiche le solde de points d'un utilisateur (solde et délai ; les balls en poche s'y ajoutent en P4, le rappel de loterie en P5)
 - [ ] `/version` — Affiche la version actuelle du bot
 - [ ] `/week question [jour] [date_debut] [date_fin]` — Créer un sondage contenant les jours d'une période
 
@@ -65,12 +65,12 @@ Les règles ne changent pas ; `/pk` disparaît au profit du Centre Pokémon, de 
 
 ## 3. Administration (`/admin`)
 
-- [ ] `/admin points cible montant` — Donne (ou retire) des points à un dresseur ou à tout un rôle
+- [x] `/admin points cible montant` — Donne (ou retire) des points à un dresseur ou à tout un rôle
 - [ ] `/admin item cible objet [quantite]` — Donne (ou retire) un objet à un dresseur ou à tout un rôle
 - [x] `/admin config cle valeur` — Modifie un réglage du bot, appliqué immédiatement
 - [x] `/admin config-voir [cle]` — Affiche un réglage — ou une branche entière — et sa valeur par défaut
 - [ ] `/admin poids [table]` — Convertit les poids de tirage en probabilités réelles
-- [ ] `/admin potcommun [simulation]` — Déclenche un pot commun immédiatement, ou simule le prochain
+- [x] `/admin potcommun [simulation]` — Déclenche un pot commun immédiatement, ou simule le prochain
 - [ ] `/admin purge [lien] [nombre]` — Supprime des messages
 - [ ] `/admin purge-membre id` — Supprime tous les messages d'un membre sur le serveur, bilan en MP
 - [ ] `/admin pokespawn [espece] [shiny] [annonce] [ping]` — Déclenche l'apparition d'un Pokémon (événements)
@@ -101,7 +101,7 @@ sa période dure). Balayages (chaque minute, chaque heure) : boucles idempotente
 - [ ] Éclosion des œufs (chaque minute)
 - [ ] Ouverture des générations + récap de saison (chaque minute)
 - [ ] Parc safari : balayage + tirage horaire (chaque heure)
-- [ ] Pot commun (échéance hebdomadaire, vérifiée chaque heure)
+- [x] Pot commun (échéance hebdomadaire, vérifiée chaque heure et au démarrage ; revendiquée dans la transaction du pot)
 - [ ] Anniversaires (à `birthday.hour`, heure de Paris)
 - [ ] Au démarrage : message des rôles, annonce de version, nettoyage `voice_time`
 - [x] **Nouveau** : bascule de la base de stats au 1er janvier (chaque compteur va au fichier de l'année de Paris où il a eu lieu)
@@ -167,7 +167,8 @@ assumés : les compteurs, prix, minutes et heures sont des entiers (les poids de
 multiplicateurs et `throwCooldownSeconds` restent fractionnaires) ; une saisie vide ou hexadécimale
 n'est plus prise pour un nombre ; « Chemin interdit. » disparaît (aucune pollution de prototype
 possible en Rust) ; le plafond de `pokemon.generation` (dernière génération des données d'espèces)
-arrive avec ces données (P4).
+arrive avec ces données (P4). Propre à la v2 : `messagePoints.cooldownMinutes` (60), la carence entre
+deux messages récompensés que la v1 codait en dur.
 
 - [x] `messagePointsDistribution` (7) : `1`, `2`, `3`, `4`, `5`, `6`, `default`
 - [x] `pokemon` (3) : `enabled`, `generation`, `starterLines`
@@ -232,6 +233,8 @@ la bascule se décalent d'un jour.
 - `points` : `messages_today_count` → `messages_today`, `last_reset_date` → `messages_day` (`''` → `NULL`).
 - `points_log` : `source = 'v1'` pour l'historique ; les déclencheurs v1 disparaissent (journal écrit
   par le code, à l'heure de `Clock`).
+- `economy_state` : le bail `redistribution_since` disparaît (un pot tient dans une transaction de
+  l'écrivain unique) ; l'échéance est reprise telle quelle.
 - `points_redistributions` : `rate` → `percent`, `triggered_by = 'auto'` → `NULL`, `failures` supprimée
   (le rapport compte les pots v1 qui avaient des échecs).
 - `bets` : `winning_option_index` → `winning_option` (pari classique) ou `estimate_result` (estimation) ;

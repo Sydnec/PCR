@@ -13,8 +13,9 @@
 - Un module par fonctionnalité, fonctions `async fn x(db: &Db | &mut SqliteConnection, …)`. Les cas
   d'usage multi-étapes reçoivent la transaction ouverte par `pcr-app`.
 - Invariants en SQL (index uniques partiels, `CHECK`, `STRICT`), montants `INTEGER`, horodatages en ms.
-- `points.balance` ne bouge que par la fonction de `points` qui écrit `points_log` dans la même
-  transaction (pas de déclencheur : il daterait avec l'horloge de SQLite, pas avec `Clock`).
+- `points.balance` ne bouge que par `points::move_balance`, qui écrit `points_log` (avec sa `Source`)
+  dans la même transaction (pas de déclencheur : il daterait avec l'horloge de SQLite, pas avec `Clock`).
+  Une liste d'identifiants passe en JSON (`json_each(?)`) : `query!` ne sait pas lier un `IN` variable.
 - `backup` : `vacuum_into` (copie cohérente, bot en marche) et `is_pcr_database`. Toute table qui stocke un
   salon/message Discord ou une action envers des membres doit être neutralisée dans
   `import_prod::neutralize` (appelé par `pcr import-prod`).
