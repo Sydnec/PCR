@@ -192,7 +192,19 @@ pub enum Outcome {
         name: String,
         /// Il brillait pour son vainqueur, porteur du Charme Chroma : l'icône et le nom du charme.
         charm: Option<(String, String)>,
+        /// Ce qu'il tenait.
+        held: Option<Held>,
     },
+}
+
+/// L'objet que tenait un Pokémon capturé : remis à son vainqueur, ou lâché au sol pour les autres.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Held {
+    pub emoji: String,
+    pub label: String,
+    pub dropped: bool,
+    /// Ce qu'est devenu l'exemplaire de trop d'un objet plafonné (`bag::overflow_notice`).
+    pub notice: Option<String>,
 }
 
 impl Outcome {
@@ -248,7 +260,12 @@ impl Outcome {
                 paid.mention(),
                 format::percent(*probability, 1)
             ),
-            Self::Catch { paid, name, charm } => {
+            Self::Catch {
+                paid,
+                name,
+                charm,
+                held,
+            } => {
                 let mut text = format!(
                     "🎉 Bravo ! **{name}** rejoint ton Pokédex ! ({})",
                     paid.mention()
@@ -258,6 +275,22 @@ impl Outcome {
                         text,
                         "\n{emoji} Il brillait pour toi, grâce à ton **{label}** !"
                     );
+                }
+                match held {
+                    Some(held) if held.dropped => {
+                        let _ = write!(
+                            text,
+                            "\n{} Il a lâché **{}** en partant : il revient aux autres.",
+                            held.emoji, held.label
+                        );
+                    }
+                    Some(held) => {
+                        let _ = write!(text, "\n{} Il tenait **{}** !", held.emoji, held.label);
+                        if let Some(notice) = &held.notice {
+                            let _ = write!(text, " {notice}");
+                        }
+                    }
+                    None => {}
                 }
                 text
             }

@@ -63,6 +63,46 @@ pub async fn consume(
     Ok(true)
 }
 
+/// Crédite `quantity` de `key`, sous la limite `cap` s'il y en a une : le compte après crédit ne doit
+/// pas la dépasser, et c'est la même instruction qui le vérifie (deux gains simultanés, un seul sous
+/// la limite). `false` : la limite l'a refusé, rien n'est écrit.
+pub async fn credit(
+    conn: &mut SqliteConnection,
+    user: i64,
+    key: &str,
+    quantity: i64,
+    cap: Option<i64>,
+    source: &str,
+    now_ms: i64,
+) -> Result<bool, DbError> {
+    if cap.is_some_and(|cap| quantity > cap) {
+        return Ok(false);
+    }
+    let cap = cap.unwrap_or(i64::MAX);
+    let done = sqlx::query!(
+        "INSERT INTO pokemon_inventory (user_id, item_key, count, first_obtained_at, last_obtained_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT (user_id, item_key) DO UPDATE SET
+           count = count + excluded.count,
+           first_obtained_at = COALESCE(first_obtained_at, excluded.first_obtained_at),
+           last_obtained_at = excluded.last_obtained_at
+         WHERE count + excluded.count <= ?",
+        user,
+        key,
+        quantity,
+        now_ms,
+        now_ms,
+        cap
+    )
+    .execute(&mut *conn)
+    .await?;
+    if done.rows_affected() != 1 {
+        return Ok(false);
+    }
+    log(conn, user, key, quantity, source, now_ms).await?;
+    Ok(true)
+}
+
 /// Donne `key` à qui ne l'a pas (le Charme Chroma) : une ligne à zéro compte comme absente. `false` :
 /// il l'avait déjà, rien n'est écrit.
 pub async fn grant_once(

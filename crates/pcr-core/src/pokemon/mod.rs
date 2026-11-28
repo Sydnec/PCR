@@ -3,9 +3,11 @@
 //! `GameConfig` (`pokemon`), la génération jouable se calcule une fois par action
 //! (`generation::active`) et se passe aux règles.
 
+pub mod bag;
 pub mod capture;
 pub mod charms;
 pub mod display;
+pub mod drop;
 pub mod fishing;
 pub mod generation;
 pub mod items;

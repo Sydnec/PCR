@@ -24,6 +24,8 @@ pub enum Source {
     Bet,
     /// Lancer d'une ball payée en points.
     Throw,
+    /// Vente d'office d'un objet gagné au-delà de sa limite de détention.
+    Overflow,
 }
 
 impl Source {
@@ -34,6 +36,7 @@ impl Source {
             Self::Redistribution => "redistribution",
             Self::Bet => "bet",
             Self::Throw => "throw",
+            Self::Overflow => "overflow",
         }
     }
 }
