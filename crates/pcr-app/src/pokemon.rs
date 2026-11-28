@@ -1,9 +1,12 @@
-//! Le jeu Pokémon côté cas d'usage : les apparitions (`spawn`), la fiche d'une espèce (`sheet`), les
-//! balls en poche (`items`), et ce que Discord et le site lisent du jeu en cours.
+//! Le jeu Pokémon côté cas d'usage : les apparitions (`spawn`), les lancers (`throw`), le Charme
+//! Chroma (`charms`), la fiche d'une espèce (`sheet`), les balls en poche (`items`), et ce que
+//! Discord et le site lisent du jeu en cours.
 
+pub mod charms;
 pub mod items;
 pub mod sheet;
 pub mod spawn;
+pub mod throw;
 
 use pcr_core::pokemon::{
     generation,

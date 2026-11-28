@@ -56,6 +56,9 @@ pub struct App {
     pub public_messages: Arc<tokio::sync::Notify>,
     /// `/admin restart` : le binaire s'arrête proprement, et systemd le relance.
     pub restart: Arc<tokio::sync::Notify>,
+    /// Le dernier lancer de chaque dresseur (ms) : un anti-spam, pas un état de jeu. Perdu au
+    /// redémarrage sans dommage : paiement et capture restent gardés en base.
+    pub(crate) last_throws: Arc<std::sync::Mutex<std::collections::HashMap<i64, i64>>>,
 }
 
 impl App {
@@ -71,6 +74,7 @@ impl App {
             stats,
             public_messages: Arc::default(),
             restart: Arc::default(),
+            last_throws: Arc::default(),
         }
     }
 
