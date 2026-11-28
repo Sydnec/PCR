@@ -143,7 +143,6 @@ Les règles ne changent pas ; `/pk` disparaît au profit du Centre Pokémon, de 
   un tirage sans espèce possible est refusé au lieu d'annoncer un succès sans rien faire apparaître ;
 - fiche « Infos » : une lecture ratée de la collection omet ses pastilles au lieu d'annoncer zéro ; la
   légende 🥚 ne cite plus `/pk oeuf pondre` (« Ne sort que d'un œuf, pondu par un couple de parents. ») ;
-- jusqu'à P4d (objet au sol), un Pokémon qui s'enfuit emporte toujours son objet.
 
 Écarts assumés des lancers (P4c, détail dans [pokemon/capture.md](pokemon/capture.md)) :
 
@@ -157,8 +156,6 @@ Les règles ne changent pas ; `/pk` disparaît au profit du Centre Pokémon, de 
 - les panneaux de lancer restent des messages classiques (texte et boutons) : un refus qui croise une
   capture ne réécrit que le texte, sans ressusciter les boutons ;
 - les points d'un lancer entrent au journal sous la source `throw` ;
-- jusqu'à P4d, l'objet tenu ne suit pas le Pokémon dans le sac de son capteur : l'annonce publique
-  dit « Il tenait », la réponse privée ne parle pas encore de l'objet ;
 - un record de capture « la plus rapide » à un délai négatif (horloge décalée) est ignoré, comme en
   v1 ;
 - les récompenses de starter qui suivaient chaque arrivée en boîte arrivent avec le starter (P5) ;
@@ -166,10 +163,23 @@ Les règles ne changent pas ; `/pk` disparaît au profit du Centre Pokémon, de 
   démarrage et les rôles du charme arrivent avec P5 (les autres portes : parc, œufs, échanges,
   évolutions).
 
+Écarts assumés des objets (P4d, détail dans [pokemon/objets.md](pokemon/objets.md)) :
+
+- l'objet tenu, sa vente d'office ou son amélioration (la Super Canne de trop devient la Méga Canne)
+  et l'objet lâché tiennent dans la transaction de la capture, de la fuite ou du ramassage : un
+  crédit qui échoue annule tout (la v1 reposait l'objet au sol, ou gardait la ball au-delà de la
+  limite quand les points ne passaient pas) ;
+- le journal des objets n'a plus de ligne à zéro : une vente d'office entre au journal des points
+  (source `overflow`), une amélioration au journal des objets (`amelioration:<source>`) ;
+- sans salon des apparitions, un objet qui serait tombé revient au capteur, et un fuyard l'emporte
+  (la v1 écrivait un objet perdu, et sa réponse disait « Il a lâché ») ;
+- « Ramasser » réécrit le message public (composants v2) ; la vente d'office se dit en privé, à la
+  suite ; un message raté se rattrape par le worker des messages publics.
+
 ## 3. Administration (`/admin`)
 
 - [x] `/admin points cible montant` — Donne (ou retire) des points à un dresseur ou à tout un rôle
-- [ ] `/admin item cible objet [quantite]` — Donne (ou retire) un objet à un dresseur ou à tout un rôle
+- [x] `/admin item cible objet [quantite]` — Donne (ou retire) un objet à un dresseur ou à tout un rôle (un rôle est servi en une transaction : une panne n'en sert aucun, et la ligne « N échec(s) » de la v1 disparaît)
 - [x] `/admin config cle valeur` — Modifie un réglage du bot, appliqué immédiatement
 - [x] `/admin config-voir [cle]` — Affiche un réglage — ou une branche entière — et sa valeur par défaut
 - [x] `/admin poids [table]` — Convertit les poids de tirage en probabilités réelles (P4a : composants v2, un tableau se poursuit dans un bloc « suite » quand le message dépasse 4 000 caractères, au lieu d'un champ de 1 024)
@@ -195,7 +205,8 @@ traduction. Ceux des panneaux éphémères sont remplacés par les panneaux `pk:
 - [x] `poke_owned` (`poke_owned|<apparition>` : la fiche de l'espèce, P4b ; `pcr_core::pokemon::spawn::Button`)
 - [x] `poke_throw` · `poke_special` (`pcr_core::pokemon::spawn::Button`, P4c)
 - [x] `poke_rethrow` · `poke_master_cancel` (panneaux de lancer, `pcr_core::pokemon::throw::Button`, P4c ; gardés pour les panneaux ouverts à la bascule)
-- [ ] `poke_box` · `poke_cmp` · `poke_cmpg` · `poke_cmpgo` · `poke_cmpn` · `poke_cmpr` · `poke_cmpt` · `poke_dex` · `poke_dexf` · `poke_dexs` · `poke_dext` · `poke_drop` · `poke_dup` · `poke_dupr` · `poke_dupsp` · `poke_dupspr` · `poke_evo` · `poke_evo_cancel` · `poke_evo_pick` · `poke_safari_bait` · `poke_safari_ball` · `poke_safari_cancel` · `poke_safari_enter` · `poke_safari_flee` · `poke_safari_gens` · `poke_safari_go` · `poke_safari_live` · `poke_safari_share` · `poke_showcase_share` · `poke_starter_no` · `poke_starter_ok` · `poke_td_back` · `poke_td_cancel` · `poke_td_find` · `poke_td_go` · `poke_td_ind` · `poke_td_kind` · `poke_td_pick` · `poke_td_pts` · `poke_td_side` · `poke_trade_accept` · `poke_trade_cancel` · `poke_trade_counter` · `poke_trade_decline` · `poke_trade_pick`
+- [x] `poke_drop` (`poke_drop|<objet>`, P4d ; `pcr_core::pokemon::drop::Button`)
+- [ ] `poke_box` · `poke_cmp` · `poke_cmpg` · `poke_cmpgo` · `poke_cmpn` · `poke_cmpr` · `poke_cmpt` · `poke_dex` · `poke_dexf` · `poke_dexs` · `poke_dext` · `poke_dup` · `poke_dupr` · `poke_dupsp` · `poke_dupspr` · `poke_evo` · `poke_evo_cancel` · `poke_evo_pick` · `poke_safari_bait` · `poke_safari_ball` · `poke_safari_cancel` · `poke_safari_enter` · `poke_safari_flee` · `poke_safari_gens` · `poke_safari_go` · `poke_safari_live` · `poke_safari_share` · `poke_showcase_share` · `poke_starter_no` · `poke_starter_ok` · `poke_td_back` · `poke_td_cancel` · `poke_td_find` · `poke_td_go` · `poke_td_ind` · `poke_td_kind` · `poke_td_pick` · `poke_td_pts` · `poke_td_side` · `poke_trade_accept` · `poke_trade_cancel` · `poke_trade_counter` · `poke_trade_decline` · `poke_trade_pick`
 
 ## 5. Minuteurs (désormais en heure de Paris, rattrapés via `job_runs`)
 

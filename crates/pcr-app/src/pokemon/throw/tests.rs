@@ -105,6 +105,7 @@ async fn a_catch_pays_fills_the_box_and_calls_the_next_pokemon() {
             paid: Paid::Points(100),
             name: "Pikachu ♀".to_owned(),
             charm: None,
+            held: None,
         }
     );
     assert_eq!(balance(&t, ASH).await, 900);

@@ -15,7 +15,9 @@
   de Discord, menu des balls spéciales, confirmation de la Master Ball ; `Ctx::panels` : un panneau
   ouvert par dresseur), `throw/rows.rs` (boutons). Messages classiques : `Edit::Classic` (texte et
   boutons), `Edit::Content` (le texte seul, boutons intacts). `Ctx::outbox` : ce que le bot envoie de
-  lui-même (annonce d'un Charme Chroma).
+  lui-même (annonce d'un Charme Chroma). Objets au sol : `pokemon/drop.rs` (rendu du message `drop`,
+  `poke_drop` réécrit le message, vente d'office en privé à la suite). `/admin item` (autocomplétion
+  du catalogue).
 - Un handler décode, appelle `pcr-app`, rend le résultat. Pas de règle de jeu ici.
 - Délai de 3 s : un handler lent renvoie `Reply::later(éphémère, travail)` (commande, bouton, modale) ou
   `Reply::later_update` (un menu, remplacé par le résultat) ; le routeur diffère puis remplace la réponse

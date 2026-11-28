@@ -1,7 +1,8 @@
 //! Le jeu Pokémon côté Discord : le message public des apparitions (`spawn`, boutons `poke_*` de la
-//! v1), les panneaux de lancer (`throw`) et la fiche d'une espèce (`sheet`). Les panneaux du jeu
-//! (`pk:`) arrivent avec P4e et P4f.
+//! v1), celui des objets au sol (`drop`), les panneaux de lancer (`throw`) et la fiche d'une espèce
+//! (`sheet`). Les panneaux du jeu (`pk:`) arrivent avec P4e et P4f.
 
+pub(crate) mod drop;
 pub(crate) mod sheet;
 pub(crate) mod spawn;
 pub(crate) mod throw;
@@ -23,14 +24,18 @@ use throw::From;
 
 /// Le préfixe des boutons du jeu posés par la v1 (messages publics et panneaux de lancer).
 pub const PREFIX: &str = "poke_";
+/// L'erreur générique de la v1, commune aux boutons du jeu.
 const READ_FAILED: &str = "❌ Erreur base de données.";
 
-/// Un bouton `poke_*` : celui d'une annonce, ou d'un panneau de lancer.
-pub fn component(ctx: &Ctx, interaction: &Interaction, custom_id: &str) -> Reply {
+/// Un bouton `poke_*` : celui d'une annonce, d'un objet au sol ou d'un panneau de lancer.
+pub async fn component(ctx: &Ctx, interaction: &Interaction, custom_id: &str) -> Reply {
     let Some(user) = interaction.author_id() else {
         return ui::ephemeral_text(EXPIRED).into();
     };
     let user = crate::id(user.get());
+    if let Some(button) = pcr_core::pokemon::drop::Button::parse(custom_id) {
+        return drop::pick(ctx, user, button.drop).await;
+    }
     if let Some(button) = Button::parse(custom_id) {
         return match button {
             Button::Info { spawn } => info(ctx, user, spawn),

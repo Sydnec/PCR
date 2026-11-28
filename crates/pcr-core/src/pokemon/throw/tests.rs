@@ -49,6 +49,7 @@ fn every_outcome_is_told_in_full_like_v1() {
                 paid: Paid::Offered { label: label() },
                 name: "✨ Pikachu ♀".to_owned(),
                 charm: Some(("🌟".to_owned(), "Charme Chroma (1re gén.)".to_owned())),
+                held: None,
             },
             "🎉 Bravo ! **✨ Pikachu ♀** rejoint ton Pokédex ! (Poké Ball offerte)\n🌟 Il brillait \
              pour toi, grâce à ton **Charme Chroma (1re gén.)** !",
@@ -75,6 +76,7 @@ fn only_a_finished_encounter_ends_the_panel() {
         paid: Paid::Points(1),
         name: String::new(),
         charm: None,
+        held: None,
     };
     for outcome in [
         Outcome::Gone,
@@ -187,4 +189,34 @@ fn the_panel_buttons_keep_their_v1_names() {
     }
     assert_eq!(Button::parse("poke_rethrow|4"), None);
     assert_eq!(Button::parse("poke_owned|4"), None);
+}
+
+#[test]
+fn the_catch_tells_what_it_held() {
+    let held = |dropped, notice: Option<&str>| Outcome::Catch {
+        paid: Paid::Points(100),
+        name: "Roucool".to_owned(),
+        charm: None,
+        held: Some(Held {
+            emoji: "🟡".to_owned(),
+            label: "Pépite".to_owned(),
+            dropped,
+            notice: notice.map(str::to_owned),
+        }),
+    };
+    assert!(
+        held(false, None)
+            .message()
+            .ends_with("(**-100** points)\n🟡 Il tenait **Pépite** !")
+    );
+    assert!(
+        held(true, None)
+            .message()
+            .ends_with("\n🟡 Il a lâché **Pépite** en partant : il revient aux autres.")
+    );
+    assert!(
+        held(false, Some("Tu as déjà une Pépite."))
+            .message()
+            .ends_with("Il tenait **Pépite** ! Tu as déjà une Pépite.")
+    );
 }

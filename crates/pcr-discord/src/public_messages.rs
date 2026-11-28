@@ -64,6 +64,7 @@ fn renderer(kind: &str) -> Option<Render> {
         bets::MESSAGE => Some(render::bet),
         bets::RESULT_MESSAGE => Some(render::result),
         pokemon::spawn::MESSAGE => Some(crate::pokemon::spawn::render),
+        pokemon::drops::MESSAGE => Some(crate::pokemon::drop::render),
         _ => None,
     }
 }

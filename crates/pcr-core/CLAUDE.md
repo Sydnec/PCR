@@ -40,4 +40,7 @@
   contre une apparition (bonus compris), le délai entre deux lancers, les issues (`Outcome`, textes
   v1, `is_final`) et les boutons des panneaux (`Button` : `poke_rethrow`, `poke_master_ok`…,
   `Promise`). `pokemon::charms` : espèces requises, charmes mérités, charmes portés, annonce.
+- `pokemon::drop` : tirage du lâcher, bouton `poke_drop`, refus du ramassage. `pokemon::bag` : ce que
+  devient un gain au-delà de `maxHeld` (`Overflow`, `Granted`, `upgrade`, phrase v1) et les refus de
+  `/admin item`.
 - Tests : valeurs de référence reprises des tests v1 (`git show origin/main:test/<fichier>`).

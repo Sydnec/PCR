@@ -22,7 +22,8 @@
 - Pokémon : `pokemon::spawn` (apparitions, état du salon, dépenses et journal des lancers ; la fuite est
   un `UPDATE` gardé sur le statut), `pokemon::throws` (journal, raté et capture gardés, prix payés),
   `pokemon::collection` (exemplaires, sexes et formes ; naissance d'un individu), `pokemon::items` (sac :
-  `consume` et `grant_once` écrivent `pokemon_item_log`), `pokemon::units` (balls de la boutique, datées).
+  `credit` sous plafond, `consume` et `grant_once` écrivent `pokemon_item_log`), `pokemon::units` (balls
+  de la boutique, datées), `pokemon::drops` (objets au sol, ramassage gardé, jamais le capteur).
   Stats du jeu : `stats::Counter::Pokemon*` (une requête par table dans `stats/pokemon.rs` : l'ordre des
   variantes est celui des colonnes ; records par `combine`), `record_highlight`, `record_expected_catch`
   et `record_personal_bests` (écrits directement).

@@ -35,6 +35,7 @@ use super::{
 };
 use crate::App;
 
+mod held;
 mod panel;
 mod pay;
 mod stats;
@@ -283,6 +284,7 @@ async fn capture(
         },
     )
     .await?;
+    let held = held::hand_over(conn, app, config, spawn, user, now_ms, rng).await?;
     public_messages::touch(conn, MESSAGE, spawn.id, now_ms).await?;
     resolved.charms = charms::check(conn, config, generation, user, now_ms).await?;
     let spent = spawns::spending(conn, spawn.id).await?;
@@ -333,6 +335,7 @@ async fn capture(
         paid,
         name: display::display_name(species, shiny, sex, spawn.form.as_deref()),
         charm,
+        held,
     })
 }
 
