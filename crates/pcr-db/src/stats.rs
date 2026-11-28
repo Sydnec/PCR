@@ -12,7 +12,8 @@ use crate::{DbError, StatsDb};
 mod pokemon;
 
 pub use pokemon::{
-    DailyColumn, Highlight, HighlightKind, SpeciesColumn, UserColumn, record_highlight,
+    BallColumn, DailyColumn, Highlight, HighlightKind, SpeciesColumn, UserColumn,
+    record_expected_catch, record_highlight, record_personal_bests,
 };
 
 /// Une ligne de compteur d'une table de stats.
@@ -69,6 +70,12 @@ pub enum Counter {
     PokemonUser {
         user: i64,
         column: UserColumn,
+    },
+    /// L'usage d'une ball par un dresseur (`pokemon_ball_stats`).
+    PokemonBall {
+        user: i64,
+        ball: String,
+        column: BallColumn,
     },
 }
 
@@ -312,7 +319,8 @@ pub async fn add_all(db: &StatsDb, counters: &[(Counter, i64)]) -> Result<(), Db
             }
             Counter::PokemonSpecies { .. }
             | Counter::PokemonDaily { .. }
-            | Counter::PokemonUser { .. } => pokemon::add(&mut tx, counter, delta).await?,
+            | Counter::PokemonUser { .. }
+            | Counter::PokemonBall { .. } => pokemon::add(&mut tx, counter, delta).await?,
         }
     }
     tx.commit().await?;

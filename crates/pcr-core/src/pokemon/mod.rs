@@ -1,8 +1,10 @@
 //! Le jeu Pokémon, règles pures : espèces et générations, rareté, poids des tirages, chances de
-//! capture, catalogue d'objets, apparitions. Les nombres viennent de `GameConfig` (`pokemon`), la
-//! génération jouable se calcule une fois par action (`generation::active`) et se passe aux règles.
+//! capture, catalogue d'objets, apparitions, lancers, Charme Chroma. Les nombres viennent de
+//! `GameConfig` (`pokemon`), la génération jouable se calcule une fois par action
+//! (`generation::active`) et se passe aux règles.
 
 pub mod capture;
+pub mod charms;
 pub mod display;
 pub mod fishing;
 pub mod generation;
@@ -12,6 +14,7 @@ pub mod rarity;
 pub mod spawn;
 pub mod species;
 pub mod tables;
+pub mod throw;
 pub mod weights;
 
 use crate::config::Pokemon;
