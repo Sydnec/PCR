@@ -329,7 +329,7 @@ async fn route(ctx: &Ctx, interaction: &Interaction) -> anyhow::Result<Reply> {
             }
             id if id.starts_with(reminders::PREFIX) => reminders::button(ctx, interaction, id),
             id if id.starts_with(TRANSLATE) => links::translate(ctx, id),
-            id if id.starts_with(pokemon::PREFIX) => pokemon::component(ctx, interaction, id),
+            id if id.starts_with(pokemon::PREFIX) => pokemon::component(ctx, interaction, id).await,
             // Un id inconnu vient d'un panneau d'une version précédente : le dire plutôt qu'échouer.
             _ => ui::ephemeral_text(EXPIRED).into(),
         },

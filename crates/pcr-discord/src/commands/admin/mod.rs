@@ -5,6 +5,7 @@
 //! l'exécution comme pour l'autocomplétion, qui énumère la configuration vivante.
 
 mod config;
+mod item;
 mod poids;
 mod points;
 mod pokespawn;
@@ -37,6 +38,8 @@ const NOT_ADMIN: &str = "❌ Cette commande est réservée aux administrateurs."
 pub enum AdminCommand {
     #[command(name = "points")]
     Points(points::PointsCommand),
+    #[command(name = "item")]
+    Item(item::ItemCommand),
     #[command(name = "config")]
     Config(config::ConfigCommand),
     #[command(name = "config-voir")]
@@ -77,6 +80,7 @@ pub async fn run(ctx: &Ctx, interaction: &Interaction, data: &CommandData) -> Re
     };
     match AdminCommand::from_interaction(CommandInputData::from(data.clone())) {
         Ok(AdminCommand::Points(command)) => points::run(ctx, command, admin.get()),
+        Ok(AdminCommand::Item(command)) => item::run(ctx, command, admin.get()),
         Ok(AdminCommand::Config(command)) => config::set(ctx, command, admin.get()).await.into(),
         Ok(AdminCommand::ConfigVoir(command)) => config::view(ctx, &command).into(),
         Ok(AdminCommand::Poids(command)) => poids::run(ctx, &command),
@@ -116,6 +120,7 @@ pub fn autocomplete(
             config::choices(ctx, typed)
         }
         Some(("pokespawn", "espece", typed)) => pokespawn::choices(ctx, typed),
+        Some(("item", "objet", typed)) => item::choices(ctx, typed),
         _ => Vec::new(),
     }
 }
