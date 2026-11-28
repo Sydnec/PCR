@@ -39,7 +39,7 @@ Réécriture en Rust, même résultat pour les joueurs. Le détail des choix est
 | P4a | Pokémon, données et règles : espèces et tables de pêche converties par `build.rs`, génération ouverte (et plafond de `pokemon.generation`), rareté, sexe, formes, poids d'apparition (🔒, 🥚), probabilités de capture, difficulté, shiny, lignées, catalogue d'objets et ses tirages, `/admin poids` | ✅ |
 | P4b | Apparitions : revendication au fil des messages, tirage (espèce, sexe, forme, shiny, objet tenu), message public et ses `custom_id` `poke_*`, fuite (balayage chaque minute), `/admin pokespawn`, fiche d'espèce (bouton « Infos »), balls en poche dans `/solde` | ✅ |
 | P4c | Lancers : paiement en points ou ball en poche, délai entre deux lancers, Master Ball (confirmation, prix personnel), course (sans remboursement : battu de peu, on ne paie rien), individus (sexe, ball, verrou d'office), panneau de relance, annonce de capture ou de fuite, journal et stats, Charme Chroma | ✅ |
-| P4d | Objets : objet tenu remis à la capture, objet au sol (`poke_drop`), limite de détention et surplus (Master Ball, cannes), journal des objets, `/admin item` | à faire |
+| P4d | Objets : objet tenu remis à la capture, objet au sol (`poke_drop`), limite de détention et surplus (Master Ball, cannes), journal des objets, `/admin item` | ✅ |
 | P4e | `/pokedex` : Pokédex et ses filtres, fiche d'espèce, classement, lettres de Zarbi, clic droit › Pokédex | à faire |
 | P4f | Centre Pokémon (message permanent) et `/pokemon` (Mon aventure) : Boîte et fiche d'individu (verrou, surnom), Sac, lien du site | à faire |
 | P5 | Pokémon avancé : boutique, revente, loterie (et son rappel dans `/solde`), évolution, œufs, pêche, safari, échanges (et doublons), vitrine (et `/zarbi`)… | à faire |

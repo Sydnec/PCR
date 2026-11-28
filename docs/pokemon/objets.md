@@ -40,8 +40,9 @@ les autres, y compris à qui n'a pas lancé une seule ball, mais pas à celui qu
 première : ce qu'un Pokémon capturé lâche revient aux autres. L'annonce dit alors « Il a lâché »
 plutôt que « Il tenait ». C'est la seule récompense du jeu qui ne demande pas d'avoir gagné quoi
 que ce soit, et la seule chose qu'une apparition perdue peut encore donner. Le verrou est en base,
-comme toujours : deux clics simultanés, un seul ramasseur, et un crédit qui échoue repose l'objet
-par terre plutôt que de le faire disparaître.
+comme toujours : deux clics simultanés, un seul ramasseur, et un crédit qui échoue laisse l'objet
+par terre plutôt que de le faire disparaître. Sans salon des apparitions configuré, rien ne tombe :
+l'objet suit son capteur, ou part avec le fuyard.
 
 - **Un objet est une clé et un compteur.** Nom, icône et description vivent dans `pokemon.items` —
   réglables à chaud, comme les balls. Une entrée `ball: "poke"` lui fait *emprunter* le libellé et
@@ -55,7 +56,7 @@ par terre plutôt que de le faire disparaître.
 - **Une seule Master Ball en poche.** `maxHeld` plafonne ce qu'un dresseur garde d'un objet : au-delà,
   chaque exemplaire gagné (tenu par un Pokémon, ramassé, tiré à la loterie) se vend d'office
   `overflowValue` points — 10 000 pour la Master Ball —, et la réponse le dit. Deux gains simultanés
-  n'en laissent qu'une, et si les points ne passent pas, la ball se garde plutôt que de se perdre.
+  n'en laissent qu'une, et la vente se joue dans la même transaction que le gain : rien ne se perd.
   Un échange qui la ferait dépasser chez son receveur est refusé, à la proposition comme à
   l'acceptation ; une Master Ball contre une Master Ball passe. Les remboursements rendent ce qu'ils
   ont pris sans regarder la limite, et `/admin item` passe outre. Ce que les dresseurs gardaient au-delà
