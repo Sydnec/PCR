@@ -1,5 +1,6 @@
 //! Les lancers de bout en bout, sur une base jetable : paiement, tirage figé, capture et ses suites,
-//! course entre deux dresseurs, Charme Chroma, panne provoquée. Les refus sont dans `refusals`.
+//! course entre deux dresseurs, Charme Chroma. Les refus sont dans `refusals`, les pannes provoquées
+//! dans `atomicity`.
 
 use std::convert::Infallible;
 
@@ -8,6 +9,7 @@ use futures_util::future::join_all;
 use super::*;
 use crate::testing::TestApp;
 
+mod atomicity;
 mod refusals;
 
 pub(super) const NOW: &str = "2026-11-27T12:00:00Z";
@@ -348,35 +350,5 @@ async fn completing_a_pokedex_grants_the_charm_once() {
         .await
         .expect("throw");
     assert!(again.charms.is_empty(), "donné une fois pour toutes");
-    t.close().await;
-}
-
-#[tokio::test]
-async fn a_failure_midway_leaves_everything_as_it_was() {
-    let t = TestApp::new("throw-atomic", NOW).await;
-    grant(&t, ASH, 1000).await;
-    let spawn = active(&t, 16, "").await;
-    // Payé, tiré, capturé : c'est l'arrivée dans la boîte qui échoue.
-    t.sql(
-        "CREATE TRIGGER panne BEFORE INSERT ON pokemon_owned
-         BEGIN SELECT RAISE(ABORT, 'panne'); END",
-    )
-    .await;
-    assert!(
-        throw(&t.app, &request(ASH, spawn, "poke"), &mut caught())
-            .await
-            .is_err()
-    );
-    assert_eq!(balance(&t, ASH).await, 1000);
-    assert_eq!(
-        t.scalar(format!(
-            "SELECT count(*) FROM pokemon_spawns WHERE id = {spawn} AND status = 'ACTIVE'
-                AND throw_count = 0"
-        ))
-        .await,
-        1
-    );
-    assert_eq!(t.scalar("SELECT count(*) FROM pokemon_throws").await, 0);
-    assert_eq!(t.scalar("SELECT count(*) FROM pokemon_spawns").await, 1);
     t.close().await;
 }

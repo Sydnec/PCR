@@ -181,17 +181,19 @@ pub async fn record_expected_catch(
 }
 
 /// Les records d'un dresseur à la capture : la moins probable (et son espèce, cohérentes entre elles :
-/// les affectations d'un UPSERT lisent toutes la ligne d'origine) et la plus rapide.
+/// les affectations d'un UPSERT lisent toutes la ligne d'origine) et la plus rapide. Un délai inconnu
+/// ou négatif (horloge décalée) ne fait pas de record : `None`.
 pub async fn record_personal_bests(
     db: &StatsDb,
     user: i64,
     probability: f64,
     species: i64,
-    delay_ms: i64,
+    delay_ms: Option<i64>,
 ) -> Result<(), DbError> {
+    let delay_ms = delay_ms.filter(|delay| *delay >= 0);
     sqlx::query!(
         "INSERT INTO pokemon_stats (user_id, best_catch_probability, best_catch_species, fastest_catch_ms)
-         VALUES (?, ?, ?, MAX(?, 0))
+         VALUES (?, ?, ?, ?)
          ON CONFLICT (user_id) DO UPDATE SET
            best_catch_species = CASE
              WHEN best_catch_probability IS NULL
@@ -199,8 +201,8 @@ pub async fn record_personal_bests(
              THEN excluded.best_catch_species ELSE best_catch_species END,
            best_catch_probability =
              MIN(COALESCE(best_catch_probability, 1.0), excluded.best_catch_probability),
-           fastest_catch_ms =
-             MIN(COALESCE(fastest_catch_ms, excluded.fastest_catch_ms), excluded.fastest_catch_ms)",
+           fastest_catch_ms = MIN(COALESCE(fastest_catch_ms, excluded.fastest_catch_ms),
+                                  COALESCE(excluded.fastest_catch_ms, fastest_catch_ms))",
         user,
         probability,
         species,
@@ -263,4 +265,137 @@ pub async fn record_highlight(db: &StatsDb, highlight: &Highlight) -> Result<(),
     .execute(db.writer())
     .await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::stats::add_all;
+
+    /// L'indexation par variante : chaque colonne reçoit son compteur, et pas celui d'à côté.
+    #[allow(clippy::too_many_lines)] // Une table de valeurs par table de stats, lue d'un bloc.
+    #[tokio::test]
+    async fn each_variant_lands_in_its_own_column() {
+        let dir = std::env::temp_dir().join(format!("pcr-db-stats-pokemon-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        let db = StatsDb::open(&dir.join("stats.db")).await.expect("open");
+        let species = [
+            SpeciesColumn::Spawns,
+            SpeciesColumn::ShinySpawns,
+            SpeciesColumn::Escapes,
+            SpeciesColumn::Catches,
+            SpeciesColumn::ShinyCatches,
+            SpeciesColumn::ThrowsReceived,
+            SpeciesColumn::PointsBurned,
+            SpeciesColumn::MaxThrowsSingleSpawn,
+        ];
+        let daily = [
+            DailyColumn::Spawns,
+            DailyColumn::Throws,
+            DailyColumn::Catches,
+            DailyColumn::PointsBurned,
+        ];
+        let users = [
+            UserColumn::Throws,
+            UserColumn::Catches,
+            UserColumn::PointsSpent,
+            UserColumn::PointsBurned,
+            UserColumn::ShinyCatches,
+            UserColumn::LegendaryCatches,
+            UserColumn::MostThrowsOnOneSpawn,
+        ];
+        let mut counters: Vec<(Counter, i64)> = Vec::new();
+        counters.extend((1..).zip(species).map(|(n, column)| {
+            (
+                Counter::PokemonSpecies {
+                    species: 25,
+                    column,
+                },
+                n,
+            )
+        }));
+        counters.extend((1..).zip(daily).map(|(n, column)| {
+            (
+                Counter::PokemonDaily {
+                    day: "2026-11-27".to_owned(),
+                    column,
+                },
+                n,
+            )
+        }));
+        counters.extend(
+            (1..)
+                .zip(users)
+                .map(|(n, column)| (Counter::PokemonUser { user: 7, column }, n)),
+        );
+        for (n, column) in (1..).zip([BallColumn::Count, BallColumn::Cost]) {
+            let ball = "poke".to_owned();
+            counters.push((
+                Counter::PokemonBall {
+                    user: 7,
+                    ball,
+                    column,
+                },
+                n,
+            ));
+        }
+        add_all(&db, &counters).await.expect("add");
+        let row = sqlx::query!(
+            "SELECT spawns, shiny_spawns, escapes, catches, shiny_catches, throws_received,
+                    points_burned, max_throws_single_spawn
+               FROM pokemon_species_stats WHERE species_id = 25"
+        )
+        .fetch_one(db.reader())
+        .await
+        .expect("species");
+        assert_eq!(
+            [
+                row.spawns,
+                row.shiny_spawns,
+                row.escapes,
+                row.catches,
+                row.shiny_catches,
+                row.throws_received,
+                row.points_burned,
+                row.max_throws_single_spawn
+            ],
+            [1, 2, 3, 4, 5, 6, 7, 8]
+        );
+        let row =
+            sqlx::query!("SELECT spawns, throws, catches, points_burned FROM pokemon_daily_stats")
+                .fetch_one(db.reader())
+                .await
+                .expect("daily");
+        assert_eq!(
+            [row.spawns, row.throws, row.catches, row.points_burned],
+            [1, 2, 3, 4]
+        );
+        let row = sqlx::query!(
+            "SELECT throws, catches, points_spent, points_burned, shiny_catches, legendary_catches,
+                    most_throws_on_one_spawn
+               FROM pokemon_stats WHERE user_id = 7"
+        )
+        .fetch_one(db.reader())
+        .await
+        .expect("user");
+        assert_eq!(
+            [
+                row.throws,
+                row.catches,
+                row.points_spent,
+                row.points_burned,
+                row.shiny_catches,
+                row.legendary_catches,
+                row.most_throws_on_one_spawn
+            ],
+            [1, 2, 3, 4, 5, 6, 7]
+        );
+        let row = sqlx::query!("SELECT count, cost FROM pokemon_ball_stats")
+            .fetch_one(db.reader())
+            .await
+            .expect("ball");
+        assert_eq!([row.count, row.cost], [1, 2]);
+        db.close().await;
+        std::fs::remove_dir_all(&dir).ok();
+    }
 }

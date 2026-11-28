@@ -58,15 +58,16 @@ pub fn component(ctx: &Ctx, interaction: &Interaction, custom_id: &str) -> Reply
             };
             throw::throw(ctx, interaction, user, spawn, ball, promise, From::Panel)
         }
-        Some(Panel::MasterOk { spawn, promise }) => throw::throw(
-            ctx,
-            interaction,
-            user,
-            spawn,
-            "master",
-            promise,
-            From::Panel,
-        ),
+        // La ball garantie se reconnaît à la config, pas à sa clé.
+        Some(Panel::MasterOk { spawn, promise }) => {
+            let config = ctx.app.game_config();
+            match pcr_core::pokemon::throw::guaranteed(&config.pokemon) {
+                Some((key, _)) => {
+                    throw::throw(ctx, interaction, user, spawn, key, promise, From::Panel)
+                }
+                None => ui::ephemeral_text(EXPIRED).into(),
+            }
+        }
         Some(Panel::Respecial { spawn }) => {
             throw::special(ctx, interaction, user, spawn, From::Panel)
         }

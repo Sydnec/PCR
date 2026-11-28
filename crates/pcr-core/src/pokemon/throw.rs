@@ -54,6 +54,16 @@ impl ThrowBall<'_> {
     }
 }
 
+/// La ball qui capture à coup sûr (la Master Ball), reconnue par la config et non par sa clé.
+pub fn guaranteed(config: &Pokemon) -> Option<(&'static str, &Ball)> {
+    config
+        .capture
+        .balls
+        .entries()
+        .into_iter()
+        .find(|(_, ball)| ball.guaranteed == Some(true))
+}
+
 /// Les balls de la boutique en jeu à cette génération, dans l'ordre du catalogue.
 pub fn open_specials(
     config: &Pokemon,

@@ -97,7 +97,7 @@ impl Stats {
         user: i64,
         probability: f64,
         species: i64,
-        delay_ms: i64,
+        delay_ms: Option<i64>,
     ) -> Result<(), DbError> {
         let mut open = self.open.lock().await;
         let db = self.current(&mut open, paris_date(now).year()).await?;

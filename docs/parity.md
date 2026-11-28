@@ -157,8 +157,11 @@ Les règles ne changent pas ; `/pk` disparaît au profit du Centre Pokémon, de 
 - les panneaux de lancer restent des messages classiques (texte et boutons) : un refus qui croise une
   capture ne réécrit que le texte, sans ressusciter les boutons ;
 - les points d'un lancer entrent au journal sous la source `throw` ;
-- jusqu'à P4d, l'objet tenu ne suit pas le Pokémon dans le sac de son capteur (le message de capture
-  dit « Il tenait ») ;
+- jusqu'à P4d, l'objet tenu ne suit pas le Pokémon dans le sac de son capteur : l'annonce publique
+  dit « Il tenait », la réponse privée ne parle pas encore de l'objet ;
+- un record de capture « la plus rapide » à un délai négatif (horloge décalée) est ignoré, comme en
+  v1 ;
+- les récompenses de starter qui suivaient chaque arrivée en boîte arrivent avec le starter (P5) ;
 - le Charme Chroma est donné et annoncé à la capture qui complète un Pokédex ; le rattrapage au
   démarrage et les rôles du charme arrivent avec P5 (les autres portes : parc, œufs, échanges,
   évolutions).

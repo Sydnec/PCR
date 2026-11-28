@@ -102,21 +102,29 @@ pub async fn throw(
     let mut resolved = Resolved::default();
     let outcome = resolve(
         &mut tx,
-        app,
         &config,
+        generation,
         &ball,
         request,
         now,
         rng,
         &mut resolved,
+        app,
     )
     .await?;
-    tx.commit().await.map_err(DbError::from)?;
+    // Seul un lancer joué (raté ou capture) s'écrit : un refus venu après le paiement (le dernier
+    // rempart du statut) ne doit rien avoir pris.
+    if resolved.throw.is_some() {
+        tx.commit().await.map_err(DbError::from)?;
+    } else {
+        tx.rollback().await.map_err(DbError::from)?;
+    }
     after_commit(app, now, resolved, outcome, special).await
 }
 
 /// Le délai entre deux lancers d'un même dresseur : `Some(secondes)` s'il doit encore attendre,
-/// sinon le lancer est noté.
+/// sinon le lancer est noté (avant la transaction, comme en v1 : une panne de base le consomme aussi).
+/// Une entrée par dresseur, jamais purgée : la table est bornée par l'effectif du serveur.
 fn cooldown(app: &App, config: &GameConfig, user: i64, now_ms: i64) -> Option<u64> {
     let mut last = app
         .last_throws
@@ -133,13 +141,14 @@ fn cooldown(app: &App, config: &GameConfig, user: i64, now_ms: i64) -> Option<u6
 #[allow(clippy::too_many_arguments)] // L'état d'un lancer, passé tel quel à sa transaction.
 async fn resolve(
     conn: &mut Conn,
-    app: &App,
     config: &GameConfig,
+    generation: u8,
     ball: &ThrowBall<'_>,
     request: &Request<'_>,
     now: Timestamp,
     rng: &mut (impl Rng + ?Sized),
     resolved: &mut Resolved,
+    app: &App,
 ) -> Result<Outcome, DbError> {
     let now_ms = now.as_millisecond();
     // Un Pokémon déjà parti ne coûte rien. Une touche de pêche n'est ouverte qu'à son pêcheur, et
@@ -212,6 +221,7 @@ async fn resolve(
         conn,
         app,
         config,
+        generation,
         ball,
         request,
         &spawn,
@@ -234,6 +244,7 @@ async fn capture(
     conn: &mut Conn,
     app: &App,
     config: &GameConfig,
+    generation: u8,
     ball: &ThrowBall<'_>,
     request: &Request<'_>,
     spawn: &Spawn,
@@ -273,7 +284,6 @@ async fn capture(
     )
     .await?;
     public_messages::touch(conn, MESSAGE, spawn.id, now_ms).await?;
-    let generation = super::generation(app);
     resolved.charms = charms::check(conn, config, generation, user, now_ms).await?;
     let spent = spawns::spending(conn, spawn.id).await?;
     resolved.end = Some((

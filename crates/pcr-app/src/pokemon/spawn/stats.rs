@@ -105,7 +105,13 @@ pub(crate) async fn record_end(
             let delay = now.as_millisecond() - spawn.spawned_at;
             if let Err(error) = app
                 .stats
-                .personal_bests(now, winner.user, winner.probability, species_id, delay)
+                .personal_bests(
+                    now,
+                    winner.user,
+                    winner.probability,
+                    species_id,
+                    Some(delay),
+                )
                 .await
             {
                 tracing::warn!(?error, "recording personal bests failed");

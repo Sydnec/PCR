@@ -86,13 +86,7 @@ pub struct SpecialMenu {
 pub async fn special_menu(app: &App, user: i64, spawn: i64) -> SpecialMenu {
     let config = app.game_config();
     let generation = super::super::generation(app);
-    let master = config
-        .pokemon
-        .capture
-        .balls
-        .entries()
-        .into_iter()
-        .find(|(_, ball)| ball.guaranteed == Some(true));
+    let master = rules::guaranteed(&config.pokemon);
     let read = async {
         let mut conn = app.db.reader().acquire().await?;
         let spawn = spawns::get(&mut conn, spawn).await?;
@@ -188,14 +182,7 @@ pub struct MasterQuote {
 /// `None` : pas de ball garantie dans la config.
 pub async fn master_quote(app: &App, user: i64) -> Result<Option<MasterQuote>, DbError> {
     let config = app.game_config();
-    let Some((key, ball)) = config
-        .pokemon
-        .capture
-        .balls
-        .entries()
-        .into_iter()
-        .find(|(_, ball)| ball.guaranteed == Some(true))
-    else {
+    let Some((key, ball)) = rules::guaranteed(&config.pokemon) else {
         return Ok(None);
     };
     let mut conn = app.db.reader().acquire().await?;
