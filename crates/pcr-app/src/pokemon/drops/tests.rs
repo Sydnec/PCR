@@ -241,3 +241,60 @@ async fn a_failed_pickup_leaves_the_item_on_the_ground() {
     assert_eq!(count(&t, MISTY, "pepite").await, 0);
     t.close().await;
 }
+
+#[tokio::test]
+async fn a_failed_hand_over_cancels_the_whole_capture() {
+    let t = setup("drops-held-atomic", "0").await;
+    let spawn = holding(&t, "pepite").await;
+    // Payé, capturé, mis en boîte : c'est l'objet tenu qui n'entre pas dans le sac.
+    t.sql(
+        "CREATE TRIGGER panne BEFORE INSERT ON pokemon_item_log WHEN NEW.item_key = 'pepite'
+         BEGIN SELECT RAISE(ABORT, 'panne'); END",
+    )
+    .await;
+    let request = throw::Request {
+        user: ASH,
+        spawn,
+        ball: "hyper",
+        promise: Promise::Unspecified,
+    };
+    assert!(
+        throw::throw(&t.app, &request, &mut StdRng::seed_from_u64(1))
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        t.scalar(format!(
+            "SELECT count(*) FROM pokemon_spawns WHERE id = {spawn} AND status = 'ACTIVE'"
+        ))
+        .await,
+        1
+    );
+    assert_eq!(t.scalar("SELECT count(*) FROM pokemon_owned").await, 0);
+    assert_eq!(
+        t.scalar(format!("SELECT balance FROM points WHERE user_id = {ASH}"))
+            .await,
+        10_000
+    );
+    t.close().await;
+}
+
+#[tokio::test]
+async fn a_fishing_bite_never_drops_its_item() {
+    let t = setup("drops-fishing", "1").await;
+    t.sql(format!(
+        "INSERT INTO pokemon_spawns (id, species_id, catch_rate, rarity, held_item, status, fished,
+                                     reserved_for, spawned_at, flees_at)
+         VALUES (50, 129, 255, 'COMMUN', 'pepite', 'FISHING', 1, {ASH}, 1, {})",
+        NOW_MS + 60_000
+    ))
+    .await;
+    let held = catch(&t, 50).await.expect("held");
+    assert!(
+        !held.dropped,
+        "pas de salon où le poser : il suit le Pokémon"
+    );
+    assert_eq!(count(&t, ASH, "pepite").await, 1);
+    assert_eq!(t.scalar("SELECT count(*) FROM pokemon_drops").await, 0);
+    t.close().await;
+}

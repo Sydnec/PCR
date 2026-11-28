@@ -300,4 +300,25 @@ mod tests {
         );
         t.close().await;
     }
+
+    #[tokio::test]
+    async fn a_failure_amid_a_role_serves_nobody() {
+        let t = TestApp::new("items-admin-atomic", "2026-11-27T12:00:00Z").await;
+        t.sql(
+            "CREATE TRIGGER panne BEFORE INSERT ON pokemon_item_log WHEN NEW.user_id = 3
+             BEGIN SELECT RAISE(ABORT, 'panne'); END",
+        )
+        .await;
+        assert!(
+            admin_members(&t.app, 99, &[2, 3], "pepite", 1)
+                .await
+                .is_err()
+        );
+        assert_eq!(
+            count(&t, 2, "pepite").await,
+            0,
+            "le premier n'est pas servi non plus"
+        );
+        t.close().await;
+    }
 }

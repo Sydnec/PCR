@@ -74,9 +74,10 @@ pub async fn claim(app: &App, user: i64, drop: i64) -> Result<Picked, UseCaseErr
     )
     .await?;
     // Une clé sortie du catalogue entre le dépôt et le ramassage : rien n'est écrit, l'objet reste au
-    // sol plutôt que de disparaître dans le vide.
+    // sol plutôt que de disparaître dans le vide. C'est une panne de config, pas un refus de jeu.
     let (Some(item), Some(granted)) = (item, granted) else {
-        return Err(UseCaseError::refused(bag::unknown_item(&found.item_key)));
+        tracing::error!(drop, key = %found.item_key, "a dropped item left the catalogue");
+        return Err(UseCaseError::refused(rules::BROKEN));
     };
     public_messages::touch(&mut tx, MESSAGE, drop, now_ms).await?;
     tx.commit().await.map_err(DbError::from)?;
@@ -104,6 +105,10 @@ pub async fn view(app: &App, id: i64) -> Result<Option<View>, DbError> {
     let Some(found) = drops::get(&mut conn, id).await? else {
         return Ok(None);
     };
+    // Un objet perdu (v1) n'a rien à montrer : son message reste tel quel.
+    if found.status == "LOST" {
+        return Ok(None);
+    }
     let config = app.game_config();
     Ok(
         items::get(&config.pokemon, &found.item_key).map(|item| View {

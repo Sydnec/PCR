@@ -24,6 +24,7 @@ use throw::From;
 
 /// Le préfixe des boutons du jeu posés par la v1 (messages publics et panneaux de lancer).
 pub const PREFIX: &str = "poke_";
+/// L'erreur générique de la v1, commune aux boutons du jeu.
 const READ_FAILED: &str = "❌ Erreur base de données.";
 
 /// Un bouton `poke_*` : celui d'une annonce, d'un objet au sol ou d'un panneau de lancer.

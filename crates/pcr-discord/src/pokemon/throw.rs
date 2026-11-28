@@ -24,6 +24,7 @@ use twilight_model::{
 };
 use twilight_util::builder::message::{ActionRowBuilder, ButtonBuilder};
 
+use super::READ_FAILED;
 use crate::{
     Ctx,
     interactions::{Edit, Reply},
@@ -33,8 +34,6 @@ use crate::{
 mod rows;
 
 use rows::{ball_row, special_row, special_text};
-
-const READ_FAILED: &str = "❌ Erreur base de données.";
 
 /// Le panneau ouvert de chaque dresseur : le jeton de son interaction (seul moyen de toucher un
 /// éphémère) et l'apparition qu'il vise.

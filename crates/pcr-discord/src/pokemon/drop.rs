@@ -13,6 +13,7 @@ use twilight_util::builder::message::{
     ActionRowBuilder, ButtonBuilder, ContainerBuilder, TextDisplayBuilder,
 };
 
+use super::READ_FAILED;
 use crate::{
     Ctx,
     interactions::{Edit, Reply},
@@ -23,7 +24,6 @@ use crate::{
 /// Les couleurs de la v1 : l'or d'un objet à prendre, le gris d'un objet pris.
 const OPEN_COLOR: u32 = 0xc2_7c_0e;
 const CLAIMED_COLOR: u32 = 0x4f_54_5c;
-const READ_FAILED: &str = "❌ Erreur base de données.";
 
 /// Le message d'un objet au sol (`public_messages` de type `drop`).
 pub(crate) fn render(app: &App, id: i64) -> RenderFuture<'_> {

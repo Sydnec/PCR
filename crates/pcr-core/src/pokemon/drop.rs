@@ -9,6 +9,8 @@ use crate::{config::Spawn, ids};
 pub const CAPTOR: &str = "🙅 Tu viens de le capturer : ce qu'il a lâché revient aux autres.";
 /// Quelqu'un l'a ramassé avant.
 pub const TOO_LATE: &str = "💨 Trop tard, quelqu'un a été plus rapide !";
+/// L'objet n'existe plus au catalogue (une panne de config) : l'erreur générique de la v1.
+pub const BROKEN: &str = "❌ Erreur base de données.";
 
 /// Le tirage du lâcher (`roll` dans [0, 1)), et lui seul : les appelants décident quoi en faire.
 pub fn leaves_item_behind(config: &Spawn, roll: f64) -> bool {

@@ -179,7 +179,7 @@ Les règles ne changent pas ; `/pk` disparaît au profit du Centre Pokémon, de 
 ## 3. Administration (`/admin`)
 
 - [x] `/admin points cible montant` — Donne (ou retire) des points à un dresseur ou à tout un rôle
-- [x] `/admin item cible objet [quantite]` — Donne (ou retire) un objet à un dresseur ou à tout un rôle (un rôle est servi en une transaction)
+- [x] `/admin item cible objet [quantite]` — Donne (ou retire) un objet à un dresseur ou à tout un rôle (un rôle est servi en une transaction : une panne n'en sert aucun, et la ligne « N échec(s) » de la v1 disparaît)
 - [x] `/admin config cle valeur` — Modifie un réglage du bot, appliqué immédiatement
 - [x] `/admin config-voir [cle]` — Affiche un réglage — ou une branche entière — et sa valeur par défaut
 - [x] `/admin poids [table]` — Convertit les poids de tirage en probabilités réelles (P4a : composants v2, un tableau se poursuit dans un bloc « suite » quand le message dépasse 4 000 caractères, au lieu d'un champ de 1 024)

@@ -214,7 +214,7 @@ pub(crate) async fn claim(
     // L'ancien sort avant l'insertion : l'index unique partiel refuserait un second ACTIVE.
     let replaced = match active {
         Some(previous) => {
-            let drop = leaves(config, Some(channel), rng.random());
+            let drop = leaves(config, &previous, Some(channel), rng);
             flee_one(conn, previous, now_ms, drop).await?
         }
         None => None,
@@ -249,15 +249,23 @@ pub(crate) async fn claim(
     }))
 }
 
-/// Le salon où un fuyard lâchera son objet, si le tirage le veut (`roll` dans [0, 1)) ; sans salon,
-/// il part avec.
-fn leaves(config: &GameConfig, channel: Option<i64>, roll: f64) -> Option<i64> {
-    channel.filter(|_| drop::leaves_item_behind(&config.pokemon.spawn, roll))
+/// Le salon où un fuyard lâchera son objet, si le tirage le veut ; sans salon il part avec, et une
+/// pêche n'a pas de salon où le poser. Le hasard n'est tiré que s'il tient quelque chose, comme en v1.
+fn leaves(
+    config: &GameConfig,
+    spawn: &Spawn,
+    channel: Option<i64>,
+    rng: &mut (impl Rng + ?Sized),
+) -> Option<i64> {
+    if spawn.held_item.is_none() || spawn.fished {
+        return None;
+    }
+    channel.filter(|_| drop::leaves_item_behind(&config.pokemon.spawn, rng.random()))
 }
 
 /// Fait fuir une apparition encore là et prépare sa fin : son message se réécrit, ses lancers
-/// comptent, et elle lâche son objet dans le salon `drop` s'il y en a un (une pêche n'a pas de salon
-/// où le poser). `None` : une capture l'a emportée entre-temps, il n'y a rien à conclure.
+/// comptent, et elle lâche son objet dans le salon `drop` s'il y en a un (`leaves`). `None` : une
+/// capture l'a emportée entre-temps, il n'y a rien à conclure.
 async fn flee_one(
     conn: &mut Conn,
     spawn: Spawn,
@@ -267,9 +275,7 @@ async fn flee_one(
     if !spawns::flee(conn, spawn.id, now_ms).await? {
         return Ok(None);
     }
-    if let (Some(channel), Some(item)) = (drop, spawn.held_item.as_deref())
-        && !spawn.fished
-    {
+    if let (Some(channel), Some(item)) = (drop, spawn.held_item.as_deref()) {
         drops::place(conn, &spawn, item, channel, now_ms).await?;
     }
     public_messages::touch(conn, MESSAGE, spawn.id, now_ms).await?;
@@ -314,7 +320,7 @@ pub async fn flee_due(app: &App) -> Result<usize, DbError> {
     }
     let mut fled = Vec::new();
     for spawn in spawns::due(&mut tx, now_ms).await? {
-        let drop = leaves(&config, channel(app), rng.random());
+        let drop = leaves(&config, &spawn, channel(app), &mut rng);
         if let Some(done) = flee_one(&mut tx, spawn, now_ms, drop).await? {
             fled.push(done);
         }
