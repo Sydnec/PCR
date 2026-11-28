@@ -20,9 +20,12 @@
   dans la même transaction (pas de déclencheur : il daterait avec l'horloge de SQLite, pas avec `Clock`).
   Une liste d'identifiants passe en JSON (`json_each(?)`) : `query!` ne sait pas lier un `IN` variable.
 - Pokémon : `pokemon::spawn` (apparitions, état du salon, dépenses et journal des lancers ; la fuite est
-  un `UPDATE` gardé sur le statut), `pokemon::collection` (exemplaires, sexes et formes d'un dresseur),
-  `pokemon::items` (sac). Stats du jeu : `stats::Counter::Pokemon*` (colonnes dans `stats/pokemon.rs`,
-  records par `combine`) et `stats::record_highlight` (une ligne par moment notable).
+  un `UPDATE` gardé sur le statut), `pokemon::throws` (journal, raté et capture gardés, prix payés),
+  `pokemon::collection` (exemplaires, sexes et formes ; naissance d'un individu), `pokemon::items` (sac :
+  `consume` et `grant_once` écrivent `pokemon_item_log`), `pokemon::units` (balls de la boutique, datées).
+  Stats du jeu : `stats::Counter::Pokemon*` (une requête par table dans `stats/pokemon.rs` : l'ordre des
+  variantes est celui des colonnes ; records par `combine`), `record_highlight`, `record_expected_catch`
+  et `record_personal_bests` (écrits directement).
 - `backup` : `vacuum_into` (copie cohérente, bot en marche) et `is_pcr_database`. Toute table qui stocke un
   salon/message Discord ou une action envers des membres doit être neutralisée dans
   `import_prod::neutralize` (appelé par `pcr import-prod`).

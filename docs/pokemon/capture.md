@@ -35,7 +35,9 @@
   message a disparu (supprimé par un modérateur) s'enfuit lui aussi au balayage suivant : plus
   personne ne le voit.
 - **Course à un vainqueur** : tout le monde peut lancer autant de balls qu'il veut, le premier jet
-  réussi remporte le Pokémon. Les balls ratées sont définitivement perdues.
+  réussi remporte le Pokémon. Les balls ratées sont définitivement perdues. Le paiement, le tirage et
+  la capture se jouent d'un bloc : battu de peu, ton lancer ne coûte rien (« 💨 Ce Pokémon n'est plus
+  là ! »), il n'y a rien à rembourser.
 - **Panneau de relance** : la réponse privée à un lancer porte elle-même les quatre balls et se
   **réécrit** à chaque jet, au lieu d'empiler un message par lancer. Une ball que tu as en poche
   y est marquée « offerte » (avec le nombre qu'il te reste) : elle part avant tes points. Plus besoin de remonter à
@@ -56,7 +58,7 @@
 - **La Master Ball renchérit à chaque achat** : `price` est celui de la première, puis chaque Master
   Ball payée en points coûte `priceGrowth` fois la précédente (×1,2 : 10 000, 12 000, 14 400… avec le
   prix par défaut). Le compte est **propre à chaque dresseur** et ne redescend jamais. Les Master
-  Balls offertes ne le font pas avancer, ni un lancer remboursé (battu à la milliseconde) : le
+  Balls offertes ne le font pas avancer, ni un lancer remboursé du temps de la v1 : le
   compte se lit dans le journal des lancers, ce qu'un dresseur a réellement payé. `priceGrowth` à
   1 rend le prix fixe. Le bouton du salon ne montre donc pas de prix — il serait faux pour presque
   tous — : c'est la **confirmation** qui dit le tien, et son bouton le porte (`poke_master_ok`) :

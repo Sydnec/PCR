@@ -11,7 +11,11 @@
   `spawn/end.rs` : capture ou fuite), `pokemon/sheet.rs` la fiche d'une espèce, suivie de
   `commands::solde::panel` (le panneau de `/solde`). `/admin pokespawn` (autocomplétion des espèces).
   `ui::emoji` : un emoji de la config (`<:nom:id>`) pour un bouton. Le balayage des fuites est lancé
-  dans `lib.rs`, avec la connexion.
+  dans `lib.rs`, avec la connexion. Panneaux de lancer : `pokemon/throw.rs` (lancer lancé avant l'accusé
+  de Discord, menu des balls spéciales, confirmation de la Master Ball ; `Ctx::panels` : un panneau
+  ouvert par dresseur), `throw/rows.rs` (boutons). Messages classiques : `Edit::Classic` (texte et
+  boutons), `Edit::Content` (le texte seul, boutons intacts). `Ctx::outbox` : ce que le bot envoie de
+  lui-même (annonce d'un Charme Chroma).
 - Un handler décode, appelle `pcr-app`, rend le résultat. Pas de règle de jeu ici.
 - Délai de 3 s : un handler lent renvoie `Reply::later(éphémère, travail)` (commande, bouton, modale) ou
   `Reply::later_update` (un menu, remplacé par le résultat) ; le routeur diffère puis remplace la réponse

@@ -1,0 +1,4 @@
+type = "enhancement"
+name = "Battu de peu, rien n'est débité"
+description = "Quand quelqu'un attrape le Pokémon juste avant toi, ton lancer n'est plus débité puis remboursé : il ne coûte rien, tout simplement."
+announce = true

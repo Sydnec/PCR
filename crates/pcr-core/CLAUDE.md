@@ -36,4 +36,8 @@
   `poke_throw`, `poke_special`, `poke_owned`) et textes de refus. `pokemon::display` : nom d'un individu
   (shiny, forme, sexe), couleur, numéro de Pokédex, chance en pourcentage. `species::search` : recherche
   par nom sans accents (autocomplétion).
+- `pokemon::throw` : la ball lancée (`ball`, boutique comprise, ouverte par génération) et sa chance
+  contre une apparition (bonus compris), le délai entre deux lancers, les issues (`Outcome`, textes
+  v1, `is_final`) et les boutons des panneaux (`Button` : `poke_rethrow`, `poke_master_ok`…,
+  `Promise`). `pokemon::charms` : espèces requises, charmes mérités, charmes portés, annonce.
 - Tests : valeurs de référence reprises des tests v1 (`git show origin/main:test/<fichier>`).
