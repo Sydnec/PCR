@@ -57,6 +57,8 @@ pub struct Spawn {
     pub form: Option<String>,
     pub status: Status,
     pub fished: bool,
+    /// Le pêcheur d'une touche de pêche : elle n'est ouverte qu'à lui.
+    pub reserved_for: Option<i64>,
     pub spawned_at: i64,
     pub flees_at: Option<i64>,
     pub throw_count: i64,
@@ -107,6 +109,7 @@ macro_rules! spawn_from {
             form: row.form,
             status: Status::parse(&row.status)?,
             fished: row.fished != 0,
+            reserved_for: row.reserved_for,
             spawned_at: row.spawned_at,
             flees_at: row.flees_at,
             throw_count: row.throw_count,

@@ -19,7 +19,7 @@ use std::{
 use jiff::Timestamp;
 use pcr_core::clock::paris_date;
 pub use pcr_db::stats::{
-    BetStats, Counter, DailyColumn, Highlight, HighlightKind, SpeciesColumn, UserColumn,
+    BallColumn, BetStats, Counter, DailyColumn, Highlight, HighlightKind, SpeciesColumn, UserColumn,
 };
 use pcr_db::{DbError, StatsDb};
 use tokio::sync::watch;
@@ -75,6 +75,33 @@ impl Stats {
         let mut open = self.open.lock().await;
         let db = self.current(&mut open, paris_date(now).year()).await?;
         pcr_db::stats::record_ship(db, message, members, shiny).await
+    }
+
+    /// La chance d'un lancer ajoutée aux captures « attendues » du dresseur (fractionnaire : écrite
+    /// directement, hors du tampon des compteurs entiers).
+    pub async fn expected_catch(
+        &self,
+        now: Timestamp,
+        user: i64,
+        probability: f64,
+    ) -> Result<(), DbError> {
+        let mut open = self.open.lock().await;
+        let db = self.current(&mut open, paris_date(now).year()).await?;
+        pcr_db::stats::record_expected_catch(db, user, probability).await
+    }
+
+    /// Les records d'un dresseur à la capture (la moins probable, la plus rapide).
+    pub async fn personal_bests(
+        &self,
+        now: Timestamp,
+        user: i64,
+        probability: f64,
+        species: i64,
+        delay_ms: Option<i64>,
+    ) -> Result<(), DbError> {
+        let mut open = self.open.lock().await;
+        let db = self.current(&mut open, paris_date(now).year()).await?;
+        pcr_db::stats::record_personal_bests(db, user, probability, species, delay_ms).await
     }
 
     /// Un moment notable du jeu Pokémon, dans le fichier de l'année en cours (une ligne).

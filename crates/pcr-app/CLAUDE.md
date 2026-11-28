@@ -35,6 +35,10 @@
   (balayage chaque minute, lancé par `pcr-discord`), `view` (ce que montre le message `spawn`) ; les
   stats partent après le commit (`spawn/stats.rs`). `pokemon::sheet::for_spawn` (bouton « Infos » :
   une lecture ratée laisse sa partie à `None`), `pokemon::items::ball_stock` (balls en poche).
+  `pokemon::throw::throw` : paiement (`throw/pay.rs`), tirage, raté ou capture, individu, Charme Chroma
+  (`pokemon::charms::check`) et apparition suivante en une transaction, `rng` en paramètre ; le délai
+  entre deux lancers est un anti-spam de l'`App` (`last_throws`). Lectures des panneaux :
+  `throw::panel`, `special_menu`, `master_quote`. `charms::announce` poste sur le port `Outbox`.
 - Points : `points` (gain d'un message, `/solde`, classement, `/admin points`), `redistribution` (pot
   commun : boucle horaire `run`, lancée par `pcr-discord`). Paris : `bets` (création, `stake`, `resolve`…,
   `View` et `gains` partagés par le paiement et les rendus ; les stats comptent après le commit).

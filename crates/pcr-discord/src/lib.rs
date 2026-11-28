@@ -64,6 +64,11 @@ pub(crate) struct Ctx {
     pub thread_list: Arc<tokio::sync::Mutex<()>>,
     /// La file des changements de vocal (`voice::run`).
     pub voice: voice::Sender,
+    /// Ce que le bot envoie de lui-même (annonce d'un Charme Chroma après une capture…).
+    pub outbox: Arc<dyn pcr_app::outbox::Outbox>,
+    /// Le panneau de lancer ouvert par chaque dresseur : un cache d'interface, pour qu'il n'en ait
+    /// qu'un à la fois (perdu au redémarrage : au pire un panneau de trop survit).
+    pub panels: pokemon::throw::Panels,
 }
 
 /// Un identifiant Discord tel qu'il vit en base.
@@ -96,6 +101,12 @@ pub async fn run(
 
     let (voice_tx, voice_rx) = tokio::sync::mpsc::unbounded_channel();
     let voice_queue = tokio::spawn(voice::run(app.clone(), guild_id, voice_rx));
+    // Les tâches de calendrier, les rappels et les annonces du jeu écrivent sur Discord : ils vivent
+    // avec la connexion, et sont attendus avant la fermeture de la base.
+    let outbox: Arc<dyn pcr_app::outbox::Outbox> = Arc::new(outbox::DiscordOutbox {
+        http: Arc::clone(&http),
+        guild: guild_id,
+    });
     let ctx = Ctx {
         app,
         http,
@@ -107,6 +118,8 @@ pub async fn run(
         purges: Arc::default(),
         thread_list: Arc::default(),
         voice: voice_tx,
+        outbox: Arc::clone(&outbox),
+        panels: Arc::default(),
     };
     // Le worker vit avec la connexion Discord : sans elle, il n'aurait rien à écrire. Il est attendu
     // avant de rendre la main, donc avant la fermeture de la base : un message posté est toujours noté.
@@ -127,12 +140,6 @@ pub async fn run(
         }),
         shutdown.clone(),
     ));
-    // Les tâches de calendrier et les rappels écrivent sur Discord : eux aussi vivent avec la
-    // connexion, et sont attendus avant la fermeture de la base.
-    let outbox: Arc<dyn pcr_app::outbox::Outbox> = Arc::new(outbox::DiscordOutbox {
-        http: Arc::clone(&ctx.http),
-        guild: guild_id,
-    });
     let ports = pcr_app::outbox::Ports {
         outbox: Arc::clone(&outbox),
         web: Arc::clone(&ctx.web),

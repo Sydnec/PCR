@@ -143,8 +143,28 @@ Les règles ne changent pas ; `/pk` disparaît au profit du Centre Pokémon, de 
   un tirage sans espèce possible est refusé au lieu d'annoncer un succès sans rien faire apparaître ;
 - fiche « Infos » : une lecture ratée de la collection omet ses pastilles au lieu d'annoncer zéro ; la
   légende 🥚 ne cite plus `/pk oeuf pondre` (« Ne sort que d'un œuf, pondu par un couple de parents. ») ;
-- jusqu'à P4c, les boutons de lancer répondent que les lancers ne sont pas ouverts ; jusqu'à P4d
-  (objet au sol), un Pokémon qui s'enfuit emporte toujours son objet.
+- jusqu'à P4d (objet au sol), un Pokémon qui s'enfuit emporte toujours son objet.
+
+Écarts assumés des lancers (P4c, détail dans [pokemon/capture.md](pokemon/capture.md)) :
+
+- plus de remboursement : paiement, tirage, capture, individu, Charme Chroma et apparition suivante
+  tiennent dans une transaction de l'écrivain unique. Un dresseur battu de peu ne paie rien et lit
+  « 💨 Ce Pokémon n'est plus là ! » (la v1 débitait puis remboursait : « Trop tard… », lignes `VOID`,
+  gardées dans l'historique et toujours exclues du prix de la Master Ball) ;
+- le délai entre deux lancers reste un anti-spam en mémoire, commun à Discord et au site ; le panneau
+  ouvert de chaque dresseur aussi (un cache : au pire un panneau de trop survit à un redémarrage) ;
+- le tirage part sans attendre l'accusé de Discord, comme en v1 ;
+- les panneaux de lancer restent des messages classiques (texte et boutons) : un refus qui croise une
+  capture ne réécrit que le texte, sans ressusciter les boutons ;
+- les points d'un lancer entrent au journal sous la source `throw` ;
+- jusqu'à P4d, l'objet tenu ne suit pas le Pokémon dans le sac de son capteur : l'annonce publique
+  dit « Il tenait », la réponse privée ne parle pas encore de l'objet ;
+- un record de capture « la plus rapide » à un délai négatif (horloge décalée) est ignoré, comme en
+  v1 ;
+- les récompenses de starter qui suivaient chaque arrivée en boîte arrivent avec le starter (P5) ;
+- le Charme Chroma est donné et annoncé à la capture qui complète un Pokédex ; le rattrapage au
+  démarrage et les rôles du charme arrivent avec P5 (les autres portes : parc, œufs, échanges,
+  évolutions).
 
 ## 3. Administration (`/admin`)
 
@@ -173,8 +193,9 @@ traduction. Ceux des panneaux éphémères sont remplacés par les panneaux `pk:
 - [x] `rappel` (`rappel|<ms>|<message encodé>` de la v1 ; la v2 renvoie au rappel d'origine, `rappel|<ms>|#<id>`, quand le message ne tient pas dans les 100 caractères d'un `custom_id`)
 - [x] `bet_estimate_join` · `bet_estimate_modal` · `bet_estimate_resolve_submit` · `bet_join` · `bet_modal` · `bet_resolve_modal` · `bet_resolve_select` (`pcr_core::bets::Action` ; le message du pari que la v1 ajoutait aux deux derniers est ignoré)
 - [x] `poke_owned` (`poke_owned|<apparition>` : la fiche de l'espèce, P4b ; `pcr_core::pokemon::spawn::Button`)
-- [ ] `poke_throw` · `poke_special` (décodés depuis P4b, `pcr_core::pokemon::spawn::Button` ; le lancer arrive en P4c, d'ici là ils répondent que les lancers ne sont pas ouverts)
-- [ ] `poke_box` · `poke_cmp` · `poke_cmpg` · `poke_cmpgo` · `poke_cmpn` · `poke_cmpr` · `poke_cmpt` · `poke_dex` · `poke_dexf` · `poke_dexs` · `poke_dext` · `poke_drop` · `poke_dup` · `poke_dupr` · `poke_dupsp` · `poke_dupspr` · `poke_evo` · `poke_evo_cancel` · `poke_evo_pick` · `poke_master` · `poke_master_cancel` · `poke_master_ok` · `poke_reback` · `poke_remaster` · `poke_respecial` · `poke_rethrow` · `poke_safari_bait` · `poke_safari_ball` · `poke_safari_cancel` · `poke_safari_enter` · `poke_safari_flee` · `poke_safari_gens` · `poke_safari_go` · `poke_safari_live` · `poke_safari_share` · `poke_showcase_share` · `poke_starter_no` · `poke_starter_ok` · `poke_td_back` · `poke_td_cancel` · `poke_td_find` · `poke_td_go` · `poke_td_ind` · `poke_td_kind` · `poke_td_pick` · `poke_td_pts` · `poke_td_side` · `poke_trade_accept` · `poke_trade_cancel` · `poke_trade_counter` · `poke_trade_decline` · `poke_trade_pick`
+- [x] `poke_throw` · `poke_special` (`pcr_core::pokemon::spawn::Button`, P4c)
+- [x] `poke_rethrow` · `poke_master_cancel` (panneaux de lancer, `pcr_core::pokemon::throw::Button`, P4c ; gardés pour les panneaux ouverts à la bascule)
+- [ ] `poke_box` · `poke_cmp` · `poke_cmpg` · `poke_cmpgo` · `poke_cmpn` · `poke_cmpr` · `poke_cmpt` · `poke_dex` · `poke_dexf` · `poke_dexs` · `poke_dext` · `poke_drop` · `poke_dup` · `poke_dupr` · `poke_dupsp` · `poke_dupspr` · `poke_evo` · `poke_evo_cancel` · `poke_evo_pick` · `poke_safari_bait` · `poke_safari_ball` · `poke_safari_cancel` · `poke_safari_enter` · `poke_safari_flee` · `poke_safari_gens` · `poke_safari_go` · `poke_safari_live` · `poke_safari_share` · `poke_showcase_share` · `poke_starter_no` · `poke_starter_ok` · `poke_td_back` · `poke_td_cancel` · `poke_td_find` · `poke_td_go` · `poke_td_ind` · `poke_td_kind` · `poke_td_pick` · `poke_td_pts` · `poke_td_side` · `poke_trade_accept` · `poke_trade_cancel` · `poke_trade_counter` · `poke_trade_decline` · `poke_trade_pick`
 
 ## 5. Minuteurs (désormais en heure de Paris, rattrapés via `job_runs`)
 

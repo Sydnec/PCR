@@ -22,6 +22,8 @@ pub enum Source {
     Redistribution,
     /// Paris : mise, remboursement, gain.
     Bet,
+    /// Lancer d'une ball payée en points.
+    Throw,
 }
 
 impl Source {
@@ -31,6 +33,7 @@ impl Source {
             Self::Admin => "admin",
             Self::Redistribution => "redistribution",
             Self::Bet => "bet",
+            Self::Throw => "throw",
         }
     }
 }

@@ -30,7 +30,7 @@ use tokio::sync::watch;
 
 use crate::{App, error::UseCaseError};
 
-mod stats;
+pub(crate) mod stats;
 mod view;
 
 pub use pcr_db::pokemon::spawn::{Spawn as Row, Status, Throw};
@@ -163,7 +163,7 @@ fn available(id: u16, generation: u8) -> Result<&'static Species, UseCaseError> 
     }
 }
 
-fn channel(app: &App) -> Option<i64> {
+pub(crate) fn channel(app: &App) -> Option<i64> {
     app.instance
         .discord
         .pokemon_channel_id
@@ -256,10 +256,10 @@ async fn flee_one(conn: &mut Conn, spawn: Spawn, now_ms: i64) -> Result<Option<F
 }
 
 /// Après le commit : les statistiques, le journal, et le réveil du worker des messages publics.
-async fn after_commit(app: &App, now: Timestamp, claimed: Claimed) -> Born {
+pub(crate) async fn after_commit(app: &App, now: Timestamp, claimed: Claimed) -> Born {
     let born = claimed.born;
     if let Some(fled) = &claimed.replaced {
-        stats::record_flight(app, now, fled).await;
+        stats::record_end(app, now, &fled.spawn, &fled.spent, None).await;
     }
     stats::record_birth(app, now, &born);
     app.public_messages_changed();
@@ -299,7 +299,7 @@ pub async fn flee_due(app: &App) -> Result<usize, DbError> {
     tx.commit().await.map_err(DbError::from)?;
     for done in &fled {
         tracing::info!(id = done.spawn.id, "spawn fled");
-        stats::record_flight(app, now, done).await;
+        stats::record_end(app, now, &done.spawn, &done.spent, None).await;
     }
     if !fled.is_empty() {
         app.public_messages_changed();
