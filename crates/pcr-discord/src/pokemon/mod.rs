@@ -1,11 +1,16 @@
 //! Le jeu Pokémon côté Discord : le message public des apparitions (`spawn`, boutons `poke_*` de la
-//! v1) et la fiche d'une espèce (`sheet`). Les panneaux du jeu (`pk:`) arrivent avec P4e et P4f.
+//! v1), les panneaux de lancer (`throw`) et la fiche d'une espèce (`sheet`). Les panneaux du jeu
+//! (`pk:`) arrivent avec P4e et P4f.
 
 pub(crate) mod sheet;
 pub(crate) mod spawn;
+pub(crate) mod throw;
 
 use pcr_app::{error::UseCaseError, pokemon::sheet as sheets};
-use pcr_core::pokemon::spawn::Button;
+use pcr_core::pokemon::{
+    spawn::Button,
+    throw::{Button as Panel, Promise},
+};
 use twilight_model::application::interaction::Interaction;
 
 use crate::{
@@ -14,23 +19,66 @@ use crate::{
     interactions::{EXPIRED, Edit, Reply},
     ui,
 };
+use throw::From;
 
-/// Le préfixe des boutons des messages publics du jeu (v1).
+/// Le préfixe des boutons du jeu posés par la v1 (messages publics et panneaux de lancer).
 pub const PREFIX: &str = "poke_";
 const READ_FAILED: &str = "❌ Erreur base de données.";
-/// Les lancers arrivent avec P4c : d'ici là, leurs boutons le disent au lieu de se taire.
-const THROWS_LATER: &str = "⏳ Les lancers ne sont pas encore ouverts sur cette version du bot.";
 
-/// Un bouton `poke_*` d'un message public.
+/// Un bouton `poke_*` : celui d'une annonce, ou d'un panneau de lancer.
 pub fn component(ctx: &Ctx, interaction: &Interaction, custom_id: &str) -> Reply {
     let Some(user) = interaction.author_id() else {
         return ui::ephemeral_text(EXPIRED).into();
     };
     let user = crate::id(user.get());
-    match Button::parse(custom_id) {
-        Some(Button::Info { spawn }) => info(ctx, user, spawn),
-        Some(Button::Throw { .. } | Button::Special { .. }) => {
-            ui::ephemeral_text(THROWS_LATER).into()
+    if let Some(button) = Button::parse(custom_id) {
+        return match button {
+            Button::Info { spawn } => info(ctx, user, spawn),
+            Button::Throw { spawn, ball } => throw::throw(
+                ctx,
+                interaction,
+                user,
+                spawn,
+                ball,
+                Promise::Unspecified,
+                From::Announcement,
+            ),
+            Button::Special { spawn } => {
+                throw::special(ctx, interaction, user, spawn, From::Announcement)
+            }
+        };
+    }
+    match Panel::parse(custom_id) {
+        Some(Panel::Rethrow { spawn, ball, item }) => {
+            // Annoncée offerte, la ball ne se paie jamais en points.
+            let promise = if item {
+                Promise::Offered
+            } else {
+                Promise::Unspecified
+            };
+            throw::throw(ctx, interaction, user, spawn, ball, promise, From::Panel)
+        }
+        Some(Panel::MasterOk { spawn, promise }) => throw::throw(
+            ctx,
+            interaction,
+            user,
+            spawn,
+            "master",
+            promise,
+            From::Panel,
+        ),
+        Some(Panel::Respecial { spawn }) => {
+            throw::special(ctx, interaction, user, spawn, From::Panel)
+        }
+        Some(Panel::Reback { spawn }) => throw::back(ctx, user, Some(spawn), "Choisis ta ball."),
+        Some(Panel::Master { spawn }) => {
+            throw::master(ctx, interaction, user, spawn, From::Announcement)
+        }
+        Some(Panel::Remaster { spawn }) => {
+            throw::master(ctx, interaction, user, spawn, From::Panel)
+        }
+        Some(Panel::MasterCancel { spawn }) => {
+            throw::back(ctx, user, spawn, "Annulé, tes points sont intacts.")
         }
         // Un bouton d'une version précédente, ou d'une fonctionnalité pas encore portée.
         None => ui::ephemeral_text(EXPIRED).into(),

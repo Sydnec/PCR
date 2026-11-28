@@ -84,6 +84,15 @@ impl Reply {
 #[derive(Debug)]
 pub enum Edit {
     Text(String),
+    /// Un message classique : un texte et des rangées de boutons (le panneau de lancer). Sur le message
+    /// d'un composant, les boutons sont remplacés (vides : retirés).
+    Classic {
+        content: String,
+        components: Vec<Component>,
+    },
+    /// Le texte seul, boutons laissés tels quels : une réponse qui en croise une autre (un délai
+    /// d'attente après une capture) ne doit pas ressusciter des boutons déjà retirés.
+    Content(String),
     Panel(Vec<Component>),
     /// Plusieurs panneaux, quand un message n'y suffit pas (`/admin poids`) : le premier remplace
     /// la réponse, les suivants partent à sa suite, avec la même visibilité.
@@ -195,7 +204,16 @@ async fn complete(
     let sent = match &edit {
         // Le menu qui a servi disparaît avec le texte qui le remplace.
         Edit::Text(text) if update => request.content(Some(text)).components(Some(&[])).await,
-        Edit::Text(text) => request.content(Some(text)).await,
+        Edit::Text(text) | Edit::Content(text) => request.content(Some(text)).await,
+        Edit::Classic {
+            content,
+            components,
+        } => {
+            request
+                .content(Some(content))
+                .components(Some(components))
+                .await
+        }
         Edit::Panel(components) => {
             request
                 .components(Some(components))

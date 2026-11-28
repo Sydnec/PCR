@@ -31,7 +31,9 @@ pub fn run(ctx: &Ctx, interaction: &Interaction, data: &CommandData) -> Reply {
     };
     if let Err(error) = pcr_app::reminders::validate(&ctx.app, &command.date) {
         return match failure(error, FAILED) {
-            Edit::Text(text) => ui::ephemeral_text(text).into(),
+            Edit::Text(text) | Edit::Content(text) | Edit::Classic { content: text, .. } => {
+                ui::ephemeral_text(text).into()
+            }
             Edit::Panel(panel) => ui::ephemeral_panel(panel).into(),
             Edit::Panels(panels) => ui::ephemeral_panel(panels.concat()).into(),
         };
